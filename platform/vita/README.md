@@ -274,6 +274,13 @@ clamped and played as stereo signed 16-bit audio. The callback only consumes
 samples; board execution stays on the main thread. Queues are bounded and
 cleared on pause/reset. Mute is saved independently of board state.
 
+MUSIC and EFFECTS (Options, under MUTE) balance the music against everything else
+(engine, skids, crashes), as the desktop launcher does: the MultiPCM voices are
+split by the game's channel at key-on, in both audio engines; the FM part follows
+only VOLUME. Defaults 100% and 75% (the effects cover the music on the Vita's
+speakers); 100/100 is the arcade's mix. Saved as music_volume/effects_volume in
+vita.cfg.
+
 EEPROM and backup RAM are saved when changed, every five seconds and on
 pause/reset/quit. Writes use a temporary file and retain a `.bak` generation;
 loads reject incorrect sizes and try the backup. A sudden power loss can

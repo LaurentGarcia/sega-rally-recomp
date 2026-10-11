@@ -1,5 +1,15 @@
 # Vita port handoff — 29 September 2026
 
+## Music and effects volumes — 11 October 2026
+
+Options MUSIC and EFFECTS (after MUTE; the later entries moved down by 2), steps of
+5%, defaults 100/75, saved in vita.cfg (`music_volume`, `effects_volume`). Reference
+engine: `SoundBoard::set_volumes` between `finish_sound()` and the next dispatch
+(the sound worker is idle there); native engine: `NativeAudio::volumes`, applied in
+the callback as on the desktop. FM is not split (VOLUME only). Vita compile checks
+(gpu-gl, gpu-fast) and the 17 Vita host tests pass; not yet heard on a console.
+The CPU build (main.cpp) has no such options.
+
 ## Runtime fast paths from the Dreamcast — 11 October 2026
 
 `DAYTONA_VITA_FAST_PATHS` (default ON; `build_vita.py --no-fast-paths` turns it

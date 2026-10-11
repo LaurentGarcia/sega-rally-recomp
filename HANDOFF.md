@@ -1,5 +1,11 @@
 # Handoff
 
+## Vita music and effects volumes (2026-10-11)
+
+The desktop launcher's music/effects balance on the Vita (Options, defaults 100/75
+because the effects cover the music on the Vita's speakers); details in
+`platform/vita/HANDOFF.md`. Not yet heard on a console.
+
 ## Shared runtime fast paths split from M2_DC_SPEED (2026-10-11)
 
 `src/runtime/fast_paths.h`: M2_FAST_BUS (TGP ports before the page table,

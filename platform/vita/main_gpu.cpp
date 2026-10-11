@@ -221,6 +221,10 @@ struct VitaSettings {
     int cpu_clock = kDefaultCpuClock;
     int gpu_clock = kDefaultGpuClock;
     int volume = 80;
+    // Balance between the music and the effects (engine, skids, crashes), as the
+    // desktop launcher's; 100/100 is the arcade's mix. Effects default lower: on
+    // the Vita's speakers they cover the music.
+    int music_volume = 100, effects_volume = 75;
     int deadzone = 12;
     int aspect = 0, draw_distance = 0, steer_curve = 0;
     bool hud_edges = false;
@@ -249,6 +253,8 @@ struct VitaSettings {
         static_assert(kDefaultGpuClock == 41 || kDefaultGpuClock == 77 || kDefaultGpuClock == 111 ||
                       kDefaultGpuClock == 166, "GPU default must be a menu choice");
         volume = std::clamp(volume, 0, 100);
+        music_volume = std::clamp(music_volume, 0, 100);
+        effects_volume = std::clamp(effects_volume, 0, 100);
         deadzone = std::clamp(deadzone, 0, 40);
         aspect = std::clamp(aspect, 0, 3);
         steer_curve = std::clamp(steer_curve, 0, 2);
@@ -278,6 +284,8 @@ struct VitaSettings {
             else if (!std::strcmp(key, "cpu_clock")) cpu_clock = value;
             else if (!std::strcmp(key, "gpu_clock")) gpu_clock = value;
             else if (!std::strcmp(key, "volume")) volume = value;
+            else if (!std::strcmp(key, "music_volume")) music_volume = value;
+            else if (!std::strcmp(key, "effects_volume")) effects_volume = value;
             else if (!std::strcmp(key, "mute")) mute = value != 0;
             else if (!std::strcmp(key, "native_audio")) native_audio = value != 0;
             else if (!std::strcmp(key, "deadzone")) deadzone = value;
@@ -290,6 +298,7 @@ struct VitaSettings {
         if (!f) return false;
         std::fprintf(f, "cpu_clock=%d\ngpu_clock=%d\nvolume=%d\nmute=%d\nnative_audio=%d\ndeadzone=%d\nsteer_invert=%d\n",
                      cpu_clock, gpu_clock, volume, int(mute), int(native_audio), deadzone, int(steer_invert));
+        std::fprintf(f, "music_volume=%d\neffects_volume=%d\n", music_volume, effects_volume);
         std::fprintf(f, "stretch_backdrop=%d\nskip_launcher=%d\n", int(stretch_backdrop), int(skip_launcher));
         std::fprintf(f, "fourth_core=%d\n", int(fourth_core));
         std::fprintf(f, "link_enabled=%d\nlink_sync=%d\nlink_port=%d\nnext_port=%d\n",
@@ -359,49 +368,51 @@ void draw_menu(bool have_game, bool &options, int &selection, const VitaSettings
                 if (selection == i && scroll_to_selection) ImGui::SetScrollHereY();
             }
         } else {
-    const char *values[29];
+    const char *values[31];
     char link_fields[6][64];
     for (int i = 0; i < 4; ++i) {
         std::snprintf(link_fields[i], sizeof link_fields[i], "NEXT CABINET IP OCTET %d: %d", i + 1, settings.next_ip[i]);
-        values[19+i] = link_fields[i];
+        values[21+i] = link_fields[i];
     }
     std::snprintf(link_fields[4], sizeof link_fields[4], "LISTEN PORT: %d", settings.link_port);
     std::snprintf(link_fields[5], sizeof link_fields[5], "NEXT CABINET PORT: %d", settings.next_port);
-    values[23] = link_fields[4]; values[24] = link_fields[5];
-    values[18] = settings.link_enabled ? "LINK PLAY: ON (REVISION A)" : "LINK PLAY: OFF";
-    values[25] = settings.link_sync ? "LINK FRAME SYNC: ON" : "LINK FRAME SYNC: OFF";
-    char cpu[64], gpu[32], volume[32], mute[32], deadzone[32], invert[32];
+    values[25] = link_fields[4]; values[26] = link_fields[5];
+    values[20] = settings.link_enabled ? "LINK PLAY: ON (REVISION A)" : "LINK PLAY: OFF";
+    values[27] = settings.link_sync ? "LINK FRAME SYNC: ON" : "LINK FRAME SYNC: OFF";
+    char cpu[64], gpu[32], volume[32], mute[32], music[32], effects[32], deadzone[32], invert[32];
     std::snprintf(cpu, sizeof cpu, "CPU CLOCK: %d MHz (ACTUAL %d)", settings.cpu_clock,
                   scePowerGetArmClockFrequency());
     std::snprintf(gpu, sizeof gpu, "GPU CLOCK: %d MHz", settings.gpu_clock);
     std::snprintf(volume, sizeof volume, "VOLUME: %d%%", settings.volume);
     std::snprintf(mute, sizeof mute, "MUTE: %s", settings.mute ? "ON" : "OFF");
+    std::snprintf(music, sizeof music, "MUSIC: %d%%", settings.music_volume);
+    std::snprintf(effects, sizeof effects, "EFFECTS: %d%%", settings.effects_volume);
     std::snprintf(deadzone, sizeof deadzone, "DEAD ZONE: %d%%", settings.deadzone);
     std::snprintf(invert, sizeof invert, "INVERT STEERING: %s", settings.steer_invert ? "ON" : "OFF");
-    values[0]=cpu; values[1]=gpu; values[2]=volume; values[3]=mute; values[4]=deadzone; values[5]=invert;
-    values[6]=settings.native_audio ? "AUDIO ENGINE: NATIVE (TEST)" : "AUDIO ENGINE: REFERENCE";
-    values[7]=kGfxLabel; values[8]="FULLSCREEN: ON";
-    values[9]=settings.revision_a ? "ROM: DAYTONA (1994 REVISION A)" : "ROM: DAYTONA93 (1993)";
-    values[10]="BINDS: SELECT+TRIANGLE TEST / SELECT+SQUARE SERVICE";
+    values[0]=cpu; values[1]=gpu; values[2]=volume; values[3]=mute; values[4]=music; values[5]=effects; values[6]=deadzone; values[7]=invert;
+    values[8]=settings.native_audio ? "AUDIO ENGINE: NATIVE (TEST)" : "AUDIO ENGINE: REFERENCE";
+    values[9]=kGfxLabel; values[10]="FULLSCREEN: ON";
+    values[11]=settings.revision_a ? "ROM: DAYTONA (1994 REVISION A)" : "ROM: DAYTONA93 (1993)";
+    values[12]="BINDS: SELECT+TRIANGLE TEST / SELECT+SQUARE SERVICE";
     static const char* aspects[] = {"ASPECT: ORIGINAL", "ASPECT: 16:10", "ASPECT: 16:9", "ASPECT: 21:9"};
     static const char* distances[] = {"DISTANCE: SHORTEST", "DISTANCE: SHORTER", "DISTANCE: DEFAULT", "DISTANCE: FURTHER", "DISTANCE: FURTHEST"};
-    values[11]=aspects[settings.aspect]; values[12]=settings.hud_edges ? "HUD: SCREEN EDGES" : "HUD: CENTRED";
-    values[13]=distances[settings.draw_distance + 2];
-    values[26]=test_hold.armed() ? "HOLD TEST BUTTON: ARMED (START / RESUME)" : "HOLD TEST BUTTON: OFF";
-    values[27]="RESET DEFAULTS"; values[28]="BACK";
-    values[17]=!settings.fourth_core ? "4TH CORE: OFF" :
+    values[13]=aspects[settings.aspect]; values[14]=settings.hud_edges ? "HUD: SCREEN EDGES" : "HUD: CENTRED";
+    values[15]=distances[settings.draw_distance + 2];
+    values[28]=test_hold.armed() ? "HOLD TEST BUTTON: ARMED (START / RESUME)" : "HOLD TEST BUTTON: OFF";
+    values[29]="RESET DEFAULTS"; values[30]="BACK";
+    values[19]=!settings.fourth_core ? "4TH CORE: OFF" :
         vita::fourth_core_active() ? "4TH CORE: ENABLED" : "4TH CORE: UNAVAILABLE (PLUGIN REQUIRED)";
-    values[15]=settings.stretch_backdrop ? "STRETCH TILE BACKGROUND: ON" : "STRETCH TILE BACKGROUND: OFF";
-    values[16]=settings.skip_launcher ? "SKIP LAUNCHER: ON" : "SKIP LAUNCHER: OFF";
+    values[17]=settings.stretch_backdrop ? "STRETCH TILE BACKGROUND: ON" : "STRETCH TILE BACKGROUND: OFF";
+    values[18]=settings.skip_launcher ? "SKIP LAUNCHER: ON" : "SKIP LAUNCHER: OFF";
     static const char* curves[] = {"STEERING CURVE: LINEAR", "STEERING CURVE: SOFT", "STEERING CURVE: EXTRA SOFT"};
-    values[14]=curves[settings.steer_curve];
+    values[16]=curves[settings.steer_curve];
     if (!kWidescreen) { // the vitaGL build draws the original 4:3 picture only (for now)
-        values[11]="ASPECT: ORIGINAL (WIDESCREEN: GXM BUILD)";
-        values[12]="HUD: CENTRED (WIDESCREEN: GXM BUILD)";
-        values[15]="STRETCH TILE BACKGROUND: N/A (GXM BUILD)";
+        values[13]="ASPECT: ORIGINAL (WIDESCREEN: GXM BUILD)";
+        values[14]="HUD: CENTRED (WIDESCREEN: GXM BUILD)";
+        values[17]="STRETCH TILE BACKGROUND: N/A (GXM BUILD)";
     }
 
-            for (int i = 0; i < 29; ++i) {
+            for (int i = 0; i < 31; ++i) {
                 ImGui::PushID(i);
                 if (ImGui::Selectable(values[i], selection == i, 0, {760, 32})) { selection = i; ui_buttons = vita::Cross; }
                 if (selection == i && scroll_to_selection) ImGui::SetScrollHereY();
@@ -623,6 +634,7 @@ int main(int, char **) {
         audio.volume(float(settings.volume) / 100.0f);
         audio.mute(settings.mute);
         native_audio.volume(float(settings.volume) / 100.0f);
+        native_audio.volumes(float(settings.music_volume) / 100.0f, float(settings.effects_volume) / 100.0f);
         native_audio.mute(settings.mute);
         controls.set_deadzone(float(settings.deadzone) / 100.0f);
         controls.set_steer_invert(settings.steer_invert);
@@ -806,7 +818,7 @@ int main(int, char **) {
             pressed |= ui_buttons;
             ui_buttons = 0;
             if (options) {
-                constexpr int kOptionCount = 29;
+                constexpr int kOptionCount = 31;
                 if (pressed & vita::Up) selection = (selection + kOptionCount - 1) % kOptionCount;
                 if (pressed & vita::Down) selection = (selection + 1) % kOptionCount;
                 if (pressed & vita::Circle) { options = false; selection = 2; wait_release = true; }
@@ -816,7 +828,7 @@ int main(int, char **) {
                     bool changed = false, clocks_changed = false;
                     static const int cpu_choices[] = {111, 222, 333, 444, 500};
                     static const int gpu_choices[] = {41, 77, 111, 166};
-                    if (!kWidescreen && (selection == 11 || selection == 12 || selection == 15) && (direction || activate)) {
+                    if (!kWidescreen && (selection == 13 || selection == 14 || selection == 17) && (direction || activate)) {
                         status = "WIDESCREEN IS DRAWN BY THE GXM (--GPU-FAST) BUILD ONLY FOR NOW.";
                     } else if (selection == 0 && (direction || activate)) {
                         settings.cpu_clock = cycle_value(settings.cpu_clock, cpu_choices, 5, direction < 0 ? -1 : 1);
@@ -829,62 +841,66 @@ int main(int, char **) {
                         changed = true;
                     } else if (selection == 3 && (direction || activate)) {
                         settings.mute = !settings.mute; changed = true;
-                    } else if (selection == 4 && (direction || activate)) {
+                    } else if ((selection == 4 || selection == 5) && (direction || activate)) {
+                        int &level = selection == 4 ? settings.music_volume : settings.effects_volume;
+                        level = std::clamp(level + (direction < 0 ? -5 : 5), 0, 100);
+                        changed = true;
+                    } else if (selection == 6 && (direction || activate)) {
                         settings.deadzone = std::clamp(settings.deadzone + (direction < 0 ? -5 : 5), 0, 40);
                         changed = true;
-                    } else if (selection == 5 && (direction || activate)) {
+                    } else if (selection == 7 && (direction || activate)) {
                         settings.steer_invert = !settings.steer_invert; changed = true;
-                    } else if (selection == 6 && (direction || activate)) {
+                    } else if (selection == 8 && (direction || activate)) {
                         settings.native_audio = !settings.native_audio; changed = true;
-                    } else if (selection == 7 && activate) {
+                    } else if (selection == 9 && activate) {
                         status = DAYTONA_VITA_GPU_GL ? "RENDERER FIXED AT BUILD: VITAGL (--GPU-GL)."
                                                      : "RENDERER FIXED AT BUILD: GXM GPU FAST (--GPU-FAST).";
-                    } else if (selection == 8 && activate) {
+                    } else if (selection == 10 && activate) {
                         status = "VITA OUTPUT IS FIXED FULLSCREEN AT 960 X 544.";
-                    } else if (selection == 9 && (direction || activate)) {
+                    } else if (selection == 11 && (direction || activate)) {
                         settings.revision_a = !settings.revision_a;
                         status = "ROM SELECTED. CHOOSE START/RESET TO SWITCH. SAVES ARE SEPARATE.";
-                    } else if (selection == 10 && activate) {
+                    } else if (selection == 12 && activate) {
                         status = "TEST: SELECT+TRIANGLE  SERVICE: SELECT+SQUARE  MENU: CROSS NEXT / START ENTER";
-                    } else if (selection == 11 && (direction || activate)) {
-                        settings.aspect = (settings.aspect + (direction < 0 ? 3 : 1)) % 4; changed = true;
-                    } else if (selection == 12 && (direction || activate)) {
-                        settings.hud_edges = !settings.hud_edges; changed = true;
                     } else if (selection == 13 && (direction || activate)) {
+                        settings.aspect = (settings.aspect + (direction < 0 ? 3 : 1)) % 4; changed = true;
+                    } else if (selection == 14 && (direction || activate)) {
+                        settings.hud_edges = !settings.hud_edges; changed = true;
+                    } else if (selection == 15 && (direction || activate)) {
                         settings.draw_distance = std::clamp(settings.draw_distance + (direction < 0 ? -1 : 1), -2, 2);
                         changed = true;
-                    } else if (selection == 14 && (direction || activate)) {
-                        settings.steer_curve = (settings.steer_curve + (direction < 0 ? 2 : 1)) % 3; changed = true;
-                    } else if (selection == 15 && (direction || activate)) {
-                        settings.stretch_backdrop = !settings.stretch_backdrop; changed = true;
                     } else if (selection == 16 && (direction || activate)) {
-                        settings.skip_launcher = !settings.skip_launcher; changed = true;
+                        settings.steer_curve = (settings.steer_curve + (direction < 0 ? 2 : 1)) % 3; changed = true;
                     } else if (selection == 17 && (direction || activate)) {
-                        settings.fourth_core = !settings.fourth_core; changed = true;
+                        settings.stretch_backdrop = !settings.stretch_backdrop; changed = true;
                     } else if (selection == 18 && (direction || activate)) {
+                        settings.skip_launcher = !settings.skip_launcher; changed = true;
+                    } else if (selection == 19 && (direction || activate)) {
+                        settings.fourth_core = !settings.fourth_core; changed = true;
+                    } else if (selection == 20 && (direction || activate)) {
                         settings.link_enabled = !settings.link_enabled; changed = true;
-                    } else if (selection >= 19 && selection <= 22 && (direction || activate)) {
-                        int &octet = settings.next_ip[selection - 19];
+                    } else if (selection >= 21 && selection <= 24 && (direction || activate)) {
+                        int &octet = settings.next_ip[selection - 21];
                         octet = (octet + (direction < 0 ? 255 : 1)) % 256; changed = true;
-                    } else if ((selection == 23 || selection == 24) && (direction || activate)) {
-                        int &port = selection == 23 ? settings.link_port : settings.next_port;
+                    } else if ((selection == 25 || selection == 26) && (direction || activate)) {
+                        int &port = selection == 25 ? settings.link_port : settings.next_port;
                         port = std::clamp(port + (direction < 0 ? -1 : 1), 1, 65535); changed = true;
-                    } else if (selection == 25 && (direction || activate)) {
+                    } else if (selection == 27 && (direction || activate)) {
                         settings.link_sync = !settings.link_sync; changed = true;
-                    } else if (selection == 26 && (direction || activate)) {
+                    } else if (selection == 28 && (direction || activate)) {
                         if (test_hold.armed()) test_hold.cancel(); else test_hold.arm();
-                    } else if (selection == 27 && activate) {
+                    } else if (selection == 29 && activate) {
                         test_hold.cancel();
                         settings.defaults(); changed = clocks_changed = true;
-                    } else if (selection == 28 && activate) {
+                    } else if (selection == 30 && activate) {
                         options = false; selection = 2; wait_release = true;
                     }
                     if (changed) {
                         commit_settings(clocks_changed);
-                        if (selection >= 18 && selection <= 25)
+                        if (selection >= 20 && selection <= 27)
                             status = "LINK SETTINGS SAVED. RESET GAME TO APPLY. NEXT: " +
                                 settings.next_address() + ":" + std::to_string(settings.next_port);
-                        if (selection == 17) status = !settings.fourth_core
+                        if (selection == 19) status = !settings.fourth_core
                             ? "4TH CORE OFF: ORDINARY THREE-CORE SCHEDULING."
                             : !vita::fourth_core_active()
                                 ? "4TH CORE REJECTED. REQUIRES A WORKING CORE-UNLOCK PLUGIN."
@@ -893,8 +909,8 @@ int main(int, char **) {
                                     : "4TH CORE ALLOWED FOR GAME, GEOMETRY AND AUDIO THREADS (FREE CORES).";
                         if (selection == 0 && settings.cpu_clock == 500 && scePowerGetArmClockFrequency() != 500)
                             status += " 500 NOT ACTIVE: CHECK OVERCLOCK PLUGIN/PROFILE.";
-                        if (selection == 13) status = "FURTHER DISTANCES ADD SCENERY AND MAY REDUCE FPS.";
-                        if (selection == 6) status = "AUDIO ENGINE CHANGE SAVED. RESET GAME TO APPLY. NATIVE IS EXPERIMENTAL.";
+                        if (selection == 15) status = "FURTHER DISTANCES ADD SCENERY AND MAY REDUCE FPS.";
+                        if (selection == 8) status = "AUDIO ENGINE CHANGE SAVED. RESET GAME TO APPLY. NATIVE IS EXPERIMENTAL.";
                     }
                 }
             } else {
@@ -1006,6 +1022,11 @@ int main(int, char **) {
                     } else {
                         // Reference backend retains the bounded sound pipeline.
                         if (!finish_sound()) break;
+                        // The sound worker is idle until the dispatch below: the
+                        // MultiPCMs' music/effects balance changes between its frames.
+                        if (auto *sound = game->sound())
+                            sound->set_volumes(float(settings.music_volume) / 100.0f,
+                                               float(settings.effects_volume) / 100.0f);
                         active_sound = std::move(next_sound);
                         sound_worker.dispatch_packet(active_sound, audio, kProfile ? ticks_us : nullptr);
                         sound_in_flight = true;
