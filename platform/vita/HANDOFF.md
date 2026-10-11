@@ -1,5 +1,16 @@
 # Vita port handoff — 29 September 2026
 
+## Runtime fast paths from the Dreamcast — 11 October 2026
+
+`DAYTONA_VITA_FAST_PATHS` (default ON; `build_vita.py --no-fast-paths` turns it
+off) defines M2_FAST_BUS/TGP/CPU/GEO (`src/runtime/fast_paths.h`): the Dreamcast's
+M2_DC_SPEED paths that give the same results, without its display-specific ones.
+Desktop parity checked (top-level HANDOFF.md). Console, probe 1 + LTO, saturated
+race windows at equal polygon load: 47.6 -> 50.4 emulated fps (i960 -0.92 ms,
+TGP -0.32 ms on core 0; np_s -13% per polygon on core 1). Next: a `--release`
+race without probes against `extern/perf/perf_base.log`; then the remaining core 0
+costs (vertex writing ~2 ms, tile cache ~1.3 ms, i960 ~6 ms).
+
 ## Multicore + vitaGL branch merged — 8 October 2026
 
 The multicore/vitaGL branch (pipelined geometrizer, pinned cores, vitaGL

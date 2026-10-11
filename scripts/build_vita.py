@@ -149,6 +149,8 @@ def main(argv=None):
     ap.add_argument("--jobs", type=int, default=min(os.cpu_count() or 2, 4))
     ap.add_argument("--compile-check", action="store_true")
     ap.add_argument("--reference-renderer", action="store_true", help="disable OPT03 renderer changes for comparison")
+    ap.add_argument("--no-fast-paths", action="store_true",
+                    help="build the shared runtime without its fast paths (src/runtime/fast_paths.h), for comparison")
     gpu = ap.add_mutually_exclusive_group()
     gpu.add_argument("--gpu-fast", action="store_true", help="build experimental vita2d/GXM 3D renderer (requires vdpm libvita2d)")
     gpu.add_argument("--gpu-gl", action="store_true", help="build experimental vitaGL 3D renderer, Model 2 draw priority "
@@ -213,6 +215,7 @@ def main(argv=None):
          f"-DDAYTONA_VITA_ROMSET={args.set}",
          f"-DDAYTONA_VITA_REV_A_SELF={(ROOT / args.revision_a_self).resolve() if args.revision_a_self else ''}",
          f"-DDAYTONA_VITA_RENDER_OPT={'OFF' if args.reference_renderer else 'ON'}",
+         f"-DDAYTONA_VITA_FAST_PATHS={'OFF' if args.no_fast_paths else 'ON'}",
          f"-DDAYTONA_VITA_DIAGNOSTICS={'ON' if args.diagnostics else 'OFF'}",
          f"-DDAYTONA_VITA_LTO={'ON' if args.release else 'OFF'}",
          f"-DDAYTONA_VITA_GPU_FAST={'ON' if args.gpu_fast else 'OFF'}",
@@ -230,7 +233,9 @@ def main(argv=None):
         mode = "GPU GL (vitaGL)" if args.gpu_gl else ("GPU FAST" if args.gpu_fast else "CPU EXACT")
         cores = ("free (--free-core)" if args.free_core else "pinned: main 0, geometry 1, sound 2") if gpu_build else "-"
         kind = "release (LTO, no logs)" if args.release else ("diagnostics (logs)" if args.diagnostics else "normal (no logs)")
+        paths = "off (--no-fast-paths)" if args.no_fast_paths else "on (M2_FAST_BUS/TGP/CPU/GEO)"
         print(f"VPK: {package}\nRenderer build: {mode}\nvitaGL: {vitagl}\nCores: {cores}\nBuild: {kind}\nGame code: {code}\n"
+              f"Runtime fast paths: {paths}\n"
               f"ROM location on Vita: ux0:data/{args.set}/{args.set}.zip")
     return 0
 

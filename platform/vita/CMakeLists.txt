@@ -141,6 +141,16 @@ target_compile_definitions(vita_runtime PUBLIC M2_ROMSET="${DAYTONA_VITA_ROMSET}
 # not rewritten (default or --fast_inaccuracy output) unchanged. PUBLIC: the generated
 # code must see the same Cpu and Lockstep layouts as the runtime.
 target_compile_definitions(vita_runtime PUBLIC M2_FAST_GEN=1)
+# The shared runtime's fast paths from the Dreamcast port (src/runtime/fast_paths.h):
+# bus decode of the TGP ports and remembered RAM pages, the TGP's FIFOs as a ring read
+# directly, register frames copied through work RAM, the geometrizer's block reads and
+# culled-polygon shortcuts. The same results; the Dreamcast's display-specific ones
+# (16-bit layers, frame skip) stay under M2_DC_SPEED. OFF (build_vita.py
+# --no-fast-paths) builds the runtime as the desktop does, for comparison.
+option(DAYTONA_VITA_FAST_PATHS "Shared runtime fast paths (M2_FAST_BUS/TGP/CPU/GEO)" ON)
+if(DAYTONA_VITA_FAST_PATHS)
+    target_compile_definitions(vita_runtime PUBLIC M2_FAST_BUS=1 M2_FAST_TGP=1 M2_FAST_CPU=1 M2_FAST_GEO=1)
+endif()
 option(DAYTONA_VITA_RENDER_OPT "Exact tile/layer caching and optimized CPU rasterizer" ON)
 if(DAYTONA_VITA_RENDER_OPT)
     # Public because the flag affects Video/Raster class layouts.

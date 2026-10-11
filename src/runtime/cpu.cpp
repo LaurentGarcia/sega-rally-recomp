@@ -232,7 +232,7 @@ void Cpu::check_pending_irqs()
 	}
 }
 
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_CPU
 // A register frame (16 words, 4-aligned): straight-line loads and stores.
 // GCC makes a 64-byte memcpy (or a copy loop) a library call on the SH-4,
 // several per call and return in the profile.
@@ -260,7 +260,7 @@ void Cpu::do_call(uint32_t adr, int type, uint32_t stack)
 	if (m_rcache_pos >= I960_RCACHE_SIZE) {
 		// flush the current register set to the current frame
 		FP = m_r[I960_FP] & ~0x3f;
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_CPU
 		if (work_ram && (FP >> 20) == 0x005) // work RAM (nothing watches its writes): one copy, not 16 bus calls
 			copy_frame(reinterpret_cast<uint32_t *>(M2_AL(work_ram + (FP & 0xfffff), 64)), m_r);
 		else
@@ -271,7 +271,7 @@ void Cpu::do_call(uint32_t adr, int type, uint32_t stack)
 	}
 	else    // a cache entry is available, use it
 	{
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_CPU
 		copy_frame(&m_rcache[m_rcache_pos][0], m_r);
 #else
 		memcpy(&m_rcache[m_rcache_pos][0], m_r, 0x10 * sizeof(uint32_t));
@@ -308,7 +308,7 @@ void Cpu::do_ret_0()
 	if ((m_rcache_pos >= I960_RCACHE_SIZE) || (m_rcache_pos < 0))
 	{
 		int i;
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_CPU
 		if (work_ram && (m_r[I960_FP] >> 20) == 0x005) // (as do_call's spill: one copy)
 			copy_frame(m_r, reinterpret_cast<const uint32_t *>(M2_AL(work_ram + (m_r[I960_FP] & 0xfffff), 64)));
 		else
@@ -323,7 +323,7 @@ void Cpu::do_ret_0()
 	}
 	else
 	{
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_CPU
 		copy_frame(m_r, m_rcache[m_rcache_pos]);
 #else
 		memcpy(m_r, m_rcache[m_rcache_pos], 0x10*sizeof(uint32_t));

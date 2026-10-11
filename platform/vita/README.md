@@ -94,7 +94,8 @@ build (`main.cpp`, no `--gpu-*`) keeps everything on one game thread.
 * **Game code options** (both builds): `--fast-inaccuracy` (i960 lockstep checks per
   block + direct work-RAM accesses, TGP counted per block; the fastest) or `--fast-gen`
   (the Dreamcast's `platform/dreamcast/scripts/fast_gen.py` pass, exact), made from the
-  host tools into `BUILD_DIR/gen_vita`; `--release` adds link-time optimization and
+  host tools into `BUILD_DIR/gen_vita`; the shared runtime's fast paths
+  (`src/runtime/fast_paths.h`) are on unless `--no-fast-paths`; `--release` adds link-time optimization and
   drops the logs; `--diagnostics` writes `vita-diag.log`, `perf.log` (per-core report,
   `core_profile.h`) and, with vitaGL, `gl.log`.
 

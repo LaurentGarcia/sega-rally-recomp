@@ -12,6 +12,7 @@
 // hard error instead of MAME's undefined behaviour. See THIRD_PARTY.md.
 #pragma once
 
+#include "runtime/fast_paths.h"
 #include "runtime/rom_source.h"
 
 #include <cstdint>
@@ -41,7 +42,7 @@ struct GeoPoly {
     uint8_t window = 0;
     uint32_t reverse = 0;
     uint8_t num_vertices = 0;
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_GEO
     // Not zero-filled for every polygon kept (160 bytes): only
     // v[0..num_vertices) is ever read, and model2_3d_process_polygon writes
     // those.
@@ -74,11 +75,11 @@ struct GeoPtr {
     uint32_t &operator*() const { return at(); }
     GeoPtr operator++(int) { GeoPtr t = *this; ++i; return t; }
     GeoPtr &operator+=(uint32_t n) { i += n; return *this; }
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_GEO
     // n words from here into out, moving past them: the values n times
     // *(*this)++ gives, a page (or up to the wrap) at a time instead of a
     // page lookup each. (The ROM's pages are little-endian words, as the
-    // hosts M2_DC_SPEED builds for.)
+    // Dreamcast's M2_DC_MEMORY supplies.)
     void read(uint32_t *out, uint32_t n) {
         while (n) {
             const uint32_t w = i & (size - 1);
@@ -118,7 +119,7 @@ struct GeoPtr16 {
         return base[i & (size - 1)];
     }
     GeoPtr16 operator++(int) { GeoPtr16 t = *this; ++i; return t; }
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_GEO
     // As GeoPtr::read, 16-bit words.
     void read(uint16_t *out, uint32_t n) {
         while (n) {

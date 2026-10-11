@@ -21,6 +21,8 @@
 #include <string>
 #include <vector>
 
+#include "runtime/fast_paths.h"
+
 // M2_DC_SPEED (Dreamcast): the one-line status helpers inline even at -Os,
 // where the generated code otherwise calls them (a call is as big as they are).
 #if defined(M2_DC_SPEED) && defined(__GNUC__)
@@ -48,9 +50,9 @@ struct TgpFatal : std::runtime_error {
     using std::runtime_error::runtime_error;
 };
 
-#ifdef M2_DC_SPEED
-// The Dreamcast: the TGP's FIFOs as a growing ring (std::deque's block
-// bookkeeping costs the SH-4 on every word). The same order and contents.
+#ifdef M2_FAST_TGP
+// The TGP's FIFOs as a growing ring (std::deque's block bookkeeping costs
+// on every word: the SH-4 first, the Vita too). The same order and contents.
 class WordFifo {
 public:
     bool empty() const { return head_ == tail_; }
@@ -237,7 +239,7 @@ struct Tgp {
     uint32_t rf_r(uint32_t n) {
         if (n == 1) {
             uint32_t v = 0;
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_TGP
             if (in_fifo) { // the board's FIFO directly (its fifo_pop, without the virtual call)
                 if (in_fifo->empty()) stall = true;
                 else v = in_fifo->front(), in_fifo->pop_front();
@@ -250,7 +252,7 @@ struct Tgp {
         return 0;
     }
     void rf_w(uint32_t n, uint32_t v) {
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_TGP
         if (n == 2 && out_fifo) { out_fifo->push_back(v); return; } // (the board's fifo_push)
 #endif
         if (n == 2) bus->fifo_push(v);
@@ -343,7 +345,7 @@ struct Tgp {
         if constexpr (C == 0x10) { if (c0 != 1) { c0--; if (c0 == 1) st |= F_ZC0; } }
         else if constexpr (C == 0x11) { if (c1 != 1) { c1--; if (c1 == 1) st |= F_ZC1; } }
     }
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_TGP
     // The board's FIFOs (TgpBoard sets them; null: through bus). Last, so the
     // members the generated code uses keep their offsets.
     WordFifo *in_fifo = nullptr, *out_fifo = nullptr;

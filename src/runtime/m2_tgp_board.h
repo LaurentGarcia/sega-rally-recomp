@@ -23,6 +23,11 @@ public:
     // copro_data read through pages (RomRegion::CoproData), not copied.
     TgpBoard(const std::vector<uint8_t> &tables, RomSource &rom);
 #endif
+#ifdef M2_FAST_TGP
+    // The TGP holds pointers to in_ and out_: a copy would read the original's.
+    TgpBoard(const TgpBoard &) = delete;
+    TgpBoard &operator=(const TgpBoard &) = delete;
+#endif
 
     // i960 accesses (dword offsets within each range, MAME's handlers).
     void function_port_w(uint32_t offset, uint32_t data);  // 0x00880000
@@ -62,7 +67,7 @@ private:
 #ifdef M2_DC_MEMORY
     RomSource *rom_ = nullptr;
 #endif
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_TGP
     WordFifo in_, out_;
 #else
     std::deque<uint32_t> in_, out_;
