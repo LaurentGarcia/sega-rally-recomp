@@ -1,5 +1,12 @@
 # Handoff
 
+## Vita icon/LiveArea images, app name always "Daytona USA" (2026-10-12)
+
+Images in `platform/vita/logo_livearea/` (icon0, bg, startup, template.xml; not
+committed) go into the VPK when present, checked at configure time; otherwise the
+Vita defaults. The home-screen name no longer depends on the renderer. Not yet
+installed on a console (`platform/vita/HANDOFF.md`).
+
 ## Vita rebindable controls (2026-10-12)
 
 Launcher Controls page: each game action (pedals, steering, shifts, start, coin,

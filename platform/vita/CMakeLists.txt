@@ -252,7 +252,6 @@ else()
         target_include_directories(daytona_vita PRIVATE "${VITAGL_INCLUDE_DIR}")
         target_compile_definitions(daytona_vita PRIVATE DAYTONA_VITA_GPU_GL=1)
         target_link_libraries(daytona_vita PRIVATE vita_runtime ${VITA_SDL_TARGET} ${VITAGL_LINK_LIBS})
-        set(VITA_APP_NAME "Daytona Recomp GL")
     elseif(DAYTONA_VITA_GPU_FAST)
         add_executable(daytona_vita main_gpu.cpp gpu_fast.cpp ${GEN_SOURCES})
         target_include_directories(daytona_vita PRIVATE "${VITA2D_INCLUDE_DIR}")
@@ -263,11 +262,9 @@ else()
             SceNet_stub SceNetCtl_stub
             SceTouch_stub
             freetype png jpeg z pthread m)
-        set(VITA_APP_NAME "Daytona Recomp ImGui")
     else()
         add_executable(daytona_vita main.cpp ${GEN_SOURCES})
         target_link_libraries(daytona_vita PRIVATE vita_runtime ${VITA_SDL_TARGET} SceCtrl_stub SceIofilemgr_stub SceProcessmgr_stub ScePower_stub pthread m)
-        set(VITA_APP_NAME "Daytona Recomp")
     endif()
     target_link_options(daytona_vita PRIVATE -Wl,--gc-sections)
     set_source_files_properties(${GEN_SOURCES} PROPERTIES COMPILE_OPTIONS "-Wno-unused-label")
@@ -279,8 +276,12 @@ else()
         endif()
         set(VITA_OTHER_GAME FILE "${DAYTONA_VITA_REV_A_SELF}" "daytona.self")
     endif()
+    # LiveArea images from platform/vita/logo_livearea, when present.
+    include("${CMAKE_CURRENT_SOURCE_DIR}/livearea.cmake")
+    message(STATUS "Vita LiveArea images: ${VITA_LIVEAREA_SUMMARY}")
     vita_create_vpk(daytona_vita.vpk ${DAYTONA_VITA_TITLEID} eboot.bin
-        VERSION "01.24" NAME "${VITA_APP_NAME}"
+        VERSION "01.24" NAME "Daytona USA" # the same home-screen name for every build option
+        ${VITA_LIVEAREA_FILES}
         FILE "${DAYTONA_ROOT}/THIRD_PARTY.md" "licenses/THIRD_PARTY.md"
         FILE "${CMAKE_CURRENT_SOURCE_DIR}/THIRD_PARTY.md" "licenses/VITA.md"
         ${VITA_IMGUI_LICENSE} ${VITA_BUFFER_LICENSE} ${VITA_OTHER_GAME})

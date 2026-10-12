@@ -1,5 +1,18 @@
 # Vita port handoff — 29 September 2026
 
+## Icon/LiveArea images and fixed app name — 12 October 2026
+
+`platform/vita/livearea.cmake` packages `icon0.png`, `bg.png`, `startup.png` and
+`template.xml` from `platform/vita/logo_livearea/` when present (README there; the
+folder's images are git-ignored). PNGs are checked at configure time (signature,
+exact size, 8-bit indexed) and a wrong one stops the build with the reason; with
+bg/startup and no template.xml a minimal one is generated in the build dir. The
+VPK name (param.sfo TITLE) is now always "Daytona USA" (it was "Daytona Recomp",
+" GL" or " ImGui" by renderer). Checked: configure with valid, 32-bit and wrong-size
+PNGs; a full `--gpu-gl` VPK contains the images and the name. Not yet installed on a
+console: the generated template.xml (style a1, gate only when startup.png exists) is
+unverified there.
+
 ## Rebindable controls — 12 October 2026
 
 Launcher page Controls (main menu entry 4, Quit moved to 5): the twelve game actions

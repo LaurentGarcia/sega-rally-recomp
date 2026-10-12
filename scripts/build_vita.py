@@ -127,6 +127,16 @@ def vita_code(host, gen, build, mode, game):
                  "fast_gen": "i960 fast_gen.py rewrite"}[mode] + ", TGP fast mode"
 
 
+LIVEAREA_FILES = ("icon0.png", "bg.png", "startup.png", "template.xml")
+
+
+def livearea_summary():
+    """Images from platform/vita/logo_livearea packaged by platform/vita/livearea.cmake."""
+    folder = ROOT / "platform/vita/logo_livearea"
+    found = [name for name in LIVEAREA_FILES if (folder / name).is_file()]
+    return ", ".join(found) if found else "none (Vita defaults)"
+
+
 def vitagl_summary(prefix):
     """Which vitaGL a --gpu-gl build links (platform/vita/CMakeLists.txt makes the same choice)."""
     try:
@@ -235,7 +245,7 @@ def main(argv=None):
         kind = "release (LTO, no logs)" if args.release else ("diagnostics (logs)" if args.diagnostics else "normal (no logs)")
         paths = "off (--no-fast-paths)" if args.no_fast_paths else "on (M2_FAST_BUS/TGP/CPU/GEO)"
         print(f"VPK: {package}\nRenderer build: {mode}\nvitaGL: {vitagl}\nCores: {cores}\nBuild: {kind}\nGame code: {code}\n"
-              f"Runtime fast paths: {paths}\n"
+              f"Runtime fast paths: {paths}\nLiveArea images: {livearea_summary()}\n"
               f"ROM location on Vita: ux0:data/{args.set}/{args.set}.zip")
     return 0
 

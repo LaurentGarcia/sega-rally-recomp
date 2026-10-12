@@ -104,6 +104,12 @@ python3 scripts/build_vita.py --gpu-gl --release --fast-inaccuracy        # pinn
 python3 scripts/build_vita.py --gpu-fast --release --fast-inaccuracy --free-core
 ```
 
+The home-screen name is "Daytona USA" for every build option. Icon and LiveArea
+images: put `icon0.png` (128x128), `bg.png` (840x500), `startup.png` (280x158) and
+optionally `template.xml` in `platform/vita/logo_livearea/` (8-bit indexed PNGs; see
+the README there). Each file present is packaged, a missing one keeps the Vita's
+default; the build summary lists them. They are not committed.
+
 ## Build
 
 ### Optional GXM CPU enhancements
@@ -230,7 +236,7 @@ ZIP ROM set** at:
 ux0:data/daytona93/daytona93.zip
 ```
 
-Launch **Daytona Recomp** and choose **START GAME**. ROM CRC and size
+Launch **Daytona USA** and choose **START GAME**. ROM CRC and size
 validation uses the existing importer. Renaming a different Daytona set
 will not make it compatible. The Vita target deliberately omits the 7z
 SDK to avoid solid-archive decoding memory spikes. A host `.7z` source can

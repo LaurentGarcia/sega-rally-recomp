@@ -141,7 +141,7 @@ int run_app() {
     using Renderer = std::unique_ptr<SDL_Renderer, decltype(&SDL_DestroyRenderer)>;
     using Texture = std::unique_ptr<SDL_Texture, decltype(&SDL_DestroyTexture)>;
     diagnostics.literal("stage: create window begin\n");
-    Window window(SDL_CreateWindow("Daytona Recomp", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+    Window window(SDL_CreateWindow("Daytona USA", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                                    kDisplayWidth, kDisplayHeight, SDL_WINDOW_FULLSCREEN), SDL_DestroyWindow);
     sdl_check(bool(window), "create window");
     diagnostics.literal("stage: create window done; create renderer begin\n");
