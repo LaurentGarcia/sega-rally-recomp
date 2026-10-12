@@ -249,6 +249,13 @@ unchanged ROM filenames before copying it to the Vita.
 | Navigate / select / resume | D-pad / Cross / Circle |
 | Test switch / service coin | Pause-menu entries |
 
+These are the defaults. The launcher's Controls page rebinds each action
+(accelerate, brake, steer left/right, shift up/down, start, coin, views 1-4) to one
+button: Cross then press the new button, or Left/Right to cycle; a button already
+used by another action swaps with it. The sticks and the Start+Select,
+Select+Triangle and Select+Square chords stay fixed. Saved as `bind_*` keys in
+vita.cfg (button bit); an invalid or duplicated entry resets all bindings.
+
 The menu chord suppresses coin/start while both buttons are held. Pressing
 Select significantly before Start can still insert a coin before the chord
 exists. Buttons must be released after loading, pausing or resuming so menu
@@ -277,7 +284,7 @@ cleared on pause/reset. Mute is saved independently of board state.
 MUSIC and EFFECTS (Options, under MUTE) balance the music against everything else
 (engine, skids, crashes), as the desktop launcher does: the MultiPCM voices are
 split by the game's channel at key-on, in both audio engines; the FM part follows
-only VOLUME. Defaults 100% and 75% (the effects cover the music on the Vita's
+only VOLUME. Defaults 100% and 20% (the effects cover the music on the Vita's
 speakers); 100/100 is the arcade's mix. Saved as music_volume/effects_volume in
 vita.cfg.
 

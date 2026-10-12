@@ -1,5 +1,12 @@
 # Handoff
 
+## Vita rebindable controls (2026-10-12)
+
+Launcher Controls page: each game action (pedals, steering, shifts, start, coin,
+views) rebinds to one pad button, swaps on conflict, saved in vita.cfg; sticks and
+Select chords stay fixed. Effects volume default now 20. Host tests 35/35, Vita
+compile checks pass, not tried on a console (`platform/vita/HANDOFF.md`).
+
 ## Vita music and effects volumes (2026-10-11)
 
 The desktop launcher's music/effects balance on the Vita (Options, defaults 100/75

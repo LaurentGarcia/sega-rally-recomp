@@ -1,6 +1,7 @@
 #include "../platform/vita/controls.h"
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <limits>
 #define CHECK(expr) do { if (!(expr)) { std::fprintf(stderr, "line %d: %s\n", __LINE__, #expr); std::exit(1); } } while (0)
 int main() {
@@ -76,6 +77,56 @@ int main() {
         CHECK(right <= (curve <= 0 ? 171 : curve == 1 ? 147 : 136));
         curved.set_steer_invert(true);
         CHECK(curved.sample({0, 192, 128}).steer == 256 - right);
+    }
+    // Rebinding: one button per action; taking a used button swaps the two.
+    {
+        vita::Bindings b;
+        b.bind(vita::Accelerate, vita::Cross);
+        CHECK(b.button[vita::Accelerate] == vita::Cross && b.button[vita::View1] == vita::R);
+        b.bind(vita::ShiftUp, vita::Triangle);
+        CHECK(b.button[vita::ShiftUp] == vita::Triangle && b.button[vita::View4] == vita::Up);
+        b.bind(vita::Brake, vita::Cross | vita::Circle); // not a single button: ignored
+        b.bind(vita::ActionCount, vita::Cross);
+        CHECK(b.button[vita::Brake] == vita::L);
+        vita::Controls remapped;
+        remapped.set_bindings(b);
+        CHECK(remapped.sample({vita::Cross}).accel == 0xe0);
+        CHECK(remapped.sample({vita::R}).accel == 0x20);
+        in = remapped.sample({vita::R});
+        CHECK((in.in0 & 0x20) == 0);
+        remapped.sample({});
+        remapped.sample({vita::Triangle}); CHECK(remapped.gear() == 2);
+        remapped.sample({});
+        remapped.sample({vita::Up}); CHECK(remapped.gear() == 2);
+        in = remapped.sample({vita::Up});
+        CHECK((in.in1 & 1) == 0);
+        // Coin on another button still fires on release; Select chords stay fixed.
+        b = vita::Bindings{};
+        b.bind(vita::Coin, vita::L);
+        CHECK(b.button[vita::Brake] == vita::Select);
+        remapped.set_bindings(b);
+        remapped.sample({});
+        CHECK(remapped.sample({vita::L}).in0 == 0xff);
+        CHECK((remapped.sample({}).in0 & 1) == 0);
+        CHECK(remapped.sample({vita::Select | vita::Triangle}).in0 == 0xfb);
+        CHECK(remapped.sample({vita::Start | vita::Select}).in0 == 0xff);
+        // Cycling visits all twelve buttons and keeps every binding unique.
+        b = vita::Bindings{};
+        for (int i = 0; i < 12; ++i) {
+            b.cycle(vita::Coin, 1);
+            uint32_t seen = 0;
+            for (uint32_t v : b.button) { CHECK(vita::single_button(v) && !(seen & v)); seen |= v; }
+        }
+        CHECK(b.button[vita::Coin] == vita::Select);
+        b = vita::Bindings{};
+        b.cycle(vita::Coin, -1);
+        CHECK(b.button[vita::Coin] == vita::Start && b.button[vita::StartButton] == vita::Select);
+        // Hand-edited duplicates reset the whole set.
+        b.button[vita::View1] = b.button[vita::View2];
+        b.sanitize();
+        CHECK(b.button[vita::View1] == vita::Cross && b.button[vita::Coin] == vita::Select);
+        CHECK(!std::strcmp(vita::button_name(vita::Select), "SELECT"));
+        CHECK(!std::strcmp(vita::button_name(0), "NONE"));
     }
     vita::FrameClock clock(16000000.0 / (656.0 * 424.0));
     int frames = 0;

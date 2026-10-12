@@ -1,5 +1,18 @@
 # Vita port handoff — 29 September 2026
 
+## Rebindable controls — 12 October 2026
+
+Launcher page Controls (main menu entry 4, Quit moved to 5): the twelve game actions
+(`vita::Action`, `platform/vita/controls.h`) each take one pad button. Cross waits for
+the next pad press (touch ignored), Left/Right cycle through the twelve buttons, a
+taken button swaps with the action that had it, so every action always has exactly
+one button. Sticks and the Select chords (menu, test, service) are fixed; Coin still
+fires on release whatever its button, and the menu chord still suppresses it. Saved
+as `bind_accelerate`..`bind_view4` in vita.cfg; `Bindings::sanitize` resets all on any
+invalid or duplicate value. Defaults are the previous layout. Host tests 35/35 (new
+cases in test_vita_controls), Vita compile checks gpu-gl and gpu-fast pass; not yet
+tried on a console. Effects volume default lowered from 75 to 20 in the same change.
+
 ## Music and effects volumes — 11 October 2026
 
 Options MUSIC and EFFECTS (after MUTE; the later entries moved down by 2), steps of

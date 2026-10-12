@@ -208,6 +208,10 @@ uint64_t diagnostic_ticks_us() {
 #endif
 constexpr int kDefaultCpuClock = DAYTONA_VITA_DEFAULT_CPU_MHZ;
 constexpr int kDefaultGpuClock = DAYTONA_VITA_DEFAULT_GPU_MHZ;
+// vita.cfg keys of the rebindable actions (vita::Action order); value = button bit.
+constexpr const char *kBindKeys[vita::ActionCount] = {"bind_accelerate", "bind_brake",
+    "bind_steer_left", "bind_steer_right", "bind_shift_up", "bind_shift_down", "bind_start",
+    "bind_coin", "bind_view1", "bind_view2", "bind_view3", "bind_view4"};
 
 struct VitaSettings {
     bool revision_a = std::strcmp(M2_ROMSET, "daytona") == 0;
@@ -224,7 +228,7 @@ struct VitaSettings {
     // Balance between the music and the effects (engine, skids, crashes), as the
     // desktop launcher's; 100/100 is the arcade's mix. Effects default lower: on
     // the Vita's speakers they cover the music.
-    int music_volume = 100, effects_volume = 75;
+    int music_volume = 100, effects_volume = 20;
     int deadzone = 12;
     int aspect = 0, draw_distance = 0, steer_curve = 0;
     bool hud_edges = false;
@@ -234,6 +238,7 @@ struct VitaSettings {
     bool mute = false;
     bool native_audio = false; // explicitly selected while native fidelity is validated
     bool steer_invert = false;
+    vita::Bindings bindings; // Controls page of the launcher
 
     void defaults() { *this = VitaSettings{}; }
     void sanitize() {
@@ -259,6 +264,7 @@ struct VitaSettings {
         aspect = std::clamp(aspect, 0, 3);
         steer_curve = std::clamp(steer_curve, 0, 2);
         draw_distance = std::clamp(draw_distance, -2, 2);
+        bindings.sanitize();
     }
     void load() {
         FILE *f = std::fopen(kConfig, "r");
@@ -290,6 +296,8 @@ struct VitaSettings {
             else if (!std::strcmp(key, "native_audio")) native_audio = value != 0;
             else if (!std::strcmp(key, "deadzone")) deadzone = value;
             else if (!std::strcmp(key, "steer_invert")) steer_invert = value != 0;
+            else for (int a = 0; a < vita::ActionCount; ++a)
+                if (!std::strcmp(key, kBindKeys[a])) bindings.button[a] = uint32_t(value);
         }
         std::fclose(f); sanitize();
     }
@@ -306,6 +314,7 @@ struct VitaSettings {
         for (int i = 0; i < 4; ++i) std::fprintf(f, "next_ip%d=%d\n", i, next_ip[i]);
         std::fprintf(f, "steer_curve=%d\n", steer_curve);
         std::fprintf(f, "aspect=%d\ndraw_distance=%d\nhud_edges=%d\n", aspect, draw_distance, int(hud_edges));
+        for (int a = 0; a < vita::ActionCount; ++a) std::fprintf(f, "%s=%u\n", kBindKeys[a], unsigned(bindings.button[a]));
         bool ok = std::fflush(f) == 0;
         if (std::fclose(f) != 0) ok = false;
         if (!ok) { std::remove(kConfigTemp); return false; }
@@ -345,25 +354,51 @@ int cycle_value(int value, const int *choices, int count, int direction) {
 
 uint32_t ui_buttons = 0;
 rt::TestHold test_hold;
-void draw_menu(bool have_game, bool &options, int &selection, const VitaSettings &settings,
-               const std::string &status, double fps) {
+// Rows of the Controls page: the actions, then reset and back.
+constexpr int kBindRows = vita::ActionCount + 2;
+void draw_menu(bool have_game, bool &options, bool &binds, int &selection, int capture,
+               const VitaSettings &settings, const std::string &status, double fps) {
     ImGui::SetNextWindowPos({12, 12});
     ImGui::SetNextWindowSize({936, 520});
     ImGui::Begin("Daytona USA", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
     ImGui::Text("Daytona USA | %.1f FPS | CPU %d MHz | GPU %d MHz | %s", fps,
                 scePowerGetArmClockFrequency(), scePowerGetGpuClockFrequency(), kGfxApi);
-    if (ImGui::Button("Game")) { options = false; selection = 0; }
+    if (ImGui::Button("Game")) { options = binds = false; selection = 0; }
     ImGui::SameLine();
-    if (ImGui::Button("Options")) { options = true; selection = 0; }
+    if (ImGui::Button("Options")) { options = true; binds = false; selection = 0; }
+    ImGui::SameLine();
+    if (ImGui::Button("Controls")) { binds = true; options = false; selection = 0; }
     ImGui::SameLine(); ImGui::TextDisabled("D-pad navigate | X select | O back");
     ImGui::Separator();
     static int previous_selection = -1;
-    static bool previous_options = false;
-    const bool scroll_to_selection = selection != previous_selection || options != previous_options;
+    static bool previous_options = false, previous_binds = false;
+    const bool scroll_to_selection = selection != previous_selection || options != previous_options ||
+                                     binds != previous_binds;
     if (ImGui::BeginChild("settings", {0, -100}, ImGuiChildFlags_None)) {
-        if (!options) {
-            const char *labels[] = {have_game ? "Resume / launch selected ROM" : "Start game", "Reset game", "Options", "Quit"};
-            for (int i = 0; i < 4; ++i) {
+        if (binds) {
+            char rows[vita::ActionCount][64];
+            for (int i = 0; i < kBindRows; ++i) {
+                const char *label = i == vita::ActionCount ? "RESET CONTROLS TO DEFAULTS" : "BACK";
+                if (i < vita::ActionCount) {
+                    std::snprintf(rows[i], sizeof rows[i], "%s: %s", vita::action_name(i),
+                                  capture == i ? "PRESS A BUTTON..." : vita::button_name(settings.bindings.button[i]));
+                    label = rows[i];
+                }
+                ImGui::PushID(i);
+                if (ImGui::Selectable(label, selection == i, 0, {760, 32})) { selection = i; ui_buttons = vita::Cross; }
+                if (selection == i && scroll_to_selection) ImGui::SetScrollHereY();
+                if (i < vita::ActionCount) {
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("<")) { selection = i; ui_buttons = vita::Left; }
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton(">")) { selection = i; ui_buttons = vita::Right; }
+                }
+                ImGui::PopID();
+            }
+        } else if (!options) {
+            const char *labels[] = {have_game ? "Resume / launch selected ROM" : "Start game", "Reset game", "Options",
+                                    "Controls", "Quit"};
+            for (int i = 0; i < 5; ++i) {
                 if (ImGui::Selectable(labels[i], selection == i, 0, {0, 36})) { selection = i; ui_buttons = vita::Cross; }
                 if (selection == i && scroll_to_selection) ImGui::SetScrollHereY();
             }
@@ -425,7 +460,7 @@ void draw_menu(bool have_game, bool &options, int &selection, const VitaSettings
         }
     }
     ImGui::EndChild();
-    previous_selection = selection; previous_options = options;
+    previous_selection = selection; previous_options = options; previous_binds = binds;
     ImGui::Separator();
     ImGui::TextWrapped("%s", status.c_str());
     ImGui::TextDisabled("START+SELECT menu | SELECT+TRIANGLE test | SELECT+SQUARE service");
@@ -572,8 +607,8 @@ int main(int, char **) {
             int(perf_log.threaded()));
     vita::Controls controls;
     vita::FrameClock clock(rt::GameLoop::kFrameHz, 1);
-    bool running = true, menu = true, options = false, wait_release = true;
-    int selection = 0;
+    bool running = true, menu = true, options = false, binds = false, wait_release = true;
+    int selection = 0, capture = -1; // capture: action waiting for its new button (Controls page)
     uint32_t previous_buttons = 0;
     std::string status = "CROSS SELECT. OPTIONS INCLUDE CLOCKS, AUDIO, DISPLAY AND CONTROLS.";
     uint64_t last = ticks_us(), perf_start = last, perf_frames = 0, perf_run_us = 0, perf_gpu_us = 0;
@@ -639,6 +674,7 @@ int main(int, char **) {
         controls.set_deadzone(float(settings.deadzone) / 100.0f);
         controls.set_steer_invert(settings.steer_invert);
         controls.set_steer_curve(settings.steer_curve);
+        controls.set_bindings(settings.bindings);
         rt::GameLoop::set_draw_distance(settings.draw_distance);
         if (game) {
             static constexpr double aspects[] = {0, 16.0/10, 16.0/9, 21.0/9};
@@ -782,7 +818,8 @@ int main(int, char **) {
             apply_geometry();
             controls = vita::Controls{};
             apply_preferences();
-            status = "START+SELECT MENU. TRIANGLE VIEW 4. D-PAD UP/DOWN SHIFT.";
+            status = std::string("START+SELECT MENU. ") + vita::button_name(settings.bindings.button[vita::ShiftUp]) +
+                "/" + vita::button_name(settings.bindings.button[vita::ShiftDown]) + " SHIFT UP/DOWN.";
             wait_release = true;
             return true;
         } catch (const std::exception &e) {
@@ -810,14 +847,45 @@ int main(int, char **) {
             if (!pad.buttons) wait_release = false;
         }
         if (!menu && !wait_release && vita::menu_chord(pad.buttons)) {
-            menu = true; options = false; selection = 0;
+            menu = true; options = binds = false; selection = 0; capture = -1;
             finish_sound();
             audio.pause(); native_audio.pause(); save(); clock.reset(); wait_release = true;
         }
         if (menu && !wait_release) {
+            const uint32_t pad_pressed = pressed;
             pressed |= ui_buttons;
             ui_buttons = 0;
-            if (options) {
+            if (binds && capture >= 0) {
+                // Any pad button (touch ignored) becomes the action's button; pressing the
+                // current one keeps it. An action that had it takes the old one (swap).
+                if (pad_pressed) {
+                    const uint32_t button = pad_pressed & (~pad_pressed + 1);
+                    settings.bindings.bind(capture, button);
+                    commit_settings(false);
+                    status = std::string(vita::action_name(capture)) + ": " + vita::button_name(button) +
+                        ". START+SELECT MENU AND SELECT+TRIANGLE/SQUARE TEST/SERVICE STAY FIXED.";
+                    capture = -1; wait_release = true;
+                }
+            } else if (binds) {
+                if (pressed & vita::Up) selection = (selection + kBindRows - 1) % kBindRows;
+                if (pressed & vita::Down) selection = (selection + 1) % kBindRows;
+                const int direction = (pressed & vita::Left) ? -1 : ((pressed & vita::Right) ? 1 : 0);
+                if (pressed & vita::Circle) { binds = false; selection = 3; wait_release = true; }
+                else if (selection < vita::ActionCount && (pressed & vita::Cross)) {
+                    capture = selection; wait_release = true;
+                    status = std::string("PRESS THE NEW BUTTON FOR ") + vita::action_name(selection) +
+                        " (ITS CURRENT BUTTON KEEPS IT).";
+                } else if (selection < vita::ActionCount && direction) {
+                    settings.bindings.cycle(selection, direction);
+                    commit_settings(false);
+                } else if (selection == vita::ActionCount && (pressed & vita::Cross)) {
+                    settings.bindings = vita::Bindings{};
+                    commit_settings(false);
+                    status = "CONTROLS RESET TO DEFAULTS. " + status;
+                } else if (selection == vita::ActionCount + 1 && (pressed & vita::Cross)) {
+                    binds = false; selection = 3; wait_release = true;
+                }
+            } else if (options) {
                 constexpr int kOptionCount = 31;
                 if (pressed & vita::Up) selection = (selection + kOptionCount - 1) % kOptionCount;
                 if (pressed & vita::Down) selection = (selection + 1) % kOptionCount;
@@ -914,8 +982,8 @@ int main(int, char **) {
                     }
                 }
             } else {
-                if (pressed & vita::Up) selection = (selection + 3) % 4;
-                if (pressed & vita::Down) selection = (selection + 1) % 4;
+                if (pressed & vita::Up) selection = (selection + 4) % 5;
+                if (pressed & vita::Down) selection = (selection + 1) % 5;
                 if ((pressed & vita::Circle) && game) {
                     menu = false; clock.reset(); wait_release = true;
                 } else if (pressed & vita::Cross) {
@@ -927,6 +995,9 @@ int main(int, char **) {
                     } else if (selection == 2) {
                         options = true; selection = 0; wait_release = true;
                     } else if (selection == 3) {
+                        binds = true; selection = 0; wait_release = true;
+                        status = "CROSS: PRESS THE NEW BUTTON. LEFT/RIGHT: CYCLE. STICKS STAY FIXED.";
+                    } else if (selection == 4) {
                         save(); settings.save(); running = false;
                     }
                 }
@@ -1067,7 +1138,7 @@ int main(int, char **) {
                         std::to_string(comm->count()) + (comm->link() == rt::CommBoard::Link::Lost ? " LOST" : "");
                 }
                 ui.frame(float(elapsed));
-                draw_menu(bool(game), options, selection, settings, shown_status, display_fps);
+                draw_menu(bool(game), options, binds, selection, capture, settings, shown_status, display_fps);
                 ui.render();
             } else if (game) {
                 gpu.draw(game->board().video()); // System 24 layers + polygons on the GPU (the only case)
