@@ -94,7 +94,8 @@ build (`main.cpp`, no `--gpu-*`) keeps everything on one game thread.
 * **Game code options** (both builds): `--fast-inaccuracy` (i960 lockstep checks per
   block + direct work-RAM accesses, TGP counted per block; the fastest) or `--fast-gen`
   (the Dreamcast's `platform/dreamcast/scripts/fast_gen.py` pass, exact), made from the
-  host tools into `BUILD_DIR/gen_vita`; `--release` adds link-time optimization and
+  host tools into `BUILD_DIR/gen_vita`; the shared runtime's fast paths
+  (`src/runtime/fast_paths.h`) are on unless `--no-fast-paths`; `--release` adds link-time optimization and
   drops the logs; `--diagnostics` writes `vita-diag.log`, `perf.log` (per-core report,
   `core_profile.h`) and, with vitaGL, `gl.log`.
 
@@ -102,6 +103,12 @@ build (`main.cpp`, no `--gpu-*`) keeps everything on one game thread.
 python3 scripts/build_vita.py --gpu-gl --release --fast-inaccuracy        # pinned cores
 python3 scripts/build_vita.py --gpu-fast --release --fast-inaccuracy --free-core
 ```
+
+The home-screen name is "Daytona USA" for every build option. Icon and LiveArea
+images: put `icon0.png` (128x128), `bg.png` (840x500), `startup.png` (280x158) and
+optionally `template.xml` in `platform/vita/logo_livearea/` (8-bit indexed PNGs; see
+the README there). Each file present is packaged, a missing one keeps the Vita's
+default; the build summary lists them. They are not committed.
 
 ## Build
 
@@ -229,7 +236,7 @@ ZIP ROM set** at:
 ux0:data/daytona93/daytona93.zip
 ```
 
-Launch **Daytona Recomp** and choose **START GAME**. ROM CRC and size
+Launch **Daytona USA** and choose **START GAME**. ROM CRC and size
 validation uses the existing importer. Renaming a different Daytona set
 will not make it compatible. The Vita target deliberately omits the 7z
 SDK to avoid solid-archive decoding memory spikes. A host `.7z` source can
@@ -247,6 +254,13 @@ unchanged ROM filenames before copying it to the Vita.
 | Pause menu | Start + Select together |
 | Navigate / select / resume | D-pad / Cross / Circle |
 | Test switch / service coin | Pause-menu entries |
+
+These are the defaults. The launcher's Controls page rebinds each action
+(accelerate, brake, steer left/right, shift up/down, start, coin, views 1-4) to one
+button: Cross then press the new button, or Left/Right to cycle; a button already
+used by another action swaps with it. The sticks and the Start+Select,
+Select+Triangle and Select+Square chords stay fixed. Saved as `bind_*` keys in
+vita.cfg (button bit); an invalid or duplicated entry resets all bindings.
 
 The menu chord suppresses coin/start while both buttons are held. Pressing
 Select significantly before Start can still insert a coin before the chord
@@ -272,6 +286,13 @@ FM and PCM are resampled independently to the output device rate, mixed,
 clamped and played as stereo signed 16-bit audio. The callback only consumes
 samples; board execution stays on the main thread. Queues are bounded and
 cleared on pause/reset. Mute is saved independently of board state.
+
+MUSIC and EFFECTS (Options, under MUTE) balance the music against everything else
+(engine, skids, crashes), as the desktop launcher does: the MultiPCM voices are
+split by the game's channel at key-on, in both audio engines; the FM part follows
+only VOLUME. Defaults 100% and 20% (the effects cover the music on the Vita's
+speakers); 100/100 is the arcade's mix. Saved as music_volume/effects_volume in
+vita.cfg.
 
 EEPROM and backup RAM are saved when changed, every five seconds and on
 pause/reset/quit. Writes use a temporary file and retain a `.bak` generation;

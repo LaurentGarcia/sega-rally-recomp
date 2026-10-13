@@ -63,6 +63,13 @@ public:
         gain_.store(uint32_t(std::clamp(value, 0.f, 1.f) * 65536.f), std::memory_order_relaxed);
     }
     void mute(bool value) { muted_.store(value, std::memory_order_relaxed); }
+    // The music and effects volumes (0..1), for an engine that has them; the
+    // callback hands them to the engine (src/app/native_audio.h does the same).
+    void volumes(float music, float effects) {
+        auto level = [](float v) { return uint32_t((std::isfinite(v) ? std::clamp(v, 0.f, 1.f) : 0.f) * 65536.f); };
+        music_.store(level(music), std::memory_order_relaxed);
+        effects_.store(level(effects), std::memory_order_relaxed);
+    }
 
     // Publish an entire packet or nothing. A false result is a visible runtime
     // error, not permission to silently drop a note-off or sequence command.
@@ -106,6 +113,7 @@ private:
     std::atomic<uint32_t> read_{0}, write_{0};
     std::atomic<uint32_t> callbacks_{0}, frames_{0}, overflows_{0}, last_us_{0}, peak_us_{0}, failed_{0};
     std::atomic<uint32_t> gain_{52428}, muted_{0};
+    std::atomic<uint32_t> music_{65536}, effects_{65536};
     std::atomic<uint32_t> unsupported_{0}, invalid_{0}, notes_{0}, voices_{0};
 
     void receive() {
@@ -133,6 +141,9 @@ private:
             float mix[kChunkFrames * 2];
             const float gain = self.muted_.load(std::memory_order_relaxed) ? 0.f
                 : float(self.gain_.load(std::memory_order_relaxed)) / 65536.f;
+            if constexpr (requires { self.engine_->set_volumes(1.f, 1.f); })
+                self.engine_->set_volumes(float(self.music_.load(std::memory_order_relaxed)) / 65536.f,
+                                          float(self.effects_.load(std::memory_order_relaxed)) / 65536.f);
             while (remaining) {
                 const unsigned count = std::min(remaining, kChunkFrames);
                 self.engine_->render(mix, count);

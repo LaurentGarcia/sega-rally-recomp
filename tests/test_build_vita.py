@@ -125,6 +125,15 @@ class BuildVitaTests(unittest.TestCase):
             self.call("--compile-check", "--host-build-dir", "host build", "--build-dir", "cross build")
         self.assertIn(f"-DDAYTONA_GEN_ROOT={self.root}/host build/gen", run.call_args_list[0].args[0])
 
+    def test_livearea_summary(self):
+        self.assertEqual(BUILD.livearea_summary(), "none (Vita defaults)")
+        folder = self.root / "platform/vita/logo_livearea"
+        folder.mkdir(parents=True)
+        (folder / "README.md").touch()
+        (folder / "bg.png").touch()
+        (folder / "icon0.png").touch()
+        self.assertEqual(BUILD.livearea_summary(), "icon0.png, bg.png")
+
 
 if __name__ == "__main__":
     unittest.main()

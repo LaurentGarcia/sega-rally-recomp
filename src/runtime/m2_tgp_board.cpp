@@ -39,6 +39,10 @@ TgpBoard::TgpBoard(const std::vector<uint8_t> &tables, const std::vector<uint8_t
     : tables_(words(tables)), copro_data_(words(copro_data)) {
     if (tables_.size() != 0x10000 || copro_data_.size() != 0x200000) throw TgpFatal("bad TGP table or copro data image");
     tgp_.bus = this;
+#ifdef M2_FAST_TGP
+    tgp_.in_fifo = &in_;
+    tgp_.out_fifo = &out_;
+#endif
     tgp_.tables = tables_.data();
     // MAME machine_reset: "initialize bufferram to a sane default".
     for (auto &w : buffer_) w = 0x07800f0f;
@@ -49,7 +53,7 @@ TgpBoard::TgpBoard(const std::vector<uint8_t> &tables, RomSource &rom) : tables_
     if (tables_.size() != 0x10000 || rom.size(RomRegion::CoproData) != 0x800000)
         throw TgpFatal("bad TGP table or copro data image");
     tgp_.bus = this;
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_TGP
     tgp_.in_fifo = &in_;
     tgp_.out_fifo = &out_;
 #endif

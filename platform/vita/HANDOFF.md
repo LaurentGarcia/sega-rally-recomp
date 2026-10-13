@@ -1,5 +1,52 @@
 # Vita port handoff — 29 September 2026
 
+## Icon/LiveArea images and fixed app name — 12 October 2026
+
+`platform/vita/livearea.cmake` packages `icon0.png`, `bg.png`, `startup.png` and
+`template.xml` from `platform/vita/logo_livearea/` when present (README there; the
+folder's images are git-ignored). PNGs are checked at configure time (signature,
+exact size, 8-bit indexed) and a wrong one stops the build with the reason; with
+bg/startup and no template.xml a minimal one is generated in the build dir. The
+VPK name (param.sfo TITLE) is now always "Daytona USA" (it was "Daytona Recomp",
+" GL" or " ImGui" by renderer). Checked: configure with valid, 32-bit and wrong-size
+PNGs; a full `--gpu-gl` VPK contains the images and the name. Not yet installed on a
+console: the generated template.xml (style a1, gate only when startup.png exists) is
+unverified there.
+
+## Rebindable controls — 12 October 2026
+
+Launcher page Controls (main menu entry 4, Quit moved to 5): the twelve game actions
+(`vita::Action`, `platform/vita/controls.h`) each take one pad button. Cross waits for
+the next pad press (touch ignored), Left/Right cycle through the twelve buttons, a
+taken button swaps with the action that had it, so every action always has exactly
+one button. Sticks and the Select chords (menu, test, service) are fixed; Coin still
+fires on release whatever its button, and the menu chord still suppresses it. Saved
+as `bind_accelerate`..`bind_view4` in vita.cfg; `Bindings::sanitize` resets all on any
+invalid or duplicate value. Defaults are the previous layout. Host tests 35/35 (new
+cases in test_vita_controls), Vita compile checks gpu-gl and gpu-fast pass; not yet
+tried on a console. Effects volume default lowered from 75 to 20 in the same change.
+
+## Music and effects volumes — 11 October 2026
+
+Options MUSIC and EFFECTS (after MUTE; the later entries moved down by 2), steps of
+5%, defaults 100/75, saved in vita.cfg (`music_volume`, `effects_volume`). Reference
+engine: `SoundBoard::set_volumes` between `finish_sound()` and the next dispatch
+(the sound worker is idle there); native engine: `NativeAudio::volumes`, applied in
+the callback as on the desktop. FM is not split (VOLUME only). Vita compile checks
+(gpu-gl, gpu-fast) and the 17 Vita host tests pass; not yet heard on a console.
+The CPU build (main.cpp) has no such options.
+
+## Runtime fast paths from the Dreamcast — 11 October 2026
+
+`DAYTONA_VITA_FAST_PATHS` (default ON; `build_vita.py --no-fast-paths` turns it
+off) defines M2_FAST_BUS/TGP/CPU/GEO (`src/runtime/fast_paths.h`): the Dreamcast's
+M2_DC_SPEED paths that give the same results, without its display-specific ones.
+Desktop parity checked (top-level HANDOFF.md). Console, probe 1 + LTO, saturated
+race windows at equal polygon load: 47.6 -> 50.4 emulated fps (i960 -0.92 ms,
+TGP -0.32 ms on core 0; np_s -13% per polygon on core 1). Next: a `--release`
+race without probes against `extern/perf/perf_base.log`; then the remaining core 0
+costs (vertex writing ~2 ms, tile cache ~1.3 ms, i960 ~6 ms).
+
 ## Multicore + vitaGL branch merged — 8 October 2026
 
 The multicore/vitaGL branch (pipelined geometrizer, pinned cores, vitaGL

@@ -25,22 +25,77 @@ inline float axis(uint8_t value, float deadzone = 0.12f) {
     if (magnitude <= deadzone) return 0.f;
     return std::copysign((magnitude - deadzone) / (1.f - deadzone), x);
 }
+
+// Game actions the player can rebind (GPU launcher, Controls page). One button each;
+// the analog sticks (left: steering, right: pedals) and the system chords
+// (Start+Select menu, Select+Triangle test, Select+Square service) stay fixed.
+enum Action : int {
+    Accelerate, Brake, SteerLeft, SteerRight, ShiftUp, ShiftDown,
+    StartButton, Coin, View1, View2, View3, View4, ActionCount
+};
+inline constexpr uint32_t kButtonMask = 0xfffu;
+inline const char *action_name(int action) {
+    static const char *names[ActionCount] = {"ACCELERATE", "BRAKE", "STEER LEFT", "STEER RIGHT",
+        "SHIFT UP", "SHIFT DOWN", "START", "COIN", "VIEW 1", "VIEW 2", "VIEW 3", "VIEW 4"};
+    return action >= 0 && action < ActionCount ? names[action] : "?";
+}
+inline bool single_button(uint32_t button) {
+    return button && !(button & ~kButtonMask) && !(button & (button - 1));
+}
+inline const char *button_name(uint32_t button) {
+    static const char *names[] = {"CROSS", "CIRCLE", "SQUARE", "TRIANGLE", "UP", "DOWN",
+        "LEFT", "RIGHT", "L", "R", "START", "SELECT"};
+    if (!single_button(button)) return "NONE";
+    int bit = 0;
+    while (!(button & (1u << bit))) ++bit;
+    return names[bit];
+}
+struct Bindings {
+    // Defaults: the original Vita layout.
+    uint32_t button[ActionCount] = {R, L, Left, Right, Up, Down, Start, Select,
+                                    Cross, Circle, Square, Triangle};
+    // Gives `action` the button `value`; an action that had it takes the old one
+    // instead, so no action is ever left without a button.
+    void bind(int action, uint32_t value) {
+        if (action < 0 || action >= ActionCount || !single_button(value)) return;
+        for (uint32_t &other : button)
+            if (other == value) other = button[action];
+        button[action] = value;
+    }
+    // Next/previous button in the fixed order above (Left/Right on the Controls page).
+    void cycle(int action, int direction) {
+        if (action < 0 || action >= ActionCount) return;
+        int bit = 0;
+        while (bit < 11 && !(button[action] & (1u << bit))) ++bit;
+        bind(action, 1u << ((bit + (direction < 0 ? 11 : 1)) % 12));
+    }
+    // Saved files may be edited by hand: any invalid or duplicated entry resets all.
+    void sanitize() {
+        uint32_t seen = 0;
+        for (uint32_t value : button) {
+            if (!single_button(value) || (seen & value)) { *this = Bindings{}; return; }
+            seen |= value;
+        }
+    }
+};
+
 class Controls {
 public:
     Input sample(Pad pad) {
         Input in;
+        const auto &b = bindings_.button;
         const uint32_t previous = held_;
         const uint32_t pressed = pad.buttons & ~held_;
-        if (pressed & Select) select_used_ = false;
+        if (pressed & b[Coin]) coin_used_ = false;
         held_ = pad.buttons;
         // The menu chord must not inject a coin or start a race.
-        if (menu_chord(pad.buttons)) { select_used_ = true; set_gear(in); return in; }
+        if (menu_chord(pad.buttons)) { coin_used_ = true; set_gear(in); return in; }
         // Cabinet controls consume the modifier and view buttons.
         if (pad.buttons & Select) {
             const bool test = (pad.buttons & Triangle) != 0;
             const bool service = (pad.buttons & Square) != 0;
             if (test || service) {
-                select_used_ = true;
+                coin_used_ = true;
                 if (test) in.in0 &= uint8_t(~0x04);
                 if (service) in.in0 &= uint8_t(~0x08);
                 set_gear(in);
@@ -50,43 +105,46 @@ public:
         float steer = axis(pad.lx, deadzone_);
         if (steer_curve_ == 1) steer *= std::abs(steer);
         else if (steer_curve_ == 2) steer = steer * steer * steer;
-        if (pad.buttons & (Left | Right))
-            steer = float(bool(pad.buttons & Right)) - float(bool(pad.buttons & Left));
+        if (pad.buttons & (b[SteerLeft] | b[SteerRight]))
+            steer = float(bool(pad.buttons & b[SteerRight])) - float(bool(pad.buttons & b[SteerLeft]));
         if (steer_invert_) steer = -steer;
         const float pedal = axis(pad.ry, deadzone_);
-        const float accel = pad.buttons & R ? 1.f : std::max(-pedal, 0.f);
-        const float brake = pad.buttons & L ? 1.f : std::max(pedal, 0.f);
+        const float accel = pad.buttons & b[Accelerate] ? 1.f : std::max(-pedal, 0.f);
+        const float brake = pad.buttons & b[Brake] ? 1.f : std::max(pedal, 0.f);
         in.steer = uint8_t(std::lround(128.f + 96.f * steer));
         in.accel = uint8_t(std::lround(32.f + 192.f * accel));
         in.brake = uint8_t(std::lround(32.f + 192.f * brake));
         // Shift only on edges, including when several board frames are run.
-        const int shift = int(bool(pressed & Up)) - int(bool(pressed & Down));
+        const int shift = int(bool(pressed & b[ShiftUp])) - int(bool(pressed & b[ShiftDown]));
         gear_ = std::clamp(gear_ + shift, 1, 4);
         set_gear(in);
         // Coin on release leaves time to distinguish Select-based chords.
-        if ((previous & Select) && !(pad.buttons & Select) && !select_used_) in.in0 &= uint8_t(~0x01);
-        if (pad.buttons & Start) in.in0 &= uint8_t(~0x10);
-        if (pad.buttons & Cross) in.in0 &= uint8_t(~0x20);
-        if (pad.buttons & Circle) in.in0 &= uint8_t(~0x40);
-        if (pad.buttons & Square) in.in0 &= uint8_t(~0x80);
-        if (pad.buttons & Triangle) in.in1 &= uint8_t(~0x01);
+        if ((previous & b[Coin]) && !(pad.buttons & b[Coin]) && !coin_used_) in.in0 &= uint8_t(~0x01);
+        if (pad.buttons & b[StartButton]) in.in0 &= uint8_t(~0x10);
+        if (pad.buttons & b[View1]) in.in0 &= uint8_t(~0x20);
+        if (pad.buttons & b[View2]) in.in0 &= uint8_t(~0x40);
+        if (pad.buttons & b[View3]) in.in0 &= uint8_t(~0x80);
+        if (pad.buttons & b[View4]) in.in1 &= uint8_t(~0x01);
         return in;
     }
-    void latch(uint32_t buttons) { held_ = buttons; if (buttons & Select) select_used_ = true; }
+    void latch(uint32_t buttons) { held_ = buttons; if (buttons & bindings_.button[Coin]) coin_used_ = true; }
     int gear() const { return gear_; }
     void set_deadzone(float value) { deadzone_ = std::clamp(value, 0.0f, 0.4f); }
     void set_steer_curve(int value) { steer_curve_ = std::clamp(value, 0, 2); }
     void set_steer_invert(bool value) { steer_invert_ = value; }
+    void set_bindings(const Bindings &value) { bindings_ = value; bindings_.sanitize(); }
+    const Bindings &bindings() const { return bindings_; }
 private:
     void set_gear(Input &in) const {
         // Same gearbox encoding as src/app/controls.cpp.
         constexpr uint8_t codes[] = {0, 2, 1, 6, 5};
         in.in1 = uint8_t((in.in1 & ~0x70) | (codes[gear_] << 4));
     }
+    Bindings bindings_;
     uint32_t held_ = 0;
     int gear_ = 1, steer_curve_ = 0;
     float deadzone_ = 0.12f;
-    bool steer_invert_ = false, select_used_ = false;
+    bool steer_invert_ = false, coin_used_ = false;
 };
 
 // Host time only; each simulation step still advances at GameLoop::kFrameHz.

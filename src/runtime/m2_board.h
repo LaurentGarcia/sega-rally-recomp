@@ -191,7 +191,7 @@ private:
 #ifdef M2_DC_SPIN_SKIP
     uint64_t spin_skipped_ = 0;
 #endif
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_BUS
     // The last page read from plain memory (RAM, texture RAM) and the last
     // plain RAM page written (no video register behind it: ram_written does
     // nothing there), straight through their base. The map never changes

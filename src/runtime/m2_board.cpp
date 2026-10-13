@@ -311,7 +311,7 @@ uint32_t M2Board::dev_read(uint32_t addr, uint32_t mask) {
     case 0x00980000: return tgp_.coproctl_r();
     case 0x00980004: {
         const uint32_t v = tgp_.fifo_out_empty() ? 1 : 0;
-#ifndef M2_DC_SPEED // (a desktop debugging print: getenv on every status read)
+#ifndef M2_FAST_BUS // (a desktop debugging print: getenv on every status read)
         if (std::getenv("M2RUN_VERBOSE")) std::fprintf(stderr, "fifo status read -> %u (frame %llu)\n", v, (unsigned long long)frame_);
 #endif
         return v;
@@ -447,7 +447,7 @@ uint32_t M2Board::fetch(uint32_t addr) {
 }
 
 uint8_t M2Board::read_byte(uint32_t addr) {
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_BUS
     if ((addr >> kPageBits) == fast_read_page_ && addr != 0x00500000u) return fast_read_base_[addr & 0xfff];
 #endif
     const Page &p = page(addr);
@@ -466,7 +466,7 @@ uint8_t M2Board::read_byte(uint32_t addr) {
     if (addr == 0x00500000u && cpu_->m_IP == 0x1394u && p.kind == Ram) {
         const uint8_t v = p.base[addr & 0xfff];
         if (v == cpu_->m_r[16]) {
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_GEN
             const uint64_t limit = std::min(ls_->next_count, ls_->end_count), count = ls_->now();
 #else
             const uint64_t limit = std::min(ls_->next_count, ls_->end_count), count = ls_->count;
@@ -475,7 +475,7 @@ uint8_t M2Board::read_byte(uint32_t addr) {
                 const uint64_t skip = (limit - 1 - count) / 2 * 2;
                 ls_->count += skip;
                 spin_skipped_ += skip;
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_GEN
                 ++ls_->epoch; // the count jumped: the fast generated code checks in full next
 #endif
             }
@@ -487,7 +487,7 @@ uint8_t M2Board::read_byte(uint32_t addr) {
     if (p.kind == Rom) return rom_page(p)[addr & 0xfff];
 #endif
     switch (p.kind) {
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_BUS
     case Ram: case Tex: fast_read(addr, p); return p.base[addr & 0xfff];
     case Rom: return p.base[addr & 0xfff];
 #else
@@ -500,7 +500,7 @@ uint8_t M2Board::read_byte(uint32_t addr) {
 
 uint16_t M2Board::read_word(uint32_t addr) {
     addr &= ~1u;
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_BUS
     if ((addr >> kPageBits) == fast_read_page_) {
         uint16_t v;
         std::memcpy(&v, M2_AL(fast_read_base_ + (addr & 0xfff), 2), 2);
@@ -517,7 +517,7 @@ uint16_t M2Board::read_word(uint32_t addr) {
     }
 #endif
     switch (p.kind) {
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_BUS
     case Ram: case Tex: fast_read(addr, p); [[fallthrough]];
     case Rom: {
 #else
@@ -534,7 +534,7 @@ uint16_t M2Board::read_word(uint32_t addr) {
 
 uint32_t M2Board::read_dword(uint32_t addr) {
     addr &= ~3u;
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_BUS
     // The TGP's FIFO, status and buffer RAM (dev_read's answers), without the
     // page table and the dispatch chain: tens of millions of reads a race.
     if ((addr & 0xffffc000u) == 0x00884000u) return tgp_.fifo_r();
@@ -544,7 +544,7 @@ uint32_t M2Board::read_dword(uint32_t addr) {
         return tgp_.buffer_r(addr & 0x1ffff);
     }
 #endif
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_BUS
     if ((addr >> kPageBits) == fast_read_page_) {
         uint32_t v;
         std::memcpy(&v, M2_AL(fast_read_base_ + (addr & 0xfff), 4), 4);
@@ -560,7 +560,7 @@ uint32_t M2Board::read_dword(uint32_t addr) {
     }
 #endif
     switch (p.kind) {
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_BUS
     case Ram: case Tex: fast_read(addr, p); [[fallthrough]];
     case Rom: {
 #else
@@ -576,7 +576,7 @@ uint32_t M2Board::read_dword(uint32_t addr) {
 }
 
 void M2Board::write_byte(uint32_t addr, uint8_t data) {
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_BUS
     if ((addr >> kPageBits) == fast_write_page_) {
         fast_write_base_[addr & 0xfff] = data;
         return;
@@ -586,7 +586,7 @@ void M2Board::write_byte(uint32_t addr, uint8_t data) {
     const unsigned sh = (addr & 3) * 8;
     switch (p.kind) {
     case Ram: {
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_BUS
         fast_write(addr, p);
 #endif
         uint8_t &dst = p.base[addr & 0xfff];
@@ -603,7 +603,7 @@ void M2Board::write_byte(uint32_t addr, uint8_t data) {
 
 void M2Board::write_word(uint32_t addr, uint16_t data) {
     addr &= ~1u;
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_BUS
     if ((addr >> kPageBits) == fast_write_page_) {
         std::memcpy(M2_AL(fast_write_base_ + (addr & 0xfff), 2), &data, 2);
         return;
@@ -613,7 +613,7 @@ void M2Board::write_word(uint32_t addr, uint16_t data) {
     const unsigned sh = (addr & 2) * 8;
     switch (p.kind) {
     case Ram: {
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_BUS
         fast_write(addr, p);
 #endif
         uint16_t old; std::memcpy(&old, M2_AL(p.base + (addr & 0xfff), 2), 2);
@@ -629,7 +629,7 @@ void M2Board::write_word(uint32_t addr, uint16_t data) {
 
 void M2Board::write_dword(uint32_t addr, uint32_t data) {
     addr &= ~3u;
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_BUS
     // The TGP's function port and FIFO (dev_write's, all lanes written),
     // without the page table and the dispatch chain.
     if ((addr & 0xffff8000u) == 0x00880000u) {
@@ -638,7 +638,7 @@ void M2Board::write_dword(uint32_t addr, uint32_t data) {
         return;
     }
 #endif
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_BUS
     if ((addr >> kPageBits) == fast_write_page_) {
         std::memcpy(M2_AL(fast_write_base_ + (addr & 0xfff), 4), &data, 4);
         return;
@@ -647,7 +647,7 @@ void M2Board::write_dword(uint32_t addr, uint32_t data) {
     const Page &p = page(addr);
     switch (p.kind) {
     case Ram: {
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_BUS
         fast_write(addr, p);
 #endif
         uint32_t old; std::memcpy(&old, M2_AL(p.base + (addr & 0xfff), 4), 4);
