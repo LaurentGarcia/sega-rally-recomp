@@ -1,5 +1,48 @@
 # Handoff
 
+## Vita icon/LiveArea images, app name always "Daytona USA" (2026-10-12)
+
+Images in `platform/vita/logo_livearea/` (icon0, bg, startup, template.xml; not
+committed) go into the VPK when present, checked at configure time; otherwise the
+Vita defaults. The home-screen name no longer depends on the renderer. Not yet
+installed on a console (`platform/vita/HANDOFF.md`).
+
+## Vita rebindable controls (2026-10-12)
+
+Launcher Controls page: each game action (pedals, steering, shifts, start, coin,
+views) rebinds to one pad button, swaps on conflict, saved in vita.cfg; sticks and
+Select chords stay fixed. Effects volume default now 20. Host tests 35/35, Vita
+compile checks pass, not tried on a console (`platform/vita/HANDOFF.md`).
+
+## Vita music and effects volumes (2026-10-11)
+
+The desktop launcher's music/effects balance on the Vita (Options, defaults 100/75
+because the effects cover the music on the Vita's speakers); details in
+`platform/vita/HANDOFF.md`. Not yet heard on a console.
+
+## Shared runtime fast paths split from M2_DC_SPEED (2026-10-11)
+
+`src/runtime/fast_paths.h`: M2_FAST_BUS (TGP ports before the page table,
+remembered RAM pages), M2_FAST_TGP (FIFOs as a ring read directly by the TGP),
+M2_FAST_CPU (register frames through work RAM; needs M2_FAST_GEN), M2_FAST_GEO
+(block reads, culled polygons skip texture reads and lighting). M2_DC_SPEED turns
+them all on (Dreamcast unchanged, not rebuilt here); video (16-bit PVR layers),
+frame skip and M2_AL stay Dreamcast-only. The Vita turns the four on by default
+(`build_vita.py --no-fast-paths` to compare). New for the Vita: the TGP FIFO
+pointers are also set in the non-M2_DC_MEMORY constructor, and TgpBoard is not
+copyable with M2_FAST_TGP. Parity: desktop m2run with and without all five flags,
+race_basic and time_attack 6000 frames: same i960/TGP counts, interrupts, 120/120
+frame dumps and (race_basic) WAV identical; ctest 18/18. Console (probe 1, LTO,
+saturated race windows at the same 1,465 polygons/frame): 47.6 -> 50.4 emulated
+fps; i960 code 7.02 -> 6.10 ms, TGP 3.62 -> 3.30 ms, core 1 np_s 7.5 -> 6.5 us per
+polygon (`extern/perf/perf_probe_base.log` vs `perf_prob_modif_1.log`; the probe
+clock read calibrated 0.705 vs 0.939 us, unexplained). Not yet measured without
+probes. What not to re-propose for the Vita: `--fast-gen` (slower than
+`--fast-inaccuracy`: per-instruction checks), fast_gen.py's rewrite_tgp (rejects
+the --fast_inaccuracy TGP output; about 0.1 ms/frame to gain), M2_DC_SPIN_SKIP
+(Vita race frames end in the idle loop at about 44k instructions, never at the
+110k cap), the Dreamcast video paths (the Vita uses M2_VITA_RENDER_OPT's tile cache).
+
 ## Mobile upstream rebase and GPU startup diagnostics (2026-10-07)
 
 Rebased mobile onto original alphanu1 upstream/main 0435a46; recovery branch

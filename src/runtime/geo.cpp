@@ -138,10 +138,10 @@ static inline void xmtrx_apply(GeoVertex *v, float w)
 #endif
 
 // Three words (a point or a normal) from the input: one block read with
-// M2_DC_SPEED (GeoPtr::read: the same words), otherwise word by word.
+// M2_FAST_GEO (GeoPtr::read: the same words), otherwise word by word.
 static inline void read_point(GeoPtr &input, GeoVertex &v)
 {
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_GEO
 	uint32_t w[3];
 	input.read(w, 3);
 	v.x = u2f(w[0]);
@@ -305,7 +305,7 @@ inline bool Geo::check_culling(raster_state *raster, uint32_t attr, float min_z,
 template <unsigned NumVerts>
 void Geo::model2_3d_process_polygon(raster_state *raster, uint32_t attr)
 {
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_GEO
 	// Not zero-filled first (GeoVertex's initialisers, for every polygon):
 	// every field used below is written before it is read.
 	union ObjectStorage { ObjectStorage() {} quad_m2 q; } object_storage;
@@ -375,7 +375,7 @@ void Geo::model2_3d_process_polygon(raster_state *raster, uint32_t attr)
 		tp = GeoPtr16{raster->texture_rom, raster->texture_rom_mask + 1, raster->command_buffer[0] & raster->texture_rom_mask};
 #endif
 
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_GEO
 	// (Read below, for a polygon not culled: tp keeps this address.)
 #else
 	object.v[0].pv = *tp++;
@@ -404,7 +404,7 @@ void Geo::model2_3d_process_polygon(raster_state *raster, uint32_t attr)
 		th = GeoPtr16{raster->texture_rom, raster->texture_rom_mask + 1, raster->command_buffer[1] & raster->texture_rom_mask};
 #endif
 
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_GEO
 	// (Read below, for a polygon not culled: th keeps this address.)
 #else
 	object.texheader[0] = *th++;
@@ -426,7 +426,7 @@ void Geo::model2_3d_process_polygon(raster_state *raster, uint32_t attr)
 	/* set the luma value of this polygon */
 	object.luma = (raster->command_buffer[9] >> 15) & 0xff;
 
-#ifndef M2_DC_SPEED
+#ifndef M2_FAST_GEO
 	/* set the texture LOD of this polygon */
 	object.texlod = ((raster->command_buffer[10] >> 8) & 0x7f80) - 0x3f80;
 	object.texlod += raster->log_ram[raster->command_buffer[10] & 0x7fff];
@@ -458,7 +458,7 @@ void Geo::model2_3d_process_polygon(raster_state *raster, uint32_t attr)
 	if (cull == false)
 	{
 		int32_t clipped_verts;
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_GEO
 		// (As object: the clipper writes each vertex before reading it.)
 		union VertexStorage { VertexStorage() {} GeoVertex v[2][8]; } vertex_storage;
 		GeoVertex (&vertices)[2][8] = vertex_storage.v;
@@ -467,7 +467,7 @@ void Geo::model2_3d_process_polygon(raster_state *raster, uint32_t attr)
 #endif
 		GeoVertex *verts_in = vertices[0], *verts_out = vertices[1];
 
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_GEO
 		// Only a polygon not culled reads its texture coordinates, texture
 		// header and LOD (nothing above uses them; tp and th are where they
 		// were set, before the address updates): the same values.
@@ -1025,7 +1025,7 @@ void Geo::geo_parse_np_s(geo_state *geo, GeoPtr input, uint32_t count)
 		/* read in the attributes */
 		attr = *input++;
 
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_GEO
 		// The rasterizer waiting for this polygon's attribute (polygon data,
 		// slot 8): this polygon's words go straight into its slots and
 		// model2_3d_process_polygon is called directly, as model2_3d_push
@@ -1074,7 +1074,7 @@ void Geo::geo_parse_np_s(geo_state *geo, GeoPtr input, uint32_t count)
 			face = 0x100; /* rear */
 			if (dotp >= 0) face = 0; /* front */
 
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_GEO
 			// A polygon model2_3d_process_polygon will cull whatever its light
 			// (check_culling's first two tests: single-sided and facing away,
 			// or link type 0) needs no lighting: its luma word only the face
@@ -1118,7 +1118,7 @@ void Geo::geo_parse_np_s(geo_state *geo, GeoPtr input, uint32_t count)
 			distance = coef * fabs(dotp) * geo->lod;
 			}
 
-#ifdef M2_DC_SPEED
+#ifdef M2_FAST_GEO
 			if (direct)
 			{
 				uint32_t *const cb = raster->command_buffer;

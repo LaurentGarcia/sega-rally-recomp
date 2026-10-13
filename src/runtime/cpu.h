@@ -12,6 +12,8 @@
 #include <string>
 #include <utility>
 
+#include "runtime/fast_paths.h"
+
 // M2_AL(p, n): p, known n-aligned. With M2_DC_SPEED on GCC (the Dreamcast)
 // it tells the compiler, so a std::memcpy of n bytes through it is one load
 // or store: the SH-4 traps on unaligned access, and without it GCC calls
@@ -20,15 +22,6 @@
 #define M2_AL(p, n) static_cast<decltype(p)>(__builtin_assume_aligned((p), (n)))
 #else
 #define M2_AL(p, n) (p)
-#endif
-
-// M2_FAST_GEN: runtime support of the i960 code rewritten by fast_gen.py
-// (platform/dreamcast/scripts; the Vita build runs it too, scripts/build_vita.py)
-// and of m2recomp --fast_inaccuracy: Cpu::work_ram, gen::wram_*, Lockstep's
-// pending/check/set_end/epoch. The Dreamcast's M2_DC_SPEED includes it; the
-// Vita build defines it alone (platform/vita/CMakeLists.txt).
-#if defined(M2_DC_SPEED) && !defined(M2_FAST_GEN)
-#define M2_FAST_GEN 1
 #endif
 
 namespace rt {

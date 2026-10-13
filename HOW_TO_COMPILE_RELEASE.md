@@ -13,7 +13,9 @@
 
 ```sh
 export VITASDK=/usr/local/vitasdk
-python3 scripts/setup_vitagl.py                                   # once: builds vitaGL in extern/vitagl
+python3 scripts/setup.py
+python3 scripts/recompile.py
+python3 scripts/setup_vitagl.py  # once: builds vitaGL in extern/vitagl
 python3 scripts/build_vita.py --gpu-gl --fast-inaccuracy --release
 ```
 
