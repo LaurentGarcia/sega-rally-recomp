@@ -17,18 +17,27 @@ Later events apply after that many frames have finished rendering and before
 the next call to resume the machine, matching the frontend's input boundary.
 These are rendered-frame counts, not screen latch numbers or wall-clock time.
 
-For example, this coin/start probe holds each button for ten rendered frames:
+The fresh verified cabinet configuration needs two coins for one credit.
+This measured coin/start sequence holds each button for ten rendered frames:
 
 ```text
 segarally-input-v1
 # frame in0 in1 in2 switches steering gas brake analog3..7
 1200 fe 8f 00 ff 80 00 00 ff ff ff ff ff # coin
 1210 ff 8f 00 ff 80 00 00 ff ff ff ff ff # release
+1220 fe 8f 00 ff 80 00 00 ff ff ff ff ff # second coin
+1230 ff 8f 00 ff 80 00 00 ff ff ff ff ff # release
 1240 bf 8f 00 ff 80 00 00 ff ff ff ff ff # start
 1250 ff 8f 00 ff 80 00 00 ff ff ff ff ff # release
 ```
 
-This is an input probe, not a known successful driving replay. Coin is active
+This reaches Car Select on the frozen v3 generation. A single coin visibly
+produces CREDIT 1/2 and does not buy a game. The complete versioned replay
+`config/segarally_lancia_select.inputs` additionally steers right at frame 1800,
+centers at 1820, presses gas at 1840 and releases at 1850. A captured menu
+confirms the Lancia with automatic transmission is selected. On v3 it then
+stops at callback `0x005e4380`, during a white transition at frame 1915; race
+entry remains unverified. Coin is active
 low bit 0 of `in0`; start is active low bit 6. The first three analog bytes
 control steering (center `80`), gas and brake. Other pins use the same raw
 cabinet wiring as the SDL frontend; no game variables or saved memory are
@@ -49,3 +58,6 @@ still compared. It freezes the file as `parity-input.txt` with a SHA-256 in
 native machine's input instruction/cycle boundaries exactly and passes through
 100 million instructions. This test uses the inherited independent CPU engine
 with shared board implementations; it is not a full emulator or PCB replay.
+The complete Lancia-selection replay also passes 376,736,993 instructions,
+6,518,236 ordered writes and 832,720,369 cycles through that same callback.
+Every input event's instruction/cycle boundary matches the native machine.

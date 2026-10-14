@@ -10,12 +10,17 @@ from the user's ROMs, not Sega's original source code.
 
 ## Current state
 
-The repository is in bring-up. The expanded address-label profile produces
+The repository is in bring-up. The frozen first-car profile produces
 68,953 native i960 instructions and 47 compiled objects. The core executes
 reset at `0x420`, copies and checks its RAM code, initializes the I/O chip,
 and displays the original startup warning and Sega Rally 1995 logo. Independent
 CPU execution agrees through 321,115,347 instructions and 1,634 rendered frames,
 including the first car/course scene.
+An exact two-coin/start/steering/gas replay reaches Car Select and selects the
+automatic Lancia. Independent CPU/device parity follows that path through
+376,736,993 instructions and 1,915 rendered frames, stopping at a missing
+callback during the transition after selection. The versioned replay is
+`config/segarally_lancia_select.inputs`; playable racing remains unverified.
 The longer native run renders the Martini Lancia, another rally car and a
 forest/gravel course before an unresolved callback. This establishes a first
 3D scene; completed attract mode and racing are not established. I/O, EEPROM, communication, UART, video, timers and screen
@@ -38,8 +43,10 @@ The dedicated SDL3/Metal frontend builds on macOS and iPhone. Its first native
 iPhone package is installed as **Sega Rally Native**, separately from the
 earlier prototype. It launches and initializes the A15 Metal device; phone frame
 capture and gameplay validation remain pending. On macOS,
-the startup warning frame matches the CPU renderer pixel for pixel. Polygon
-and racing-scene parity still require actual 3D captures.
+the startup warning frame matches the CPU renderer pixel for pixel. A paired
+3D car capture has 8.31% differing pixels; a frozen-scene diagnostic attributes
+most average error to whole-polygon versus triangle-fan interpolation. Exact
+graphics fidelity and racing-scene parity remain unresolved.
 
 Daytona's instruction decoder, C++ generator, CPU services, geometry, rasterizer,
 SDL3 host, Metal shaders, and tests form the starting codebase. Game-specific

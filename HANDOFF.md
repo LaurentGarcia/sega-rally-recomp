@@ -1,5 +1,32 @@
 # Handoff
 
+## Real coin/start and Lancia selection with independent parity (2026-10-14)
+
+The frozen v3 core accepts real cabinet inputs and reaches Car Select. The
+fresh cabinet needs two coins: the first probe visibly showed CREDIT 1/2,
+so its Start pulse did not leave attract mode. Two separate coin pulses at
+frames 1200/1220 and Start at 1240 reach the menu, captured at frame 1777.
+Steering right at 1800 and pressing gas at 1840 selects Lancia AT; the coupled
+sound lane's frame 1841 visibly highlights that option. The exact ten-event
+schedule is now versioned as `config/segarally_lancia_select.inputs`.
+
+The sound-disabled native run stops during the subsequent white transition
+at missing callback `0x005e4380`, called from `0x005de478`, with g0 `0x00510a00`.
+It reaches 376,736,993 instructions, 832,720,369 cycles, 19,541 IRQs, 1,915
+renders / 1,916 parses and pixel hash `54fd87f7d2db4325`. Geometry first appears
+at frame 1235; 665 frames contain geometry. Race entry and driving remain
+unverified. Evidence is under ignored `build/validation/input-replay/`.
+
+Independent CPU/device parity passes the exact replay through the same
+frontier, checking 6,518,236 ordered writes and 33,308,814 physical UART edges.
+All ten input events match the shared machine's instruction and cycle boundaries
+exactly. The coupled sound run also matches the first nine event boundaries,
+then stops at its newly observed sound callback `0x6016ce` just after the gas
+assertion; the release event is still pending there. No game state was patched
+and neither missing callback was skipped. Next: compile the observed callback
+entries, proceed through race entry and make the live host replay this proven
+selection sequence before handing control to the user.
+
 ## Coupled sound reaches the first extended 3D sequence (2026-10-14)
 
 A separate copy of the 73,657-instruction v4 main profile, under ignored
