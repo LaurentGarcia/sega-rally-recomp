@@ -159,6 +159,17 @@ graphics fidelity remains under investigation. Hidden Metal captures preserve
 the visible Mac instance. The Mac launcher validates assets, packages them in
 SDL's `Contents/Resources` base path, and starts a normal application through
 LaunchServices with a persistent diagnostic log.
+An isolated same-scene CPU triangle-fan rerender reduces the GPU difference
+to 1,602 pixels and mean channel error 0.040408/255. This attributes 94.45% of
+mean error to polygon interpolation: the CPU uses outer scanline edges for
+four-to-eight-vertex polygons; the GPU uses triangle fans. Production shaders
+are unchanged at this checkpoint. Residual edge/texture/precision differences
+remain separate. Any correction must preserve the common shader path and the
+existing ordering/tile contracts, with real-scene and performance checks.
+The host also accepts the bounded cabinet replay and holds its final snapshot
+through one complete frame before handing control to keyboard/touch. Both
+rendering instances receive identical inputs. Normal board-time pacing is the
+Mac launch default; unthrottled runs are explicit diagnostics.
 Bundled assets are verified Xcode resource inputs so signing follows copying,
 including incremental builds; post-signing bundle mutation is not allowed.
 

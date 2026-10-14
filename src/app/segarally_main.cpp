@@ -3,6 +3,7 @@
 #include "app/gpu/gpu_renderer.h"
 #include "app/gpu_device.h"
 #include "app/segarally_touch.h"
+#include "../../tools/srally_boot/input_replay.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <algorithm>
@@ -68,7 +69,7 @@ void capture_reference(const rt::Video &video,const std::filesystem::path &path)
 } // namespace
 
 int segarally_host_main(int argc,char **argv) {
-    std::filesystem::path data,saves,capture_path,reference_path,log_path;
+    std::filesystem::path data,saves,capture_path,reference_path,log_path,replay_path;
     uint64_t frame_limit=0,instruction_limit=0;
     bool touch_visible=false,unthrottled=false,hidden=false;
     if(const char *env=std::getenv("SEGARALLY_DATA_DIR")) data=env;
@@ -83,7 +84,8 @@ int segarally_host_main(int argc,char **argv) {
         else if(arg=="--unthrottled") unthrottled=true;
         else if(arg=="--hidden") hidden=true;
         else if(arg=="--log") log_path=value();
-        else if(arg=="--help") {puts("Sega Rally native: --data DIR --save-dir DIR --frames N --instructions N --capture FILE.ppm --reference-capture FILE.ppm --touch --unthrottled --hidden --log FILE\nKeys: arrows steer, Z gas, X brake, C coin, Return start, V view, A/S gear down/up, Space handbrake, F2 service, F3 test, Escape quit.");return 0;}
+        else if(arg=="--input-replay") replay_path=value();
+        else if(arg=="--help") {puts("Sega Rally native: --data DIR --save-dir DIR --frames N --instructions N --capture FILE.ppm --reference-capture FILE.ppm --touch --unthrottled --hidden --log FILE --input-replay FILE\nKeys: arrows steer, Z gas, X brake, C coin, Return start, V view, A/S gear down/up, Space handbrake, F2 service, F3 test, Escape quit.");return 0;}
         else throw std::runtime_error("Unknown argument "+arg);
     }
     if(!log_path.empty()) {
@@ -91,6 +93,13 @@ int segarally_host_main(int argc,char **argv) {
         setvbuf(stderr,nullptr,_IONBF,0);
     }
     fprintf(stderr,"Sega Rally native host startup\n");
+    std::unique_ptr<srally::InputReplay> replay;
+    if(!replay_path.empty()) {
+        std::ifstream stream(replay_path);
+        if(!stream) throw std::runtime_error("Cannot read input replay "+replay_path.string());
+        replay=std::make_unique<srally::InputReplay>(stream);
+        fprintf(stderr,"Input replay loaded: %zu events, completed-render frame boundaries\n",replay->size());
+    }
     SDL_SetMainReady();SDL_SetHint(SDL_HINT_GPU_DRIVER,"metal");
     if(hidden) SDL_SetHint(SDL_HINT_MAC_BACKGROUND_APP,"1");
     if(!SDL_Init(SDL_INIT_VIDEO)) {fprintf(stderr,"SDL_Init: %s\n",SDL_GetError());return 1;}
@@ -130,6 +139,7 @@ int segarally_host_main(int argc,char **argv) {
             throw std::runtime_error(std::string("Metal pipelines: ")+gpu.error()+" "+SDL_GetError());
         touch.visible=touch_visible;touch.layout(window);
         bool quit=false,background=false,stopped=false;int gear=0;
+        uint64_t replay_release_frame=0;bool replay_manual_takeover=false;
         Uint64 start=SDL_GetTicksNS();uint64_t displayed=0,last_frames=0;
         while(!quit) {
             SDL_Event event;
@@ -145,19 +155,33 @@ int segarally_host_main(int argc,char **argv) {
             const bool *keys=SDL_GetKeyboardState(nullptr);
             if(keys[SDL_SCANCODE_ESCAPE]) quit=true;
             auto &in=machine->inputs();
-            in.in0=0xff;
-            auto low=[&](unsigned bit,bool held){if(held) in.in0&=uint8_t(~(1u<<bit));};
-            low(0,keys[SDL_SCANCODE_C]||touch.held[rally::Coin]);low(6,keys[SDL_SCANCODE_RETURN]||touch.held[rally::Start]);
-            low(5,keys[SDL_SCANCODE_V]||touch.held[rally::View]);low(2,keys[SDL_SCANCODE_F2]);low(3,keys[SDL_SCANCODE_F3]);
-            static bool last_up=false,last_down=false;
-            const bool up=keys[SDL_SCANCODE_S]||touch.held[rally::GearUp],down=keys[SDL_SCANCODE_A]||touch.held[rally::GearDown];
-            if(up&&!last_up) gear=std::min(4,gear+1);if(down&&!last_down) gear=std::max(0,gear-1);last_up=up;last_down=down;
-            constexpr uint8_t gears[]={0,0x20,0x10,0x60,0x50};in.in1=uint8_t(0x8f|gears[gear]);
-            in.in2=(keys[SDL_SCANCODE_SPACE]||touch.held[rally::Handbrake])?0xff:0;
-            const int steering=int(keys[SDL_SCANCODE_RIGHT]||touch.held[rally::Right])-int(keys[SDL_SCANCODE_LEFT]||touch.held[rally::Left]);
-            in.analog[0]=steering<0?0:steering>0?255:128;
-            in.analog[1]=(keys[SDL_SCANCODE_Z]||touch.held[rally::Gas])?255:0;
-            in.analog[2]=(keys[SDL_SCANCODE_X]||touch.held[rally::Brake])?255:0;
+            const auto before=machine->stats();
+            if(replay && replay->apply(before.frames_rendered,in)) {
+                fprintf(stderr,"Input replay event: frame=%llu instructions=%llu cycles=%llu in0=%02x steer=%02x gas=%02x brake=%02x\n",
+                    static_cast<unsigned long long>(before.frames_rendered),static_cast<unsigned long long>(before.instructions),
+                    static_cast<unsigned long long>(before.reference_cycles),in.in0,in.analog[0],in.analog[1],in.analog[2]);
+                if(replay->applied()==replay->size()) replay_release_frame=before.frames_rendered+1;
+            }
+            const bool replay_active=replay && (replay->applied()<replay->size() || before.frames_rendered<replay_release_frame);
+            if(replay && !replay_active && !replay_manual_takeover) {
+                replay_manual_takeover=true;
+                fprintf(stderr,"Input replay complete: manual takeover at frame=%llu\n",static_cast<unsigned long long>(before.frames_rendered));
+            }
+            if(!replay_active) {
+                in={};
+                auto low=[&](unsigned bit,bool held){if(held) in.in0&=uint8_t(~(1u<<bit));};
+                low(0,keys[SDL_SCANCODE_C]||touch.held[rally::Coin]);low(6,keys[SDL_SCANCODE_RETURN]||touch.held[rally::Start]);
+                low(5,keys[SDL_SCANCODE_V]||touch.held[rally::View]);low(2,keys[SDL_SCANCODE_F2]);low(3,keys[SDL_SCANCODE_F3]);
+                static bool last_up=false,last_down=false;
+                const bool up=keys[SDL_SCANCODE_S]||touch.held[rally::GearUp],down=keys[SDL_SCANCODE_A]||touch.held[rally::GearDown];
+                if(up&&!last_up) gear=std::min(4,gear+1);if(down&&!last_down) gear=std::max(0,gear-1);last_up=up;last_down=down;
+                constexpr uint8_t gears[]={0,0x20,0x10,0x60,0x50};in.in1=uint8_t(0x8f|gears[gear]);
+                in.in2=(keys[SDL_SCANCODE_SPACE]||touch.held[rally::Handbrake])?0xff:0;
+                const int steering=int(keys[SDL_SCANCODE_RIGHT]||touch.held[rally::Right])-int(keys[SDL_SCANCODE_LEFT]||touch.held[rally::Left]);
+                in.analog[0]=steering<0?0:steering>0?255:128;
+                in.analog[1]=(keys[SDL_SCANCODE_Z]||touch.held[rally::Gas])?255:0;
+                in.analog[2]=(keys[SDL_SCANCODE_X]||touch.held[rally::Brake])?255:0;
+            }
             bool new_frame=false;
             if(!stopped && !quit) {
                 const uint64_t completed=machine->stats().instructions;
@@ -212,6 +236,8 @@ int segarally_host_main(int argc,char **argv) {
         if(!capture_path.empty() && displayed) capture(device,screen,capture_path);
         if(reference && displayed) capture_reference(reference->video(),reference_path);
         save(*machine,saves);
+        if(replay) fprintf(stderr,"Input replay exit: events=%zu applied=%zu pending=%zu manual_takeover=%d\n",
+            replay->size(),replay->applied(),replay->size()-replay->applied(),int(replay_manual_takeover));
         const auto stats=machine->stats();
         fprintf(stderr,"Native host exit: frames=%llu instructions=%llu cycles=%llu pc=%08x result=%d\n",
             static_cast<unsigned long long>(displayed),static_cast<unsigned long long>(stats.instructions),

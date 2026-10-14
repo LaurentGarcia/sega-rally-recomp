@@ -12,6 +12,8 @@ import subprocess
 ROOT=Path(__file__).resolve().parents[3]
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--build-dir",type=Path,default=ROOT/"build/segarally-mac")
+parser.add_argument("--unthrottled",action="store_true",help="Disable board-time pacing for diagnostics")
+parser.add_argument("--input-replay",type=Path,help="Optional cabinet input replay, then manual control")
 args=parser.parse_args()
 build=args.build_dir.resolve()
 if not build.is_relative_to(ROOT/"build"):
@@ -44,8 +46,10 @@ try:
             "CFBundleShortVersionString":"0.1","CFBundleVersion":"1",
             "NSHighResolutionCapable":True,"NSPrincipalClass":"NSApplication"},file)
     subprocess.run(["codesign","--force","--sign","-",str(app)],check=True)
-    subprocess.run(["open","-n",str(app),"--args","--unthrottled","--save-dir",str(build/"live-app-save"),
-                    "--log",str(build/"live-app.log")],check=True)
+    startup=["--save-dir",str(build/"live-app-save"),"--log",str(build/"live-app.log")]
+    if args.unthrottled:startup.append("--unthrottled")
+    if args.input_replay:startup += ["--input-replay",str(args.input_replay.resolve())]
+    subprocess.run(["open","-n",str(app),"--args",*startup],check=True)
     print(f"Opened {app}; startup log {build/'live-app.log'}")
 except (OSError,ValueError,KeyError,subprocess.SubprocessError) as error:
     parser.exit(2,f"launch: {error}\n")

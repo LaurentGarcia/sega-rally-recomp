@@ -1,5 +1,39 @@
 # Handoff
 
+## Interactive replay and measured Metal interpolation difference (2026-10-14)
+
+The SDL3 host and Mac launcher accept the same `--input-replay FILE` format.
+The host holds the final snapshot for one completed frame, then returns to
+current keyboard/touch input. The paired CPU renderer receives identical input
+at every resumed step. A hidden three-frame press/release check applies frame
+zero before execution, releases at frame one (285,550 instructions / 475,600
+cycles), and hands over at frame two; GPU/CPU captures match exactly. Invalid
+schema fails before SDL initialization. Strict host compilation, Python compile,
+help and diff checks pass. Interactive Mac launches now use normal board-time
+pacing; `--unthrottled` remains explicit. No visible app was relaunched here.
+
+The frozen first-car scene contains 1,683 polygons for rendered frame 1,634;
+the earlier 1,692 figure describes the next parsed vblank before another render.
+An isolated rerender of its exact primitive and memory state reproduces the CPU
+reference byte for byte. Changing only that diagnostic CPU renderer to use
+vertex-zero triangle fans reduces GPU disagreement from 15,830 to 1,602 pixels,
+and mean absolute channel error from 0.727817 to 0.040408 out of 255. Thus
+whole-polygon versus triangle-fan interpolation explains 94.45% of measured mean
+error. The production renderer has not been changed. CPU polygons with four to
+eight vertices interpolate between outer scanline edges, whereas the inherited
+GPU path splits all polygons into triangle fans.
+
+Residual errors remain separate: 32 pixels exceed channel error 32, including
+eight over 128. Three of those eight lie within 0.0014 pixels of a projected
+edge; the others also require texture/alpha/precision investigation. This is not
+exact raster parity or proof of physical hardware fidelity. Evidence is under
+ignored `build/validation/car-interpolation`. Primitive-stream SHA-256 is
+`45d4b1346131d3924743113b1e5d57089fd3dafceb0b49c998f0721b357c01ca`;
+diagnostic harness `e75223f7070413ba572428ddd16bf6a7d628152a1909b4988ff5946ac882c4c8`.
+Next: prototype whole-polygon texture interpolation in the common GPU shader,
+preserving existing polygon order, tile passes and Metal rendering; compare
+actual scenes and performance before changing the production default.
+
 ## Expanded object-update coverage for the race transition (2026-10-14)
 
 The frozen v4 generation contains 73,945 instructions, 51 compiled objects
