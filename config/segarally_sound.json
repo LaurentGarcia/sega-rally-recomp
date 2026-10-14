@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "romset": "srallycb",
+  "board": "model2a",
+  "sound_board": "scsp",
+  "source": {
+    "repository": "https://github.com/mamedev/mame",
+    "commit": "dddd73680656e355bb2b5beecab1167c9f07bf81",
+    "path": "src/mame/sega/model2.cpp",
+    "sha256": "359d7fa309c0bca6c93f5c0826011a7054ae8f04068e9df995188a6256c995b6",
+    "definition": "ROM_START(srallycb), model2_snd, model2_scsp, reset_model2_scsp"
+  },
+  "image_byte_order": "big-endian bus bytes, independent of host endianness",
+  "clocks_hz": {"m68000": 11289600, "scsp": 22579200, "uart_external": 500000, "midi_baud": 31250},
+  "reset": {
+    "sound_ram_bytes": 524288,
+    "copy_audiocpu_offset": 0,
+    "copy_ram_offset": 0,
+    "copy_bytes": 16,
+    "audiocpu_bus_base": "0x600000",
+    "expected_vectors": ["0x00005000", "0x00600100", "0x00600682", "0x00600682"]
+  },
+  "regions": [
+    {
+      "name": "audiocpu", "size": 524288, "fill": 0,
+      "loads": [
+        {"file": "epr-17890a.30", "aliases": ["epr-17890.30"],
+         "alias_basis": "Supplied archive uses the older label; both CRC32 and SHA1 match the pinned canonical image.",
+         "offset": 0, "size": 262144, "load": "ROM_LOAD16_WORD_SWAP",
+         "crc32": "5bac3fa1", "sha1": "3635333d36463b6fab25560ed918e05138f964dc"}
+      ]
+    },
+    {
+      "name": "samples", "size": 8388608, "fill": 0,
+      "loads": [
+        {"file": "mpr-17756.31", "offset": 0, "size": 2097152, "load": "ROM_LOAD16_WORD_SWAP",
+         "crc32": "7725f111", "sha1": "1f1ee3f19a6bcf57bc5a1c7dd64ee83f8b81f084"},
+        {"file": "mpr-17757.32", "offset": 2097152, "size": 2097152, "load": "ROM_LOAD16_WORD_SWAP",
+         "crc32": "1616e649", "sha1": "1d3a0e441d150ada0535a9d50e2f69dd4b99c584"},
+        {"file": "mpr-17886.36", "offset": 4194304, "size": 2097152, "load": "ROM_LOAD16_WORD_SWAP",
+         "crc32": "54a72923", "sha1": "103c4838b27378c834c08d29d6fb6ba95e7f9d03"},
+        {"file": "mpr-17887.37", "offset": 6291456, "size": 2097152, "load": "ROM_LOAD16_WORD_SWAP",
+         "crc32": "38c31fdd", "sha1": "a85f05160b060d9d4a431aaa73cfc03f24214fb9"}
+      ]
+    }
+  ]
+}

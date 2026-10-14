@@ -113,6 +113,8 @@ add_library(runtime STATIC
     src/runtime/model2a_control.cpp
     src/runtime/model2a_clock.cpp
     src/runtime/model2a_video.cpp
+    src/runtime/model2_uart.cpp
+    src/runtime/model2a_uart.cpp
     src/runtime/game_loop.cpp
     src/runtime/zip.cpp
     src/runtime/rom_import.cpp
@@ -408,6 +410,15 @@ add_executable(test_model2a_video tests/test_model2a_video.cpp
     src/runtime/video.cpp src/runtime/raster.cpp src/runtime/geo.cpp)
 target_include_directories(test_model2a_video PRIVATE src)
 add_test(NAME model2a_video COMMAND test_model2a_video)
+
+add_executable(test_model2_uart tests/test_model2_uart.cpp src/runtime/model2_uart.cpp)
+target_include_directories(test_model2_uart PRIVATE src)
+add_test(NAME model2_uart COMMAND test_model2_uart)
+
+add_executable(test_model2a_uart tests/test_model2a_uart.cpp src/runtime/model2a_uart.cpp
+    src/runtime/model2_uart.cpp src/runtime/model2a_bus.cpp src/runtime/cpu.cpp)
+target_include_directories(test_model2a_uart PRIVATE src)
+add_test(NAME model2a_uart COMMAND test_model2a_uart)
 
 add_executable(test_decode tests/test_decode.cpp)
 target_link_libraries(test_decode PRIVATE i960)

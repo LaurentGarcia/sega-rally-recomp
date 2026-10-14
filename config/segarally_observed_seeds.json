@@ -11,6 +11,26 @@
       "observed_after_instructions": 1182657,
       "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
       "provenance": "Native missing-code frontier after real reset and checked ROM-to-RAM copy; canonical ROM PC = 0x1000 + (0x5d0710 - 0x5a0000). Linear decoding at the canonical ROM address confirms an executable entry; no lifted implementation copied."
+    },
+    {
+      "address": "0x0000c6a4",
+      "observed_runtime_address": "0x005ab6a4",
+      "name": "observed_startup_warning_dispatch_target",
+      "evidence": "build/segarally-timed/evidence/native-005ab6a4.json",
+      "observed_after_instructions": 182304560,
+      "observed_reference_cycles": 403346976,
+      "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+      "provenance": "Native missing-code frontier after 927 rendered startup frames with shared screen/timer/UART clocks and Rally's own uploaded native TGP. Canonical ROM PC = 0x1000 + (0x5ab6a4 - 0x5a0000). The generated dispatcher reported the actual target; no game instruction or return value was patched."
+    },
+    {
+      "address": "0x0000f9c4",
+      "observed_runtime_address": "0x005ae9c4",
+      "name": "observed_startup_indirect_target_005ae9c4",
+      "evidence": "build/segarally-timed-v2/evidence/native-005ae9c4.json",
+      "observed_after_instructions": 182692288,
+      "observed_reference_cycles": 404204373,
+      "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+      "provenance": "Actual generated-code dispatcher frontier after the startup warning, 929 rendered frames and 37414 native TGP instructions. Canonical ROM PC = 0x1000 + (0x5ae9c4 - 0x5a0000); no game state or instruction patched."
     }
   ]
 }

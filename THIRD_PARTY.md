@@ -95,6 +95,35 @@ for `src/mame/sega/segaic24.cpp`. The video ROM manifest records public
 `srallycb` and `MODEL2A_VID_BOARD` size/checksum/loading metadata from the
 pinned `model2.cpp`; no ROM content is stored in source control.
 
+`model2_uart` adapts pinned MAME's asynchronous i8251 and serial-interface
+logic (BSD-3-Clause, smf, Robbbert, Carl, Miodrag Milanovic, Vas Crabb; notices
+retained). Device framework and internal timers become explicit physical pin
+edges and callbacks. Idle sync programming/reset is supported; synchronous
+activity is an explicit frontier. Reference frame/parity/reset quirks remain.
+`model2a_uart` supplies the exact Model 2A lanes and clock-pin wiring from
+the pinned `model2.cpp`. Additional source SHA-256 hashes:
+
+| Reference file | SHA-256 |
+| --- | --- |
+| `src/devices/machine/i8251.cpp` | `274e29a659c75302acdc8ab746034b88c7e337e8122135eac9372db6b0832931` |
+| `src/devices/machine/i8251.h` | `a99ee4e12ad03574fd99901ec5a88c84314c3972f5111be0897a07fd2f5f94f2` |
+| `src/emu/diserial.cpp` | `34ab348975fcafebaf7f5154fcce722b942ea1aefe10a0f5f78296b467310803` |
+| `src/emu/diserial.h` | `a787f56d47cc003b6f13918e81ba7115908de28549d3d69a8fc6da951637c53f` |
+| `src/devices/machine/clock.cpp` | `97d1b6bf24b452c0984790a4ecc45c1b405f144d13d664ecbf1b575af2b75d4f` |
+
+The sound manifest imports public `srallycb` layout/checksum metadata from
+the same `model2.cpp`. Portable big-endian byte normalization was checked
+against `src/emu/romload.cpp` (BSD-3-Clause), SHA-256
+`854873d6f1b33d1dd3614a219b4b744f8fefb11708c8389141157825599f275f`.
+The SCSP source was read for the sound-board inventory, not yet linked:
+`src/devices/sound/scsp.cpp/.h`, hashes
+`11750fa03db0324cedc8a56ac481537df1991e58d3ef522e6ca737694dc1a259` and
+`82636b35d049e2e07f0df5b778d1fd87cc3152e5a7d53fe0da64e3bd1206b1d5`;
+`scspdsp.cpp/.h`, hashes
+`9d4b1de166e5d7d5128b591c612eff3fd5cec78af79c1acabb9d5e93341917fd` and
+`db522ecaa04665063e46f7f6c699eb7781c672fd7624ac58a60b0b180652d3cc`.
+All are BSD-3-Clause at the same pinned MAME revision.
+
 This project's own code is under the BSD-3-Clause licence (`LICENSE`). The
 code below keeps its own licence and notices; every component linked into the
 game is under a licence compatible with it (BSD, zlib, MIT, public domain).

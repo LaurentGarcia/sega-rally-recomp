@@ -28,16 +28,22 @@ def main() -> int:
     parser.add_argument("--with-control", action="store_true", help="Connect the IRQ controller and countdown timers at instruction boundaries")
     parser.add_argument("--with-video", action="store_true", help="Connect shared video hardware and verified graphics ROMs (requires --with-tgp)")
     parser.add_argument("--with-screen", action="store_true", help="Schedule screen events and render real display lists (requires --with-control --with-video)")
+    parser.add_argument("--with-uart", action="store_true", help="Connect the timed main-board UART with idle RX (requires --with-control; SCSP not connected)")
+    parser.add_argument("--capture-frame", action="store_true", help="Save the latest rendered startup frame as boot-frame.ppm (requires --with-screen)")
     args = parser.parse_args()
     output = args.build_dir.resolve()
     if not output.is_relative_to(ROOT / "build"):
         parser.error("--build-dir must be inside this project's ignored build directory")
-    if not 1 <= args.instructions <= 100_000_000:
-        parser.error("--instructions must be 1..100000000")
+    if not 1 <= args.instructions <= 1_000_000_000:
+        parser.error("--instructions must be 1..1000000000")
     if args.with_video and not args.with_tgp:
         parser.error("--with-video requires --with-tgp for the shared geometry buffer")
     if args.with_screen and not (args.with_control and args.with_video):
         parser.error("--with-screen requires --with-control and --with-video")
+    if args.with_uart and not args.with_control:
+        parser.error("--with-uart requires --with-control for its ready IRQ pins")
+    if args.capture_frame and not args.with_screen:
+        parser.error("--capture-frame requires --with-screen")
     try:
         audit = json.loads((output / "coverage.json").read_text())
         if audit.get("board") != "model2a" or not audit.get("native_objects_compiled"):
@@ -73,6 +79,8 @@ def main() -> int:
             command += ["-DM2_SRALLY_CONTROL", "src/runtime/model2a_control.cpp"]
         if args.with_screen:
             command += ["-DM2_SRALLY_SCREEN"]
+        if args.with_uart:
+            command += ["-DM2_SRALLY_UART", "src/runtime/model2_uart.cpp", "src/runtime/model2a_uart.cpp"]
         if args.with_tgp:
             tgp_dir = output / "tgp"
             tgp_audit = json.loads((tgp_dir / "audit.json").read_text())
@@ -103,17 +111,20 @@ def main() -> int:
                         "src/runtime/raster.cpp", "src/runtime/geo.cpp"]
         with (output / "boot-build.log").open("w") as log:
             subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, check=True)
-        result = subprocess.run([str(executable), *map(str, images), str(args.instructions), *map(str, tgp_images), *map(str, video_images)],
-            cwd=ROOT, capture_output=True, text=True, timeout=30)
+        capture = [str(output / "boot-frame.ppm")] if args.capture_frame else []
+        result = subprocess.run([str(executable), *map(str, images), str(args.instructions), *map(str, tgp_images), *map(str, video_images), *capture],
+            cwd=ROOT, capture_output=True, text=True, timeout=180)
         transcript = result.stdout + result.stderr
         (output / "boot.txt").write_text(transcript)
         report = {"native_core_linked": True, "full_game_boot_verified": False,
                   "native_tgp_linked": args.with_tgp,
-                  "native_io_linked": args.with_io, "board_clock_connected": args.with_io,
+                  "native_io_linked": args.with_io,
+                  "board_clock_connected": args.with_io or args.with_control,
                   "native_comm_linked": args.with_comm, "comm_peer_connected": False,
                   "native_control_linked": args.with_control,
                   "native_video_linked": args.with_video,
-                  "video_clock_connected": args.with_screen, "uart_connected": False,
+                  "video_clock_connected": args.with_screen, "uart_connected": args.with_uart,
+                  "scsp_sound_board_connected": False,
                   "clock_source": "pinned_mame_i960_cycles_at_25mhz", "pcb_timing_verified": False,
                   "instruction_limit": args.instructions, "exit_code": result.returncode,
                   "image_sha256": {name: audit["images"][name]["sha256"] for name in ("program", "main_data")},
@@ -121,6 +132,10 @@ def main() -> int:
         for line in result.stdout.splitlines():
             if line.startswith("status="):
                 report["frontier"] = dict(token.split("=", 1) for token in line.split() if "=" in token)
+            elif line.startswith("frame_capture "):
+                report["frame_capture"] = {"path": capture[0],
+                    "sha256": hashlib.sha256(Path(capture[0]).read_bytes()).hexdigest(),
+                    **dict(token.split("=", 1) for token in line.split() if "=" in token)}
         (output / "boot.json").write_text(json.dumps(report, indent=2) + "\n")
         print(transcript, end="")
         print(f"Boot frontier report: {output / 'boot.json'}")

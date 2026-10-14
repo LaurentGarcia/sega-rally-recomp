@@ -1,5 +1,49 @@
 # Handoff
 
+## Native UART and first visible startup screens (2026-10-14)
+
+The timed i8251/uPD71051 path now executes the actual control recovery sequence
+`00 00 00 40 4e 37`: idle sync programming, reset-to-mode, then 8N1 at x16.
+Physical clock edges begin high at 1 us and low at 2 us, alternating thereafter
+from the shared queue. Ready pins feed the existing IRQ controller; RX remains
+idle because SCSP is not connected. No sound acknowledgment is manufactured.
+Actual synchronous serial activity is fenced; async reference limitations are
+documented in the source. Strict and sanitizer suites pass 49,152 transmit and
+49,152 receive frames over 192 formats, plus reset, errors, pin/buffer behavior
+and exact Model 2A bus lanes. Dedicated CMake tests pass.
+
+Independent native/reference startup matches 100,000,000 instructions,
+1,719,294 cycle-stamped writes, 223,328,073 reference cycles and 4,585 IRQ
+entries. All 8,933,122 physical UART edges and output/ready events agree, as do
+full chip/control/queue state and final video RAM/pixels. Both render 513
+frames with screen hash `c2b1e0b7602037ac`. The capture is the game's Japanese
+region startup warning, visually inspected. The main CPU has uploaded and
+executed its real TGP program (19,074 native TGP instructions at this point).
+This extends the earlier separate upload probe into actual main-game startup.
+
+Longer native runs discover two actual indirect entries, now recorded in the
+observed-seed manifest: runtime `0x005ab6a4` after 182,304,560 instructions,
+then `0x005ae9c4` after 182,692,288. The separate ignored
+`build/segarally-timed-v2` profile contains 66,537 instructions / 46 objects;
+the old `build/segarally-timed` retains the 100-million parity baseline.
+The new profile reaches the Sega Rally Championship 1995 logo, captured and
+visually inspected, then stops at missing target `0x005af878` after
+266,510,626 instructions / 588,905,944 cycles / 1,354 rendered frames.
+That target comes from an executed, bounded seven-entry jump table at
+`0x005af85c`, dispatched at `0x005af858`; table analysis is next. The longer
+logo run is native evidence, not yet an independent CPU parity checkpoint.
+Capture output remains ignored (`--capture-frame` writes `boot-frame.ppm`).
+
+The SCSP sound importer verifies all five sound ROMs, including the supplied
+`epr-17890.30` alias matching canonical `epr-17890a.30` by CRC32/SHA1. Portable
+images use big-endian bus byte order. Reset copies exactly 16 ROM bytes to
+512 KiB sound RAM, producing SSP `0x5000` and PC `0x600100`; the program itself
+must install the remaining vectors. Ten importer tests pass. Sound CPU and
+chip clocks are 11,289,600 and 22,579,200 Hz respectively. These images do not
+make Daytona's Model 1 sound board compatible; native SCSP execution is still
+missing. The existing 68000 generator needs Rally's actual ROM map and an
+explicit memory adapter before reuse.
+
 ## Screen, timer and video startup checkpoint (2026-10-14)
 
 The native core now reaches its sound-UART initialization at PC `0x005c4ce0`,

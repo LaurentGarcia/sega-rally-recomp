@@ -127,6 +127,15 @@ the active mask, disabling a source does not clear its latched request, and
 soft reset does not cancel an already pending delayed-enable callback. These
 are preserved reference contracts, not conclusions from PCB measurements.
 
+The main-board UART now uses explicit physical edges at 500 kHz, beginning
+with a rising edge at 1 us. Its ready outputs feed the IRQ controller while
+CPU line delivery stays at instruction boundaries. The real recovery sequence
+briefly programs idle synchronous mode before resetting into asynchronous 8N1
+at x16; rejecting that programming sequence would stop valid startup. Actual
+synchronous transfer remains unsupported. SCSP RX is unconnected and idle,
+with no fake responses. Sound ROMs are verified independently, but the 68000
+map, scheduling and SCSP must be implemented before audio is claimed.
+
 The older lifted-C prototype already reaches desert practice on the phone, but
 contains incomplete game paths. It is a useful source of address annotations and
 capture tooling. Its C implementation is not a substitute for verifying the new

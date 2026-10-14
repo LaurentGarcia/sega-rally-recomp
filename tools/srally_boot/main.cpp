@@ -9,6 +9,9 @@
 #ifdef M2_SRALLY_CONTROL
 #include "runtime/model2a_control.h"
 #endif
+#ifdef M2_SRALLY_UART
+#include "runtime/model2a_uart.h"
+#endif
 #ifdef M2_SRALLY_VIDEO
 #include "runtime/model2a_video.h"
 #include "runtime/geo.h"
@@ -56,16 +59,16 @@ std::vector<uint8_t> load(const char *path)
 
 int main(int argc, char **argv)
 {
-    if (argc != 4 && argc != 6 && argc != 8) {
-        std::fprintf(stderr, "usage: srally_boot PROGRAM.bin MAIN_DATA.bin INSTRUCTION_LIMIT [TGP_TABLES.bin COPRO_DATA.bin [POLYGONS.bin TEXTURES.bin]]\n");
+    if (argc != 4 && argc != 6 && argc != 8 && argc != 9) {
+        std::fprintf(stderr, "usage: srally_boot PROGRAM.bin MAIN_DATA.bin INSTRUCTION_LIMIT [TGP_TABLES.bin COPRO_DATA.bin [POLYGONS.bin TEXTURES.bin [FRAME.ppm]]]\n");
         return 2;
     }
     try {
         size_t used = 0;
         const std::string requested = argv[3];
         uint64_t limit = std::stoull(requested, &used, 10);
-        if (used != requested.size() || !limit || limit > 100000000)
-            throw std::runtime_error("instruction limit must be 1..100000000");
+        if (used != requested.size() || !limit || limit > 1000000000)
+            throw std::runtime_error("instruction limit must be 1..1000000000");
         rt::Model2ABus bus(load(argv[1]), load(argv[2]));
         rt::Cpu cpu(&bus);
         rt::Model2AClock board_clock;
@@ -94,6 +97,33 @@ int main(int argc, char **argv)
         rt::Model2AScreen screen(board_clock);
         uint64_t frames_rendered = 0, frames_parsed = 0;
 #endif
+#ifdef M2_SRALLY_UART
+        rt::Model2UART uart_chip;
+        rt::Model2AUART uart(uart_chip);
+        uint64_t tx_pin_changes = 0;
+        bool tx_pin_level = true;
+        rt::Model2UART::Callbacks uart_callbacks;
+        uart_callbacks.tx_ready = uart_callbacks.rx_ready = [&](bool) {
+            control.sound_ready(uart_chip.tx_ready(), uart_chip.rx_ready());
+        };
+        uart_callbacks.txd = [&](bool level) {
+            if (level != tx_pin_level) ++tx_pin_changes;
+            tx_pin_level = level;
+        };
+        uart_chip.set_callbacks(std::move(uart_callbacks));
+        uart.reset();
+        bus.add_model(&uart);
+        // Pinned clock_device starts low: high at 1us, low at 2us.
+        // UART RX remains physically idle until a real sound board is wired.
+        bool uart_clock_level = false;
+        std::function<void(uint64_t)> uart_tick;
+        uart_tick = [&](uint64_t) {
+            uart_clock_level = !uart_clock_level;
+            uart.clock_edge(uart_clock_level);
+            board_clock.schedule_after(1000, uart_tick);
+        };
+        board_clock.schedule_after(1000, uart_tick);
+#endif
 #ifdef M2_SRALLY_COMM
         rt::Model2AComm comm;
         bus.add_model(&comm);
@@ -120,7 +150,7 @@ int main(int argc, char **argv)
 #ifdef M2_SRALLY_VIDEO
         std::unique_ptr<rt::Geo> geo;
         std::unique_ptr<rt::Model2AVideo> video;
-        if (argc == 8) {
+        if (argc >= 8) {
             if (!tgp) throw std::runtime_error("native video requires the shared TGP buffer");
             geo = std::make_unique<rt::Geo>(load(argv[6]), load(argv[7]), tgp->buffer_data());
             video = std::make_unique<rt::Model2AVideo>(rt::Model2AVideo::Hooks{
@@ -134,7 +164,7 @@ int main(int argc, char **argv)
             bus.add_model(video.get());
         }
 #else
-        if (argc == 8) throw std::runtime_error("this runner was built without native video");
+        if (argc >= 8) throw std::runtime_error("this runner was built without native video");
 #endif
 #ifdef M2_SRALLY_SCREEN
         if (!video || !geo || !tgp) throw std::runtime_error("screen timing requires native video and TGP");
@@ -154,24 +184,36 @@ int main(int argc, char **argv)
             video->screen_update(geo->polys, geo->windows());
             ++frames_rendered;
         };
+#else
+        if (argc == 9) throw std::runtime_error("frame capture requires timed screen rendering");
 #endif
+        rt::Lockstep schedule(cpu);
+        schedule.end_count = limit;
+        uint32_t previous_dispatch = cpu.m_IP;
         const auto report_contracts = [&] {
             const auto &d = bus.diagnostics();
             std::printf("reference_unmapped reads=%" PRIu64 " writes=%" PRIu64
                 " last_write=%08x pcb_verified=false\n",
                 d.reference_gap_reads, d.reference_gap_writes, d.reference_gap_last_write);
 #ifdef M2_SRALLY_CONTROL
-            std::printf("native_control linked=true timers_connected=true uart_connected=false\n");
+            std::printf("native_control linked=true timers_connected=true\n");
 #else
             std::printf("irq_reset writes=%" PRIu64 " asynchronous_sources=false\n", d.irq_reset_writes);
 #endif
             std::printf("reference_clock cycles=%" PRIu64 " nanoseconds=%" PRIu64 " pcb_verified=false\n",
                 cpu.reference_cycles, cpu.reference_cycles * 40);
+            std::printf("native_cpu irq_entries=%d previous_dispatch=%08x\n",
+                schedule.interrupts(), previous_dispatch);
 #ifdef M2_SRALLY_COMM
             std::printf("native_comm linked=true peer_connected=false firmware_executed=false\n");
 #endif
 #ifdef M2_SRALLY_IO
             std::printf("native_io linked=true clock_connected=true\n");
+#endif
+#ifdef M2_SRALLY_UART
+            std::printf("native_uart linked=true clock_connected=true sound_board_connected=false"
+                " mode=%02x command=%02x tx_pin_changes=%" PRIu64 "\n",
+                unsigned(uart_chip.mode()), unsigned(uart_chip.command()), tx_pin_changes);
 #endif
 #ifdef M2_SRALLY_VIDEO
 #ifdef M2_SRALLY_SCREEN
@@ -179,6 +221,17 @@ int main(int argc, char **argv)
                 " frames_parsed=%" PRIu64 " latched_frame=%" PRIu64 " screen_frame=%" PRIu64
                 " screen_hash=%016" PRIx64 "\n", frames_rendered, frames_parsed,
                 screen.latched_frame(), screen.screen_frame(), video->video().screen_hash());
+            if (argc == 9 && frames_rendered) {
+                std::ofstream frame(argv[8], std::ios::binary);
+                frame << "P6\n" << video->video().width() << ' ' << rt::Video::H << "\n255\n";
+                for (uint32_t pixel : video->video().screen()) {
+                    const char rgb[] = {char(pixel >> 16), char(pixel >> 8), char(pixel)};
+                    frame.write(rgb, 3);
+                }
+                if (!frame) throw rt::Fatal("cannot write rendered frame capture");
+                std::printf("frame_capture format=ppm width=%d height=%d rendered_frame=%" PRIu64 "\n",
+                    video->video().width(), rt::Video::H, frames_rendered - 1);
+            }
 #else
             if (video) std::printf("native_video linked=true frame_clock_connected=false frames_rendered=0\n");
 #endif
@@ -188,8 +241,6 @@ int main(int argc, char **argv)
                 tgp->booted() ? "true" : "false", (unsigned long long)tgp->tgp_instructions());
 #endif
         };
-        rt::Lockstep schedule(cpu);
-        schedule.end_count = limit;
         gen::Env env{cpu, schedule};
         cpu.reset();
         std::printf("reset IP=%08x SAT=%08x PRCB=%08x FP=%08x SP=%08x\n",
@@ -210,10 +261,13 @@ int main(int argc, char **argv)
 #endif
                 if (!gen::has_code(cpu.m_IP)) {
                     report_contracts();
+                    std::printf("missing_context pfp=%08x sp=%08x rip=%08x g0=%08x g1=%08x g14=%08x fp=%08x\n",
+                        cpu.m_r[0], cpu.m_r[1], cpu.m_r[2], cpu.m_r[16], cpu.m_r[17], cpu.m_r[30], cpu.m_r[31]);
                     std::printf("status=missing_code instructions=%" PRIu64 " pc=%08x\n",
                         schedule.count, cpu.m_IP);
                     return 4;
                 }
+                previous_dispatch = cpu.m_IP;
                 gen::run(env);
             }
         } catch (const rt::Model2AAccess &access) {

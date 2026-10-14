@@ -27,11 +27,14 @@ def main():
     parser.add_argument("--control", action="store_true", help="Attach independent IRQ/countdown timers with explicit boundary dispatch")
     parser.add_argument("--video", action="store_true", help="Attach independent video RAM and actual Geo/TGP bindings (frame clock frozen)")
     parser.add_argument("--screen", action="store_true", help="Connect shared queue screen phase, geometry, rendering and vblank IRQ")
+    parser.add_argument("--uart", action="store_true", help="Connect independent main-board UARTs on physical clock edges, idle RX, no SCSP")
     args = parser.parse_args()
     if args.video and not args.tgp:
         parser.error("--video requires --tgp for each independent geometry buffer")
     if args.screen and not (args.control and args.video):
         parser.error("--screen requires --control and --video")
+    if args.uart and not args.control:
+        parser.error("--uart requires --control for ready IRQ pins")
     directory = args.build_dir.resolve()
     if not directory.is_relative_to(ROOT / "build") or directory == ROOT / "build":
         parser.error("--build-dir must be below ignored build/")
@@ -74,6 +77,8 @@ def main():
         command += ["-DM2_SRALLY_COMM", "src/runtime/model2a_comm.cpp", "src/runtime/comm_board.cpp"]
     if args.control:
         command += ["-DM2_SRALLY_CONTROL", "src/runtime/model2a_control.cpp"]
+    if args.uart:
+        command += ["-DM2_SRALLY_UART", "src/runtime/model2_uart.cpp", "src/runtime/model2a_uart.cpp"]
     video_images = []
     if args.video:
         video_audit = json.loads((directory / "video/audit.json").read_text())
@@ -99,8 +104,10 @@ def main():
         arguments.append("--video")
     if args.screen:
         arguments.append("--screen")
+    if args.uart:
+        arguments.append("--uart")
     result = subprocess.run(arguments,
-                            cwd=ROOT, capture_output=True, text=True, timeout=60)
+                            cwd=ROOT, capture_output=True, text=True, timeout=180)
     transcript = result.stdout + result.stderr
     (directory / "boot-parity.txt").write_text(transcript)
     print(transcript, end="")

@@ -19,6 +19,9 @@
 #ifdef M2_SRALLY_CONTROL
 #include "runtime/model2a_control.h"
 #endif
+#ifdef M2_SRALLY_UART
+#include "runtime/model2a_uart.h"
+#endif
 #ifdef M2_SRALLY_VIDEO
 #include "runtime/model2a_video.h"
 #include "runtime/geo.h"
@@ -96,7 +99,7 @@ static bool same(const rt::Cpu& a,const rt::Cpu& b) {
         a.m_immediate_pri==b.m_immediate_pri && a.reference_cycles==b.reference_cycles;
 }
 int main(int argc,char** argv) {
-    bool enable_io=false,enable_comm=false,enable_control=false,enable_video=false,enable_screen=false;
+    bool enable_io=false,enable_comm=false,enable_control=false,enable_video=false,enable_screen=false,enable_uart=false;
     int positional_argc=argc;
     while(positional_argc>1) {
         const char* option=argv[positional_argc-1];
@@ -105,12 +108,14 @@ int main(int argc,char** argv) {
         else if(std::strcmp(option,"--control")==0 && !enable_control) enable_control=true;
         else if(std::strcmp(option,"--video")==0 && !enable_video) enable_video=true;
         else if(std::strcmp(option,"--screen")==0 && !enable_screen) enable_screen=true;
+        else if(std::strcmp(option,"--uart")==0 && !enable_uart) enable_uart=true;
         else break;
         positional_argc--;
     }
     if(positional_argc!=4 && positional_argc!=6 && positional_argc!=8) return 2;
     if(enable_video!=(positional_argc==8)) return 2;
     if(enable_screen && (!enable_control || !enable_video)) return 2;
+    if(enable_uart && !enable_control) return 2;
     try {
         auto p=load(argv[1]),d=load(argv[2]);
         ObservedBus nb(p,d),rb(p,d);
@@ -146,10 +151,12 @@ int main(int argc,char** argv) {
         };
         std::vector<std::tuple<bool,uint64_t,uint64_t>> native_frames,reference_frames;
         uint64_t native_parses=0,reference_parses=0,native_renders=0,reference_renders=0;
+        uint64_t native_screen_hash=0,reference_screen_hash=0;
         const auto report_screen=[&] {
-            if(enable_screen) std::printf("screen frames=%llu latched=%llu parses=%llu renders=%llu irq_entries=%llu\n",
+            if(enable_screen) std::printf("screen frames=%llu latched=%llu parses=%llu renders=%llu irq_entries=%llu pixel_hash=%016llx\n",
                 (unsigned long long)native_screen->screen_frame(),(unsigned long long)native_screen->latched_frame(),
-                (unsigned long long)native_parses,(unsigned long long)native_renders,(unsigned long long)native_irqs.total);
+                (unsigned long long)native_parses,(unsigned long long)native_renders,(unsigned long long)native_irqs.total,
+                (unsigned long long)native_screen_hash);
         };
 #ifdef M2_SRALLY_CONTROL
         rt::Model2AControl native_control(native_clock);
@@ -162,7 +169,8 @@ int main(int argc,char** argv) {
             reference_control.on_irq_line=[&](unsigned line,bool asserted) {
                 reference_edges.emplace_back(line,asserted);
             };
-            std::printf("Control parity independent_devices=true timers_connected=true vblank_connected=%s uart_connected=false\n",enable_screen?"true":"false");
+            std::printf("Control parity independent_devices=true timers_connected=true vblank_connected=%s uart_connected=%s\n",
+                enable_screen?"true":"false",enable_uart?"true":"false");
         }
         const auto advance_control=[&] {
             if(enable_control) {
@@ -184,6 +192,70 @@ int main(int argc,char** argv) {
         if(enable_control) throw rt::Fatal("control support not linked into test");
         const auto advance_control=[] {};
         const auto same_control=[] { return true; };
+#endif
+#if defined(M2_SRALLY_UART) && defined(M2_SRALLY_CONTROL)
+        rt::Model2UART native_uart_chip,reference_uart_chip;
+        rt::Model2AUART native_uart(native_uart_chip),reference_uart(reference_uart_chip);
+        bool native_uart_clock=false,reference_uart_clock=false;
+        std::vector<std::tuple<unsigned,bool,uint64_t>> native_uart_events,reference_uart_events;
+        uint64_t native_uart_edges=0,reference_uart_edges=0;
+        if(enable_uart) {
+            const auto callbacks=[](rt::Model2UART& chip,rt::Model2AControl& control,
+                                    rt::Model2AClock& clock,auto& events) {
+                rt::Model2UART::Callbacks cb;
+                cb.txd=[&events,&clock](bool level) { events.emplace_back(0,level,clock.now_ns()); };
+                cb.dtr=[&events,&clock](bool level) { events.emplace_back(1,level,clock.now_ns()); };
+                cb.rts=[&events,&clock](bool level) { events.emplace_back(2,level,clock.now_ns()); };
+                cb.rx_ready=[&events,&clock,&chip,&control](bool level) {
+                    events.emplace_back(3,level,clock.now_ns());control.sound_ready(chip.tx_ready(),chip.rx_ready());
+                };
+                cb.tx_ready=[&events,&clock,&chip,&control](bool level) {
+                    events.emplace_back(4,level,clock.now_ns());control.sound_ready(chip.tx_ready(),chip.rx_ready());
+                };
+                cb.tx_empty=[&events,&clock](bool level) { events.emplace_back(5,level,clock.now_ns()); };
+                cb.syndet=[&events,&clock](bool level) { events.emplace_back(6,level,clock.now_ns()); };
+                return cb;
+            };
+            native_uart_chip.set_callbacks(callbacks(native_uart_chip,native_control,native_clock,native_uart_events));
+            reference_uart_chip.set_callbacks(callbacks(reference_uart_chip,reference_control,reference_clock,reference_uart_events));
+            native_uart.reset();reference_uart.reset();
+            nb.board.add_model(&native_uart);rb.board.add_model(&reference_uart);
+        }
+        std::function<void(uint64_t)> native_uart_tick,reference_uart_tick;
+        if(enable_uart) {
+            native_uart_tick=[&](uint64_t deadline) {
+                native_uart_clock=!native_uart_clock;native_uart_edges++;
+                native_uart_events.emplace_back(7,native_uart_clock,deadline);
+                native_uart.clock_edge(native_uart_clock);
+                native_clock.schedule_after(1000,native_uart_tick);
+            };
+            reference_uart_tick=[&](uint64_t deadline) {
+                reference_uart_clock=!reference_uart_clock;reference_uart_edges++;
+                reference_uart_events.emplace_back(7,reference_uart_clock,deadline);
+                reference_uart.clock_edge(reference_uart_clock);
+                reference_clock.schedule_after(1000,reference_uart_tick);
+            };
+            // Pinned clock starts low; high1us, low2us; TXC then RXC.
+            native_clock.schedule_after(1000,native_uart_tick);
+            reference_clock.schedule_after(1000,reference_uart_tick);
+            std::puts("UART parity independent_devices=true edge_ns=1000 rx_idle=true scsp_connected=false");
+        }
+        const auto clear_uart_events=[&] { native_uart_events.clear();reference_uart_events.clear(); };
+        const auto same_uart=[&] {
+            return !enable_uart || (native_uart_chip.snapshot()==reference_uart_chip.snapshot() &&
+                native_uart_clock==reference_uart_clock && native_uart_edges==reference_uart_edges &&
+                native_uart_events==reference_uart_events);
+        };
+        const auto report_uart=[&] {
+            if(enable_uart) std::printf("uart edges=%llu mode=%02x command=%02x tx_ready=%d rx_ready=%d\n",
+                (unsigned long long)native_uart_edges,unsigned(native_uart_chip.mode()),unsigned(native_uart_chip.command()),
+                native_uart_chip.tx_ready(),native_uart_chip.rx_ready());
+        };
+#else
+        if(enable_uart) throw rt::Fatal("UART requires linked control and UART support");
+        const auto clear_uart_events=[] {};
+        const auto same_uart=[] { return true; };
+        const auto report_uart=[] {};
 #endif
 #ifdef M2_SRALLY_COMM
         rt::Model2AComm native_comm,reference_comm;
@@ -305,6 +377,8 @@ int main(int argc,char** argv) {
             // compare all backing RAM at the final frontier as an additional
             // state check, without mutating handler latches through reads.
             if(!full) return true;
+            native_screen_hash=native_video->video().screen_hash();
+            reference_screen_hash=reference_video->video().screen_hash();
             const auto equal=[](auto a,auto b) {
                 return a.size()==b.size() && !std::memcmp(a.data(),b.data(),a.size_bytes());
             };
@@ -317,7 +391,7 @@ int main(int argc,char** argv) {
                 equal(native_video->texture_words(1),reference_video->texture_words(1)) &&
                 equal(native_video->framebuffer_ram(0),reference_video->framebuffer_ram(0)) &&
                 equal(native_video->framebuffer_ram(1),reference_video->framebuffer_ram(1)) &&
-                native_video->video().screen()==reference_video->video().screen();
+                native_video->video().screen()==reference_video->video().screen() && native_screen_hash==reference_screen_hash;
         };
 #else
         if(enable_video) throw rt::Fatal("video and TGP support not linked into test");
@@ -334,17 +408,19 @@ int main(int argc,char** argv) {
             nb.writes.clear();rb.writes.clear();
             native_irqs.events.clear();reference_irqs.events.clear();
             native_frames.clear();reference_frames.clear();
+            clear_uart_events();
             const auto before_count=ls.count;
             ls.end_count=ls.count+1;
             sync_native();sync_reference();
             advance_control();
             if(ls.count!=before_count || !same(native,ref) || nb.writes!=rb.writes ||
-               native_irqs.events!=reference_irqs.events || !same_control() || !same_clock())
+               native_irqs.events!=reference_irqs.events || !same_control() || !same_clock() || !same_uart())
                 throw rt::Fatal("instruction boundary/IRQ parity mismatch");
             const auto pc=native.m_IP;
             if(!gen::has_code(pc)) {
                 if(!same_video(true)) throw rt::Fatal("video RAM mismatch at code frontier");
                 report_screen();
+                report_uart();
                 std::printf("PASS native/reference parity instructions=%llu writes=%llu cycles=%llu irq_entries=%llu frontier=missing_code pc=%08x\n",
                     (unsigned long long)ls.count,(unsigned long long)writes,(unsigned long long)native.reference_cycles,
                     (unsigned long long)native_irqs.total,pc);
@@ -365,8 +441,9 @@ int main(int argc,char** argv) {
                        access.write==other.write && access.value==other.value &&
                        nb.writes==rb.writes && same(native,ref) && same_io() && same_comm() &&
                        same_control() && same_video(true) && same_clock() && native_irqs.events==reference_irqs.events &&
-                       native_frames==reference_frames && native_parses==reference_parses && native_renders==reference_renders) {
+                       native_frames==reference_frames && native_parses==reference_parses && native_renders==reference_renders && same_uart()) {
                         report_screen();
+                        report_uart();
                         std::printf("PASS native/reference parity instructions=%llu writes=%llu cycles=%llu irq_entries=%llu frontier=device pc=%08x access=%s%u address=%08x value=%08x\n",
                             (unsigned long long)ls.count,(unsigned long long)writes,(unsigned long long)native.reference_cycles,
                             (unsigned long long)native_irqs.total,pc,
@@ -389,7 +466,7 @@ int main(int argc,char** argv) {
             if(ls.count!=before_count+1 || !same(native,ref) || nb.writes!=rb.writes ||
                !same_io() || !same_comm() || !same_control() || !same_video() ||
                native_irqs.events!=reference_irqs.events || !same_clock() || native_frames!=reference_frames ||
-               native_parses!=reference_parses || native_renders!=reference_renders) {
+               native_parses!=reference_parses || native_renders!=reference_renders || !same_uart()) {
                 std::fprintf(stderr,"Parity mismatch count=%llu pc=%08x native_ip=%08x reference_ip=%08x\n",
                     (unsigned long long)ls.count,pc,native.m_IP,ref.m_IP);
                 std::fprintf(stderr,"reference cycles native=%llu oracle=%llu write_timestamps_equal=%d\n",
@@ -402,6 +479,7 @@ int main(int argc,char** argv) {
         }
         if(!same_video(true)) throw rt::Fatal("video RAM mismatch at instruction limit");
         report_screen();
+        report_uart();
         std::printf("PASS native/reference parity instructions=%llu writes=%llu cycles=%llu irq_entries=%llu frontier=instruction_limit pc=%08x\n",
             (unsigned long long)ls.count,(unsigned long long)writes,(unsigned long long)native.reference_cycles,
             (unsigned long long)native_irqs.total,native.m_IP);
