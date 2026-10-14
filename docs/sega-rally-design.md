@@ -73,6 +73,12 @@ candidate retains its source span hash and original seed provenance; unknown
 indirect side entries and exclusive coverage are not established. Conditional
 paths remain outside this proof. Actual callback frontiers are separately
 recorded with instruction/cycle counts and ignored execution-report paths.
+Unsigned compare/branch tables also admit intervening frame spills only when
+they preserve both the comparison flags and index. The bounded index and
+loaded branch destination are checked independently. Eleven audited tables
+now contribute 61 candidate rows. The resulting native profile reaches its
+first geometry at rendered frame 1,357 and a visible textured car/course scene
+by frame 1,634; this is CPU-renderer evidence, pending Metal and race validation.
 
 Daytona's unchanged TGP generator and TgpBoard compile Rally's own 1,665-word
 upload, not Daytona's microcode. A bus-level upload/startup probe returns `8`

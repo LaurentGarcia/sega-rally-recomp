@@ -17,7 +17,30 @@ static uint32_t number(const std::string &text) {
     return uint32_t(value);
 }
 
-struct CallbackProof { uint32_t table, count, size; };
+struct CallbackProof { uint32_t table, count, size, fallback=0; };
+static std::optional<CallbackProof> compare_proof(uint32_t start,
+    const std::function<i960::Insn(uint32_t)> &decode) {
+    using namespace i960;
+    auto bound=decode(start);
+    if(!bound.valid() || bound.op->code!=0x5a0 || bound.m1 || !bound.m2 || bound.src2>31) return {};
+    const auto index=bound.src1;
+    uint32_t p=start+4;
+    for(unsigned n=0;n<16;++n) {
+        auto in=decode(p); if(!in.valid()) return {};
+        // st/stq preserve both unsigned comparison flags and index register.
+        // Restrict the audited spill idiom to fixed offsets from frame pointer.
+        if(in.fmt==Format::Mem && (in.op->code==0x92 || in.op->code==0xb2) &&
+            in.ea==EaMode::AbaseOffset && in.src2==31 &&
+            (in.op->code!=0xb2 || in.src1<=28)) { p+=in.length; continue; }
+        if(in.op->code!=0x11 || !in.has_target) return {};
+        auto load=decode(p+4), branch=decode(p+12);
+        if(!load.valid() || load.op->code!=0x90 || load.ea!=EaMode::IndexDisp ||
+            load.index!=index || load.scale!=2 || load.length!=8 || !branch.valid() ||
+            branch.op->code!=0x84 || branch.ea!=EaMode::Abase || branch.src2!=load.src1) return {};
+        return CallbackProof{load.disp,uint32_t(bound.src2)+1,p+16-start,in.target};
+    }
+    return {};
+}
 static std::optional<CallbackProof> callback_proof(uint32_t start,
     const std::function<i960::Insn(uint32_t)> &decode) {
     using namespace i960;
@@ -49,7 +72,7 @@ static std::optional<CallbackProof> callback_proof(uint32_t start,
             // Other object stores cannot overlap the saved pointer at +4.
             // Include both words of stl, and reject every alternate base/EA.
             const uint32_t width=in.op->code==0x9a?8:4;
-            if (in.ea!=EaMode::AbaseOffset || in.src2!=16 ||
+            if (in.ea!=EaMode::AbaseOffset || in.src2!=16 || (width==8 && in.src1>30) ||
                 (in.offset<8 && in.offset+width>4)) return {};
         } else if (in.op->code==0x90 || in.op->code==0x98) {
             const unsigned width=in.op->code==0x98?2:1;
@@ -72,15 +95,17 @@ static std::set<uint32_t> addresses(const char *path) {
 }
 int main(int argc, char **argv) {
     try {
+        const bool comparison=argc==7 && std::string(argv[1])=="--compare";
         const bool masked=argc==7 && std::string(argv[1])=="--masked";
-        if (!masked && argc != 8) throw std::runtime_error("program trusted reachable entries source guest size required");
-        std::ifstream f(argv[masked?2:1], std::ios::binary); if (!f) throw std::runtime_error("program unavailable");
+        const bool table_mode=masked || comparison;
+        if (!table_mode && argc != 8) throw std::runtime_error("program trusted reachable entries source guest size required");
+        std::ifstream f(argv[table_mode?2:1], std::ios::binary); if (!f) throw std::runtime_error("program unavailable");
         const std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(f), {}};
-        auto trusted = masked ? std::set<uint32_t>{} : addresses(argv[2]);
-        auto reached = masked ? std::set<uint32_t>{} : addresses(argv[3]);
-        const uint32_t source = number(argv[masked?4:5]);
-        const uint32_t guest = number(argv[masked?5:6]);
-        const uint32_t size = number(argv[masked?6:7]);
+        auto trusted = table_mode ? std::set<uint32_t>{} : addresses(argv[2]);
+        auto reached = table_mode ? std::set<uint32_t>{} : addresses(argv[3]);
+        const uint32_t source = number(argv[table_mode?4:5]);
+        const uint32_t guest = number(argv[table_mode?5:6]);
+        const uint32_t size = number(argv[table_mode?6:7]);
         if ((source | guest | size) & 3 || !size || uint64_t(source)+size > bytes.size() ||
             guest < 0x500000 || uint64_t(guest)+size > 0x600000)
             throw std::runtime_error("invalid verified copy span");
@@ -90,15 +115,21 @@ int main(int argc, char **argv) {
             if (p < source || uint64_t(p)+4 > uint64_t(source)+size)
                 return i960::Insn{};
             auto in = i960::decode(p, word(p), uint64_t(p)+8 <= uint64_t(source)+size ? word(p+4) : 0);
-            if ((!masked && !reached.contains(p)) || !in.valid() || in.quirks || uint64_t(p)+in.length > uint64_t(source)+size)
+            if ((!table_mode && !reached.contains(p)) || !in.valid() || in.quirks || uint64_t(p)+in.length > uint64_t(source)+size)
                 return i960::Insn{};
             return in;
         };
-        if (masked) {
+        if (table_mode) {
             const auto start=number(argv[3]);
-            const auto result=callback_proof(start,decode);
-            if (!result) throw std::runtime_error("masked callback operand/dataflow proof failed");
-            std::cout<<"{\"table\":"<<result->table<<",\"count\":"<<result->count<<",\"size\":"<<result->size<<"}\n";
+            const auto result=comparison?compare_proof(start,decode):callback_proof(start,decode);
+            if (!result) throw std::runtime_error("table operand/dataflow proof failed");
+            std::cout<<"{\"table\":"<<result->table<<",\"count\":"<<result->count<<",\"size\":"<<result->size;
+            if(comparison) {
+                if(result->fallback<source || uint64_t(result->fallback)>=uint64_t(source)+size)
+                    throw std::runtime_error("unsigned rejection target exceeds verified copy");
+                std::cout<<",\"fallback\":"<<guest+result->fallback-source;
+            }
+            std::cout<<"}\n";
             return 0;
         }
         // Any known seed or direct transfer into the interior invalidates the

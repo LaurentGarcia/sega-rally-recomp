@@ -101,6 +101,402 @@
         }
       ],
       "proof": "AND literal31 bounds g4 to32 entries; indexed4-byte table load feeds a pointer saved at newly allocated object+4. Object base/pointer registers remain unchanged until reload; intervening stores use disjoint object offsets and complete stl width. Reloaded target is compared to zero and conditional branch skips callx(g5) for null entries. Inherited decoder validates exact operand/dataflow idiom; candidates are not runtime observations."
+    },
+    {
+      "name": "unsigned_transition_dispatch",
+      "kind": "compare_dispatch",
+      "relocation": "reset_workram_copy",
+      "program_offset": "0x000104f4",
+      "runtime_address": "0x005af4f4",
+      "entry_count": 7,
+      "rejected_index_target": "0x005af704",
+      "table_sha256": "9916b340f63853aebc75ea8925c109d867637160977491d39c9cc9b47f9c2f98",
+      "targets": [
+        "0x005af6f8",
+        "0x005af510",
+        "0x005af54c",
+        "0x005af55c",
+        "0x005af5cc",
+        "0x005af610",
+        "0x005af680"
+      ],
+      "code_evidence": [
+        {
+          "role": "body",
+          "program_offset": "0x000104d4",
+          "runtime_address": "0x005af4d4",
+          "size": 32,
+          "sha256": "d3a7d5db8b9bef8c58c55d348f97d0da00464b0ff42ce21a316ef0ed2ab661d5"
+        }
+      ],
+      "proof": "Unsigned cmpo index g6 against literal6, followed only by frame-pointer stores preserving index and condition flags, then bg rejects >6. Indexed 4-byte load uses g6 and assigns g4; bx(g4) uses that loaded value. Preceding subo1 wraps zero to unsigned-max, which the comparison rejects. Decoder validates exact operands and frame-spill whitelist. These initial copied-table candidates do not imply immutable live RAM tables or runtime observation."
+    },
+    {
+      "name": "unsigned_transform_dispatch",
+      "kind": "compare_dispatch",
+      "relocation": "reset_workram_copy",
+      "program_offset": "0x00011c2c",
+      "runtime_address": "0x005b0c2c",
+      "entry_count": 12,
+      "rejected_index_target": "0x005b18ac",
+      "table_sha256": "b8418bb556104a2fa0f7d4210c3383868fd2e8e3177f55be9e090416a072c85b",
+      "targets": [
+        "0x005b0c5c",
+        "0x005b0d50",
+        "0x005b0ddc",
+        "0x005b0e60",
+        "0x005b0f24",
+        "0x005b0fbc",
+        "0x005b10fc",
+        "0x005b1268",
+        "0x005b1308",
+        "0x005b13b8",
+        "0x005b1450",
+        "0x005b167c"
+      ],
+      "code_evidence": [
+        {
+          "role": "body",
+          "program_offset": "0x00011c14",
+          "runtime_address": "0x005b0c14",
+          "size": 24,
+          "sha256": "677de5d063ea44b35091e38a87951c9e077d99aed3d1b0262cbef60b229c80fb"
+        }
+      ],
+      "proof": "Unsigned cmpo index r6 against literal11, then one frame-pointer spill preserving index and condition flags, then bg rejects >11. Indexed4-byte load uses r6 and assigns g4; bx(g4) uses that loaded value. Existing inherited-decoder comparison/dispatch proof validates exact operands and fallback alias. Initial copied-table candidates do not imply immutable live RAM tables or runtime observation."
+    },
+    {
+      "name": "unsigned_clip_dispatch",
+      "relocation": "reset_workram_copy",
+      "program_offset": "0x00031ae8",
+      "runtime_address": "0x005d0ae8",
+      "entry_count": 6,
+      "index_register": 20,
+      "destination_register": 20,
+      "maximum_index": 5,
+      "rejected_index_target": "0x005d0f84",
+      "table_sha256": "ecc3cf3bb64d29b041cb98dbff29781e61bd11c35cf3b232bab42eaa067b02d9",
+      "targets": [
+        "0x005d0d2c",
+        "0x005d0d2c",
+        "0x005d0b00",
+        "0x005d0b00",
+        "0x005d0d2c",
+        "0x005d0d2c"
+      ],
+      "code_evidence": [
+        {
+          "role": "bound",
+          "program_offset": "0x00031ad8",
+          "runtime_address": "0x005d0ad8",
+          "size": 4,
+          "sha256": "6a833999ba6ff4ac3a705032dea0420075ac0556348798804c456f880f9c66bc"
+        },
+        {
+          "role": "load",
+          "program_offset": "0x00031adc",
+          "runtime_address": "0x005d0adc",
+          "size": 8,
+          "sha256": "1b8191485bb9f3c3ed0d6642831529f536818bc046e204751c1656eeafe29f42"
+        },
+        {
+          "role": "branch",
+          "program_offset": "0x00031ae4",
+          "runtime_address": "0x005d0ae4",
+          "size": 4,
+          "sha256": "319ca02e90e424ddd1f97474f4daf664c64518829054b778a70cc81683dbc889"
+        }
+      ],
+      "proof": "Unsigned cmpobl literal5 rejects g4>5; contiguous indexed4-byte load and bx use g4. Preceding subtraction2 wraps lower values to unsigned-max, which the bound rejects. Verified initial copied table candidates remain distinct from actual observations and do not imply immutable live RAM tables."
+    },
+    {
+      "name": "unsigned_math_dispatch_005af314",
+      "relocation": "reset_workram_copy",
+      "program_offset": "0x00010324",
+      "runtime_address": "0x005af324",
+      "entry_count": 7,
+      "index_register": 20,
+      "destination_register": 20,
+      "maximum_index": 6,
+      "rejected_index_target": "0x005af3a0",
+      "table_sha256": "9d774acd9c675fa62a94b31c6962d93dfc215dbd9f8e87512229b923746b7680",
+      "targets": [
+        "0x005af3a0",
+        "0x005af340",
+        "0x005af354",
+        "0x005af368",
+        "0x005af340",
+        "0x005af354",
+        "0x005af37c"
+      ],
+      "code_evidence": [
+        {
+          "role": "bound",
+          "program_offset": "0x00010314",
+          "runtime_address": "0x005af314",
+          "size": 4,
+          "sha256": "5e20dfcd26b35637afa84884449b181a21952fb77a02c3080e966a0d03242610"
+        },
+        {
+          "role": "load",
+          "program_offset": "0x00010318",
+          "runtime_address": "0x005af318",
+          "size": 8,
+          "sha256": "d193eed15bb5d1d968623f27e5beaa9bc1e6196cf74905d4929112e1fcdcd927"
+        },
+        {
+          "role": "branch",
+          "program_offset": "0x00010320",
+          "runtime_address": "0x005af320",
+          "size": 4,
+          "sha256": "319ca02e90e424ddd1f97474f4daf664c64518829054b778a70cc81683dbc889"
+        }
+      ],
+      "proof": "Unsigned cmpobl literal maximum rejects out-of-range index; contiguous indexed4-byte load and bx use the independently verified loaded destination. All three instruction PCs belong to the prior reachability report. Static initial copied-table candidates remain distinct from runtime observations and do not imply immutable live RAM tables."
+    },
+    {
+      "name": "unsigned_math_dispatch_005afa5c",
+      "relocation": "reset_workram_copy",
+      "program_offset": "0x00010a6c",
+      "runtime_address": "0x005afa6c",
+      "entry_count": 12,
+      "index_register": 20,
+      "destination_register": 20,
+      "maximum_index": 11,
+      "rejected_index_target": "0x005afa9c",
+      "table_sha256": "3da20a4ef3a63f52ec1fb583c22bd90bce95fcaa4e4049c042fe99669f593497",
+      "targets": [
+        "0x005afd24",
+        "0x005afa9c",
+        "0x005afd54",
+        "0x005afd54",
+        "0x005afd54",
+        "0x005afd24",
+        "0x005afa9c",
+        "0x005afa9c",
+        "0x005afa9c",
+        "0x005afa9c",
+        "0x005afa9c",
+        "0x005afd54"
+      ],
+      "code_evidence": [
+        {
+          "role": "bound",
+          "program_offset": "0x00010a5c",
+          "runtime_address": "0x005afa5c",
+          "size": 4,
+          "sha256": "9f897e3e0b414fae8ca7aeb07d65b5b98384f68591e295d4a4a59a04179b4988"
+        },
+        {
+          "role": "load",
+          "program_offset": "0x00010a60",
+          "runtime_address": "0x005afa60",
+          "size": 8,
+          "sha256": "929072d0de8087c70e246796dec8f15a53753580475b278cf68c74e063a7745c"
+        },
+        {
+          "role": "branch",
+          "program_offset": "0x00010a68",
+          "runtime_address": "0x005afa68",
+          "size": 4,
+          "sha256": "319ca02e90e424ddd1f97474f4daf664c64518829054b778a70cc81683dbc889"
+        }
+      ],
+      "proof": "Unsigned cmpobl literal maximum rejects out-of-range index; contiguous indexed4-byte load and bx use the independently verified loaded destination. All three instruction PCs belong to the prior reachability report. Static initial copied-table candidates remain distinct from runtime observations and do not imply immutable live RAM tables."
+    },
+    {
+      "name": "unsigned_math_dispatch_005afb50",
+      "relocation": "reset_workram_copy",
+      "program_offset": "0x00010b60",
+      "runtime_address": "0x005afb60",
+      "entry_count": 8,
+      "index_register": 20,
+      "destination_register": 20,
+      "maximum_index": 7,
+      "rejected_index_target": "0x005afbdc",
+      "table_sha256": "566f205a892df7b97715d19273879fb45b47182a6c299c4f9f3df5bc31b2e02a",
+      "targets": [
+        "0x005afb80",
+        "0x005afbdc",
+        "0x005afb80",
+        "0x005afb80",
+        "0x005afb80",
+        "0x005afd54",
+        "0x005afb80",
+        "0x005afbcc"
+      ],
+      "code_evidence": [
+        {
+          "role": "bound",
+          "program_offset": "0x00010b50",
+          "runtime_address": "0x005afb50",
+          "size": 4,
+          "sha256": "86126ce5e93fd5fae9c76e7a03dc75023d98ca6048dbe91384a30ac034d16f66"
+        },
+        {
+          "role": "load",
+          "program_offset": "0x00010b54",
+          "runtime_address": "0x005afb54",
+          "size": 8,
+          "sha256": "0c1c006d4d7449497066c88beda9e5b06cb75da06fea1ce6fffdd46f7f178004"
+        },
+        {
+          "role": "branch",
+          "program_offset": "0x00010b5c",
+          "runtime_address": "0x005afb5c",
+          "size": 4,
+          "sha256": "319ca02e90e424ddd1f97474f4daf664c64518829054b778a70cc81683dbc889"
+        }
+      ],
+      "proof": "Unsigned cmpobl literal maximum rejects out-of-range index; contiguous indexed4-byte load and bx use the independently verified loaded destination. All three instruction PCs belong to the prior reachability report. Static initial copied-table candidates remain distinct from runtime observations and do not imply immutable live RAM tables."
+    },
+    {
+      "name": "unsigned_math_dispatch_005afc98",
+      "relocation": "reset_workram_copy",
+      "program_offset": "0x00010ca8",
+      "runtime_address": "0x005afca8",
+      "entry_count": 8,
+      "index_register": 20,
+      "destination_register": 20,
+      "maximum_index": 7,
+      "rejected_index_target": "0x005afd84",
+      "table_sha256": "dc36b06aba687059a378b7036dcf545af89561eec4b9b998ebdee29cf36a4789",
+      "targets": [
+        "0x005afcc8",
+        "0x005afd84",
+        "0x005afcc8",
+        "0x005afcc8",
+        "0x005afcc8",
+        "0x005afd54",
+        "0x005afcc8",
+        "0x005afd14"
+      ],
+      "code_evidence": [
+        {
+          "role": "bound",
+          "program_offset": "0x00010c98",
+          "runtime_address": "0x005afc98",
+          "size": 4,
+          "sha256": "993a2239b9d5f0314b1f36b5ab4dd0203d2414c0578bf4674167f010f8aeecfa"
+        },
+        {
+          "role": "load",
+          "program_offset": "0x00010c9c",
+          "runtime_address": "0x005afc9c",
+          "size": 8,
+          "sha256": "c479dc0d8861dcc05063aa5b2c544ee42e0a9212739e3b2543b709b3307e3665"
+        },
+        {
+          "role": "branch",
+          "program_offset": "0x00010ca4",
+          "runtime_address": "0x005afca4",
+          "size": 4,
+          "sha256": "319ca02e90e424ddd1f97474f4daf664c64518829054b778a70cc81683dbc889"
+        }
+      ],
+      "proof": "Unsigned cmpobl literal maximum rejects out-of-range index; contiguous indexed4-byte load and bx use the independently verified loaded destination. All three instruction PCs belong to the prior reachability report. Static initial copied-table candidates remain distinct from runtime observations and do not imply immutable live RAM tables."
+    },
+    {
+      "name": "unsigned_math_dispatch_005b0764",
+      "relocation": "reset_workram_copy",
+      "program_offset": "0x00011774",
+      "runtime_address": "0x005b0774",
+      "entry_count": 13,
+      "index_register": 20,
+      "destination_register": 20,
+      "maximum_index": 12,
+      "rejected_index_target": "0x005b07a8",
+      "table_sha256": "02fbf3d2a93944d52567f21e8baf67314de6c9f0a87f00b557f9cd55145def13",
+      "targets": [
+        "0x005b0914",
+        "0x005b07a8",
+        "0x005b07a8",
+        "0x005b07a8",
+        "0x005b0914",
+        "0x005b0914",
+        "0x005b07a8",
+        "0x005b07a8",
+        "0x005b07a8",
+        "0x005b0914",
+        "0x005b0914",
+        "0x005b0914",
+        "0x005b0914"
+      ],
+      "code_evidence": [
+        {
+          "role": "bound",
+          "program_offset": "0x00011764",
+          "runtime_address": "0x005b0764",
+          "size": 4,
+          "sha256": "429a85edd645f8a185dddf6f5b7702fd3d00a5ff11b5b70327fa9c53d2bf5ead"
+        },
+        {
+          "role": "load",
+          "program_offset": "0x00011768",
+          "runtime_address": "0x005b0768",
+          "size": 8,
+          "sha256": "cbac9c986053dbecdd39cbb66bcfbbab1e42986b59e7bf229cdfc917ed30871f"
+        },
+        {
+          "role": "branch",
+          "program_offset": "0x00011770",
+          "runtime_address": "0x005b0770",
+          "size": 4,
+          "sha256": "319ca02e90e424ddd1f97474f4daf664c64518829054b778a70cc81683dbc889"
+        }
+      ],
+      "proof": "Unsigned cmpobl literal maximum rejects out-of-range index; contiguous indexed4-byte load and bx use the independently verified loaded destination. All three instruction PCs belong to the prior reachability report. Static initial copied-table candidates remain distinct from runtime observations and do not imply immutable live RAM tables."
+    },
+    {
+      "name": "unsigned_math_dispatch_005b08d0",
+      "relocation": "reset_workram_copy",
+      "program_offset": "0x000118e0",
+      "runtime_address": "0x005b08e0",
+      "entry_count": 13,
+      "index_register": 20,
+      "destination_register": 20,
+      "maximum_index": 12,
+      "rejected_index_target": "0x005b0968",
+      "table_sha256": "26c0f891876ad8d2a9c44cdb8f2d03f00b1ae323d467b2109f4ae52ee36a637c",
+      "targets": [
+        "0x005b0914",
+        "0x005b0968",
+        "0x005b0968",
+        "0x005b0968",
+        "0x005b0914",
+        "0x005b0914",
+        "0x005b0968",
+        "0x005b0968",
+        "0x005b0968",
+        "0x005b0914",
+        "0x005b0914",
+        "0x005b0914",
+        "0x005b0914"
+      ],
+      "code_evidence": [
+        {
+          "role": "bound",
+          "program_offset": "0x000118d0",
+          "runtime_address": "0x005b08d0",
+          "size": 4,
+          "sha256": "2ffbf12bb9324c8cfe9be98238db7eee6dcefc9969c2863ece5e7c2bbeca7792"
+        },
+        {
+          "role": "load",
+          "program_offset": "0x000118d4",
+          "runtime_address": "0x005b08d4",
+          "size": 8,
+          "sha256": "407f709acc94740dece37af978a1c3ac41b0c9c8e1863d131ef63f6bd1e361af"
+        },
+        {
+          "role": "branch",
+          "program_offset": "0x000118dc",
+          "runtime_address": "0x005b08dc",
+          "size": 4,
+          "sha256": "319ca02e90e424ddd1f97474f4daf664c64518829054b778a70cc81683dbc889"
+        }
+      ],
+      "proof": "Unsigned cmpobl literal maximum rejects out-of-range index; contiguous indexed4-byte load and bx use the independently verified loaded destination. All three instruction PCs belong to the prior reachability report. Static initial copied-table candidates remain distinct from runtime observations and do not imply immutable live RAM tables."
     }
   ]
 }

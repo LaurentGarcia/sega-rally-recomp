@@ -60,6 +60,23 @@ class TableSeedTests(unittest.TestCase):
         self.assertEqual(candidates[0]["table_indices"], [0, 2])
         self.assertIn("runtime observation", candidates[0]["provenance"])
 
+    def test_distinct_loaded_destination_and_bx_register(self):
+        table = self.config["tables"][0]
+        table["destination_register"] = 18
+        load = struct.unpack_from("<I", self.program, 0x84)[0]
+        branch = struct.unpack_from("<I", self.program, 0x8c)[0]
+        struct.pack_into("<I", self.program, 0x84, (load & ~(31 << 19)) | 18 << 19)
+        struct.pack_into("<I", self.program, 0x8c, (branch & ~(31 << 14)) | 18 << 14)
+        self.refresh_hashes(self.program, self.config)
+        self.assertEqual(len(table_seeds(self.program, self.config, self.relocations)), 2)
+        for destination in (16, 17, 32):
+            changed = copy.deepcopy(self.config)
+            changed["tables"][0]["destination_register"] = destination
+            self.reject(config=changed)
+        struct.pack_into("<I", self.program, 0x8c, branch)
+        self.refresh_hashes(self.program, self.config)
+        self.reject()
+
     def test_program_code_and_table_hashes_rejected(self):
         for role in ("program", "bound", "load", "branch", "table"):
             with self.subTest(role=role):

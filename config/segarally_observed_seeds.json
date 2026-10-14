@@ -154,6 +154,42 @@
       "observed_rip": "0x005de2a8",
       "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
       "provenance": "Actual native dispatcher frontier from explicit address load and bx(g1) at 0x5e3588 after a conditional bit-test path. Strict continuation analysis rejects that control flow.1355 rendered frames; latest capture is a white transition with no geometry yet. Canonical ROM target = runtime -0x59f000 in verified reset copy; no game state or instruction patched."
+    },
+    {
+      "address": "0x000106f8",
+      "observed_runtime_address": "0x005af6f8",
+      "name": "observed_transition_dispatch_005af6f8",
+      "evidence": "build/segarally-timed-v3/evidence/native-005af6f8/boot.json",
+      "observed_after_instructions": 266700692,
+      "observed_reference_cycles": 589330734,
+      "observed_previous_dispatch": "0x005af4f0",
+      "observed_rip": "0x005afa44",
+      "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+      "provenance": "Actual native dispatcher frontier at bx(g4) at 0x5af4f0, after an unsigned bounded indexed table load. Last capture is a white transition, with no rendered geometry yet. Canonical ROM target = runtime -0x59f000 in verified reset copy; no game state or instruction patched."
+    },
+    {
+      "address": "0x00012268",
+      "observed_runtime_address": "0x005b1268",
+      "name": "observed_transition_dispatch_005b1268",
+      "evidence": "build/segarally-timed-v3/evidence/native-005b1268/boot.json",
+      "observed_after_instructions": 266701399,
+      "observed_reference_cycles": 589335732,
+      "observed_previous_dispatch": "0x005b0c28",
+      "observed_rip": "0x005afe20",
+      "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+      "provenance": "Actual native dispatcher frontier at bx(g4) at 0x5b0c28 after unsigned bounded indexed table load. Last capture is a white transition with no rendered geometry yet. Canonical ROM target = runtime -0x59f000 in verified reset copy; no game state or instruction patched."
+    },
+    {
+      "address": "0x00031d2c",
+      "observed_runtime_address": "0x005d0d2c",
+      "name": "observed_transition_dispatch_005d0d2c",
+      "evidence": "build/segarally-timed-v3/evidence/native-005d0d2c/boot.json",
+      "observed_after_instructions": 266703017,
+      "observed_reference_cycles": 589340464,
+      "observed_previous_dispatch": "0x005d0ae4",
+      "observed_rip": "0x005c30ac",
+      "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+      "provenance": "Actual native dispatcher frontier at bx(g4) at 0x5d0ae4 after unsigned cmpobl bounded indexed table load. Last capture is a white transition with no rendered geometry yet; native TGP has executed 67207 instructions. Canonical ROM target = runtime -0x59f000 in verified reset copy; no game state or instruction patched."
     }
   ]
 }

@@ -1,5 +1,44 @@
 # Handoff
 
+## First native car and course capture (2026-10-14)
+
+The generated native core now renders the textured Martini Lancia, a second
+rally car, forest, gravel road and sky. The actual CPU-renderer capture is
+preserved under ignored `build/segarally-timed-v3/evidence/
+first-native-3d-005e4980/boot-frame.png`. Its source PPM SHA-256 is
+`1c1fc6f0a09cfa6d9758ff48237f41fdd4d529215790905de16f02a5135f3096`.
+This is a first native 3D milestone, not a complete attract loop, playable
+race, Metal comparison or phone capture.
+
+The bounded run reaches 321,115,347 i960 instructions, 710,610,287 reference
+cycles, 4,681,221 native TGP instructions and 1,634 rendered frames. Geometry
+first appears at frame 1,357 (one-based); 278 frames contain geometry and the
+last has 1,692 polygons. Execution then stops at missing callback `0x005e4980`,
+called from `0x005de478` with RIP `0x005de47c`. It is not skipped or patched.
+
+Eleven audited dispatch tables contribute 61 candidate rows. New unsigned
+compare/branch proofs allow only frame spills preserving the index and flags;
+classic proofs now check distinct bounded-index and loaded-destination
+registers independently. Read-only scouting found further bounded tables,
+but only the frozen generation's verified subset is part of this checkpoint.
+Twelve decoder-proof tests, eight classic-table tests and eight bootstrap
+tests pass; the proof suite also passes ASan/UBSan. All ten continuation rows
+retain source provenance and reproduce against the final reached graph.
+
+The frozen profile contains 68,953 instructions, 47 compiled objects and zero
+missing templates. Native source-set SHA-256 is
+`26ee00f68fcb1d38e354e5614f4b986656221acce3035f4a92924f4b51dcf840`;
+coverage SHA-256 is
+`803268bf29ebf20a93972065a4e3a007624e284816708e5f287493e30b4c6aab`;
+proof helper SHA-256 is
+`91a2ef4ace8ad442cf7a76445b52ec4f083d9586209240e10c291af792b043b0`.
+
+Keep this v3 generation frozen while the Mac Metal comparison and new signed
+iPhone build consume it. Independent CPU/device parity through this longer
+scene is running separately. Next: show the live Mac build, compare the car
+scene's Metal pixels, install on an available unlocked phone, and then extend
+callback coverage from the preserved frontier.
+
 ## Timed sound core and optional shared-board diagnostic (2026-10-14)
 
 The 68000 generator now supports explicit `--timing model2a-boundary` for

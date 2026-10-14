@@ -122,9 +122,47 @@ class ProofTests(unittest.TestCase):
     def callback_hashes(self, config):
         config["program_sha256"] = hashlib.sha256(self.program).hexdigest()
         table = config["tables"][0]
-        table["table_sha256"] = hashlib.sha256(self.program[0x300:0x380]).hexdigest()
+        table["table_sha256"] = hashlib.sha256(self.program[0x300:0x300+table["entry_count"]*4]).hexdigest()
         body = table["code_evidence"][0]
-        body["sha256"] = hashlib.sha256(self.program[0x80:0x80+body["size"]]).hexdigest()
+        start = int(body["program_offset"], 16)
+        body["sha256"] = hashlib.sha256(self.program[start:start+body["size"]]).hexdigest()
+
+    def compare_fixture(self):
+        config = self.callback_fixture()
+        words = [reg(0x5a0, 0, 22, 2, m2=1), mem(0xb2, 16, 31, 80), mem(0x92, 20, 31, 112),
+            0x11000054, mem(0x90, 20, mode=14, index=22, scale=2), 0x500300,
+            mem(0x84, 0, 20, mode=4)]
+        self.install(0x100, words)
+        targets = [0x500180, 0x5001c0, 0x500200]
+        self.install(0x300, targets)
+        table = config["tables"][0]
+        table.update(kind="compare_dispatch", entry_count=3, targets=[hex(v) for v in targets],
+            rejected_index_target="0x500160", code_evidence=[{"role": "body", "program_offset": "0x100",
+                "runtime_address": "0x500100", "size": len(words)*4}])
+        self.callback_hashes(config)
+        return config
+
+    def test_unsigned_comparison_preserved_across_frame_spills(self):
+        config = self.compare_fixture()
+        rows = table_seeds(self.program, config, self.relocations, self.tool)
+        self.assertEqual([r["address"] for r in rows], ["0x00000180", "0x000001c0", "0x00000200"])
+
+    def test_unsigned_comparison_clobbers_branch_and_alias_mutations(self):
+        mutations = {0x100: reg(0x5a1, 0, 22, 2, m2=1),
+            0x104: reg(0x590, 22, 22, 1, m2=1), 0x108: reg(0x5a0, 0, 20, 2, m2=1),
+            0x10c: 0x16000054, 0x110: mem(0x90, 20, mode=14, index=21, scale=2),
+            0x118: mem(0x84, 0, 21, mode=4)}
+        for address, word in mutations.items():
+            with self.subTest(address=address):
+                config = self.compare_fixture()
+                self.install(address, [word])
+                self.callback_hashes(config)
+                with self.assertRaises(ValueError):
+                    table_seeds(self.program, config, self.relocations, self.tool)
+        config = self.compare_fixture()
+        config["tables"][0]["rejected_index_target"] = "0x500164"
+        with self.assertRaises(ValueError):
+            table_seeds(self.program, config, self.relocations, self.tool)
 
     def test_masked_table_nulls_and_saved_pointer(self):
         config = self.callback_fixture()

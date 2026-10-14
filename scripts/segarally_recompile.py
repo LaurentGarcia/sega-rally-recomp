@@ -232,7 +232,7 @@ def table_seeds(program: bytes, config: dict, relocations: dict, proof_tool: Pat
                 raise ValueError("table code/data evidence hash differs from supplied program")
             return data
 
-        if table.get("kind") == "masked_callback":
+        if table.get("kind") in ("masked_callback", "compare_dispatch"):
             if proof_tool is None or len(table["code_evidence"]) != 1:
                 raise ValueError("masked callback requires the inherited-decoder proof tool and one body span")
             body = table["code_evidence"][0]
@@ -243,20 +243,24 @@ def table_seeds(program: bytes, config: dict, relocations: dict, proof_tool: Pat
             with tempfile.TemporaryDirectory(prefix="srally-table-") as directory:
                 image = Path(directory) / "program.bin"
                 image.write_bytes(program)
-                result = subprocess.run([str(proof_tool), "--masked", str(image), hex(start),
+                mode = "--masked" if table["kind"] == "masked_callback" else "--compare"
+                result = subprocess.run([str(proof_tool), mode, str(image), hex(start),
                     hex(source), hex(guest), hex(size)], capture_output=True, text=True)
             if result.returncode:
                 raise ValueError("masked callback operand/dataflow proof failed: " + result.stderr.strip())
             proof = json.loads(result.stdout)
             count, address, offset = table["entry_count"], number(table["runtime_address"]), number(table["program_offset"])
-            if proof != {"table": address, "count": count, "size": body["size"]}:
+            expected = {"table": address, "count": count, "size": body["size"]}
+            if table["kind"] == "compare_dispatch":
+                expected["fallback"] = number(table["rejected_index_target"])
+            if proof != expected:
                 raise ValueError("masked callback decoded proof differs from declared table/body")
             data = verified_span(offset, address, count * 4, table["table_sha256"])
             targets = list(struct.unpack("<" + "I" * count, data))
             if targets != [number(target) for target in table["targets"]]:
                 raise ValueError("masked callback entries differ from audited metadata")
             for target in dict.fromkeys(targets):
-                if target == 0:
+                if target == 0 and table["kind"] == "masked_callback":
                     continue  # decoded cmpi/be skips null callbacks
                 if target & 3 or not guest <= target < guest + size:
                     raise ValueError("masked callback target lies outside aligned verified reset copy")
@@ -265,7 +269,9 @@ def table_seeds(program: bytes, config: dict, relocations: dict, proof_tool: Pat
                     "table_indices": [i for i, value in enumerate(targets) if value == target],
                     "name": f"verified_table_{table['name']}_target_{target:08x}",
                     "evidence": "config/segarally_table_seeds.json",
-                    "provenance": "Verified masked callback table candidate with null guard and saved-pointer dataflow; runtime observation and full coverage are not implied."})
+                    "provenance": ("Verified masked callback table candidate with null guard and saved-pointer dataflow" if table["kind"] == "masked_callback" else
+                        "Verified unsigned compare/branch dispatch candidate with preserved index/flags through frame spills") +
+                        "; runtime observation, immutable live RAM tables and full coverage are not implied."})
             continue
 
         evidence = {}
@@ -279,7 +285,8 @@ def table_seeds(program: bytes, config: dict, relocations: dict, proof_tool: Pat
         if set(evidence) != {"bound", "load", "branch"}:
             raise ValueError("incomplete table control-flow evidence")
         count, index = table["entry_count"], table["index_register"]
-        if not 1 <= count <= 32 or not 0 <= index < 32 or table["maximum_index"] != count - 1:
+        destination = table.get("destination_register", index)
+        if not 1 <= count <= 32 or not 0 <= index < 32 or not 0 <= destination < 32 or table["maximum_index"] != count - 1:
             raise ValueError("table bound must prove exactly the declared entry count")
         bound_pc, bound = evidence["bound"]
         load_pc, load = evidence["load"]
@@ -298,13 +305,14 @@ def table_seeds(program: bytes, config: dict, relocations: dict, proof_tool: Pat
                 bound_word & 3 or bound_pc + displacement != rejected or not guest <= rejected < guest + size):
             raise ValueError("table unsigned bounds check differs from audited proof")
         address, offset = number(table["runtime_address"]), number(table["program_offset"])
-        # MEMB index+displacement, scale2 (=4 bytes); destination==index.
+        # MEMB index+displacement, scale2 (=4 bytes). The bounded index
+        # and loaded destination may differ; bx must use the destination.
         if (load_word >> 24 != 0x90 or (load_word >> 10) & 15 != 14 or
                 (load_word >> 7) & 7 != 2 or (load_word & 31) != index or
-                (load_word >> 19) & 31 != index or load_word & 0x60 or
+                (load_word >> 19) & 31 != destination or load_word & 0x60 or
                 struct.unpack_from("<I", load, 4)[0] != address):
             raise ValueError("table indexed load differs from audited proof")
-        if (branch_word >> 24 != 0x84 or (branch_word >> 14) & 31 != index or
+        if (branch_word >> 24 != 0x84 or (branch_word >> 14) & 31 != destination or
                 branch_word & 0x3fff != 0x1000):
             raise ValueError("table indirect branch does not use the loaded register")
         data = verified_span(offset, address, count * 4, table["table_sha256"])
