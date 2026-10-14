@@ -48,7 +48,9 @@ The hook matches the old Machine through 600 million driving instructions,
 every compared frame and every captured PCM sample. This hidden-window result
 does not establish every course or visible presentation. A ten-second native
 PCM sample has been heard on the Mac speakers. Opening audio after window/Metal
-setup passes the new windowed startup check; live-game sound still needs testing.
+setup fixes the observed startup failure. The subsequent windowed session exits
+normally after 9,347 frames with zero audio drops or estimated input shortages;
+live-game listening feedback remains pending.
 Sound requires both the build option and runtime `--sound`.
 See the [sound instructions](docs/segarally-build-validation.md#optional-sound-experiment).
 

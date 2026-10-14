@@ -227,7 +227,9 @@ input shortfalls or chip/host sample drops. The old sound path recorded 3,222
 estimated input-demand requests at that checkpoint. Hidden presentation and
 SDL counters do not establish user hearing, every course or physical audio
 fidelity. The user has separately heard a ten-second native PCM excerpt on the
-Mac speakers; visible-window game playback remains a separate test.
+Mac speakers. A later windowed session supplies 7,165,805 stereo frames and exits
+normally after 9,347 rendered frames with no drops or estimated SDL input
+shortages. Live-game listening feedback and physical fidelity remain open.
 The host now opens its physical audio device after window/Metal initialization,
 following Daytona's order and before establishing the pacing origin. This
 startup-only move resolves the observed `AudioQueueStart: -66681` failure in a

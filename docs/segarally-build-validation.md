@@ -179,8 +179,10 @@ instruction boundary hook enabled, the same checkpoint completes in 48.519993
 seconds including startup and shutdown, with zero extra input requests and
 zero chip/host drops. These counters estimate SDL input demand, not exact
 hardware output samples. The user confirmed hearing a separate ten-second native
-PCM sample through the Mac speakers. Continuous game playback and full-game
-sound parity remain pending.
+PCM sample through the Mac speakers. The subsequent windowed session exits
+normally after 9,347 frames and supplies 7,165,805 stereo frames with no drops
+or estimated input shortages. Live-game listening feedback and full-game sound
+parity remain pending.
 
 Full MAME reference work is separately blocked by three files absent from the
 supplied archive: `epr-17891.ic12`, `epr-16726.bin` and `epr-18022.ic2`.

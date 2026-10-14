@@ -1,5 +1,37 @@
 # Handoff
 
+## Windowed sound session exits cleanly (2026-10-14)
+
+The signed window-first app completed 9,347 frames, 1,726,555,073 instructions
+and 4,062,247,215 reference cycles at PC `0x005d2648`, then exited with result 0.
+All ten selection events applied and controls handed over at frame 1,851.
+The session produced 7,165,805 stereo audio frames at 44.1 kHz, including
+12,889,932 nonzero channel samples. Peak was 0.0759811401 and RMS 0.0105479909.
+There were zero chip drops, host drops, estimated SDL input-demand shortfalls
+or extra requested bytes; 2,255 frames remained queued at exit. These are
+actual visible-session counters, not a wall-speed or hardware-fidelity proof.
+The user confirmed the separate ten-second sample; the optional live-game
+listening question remains unanswered.
+
+Evidence: `build/worktrees/boundary-hook/build/mac-boundary-sound-v13-ordering/`
+contains `live-session-results.json` (SHA-256
+`2f43f95f97d22577b8d70298f0d450ccb8abd8696bf878e77fe57ee400f947f6`) and
+`live-app.log` (SHA-256
+`5be11928cce49ff9cb8ba4f5465a808f8c342a6d1a592ff1af33ea0d0173886c`).
+An outside-sandbox process check confirms both the live process 28011 and the
+older frozen process 8289 are absent. No restart was performed. Graphics
+validation may resume; preserve the completed log before another launch.
+
+Parallel work now isolates the scanline raster correction in
+`build/worktrees/mac-raster-fidelity`, based on `38abb7c`, preserving the four
+uncommitted main-tree prototype files. The original patch is saved at
+`build/validation/mac-raster-fidelity/original-prototype.patch`, SHA-256
+`88ce63e1875dba182f66722bf69ebc8e0b3023714d32a485324e211c6dd5039b`.
+A separate input-capture audit found that frame-only replays cannot faithfully
+record current mid-frame manual input. Instruction-boundary event timing,
+initial save/configuration provenance and sound-board coupling must be covered
+before manual recordings can serve as independent full-course parity evidence.
+
 ## Window-first audio startup passes (2026-10-14)
 
 Moving only `audio.open()` after successful window, Metal and touch setup fixes

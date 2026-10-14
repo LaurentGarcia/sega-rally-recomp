@@ -8,13 +8,13 @@ The [design](sega-rally-design.md) records interpretation and hardware limits.
 | Area | Established evidence | Limit |
 | --- | --- | --- |
 | Main native coverage | Frozen v13: 75,205 instructions, 52 native objects, no missing templates | Coverage is a reached graph, not a remaining-work percentage |
-| Interactive Mac | Stable SDL3/Metal host, actual driving after selection replay handoff; window-first audio initialization passes 60-frame startup | Continuous visible-game listening confirmation pending |
+| Interactive Mac | Stable SDL3/Metal host, manual control after selection handoff; sound-enabled windowed session exits normally after 9,347 frames | User feedback on live audio quality pending |
 | Driving parity | 600 million instructions, 19,641,024 ordered writes, 1,365,742,448 cycles, 32,576 IRQs and 3,142 renders; nineteen replay events match | Independent CPU with shared board implementations; no full MAME race |
 | Later game paths | Held-gas v13 runs two billion instructions and 10,701 renders without a code/device frontier; returns to attract | Game Over overlay and a new credit/start sequence not separately validated |
 | Course progress | Desert clear/results show 1:12.15; forested second course enters, times out, then attract returns | Centered steering does not complete second-course bends; remaining courses unvalidated |
 | Metal fidelity | Startup warning matches CPU renderer pixel for pixel; stable fan path is used | Exact racing-scene raster parity remains open |
 | Sound generation | Native linked board captures 2,409,170 stereo frames: 54.6297052 seconds including nonzero 44.1 kHz PCM; shared-core drains agree | Whole-game audio parity unvalidated |
-| Audio output | Sound-and-hook build reaches 2,760 frames with unchanged main state, zero SDL input shortfalls and zero chip/host drops; user heard a ten-second native PCM sample | Continuous visible-game playback unconfirmed |
+| Audio output | Windowed session supplies 7,165,805 stereo frames with zero drops or estimated input shortfalls; user heard a separate ten-second native PCM sample | Live-game listening feedback and physical fidelity remain open |
 | Hardware fidelity | Isolated device/reference tests and instruction-timed diagnostics | PCB timing, extF80 precision and full-machine behavior remain open |
 
 ## Measured Mac speed
@@ -45,7 +45,7 @@ The hook preserves the prior game and sound data: actual Machine comparison
 matches all 3,142 frames through 600 million instructions, and the entire
 54.6297052-second WAV matches the old output byte for byte. SDL stayed supplied
 through this quiet hidden-window check. The user has heard a separate ten-second
-native PCM sample; visible game playback and longer paths remain separate checks.
+native PCM sample; longer paths and physical audio fidelity remain separate checks.
 
 The earlier LaunchServices sound attempt loaded its bundled selection replay
 and initialized the machine, then exited at `AudioQueueStart` with CoreAudio
@@ -53,11 +53,11 @@ error `-66681` (`kAudioQueueErr_CannotStart`). Direct windowed and hidden probes
 also failed while the standalone native PCM player succeeded. Moving only audio
 opening after window/Metal setup, following Daytona's order, passes a new
 60-frame windowed test with zero drops or estimated input shortages. The boot
-PCM is silent; live gameplay sound remains a separate test.
-The signed windowed app subsequently applies all ten selection events, hands
-control to the keyboard at frame 1,851 and progresses beyond frame 2,760 with
-sound enabled. The user has been asked to confirm live-game audio; the running
-session's final audio counters are not available until it exits.
+PCM is silent. The signed windowed app subsequently applies all ten selection
+events, hands control to the keyboard at frame 1,851 and exits normally after
+9,347 frames. It supplies 7,165,805 stereo frames with zero chip/host drops or
+estimated SDL input shortages and 2,255 frames queued at exit. This session has
+no separate wall-speed measurement. Live-game listening feedback is pending.
 
 ## Graphics evidence
 

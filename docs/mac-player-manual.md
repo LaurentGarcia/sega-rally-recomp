@@ -47,7 +47,8 @@ renderer and passes a 60-frame windowed startup check. The longer timing results
 below came from a separate direct-executable test. See
 [current evidence](segarally-status.md) for the test scope.
 The subsequent windowed launch applies the selection replay, hands control back
-at frame 1,851 and progresses into the race with sound enabled.
+at frame 1,851 and exits normally after 9,347 frames with sound enabled and zero
+reported audio drops or input shortages.
 
 The earlier sound-off v13 playtest is preserved in
 `build/worktrees/indexed-dispatch/build/mac-playtest-v13/Sega Rally Native.app`.
@@ -107,7 +108,9 @@ startup and shutdown, with no reported audio input shortfalls or sample drops.
 The [build guide](segarally-build-validation.md) explains both build options
 and the runtime switches `--sound --instruction-boundary-hook`. The older
 sound-off speed app remains silent by design. The user has heard a ten-second
-native PCM sample on the Mac speakers; continuous gameplay sound remains pending.
+native PCM sample on the Mac speakers. The completed windowed session supplies
+7,165,805 stereo frames with no drops or input shortages; live listening feedback
+remains pending.
 
 Other paths and machines may run more slowly. `--unthrottled` disables waiting
 for diagnostic runs and does not guarantee arcade speed. Avoid additional builds
