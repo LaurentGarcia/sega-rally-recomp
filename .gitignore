@@ -19,6 +19,7 @@ platform/mobile/android/app/.cxx/
 *.bin
 *.ic*
 roms/
+ROMS/
 rom/
 generated/
 extracted/
@@ -34,6 +35,8 @@ platform/vita/logo_livearea/*
 ghidra_*/
 traces/
 dumps/
+captures/
+private/
 *.m2tr
 *.m2in
 
@@ -47,6 +50,8 @@ logs/
 CMakeUserPresets.json
 compile_commands.json
 *.apk
+*.ipa
+*.xcarchive/
 *.cmd
 *.o
 *.a

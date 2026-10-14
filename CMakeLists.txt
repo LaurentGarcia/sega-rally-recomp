@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(daytona_recomp LANGUAGES C CXX)
+project(sega_rally_recomp LANGUAGES C CXX)
 if(IOS)
     enable_language(OBJCXX)
 endif()
@@ -345,6 +345,10 @@ add_test(NAME geo_clip COMMAND test_geo_clip)
 add_executable(test_geo_stream tests/test_geo_stream.cpp)
 target_include_directories(test_geo_stream PRIVATE src)
 add_test(NAME geo_stream COMMAND test_geo_stream)
+
+add_executable(test_model2_priority tests/test_model2_priority.c)
+target_include_directories(test_model2_priority PRIVATE src)
+add_test(NAME model2_priority COMMAND test_model2_priority)
 
 add_executable(test_decode tests/test_decode.cpp)
 target_link_libraries(test_decode PRIVATE i960)

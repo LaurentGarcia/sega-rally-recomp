@@ -9,6 +9,7 @@
 // MAME's reference build gives, so every host agrees.
 
 #include "runtime/raster.h"
+#include "runtime/model2_priority.h"
 #ifdef M2_VITA_RENDER_OPT
 #include "runtime/raster_texel.h"
 #endif
@@ -169,9 +170,8 @@ void Raster::render(const std::vector<GeoPoly> &polys, int windows, const VideoM
 #endif
     std::iota(order.begin(), order.end(), size_t(0));
     std::sort(order.begin(), order.end(), [&](size_t a, size_t b) {
-        if (polys[a].window != polys[b].window) return polys[a].window > polys[b].window;
-        if (polys[a].z != polys[b].z) return polys[a].z < polys[b].z;
-        return a > b;
+        return daytona_model2_order_compare(polys[a].window, polys[a].z, a,
+                                            polys[b].window, polys[b].z, b) < 0;
     });
     for (size_t i : order)
         if (polys[i].window <= windows) render_one(polys[i], crtc_x, crtc_y, render_x, render_y, clip_minx, clip_maxx, clip_miny, clip_maxy);

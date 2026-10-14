@@ -1,6 +1,7 @@
 #include "app/gpu/gpu_renderer.h"
 
 #include "app/gpu/shaders_gen.h"
+#include "runtime/model2_priority.h"
 
 #include <algorithm>
 #include <cmath>
@@ -266,11 +267,9 @@ void GpuRenderer::build(const rt::Video &video, int w, int h, int scale) {
     order_.resize(polys.size());
     std::iota(order_.begin(), order_.end(), size_t(0));
     std::sort(order_.begin(), order_.end(), [&](size_t a, size_t b) {
-        if (polys[a].window != polys[b].window) return polys[a].window > polys[b].window;
-        if (polys[a].z != polys[b].z) return polys[a].z < polys[b].z;
-        return a > b;
+        return daytona_model2_order_compare(polys[a].window, polys[a].z, a,
+                                            polys[b].window, polys[b].z, b) < 0;
     });
-    const float depth_step = 1.0f / float(order_.size() + 2);
     uint32_t drawn = 0;
     for (size_t i : order_) {
         const rt::GeoPoly &poly = polys[i];
@@ -311,7 +310,7 @@ void GpuRenderer::build(const rt::Video &video, int w, int h, int scale) {
         const float r = gamma_[le16(mem.colorxlat, 0x0000 / 2 + (((color >> 0) & 0x1f) << 8) + luma) & 0xff] / 255.0f;
         const float g = gamma_[le16(mem.colorxlat, 0x4000 / 2 + (((color >> 5) & 0x1f) << 8) + luma) & 0xff] / 255.0f;
         const float b = gamma_[le16(mem.colorxlat, 0x8000 / 2 + (((color >> 10) & 0x1f) << 8) + luma) & 0xff] / 255.0f;
-        const float depth = float(++drawn) * depth_step;
+        const float depth = daytona_model2_rank_depth(drawn++, order_.size());
 
         // texture state, decoded as render_one (m2.hlsl PolyIn)
         const uint32_t th0 = poly.texheader[0], th1 = poly.texheader[1], th2 = poly.texheader[2];

@@ -10,6 +10,7 @@
 // src/runtime/geo.h and THIRD_PARTY.md.
 
 #include "runtime/geo.h"
+#include "runtime/model2_priority.h"
 
 #include <algorithm>
 #include <bit>
@@ -194,32 +195,7 @@ static inline void apply_focus(Geo::geo_state *geo, GeoVertex *p0)
 /* 1.8.23 float to 4.12 float converter, courtesy of Aaron Giles */
 inline uint16_t Geo::float_to_zval(float floatval, int32_t z_adjust)
 {
-	int32_t fpint = f2u(floatval);
-	int32_t exponent = ((fpint >> 23) & 0xff) - ((z_adjust >> 23) & 0xff);
-	uint32_t mantissa = fpint & 0x7fffff;
-
-	/* round the low bits and reduce to 12 */
-	mantissa += 0x400;
-	if (mantissa > 0x7fffff)
-	{
-		exponent++;
-		mantissa = (mantissa & 0x7fffff) >> 1;
-	}
-	mantissa >>= 11;
-
-	// if negative, clamp to 0
-	if (fpint < 0)
-		return 0x0000;
-
-	// the rest depends on the exponent
-	if (exponent < -12)
-		return 0x0000; // less than -12 is too small, return 0
-	else if (exponent < 0)
-		return (mantissa | 0x1000) >> -exponent; // between -12 and 0 create a denormal with exponent of 0
-	else if (exponent < 15)
-		return ((exponent + 1) << 12) | mantissa; // between 0 and 14 create a FP value with exponent + 1
-	else
-		return 0xffff; // above 14 is too large
+	return daytona_model2_z_bucket(floatval, uint32_t(z_adjust));
 }
 
 static inline bool polygon_inside_plane(const GeoVertex *v, int32_t count, const Geo::plane &clip_plane)
@@ -279,16 +255,7 @@ static int32_t clip_polygon(GeoVertex *v, int32_t num_vertices, GeoVertex *vout,
 
 inline bool Geo::check_culling(raster_state *raster, uint32_t attr, float min_z, float max_z)
 {
-	/* if doubleside is disabled */
-	if (((attr >> 17) & 1) == 0)
-	{
-		/* if it's the backface, cull it */
-		if (raster->command_buffer[9] & 0x00800000)
-			return true;
-	}
-
-	/* if the linktype is 0, then we can also cull it */
-	if (((attr >> 8) & 3) == 0)
+	if (!daytona_model2_polygon_visible(attr, !(raster->command_buffer[9] & 0x00800000)))
 		return true;
 
 	/* if the minimum z value is bigger than the master z clip value, don't render */
