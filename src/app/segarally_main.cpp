@@ -142,7 +142,6 @@ int segarally_host_main(int argc,char **argv) {
         fprintf(stderr,"Exact instruction boundary hook=%d (reference comparison uses outer loop)\n",int(instruction_boundary_hook));
 #endif
         static_assert(Machine::kAudioRate==rally::AudioOutput::kRate);
-        if(sound && !unthrottled) audio.open();
         if(!audio_path.empty()) audio_capture=std::make_unique<rally::AudioCapture>(audio_path);
         const auto eeprom=read_file(saves/"eeprom.bin",true),backup=read_file(saves/"backup.bin",true);
         if(!eeprom.empty()) machine->load_eeprom(eeprom);if(!backup.empty()) machine->load_backup(backup);
@@ -167,6 +166,7 @@ int segarally_host_main(int argc,char **argv) {
         if(!screen || !gpu.init(device,ti.format) || !touch.init(device,SDL_GetGPUSwapchainTextureFormat(device,window)))
             throw std::runtime_error(std::string("Metal pipelines: ")+gpu.error()+" "+SDL_GetError());
         touch.visible=touch_visible;touch.layout(window);
+        if(sound && !unthrottled) audio.open();
         bool quit=false,background=false,stopped=false;int gear=0;
         uint64_t replay_release_frame=0;bool replay_manual_takeover=false;
         Uint64 start=SDL_GetTicksNS();uint64_t displayed=0,last_frames=0;

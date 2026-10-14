@@ -27,12 +27,12 @@ resources before signing. Startup reads the bundled copy. Missing files,
 directories and replays larger than 1 MiB are rejected before packaging.
 
 The latest prepared sound playtest is in
-`build/worktrees/boundary-hook/build/mac-boundary-sound-v13-live/Sega Rally Native.app`.
+`build/worktrees/boundary-hook/build/mac-boundary-sound-v13-ordering/Sega Rally Native.app`.
 Launch it with its sound and execution options using:
 
 ```sh
 python3 platform/segarally/macos/launch.py \
-    --build-dir build/worktrees/boundary-hook/build/mac-boundary-sound-v13-live \
+    --build-dir build/worktrees/boundary-hook/build/mac-boundary-sound-v13-ordering \
     --sound --instruction-boundary-hook \
     --input-replay config/segarally_lancia_select.inputs
 ```
@@ -41,10 +41,13 @@ These flags matter: opening the executable without them retains its default
 sound-off, original execution mode. Quit a running copy before relaunching with
 different options.
 
-The latest sound app currently exits during CoreAudio startup with
-`AudioQueueStart: -66681`, before creating a game window. The successful timing
-and output checks below came from a separate direct-executable test. See
-[current evidence](segarally-status.md) for the launch investigation.
+The earlier sound app exited during CoreAudio startup with
+`AudioQueueStart: -66681`. The latest build opens audio after the window and Metal
+renderer and passes a 60-frame windowed startup check. The longer timing results
+below came from a separate direct-executable test. See
+[current evidence](segarally-status.md) for the test scope.
+The subsequent windowed launch applies the selection replay, hands control back
+at frame 1,851 and progresses into the race with sound enabled.
 
 The earlier sound-off v13 playtest is preserved in
 `build/worktrees/indexed-dispatch/build/mac-playtest-v13/Sega Rally Native.app`.

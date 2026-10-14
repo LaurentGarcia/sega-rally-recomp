@@ -228,6 +228,12 @@ estimated input-demand requests at that checkpoint. Hidden presentation and
 SDL counters do not establish user hearing, every course or physical audio
 fidelity. The user has separately heard a ten-second native PCM excerpt on the
 Mac speakers; visible-window game playback remains a separate test.
+The host now opens its physical audio device after window/Metal initialization,
+following Daytona's order and before establishing the pacing origin. This
+startup-only move resolves the observed `AudioQueueStart: -66681` failure in a
+60-frame windowed probe with zero audio drops or estimated input shortages.
+The probe's boot PCM is silent, and the underlying CoreAudio failure mechanism
+is not established by that ordering comparison.
 Bundled assets are verified Xcode resource inputs so signing follows copying,
 including incremental builds; post-signing bundle mutation is not allowed.
 The Mac launcher also copies the selected cabinet replay into app resources

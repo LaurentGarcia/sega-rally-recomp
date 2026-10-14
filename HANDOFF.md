@@ -1,5 +1,46 @@
 # Handoff
 
+## Window-first audio startup passes (2026-10-14)
+
+Moving only `audio.open()` after successful window, Metal and touch setup fixes
+the observed startup failure in a bounded windowed test. This follows Daytona's
+device-opening order and keeps opening before the board-time pacing origin.
+No CPU, device, PCM, shader, audio parameter or generated object was changed.
+The exact host source is integrated in the main tree and matches the isolated
+candidate SHA-256 `1af69d360c94d1a764d144f77ca220c8f7cd8cf22b2250efeb2370ff5d3827eb`.
+
+The candidate completes 60 frames, 10,923,622 instructions and 26,117,011 cycles
+at PC `0x005a27c8`, exits normally, and submits 46,071 stereo frames with zero
+chip/host drops and zero estimated SDL input-demand shortfalls. There are 2,933
+frames queued at exit. Boot PCM is silent; this verifies startup/output without
+claiming a live-game listening result. The preceding same-context windowed and
+hidden probes failed `AudioQueueStart`; both failures remain preserved.
+
+Evidence is `build/worktrees/boundary-hook/build/mac-boundary-sound-v13-ordering/`
+with `ordering.diff`, `build-provenance.json`, `windowed-60-results.json` and
+`windowed-60.log`. Provenance records the compiler/linker arguments and reused
+object hashes. Candidate executable SHA-256 is
+`102532a8259b23a6c4b40f969acacca939cd23b3ad0a6ead2a824a980d4f4d03`;
+the earlier tested executable remains preserved.
+
+The signed app in the same ordering build directory is now running windowed
+with sound, the exact hook and normal pacing. All ten bundled selection events
+applied, manual control returned at frame 1,851, and execution passed the
+race-start checkpoint and frame 2,760 without an initialization/frontier error.
+PID 28011 was alive when checked; `live-app.log`, `live-app-save` and
+`package-provenance.json` record the session. The signed executable SHA-256 is
+`9a9c6f4e78e633edd41f15341535203f9560f8098ee80ff822b6406f3c0fa169`;
+all 26 code/data sections match the tested raw candidate, all eight assets and
+the bundled replay match, and strict/deep signature verification passes.
+
+The window is left for the user's test; an optional live-game listening question
+is pending. Do not confuse the confirmed standalone sample with live-game
+listening, or the 60-frame counters with a completed live-session audio report.
+Heavy builds, replays and captures remain held during the playtest. Next work
+is to record that feedback and the eventual exit counters, then test longer
+sound-enabled paths and remaining course/restart coverage. The original frozen
+pre-game PID 8289 was not terminated; its bundle/evidence remain separate.
+
 ## Native PCM heard on Mac speakers (2026-10-14)
 
 The user confirmed hearing the standalone ten-second native Sega Rally audio
