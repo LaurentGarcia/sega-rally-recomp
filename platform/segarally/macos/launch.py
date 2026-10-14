@@ -16,6 +16,7 @@ parser.add_argument("--unthrottled",action="store_true",help="Disable board-time
 parser.add_argument("--input-replay",type=Path,help="Optional cabinet input replay, then manual control")
 parser.add_argument("--fullscreen",action="store_true",help="Launch in desktop fullscreen")
 parser.add_argument("--sound",action="store_true",help="Enable the audited diagnostic SCSP sound board")
+parser.add_argument("--instruction-boundary-hook",action="store_true",help="Enable audited exact resident-chunk execution")
 args=parser.parse_args()
 build=args.build_dir.resolve()
 if not build.is_relative_to(ROOT/"build"):
@@ -31,6 +32,8 @@ try:
         raise ValueError("matching verified native host assets required")
     if args.sound and "sound" not in audit:
         raise ValueError("--sound requires a host built with SEGARALLY_SOUND=ON and verified sound assets")
+    if args.instruction_boundary_hook and audit.get("instruction_boundary_hook",{}).get("version")!=1:
+        raise ValueError("--instruction-boundary-hook requires an audited hook-enabled host")
     for name,entry in audit["images"].items():
         if entry["file"]!=name+".bin" or hashlib.sha256((assets/entry["file"]).read_bytes()).hexdigest()!=entry["sha256"]:
             raise ValueError(f"{name} differs from the verified host package")
@@ -56,6 +59,7 @@ try:
     if args.unthrottled:startup.append("--unthrottled")
     if args.fullscreen:startup.append("--fullscreen")
     if args.sound:startup.append("--sound")
+    if args.instruction_boundary_hook:startup.append("--instruction-boundary-hook")
     if args.input_replay:startup += ["--input-replay",str(args.input_replay.resolve())]
     subprocess.run(["open","-n",str(app),"--args",*startup],check=True)
     print(f"Opened {app}; startup log {build/'live-app.log'}")

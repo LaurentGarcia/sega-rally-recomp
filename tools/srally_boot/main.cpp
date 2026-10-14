@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
     expected += 2;
 #endif
     if (argc < expected) {
-        std::fprintf(stderr, "usage: srally_boot PROGRAM.bin MAIN_DATA.bin INSTRUCTION_LIMIT [compiled TGP/video/sound image pairs] [FRAME.ppm] [--input-replay FILE]\n");
+        std::fprintf(stderr, "usage: srally_boot PROGRAM.bin MAIN_DATA.bin INSTRUCTION_LIMIT [compiled TGP/video/sound image pairs] [FRAME.ppm] [--input-replay FILE] [--instruction-boundary-hook]\n");
         return 2;
     }
     try {
@@ -47,15 +47,18 @@ int main(int argc, char **argv) {
         [[maybe_unused]] int next_image = 4;
         int next_option = expected;
         const char *capture = nullptr;
-        if (next_option < argc && std::string(argv[next_option]) != "--input-replay")
+        if (next_option < argc && !std::string(argv[next_option]).starts_with("--"))
             capture = argv[next_option++];
         std::optional<srally::InputReplay> replay;
-        if (next_option < argc) {
-            if (argc - next_option != 2 || std::string(argv[next_option]) != "--input-replay")
-                throw std::runtime_error("expected --input-replay FILE after image/capture paths");
-            std::ifstream file(argv[next_option + 1]);
-            if (!file) throw std::runtime_error("cannot open input replay");
-            replay.emplace(file);
+        while (next_option < argc) {
+            const std::string argument = argv[next_option++];
+            if (argument == "--input-replay" && !replay && next_option < argc) {
+                std::ifstream file(argv[next_option++]);
+                if (!file) throw std::runtime_error("cannot open input replay");
+                replay.emplace(file);
+            } else if (argument == "--instruction-boundary-hook" && !options.instruction_boundary_hook) {
+                options.instruction_boundary_hook = true;
+            } else throw std::runtime_error("invalid or duplicate native boot option: " + argument);
         }
 #ifdef M2_SRALLY_TGP
         images.tgp_tables = load(argv[next_image++]);
@@ -89,6 +92,10 @@ int main(int argc, char **argv) {
         if (replay && (!options.io || !options.screen))
             throw std::runtime_error("input replay requires timed screen rendering and cabinet I/O");
         Machine machine(std::move(images), options);
+#ifdef M2_INSTRUCTION_BOUNDARY_HOOK
+        std::printf("instruction_boundary_hook compiled=true enabled=%s\n",
+            options.instruction_boundary_hook ? "true" : "false");
+#endif
         const auto &cpu = machine.cpu();
         std::printf("reset IP=%08x SAT=%08x PRCB=%08x FP=%08x SP=%08x\n",
             cpu.m_IP, cpu.m_SAT, cpu.m_PRCB, cpu.m_r[rt::I960_FP], cpu.m_r[rt::I960_SP]);

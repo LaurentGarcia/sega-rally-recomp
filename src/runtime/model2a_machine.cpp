@@ -56,6 +56,11 @@ struct Model2AMachine::Impl {
     uint32_t previous_dispatch = 0;
     uint64_t frames_rendered = 0, frames_parsed = 0;
     uint64_t frames_with_geometry = 0, first_geometry_frame = 0;
+#ifdef M2_INSTRUCTION_BOUNDARY_HOOK
+    uint64_t boundary_target = 0, boundary_first_frame = 0, prepared_count = 0;
+    bool boundary_until_frame = false, boundary_prepared = false;
+    Reason boundary_reason = Reason::Budget;
+#endif
 #ifdef M2_SRALLY_CONTROL
     std::unique_ptr<Model2AControl> control;
 #endif
@@ -98,6 +103,17 @@ struct Model2AMachine::Impl {
         if (options.uart && !options.control) throw Fatal("Model2A UART requires control");
         if (options.sound && !options.uart) throw Fatal("Model2A sound requires the physical UART link");
         if (options.external_video && !options.video) throw Fatal("external renderer requires video");
+#ifdef M2_INSTRUCTION_BOUNDARY_HOOK
+        // An enabled binary verifies all chunks even in the old comparison
+        // mode. Ordinary builds have no new generated symbol dependency.
+        if (!Lockstep::boundary_hook_abi() || !gen::instruction_boundary_hook_compatible())
+            throw Fatal("instruction boundary hook build has incompatible exact generated chunks");
+        if (options.instruction_boundary_hook && !options.control)
+            throw Fatal("instruction boundary hook requires Model2A control");
+#else
+        if (options.instruction_boundary_hook)
+            throw Fatal("instruction boundary hook support is not compiled");
+#endif
         bus.set_before_access([this] { synchronize(); });
 #ifdef M2_SRALLY_CONTROL
         if (options.control) {
@@ -219,6 +235,10 @@ struct Model2AMachine::Impl {
         }
 #endif
         cpu.reset();
+#ifdef M2_INSTRUCTION_BOUNDARY_HOOK
+        if (options.instruction_boundary_hook)
+            schedule.set_boundary_hook(instruction_boundary, this);
+#endif
     }
 
     void synchronize() {
@@ -231,6 +251,53 @@ struct Model2AMachine::Impl {
         syncing = false;
     }
 
+#ifdef M2_INSTRUCTION_BOUNDARY_HOOK
+    using BoundaryAction = Lockstep::BoundaryAction;
+    BoundaryAction prepare_instruction() {
+        // This is the old post-gen frame check. It precedes even an exact
+        // budget tie, and must not advance devices past the completed frame.
+        if (boundary_until_frame && frames_rendered != boundary_first_frame) {
+            boundary_reason = Reason::Frame;
+            return BoundaryAction::Yield;
+        }
+        if (schedule.count >= boundary_target) {
+            boundary_reason = Reason::Budget;
+            return BoundaryAction::Yield;
+        }
+        // IRQ entry can redispatch within/across chunks at the same completed
+        // count. Edges produced by entry's bus accesses wait until the next
+        // instruction; a public resume explicitly invalidates this token.
+        if (boundary_prepared && prepared_count == schedule.count)
+            return BoundaryAction::Continue;
+        const uint32_t before = cpu.m_IP;
+        synchronize();
+        while (!irq_edges.empty()) {
+            const auto [line, asserted] = irq_edges.front();
+            irq_edges.pop_front();
+            cpu.execute_set_input(int(line), asserted ? 1 : 0);
+        }
+        cpu.check_immediate_irqs();
+        prepared_count = schedule.count;
+        boundary_prepared = true;
+        // Complete the entire advance/IRQ entry before testing Frame: an
+        // exception after a frame event retains its existing frontier priority.
+        if (boundary_until_frame && frames_rendered != boundary_first_frame) {
+            boundary_reason = Reason::Frame;
+            return BoundaryAction::Yield;
+        }
+        return cpu.m_IP != before ? BoundaryAction::Redispatch : BoundaryAction::Continue;
+    }
+    static BoundaryAction instruction_boundary(void *context, uint64_t) {
+        auto &self = *static_cast<Impl *>(context);
+        const BoundaryAction action = self.prepare_instruction();
+        if (action == BoundaryAction::Continue)
+            // Only a known generated label calls here. Record its attempted
+            // instruction before live-word guards, never a missing target.
+            self.previous_dispatch = self.cpu.m_IP;
+        return action;
+    }
+#endif
+
     RunResult result(Reason reason, std::string message = {}) const {
         return {reason, cpu.m_IP, schedule.count, std::move(message)};
     }
@@ -239,8 +306,27 @@ struct Model2AMachine::Impl {
         if (budget > UINT64_MAX - schedule.count) throw Fatal("instruction budget overflow");
         if (until_frame && !options.screen) throw Fatal("run_until_frame requires the screen clock");
         const uint64_t target = schedule.count + budget, first_frame = frames_rendered;
+#ifdef M2_INSTRUCTION_BOUNDARY_HOOK
+        if (options.instruction_boundary_hook) {
+            schedule.reset_boundary_yield();
+            schedule.end_count = target;
+            boundary_target = target;
+            boundary_first_frame = first_frame;
+            boundary_until_frame = until_frame;
+            boundary_prepared = false;
+            boundary_reason = Reason::Budget;
+        }
+#endif
         try {
             while (schedule.count < target) {
+#ifdef M2_INSTRUCTION_BOUNDARY_HOOK
+                if (options.instruction_boundary_hook) {
+                    // Prepare before has_code: an IRQ may redirect a target
+                    // that is otherwise missing. The label reuses this token.
+                    if (prepare_instruction() == BoundaryAction::Yield)
+                        return result(boundary_reason);
+                } else
+#endif
                 if (options.control) {
                     synchronize();
                     while (!irq_edges.empty()) {
@@ -256,9 +342,13 @@ struct Model2AMachine::Impl {
                     stopped = result(Reason::MissingCode, "native code target is not compiled");
                     return *stopped;
                 }
-                previous_dispatch = cpu.m_IP;
+                if (!options.instruction_boundary_hook) previous_dispatch = cpu.m_IP;
                 gen::run(env);
                 if (until_frame && frames_rendered != first_frame) return result(Reason::Frame);
+#ifdef M2_INSTRUCTION_BOUNDARY_HOOK
+                if (options.instruction_boundary_hook && schedule.boundary_yielded())
+                    return result(boundary_reason);
+#endif
             }
         } catch (const Model2AAccess &access) {
             auto failure = result(Reason::DeviceAccess, access.what());

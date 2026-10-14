@@ -31,6 +31,17 @@ public:
     // Call before each instruction. Returns true when the run is over or an
     // interrupt was taken (IP changed); the caller re-dispatches on m_IP.
     bool boundary() {
+#ifdef M2_INSTRUCTION_BOUNDARY_HOOK
+        if (boundary_hook_) {
+            if (boundary_yielded_) return true;
+            const BoundaryAction action = boundary_hook_(boundary_context_, count);
+            if (action == BoundaryAction::Yield) {
+                boundary_yielded_ = true;
+                return true;
+            }
+            if (action == BoundaryAction::Redispatch) return true;
+        }
+#endif
 #ifdef M2_FAST_GEN
         // next_count is kept at or below end_count (refresh_next, set_end):
         // one compare (this is called before every instruction).
@@ -50,7 +61,25 @@ public:
         if (poked_) next_count = std::min(next_count, count);
     }
 #endif
-    bool finished() const { return count >= end_count; }
+    bool finished() const {
+        return count >= end_count
+#ifdef M2_INSTRUCTION_BOUNDARY_HOOK
+            || boundary_yielded_
+#endif
+            ;
+    }
+#ifdef M2_INSTRUCTION_BOUNDARY_HOOK
+    enum class BoundaryAction { Continue, Redispatch, Yield };
+    using BoundaryHook = BoundaryAction (*)(void *context, uint64_t completed_count);
+    // Exclusive free-run event authority. Count-based callbacks/log replay and
+    // rewritten block execution cannot be combined with this hook.
+    void set_boundary_hook(BoundaryHook hook, void *context = nullptr);
+    void reset_boundary_yield() { boundary_yielded_ = false; }
+    bool boundary_yielded() const { return boundary_yielded_; }
+    // Generated chunks return this separately compiled marker. Bump the
+    // version when the hook contract changes; include layout in the check.
+    static constexpr uint64_t boundary_hook_abi();
+#endif
     // Run fn when `at` instructions have completed, before any interrupt
     // event at the same count (MAME's vblank handler parses the display list
     // before it raises the vblank line). Lockstep: call before the run
@@ -108,6 +137,23 @@ private:
 public:
     uint32_t epoch = 0; // (last, like free_calls_)
 #endif
+#ifdef M2_INSTRUCTION_BOUNDARY_HOOK
+private:
+    // Appended: original member offsets stay unchanged in enabled builds.
+    BoundaryHook boundary_hook_ = nullptr;
+    void *boundary_context_ = nullptr;
+    bool boundary_yielded_ = false;
+#endif
 };
+
+#ifdef M2_INSTRUCTION_BOUNDARY_HOOK
+inline constexpr uint64_t Lockstep::boundary_hook_abi() {
+#if defined(M2_FAST_GEN) || defined(M2_FAST_CPU) || defined(M2_DC_MEMORY)
+    return 0; // These configurations do not implement this exact contract.
+#else
+    return (uint64_t(1) << 32) | sizeof(Lockstep);
+#endif
+}
+#endif
 
 } // namespace rt

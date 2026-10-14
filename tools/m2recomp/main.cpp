@@ -522,6 +522,7 @@ int main(int argc, char **argv) {
         std::fprintf(stderr, "usage: m2recomp PROGRAM.bin OUTDIR [--seeds FILE]... [--hooks FILE] [--chunk N] [--fast_inaccuracy]\n"
                              "  [--board model2o|model2a] [--main-data FILE] [--report FILE]\n"
                              "  [--indexed-dispatch] (exact instruction lookup; no timing changes)\n"
+                             "  [--instruction-boundary-hook] (exact per-chunk runtime capability)\n"
                              "  [--relocated-code GUEST:PROGRAM_OFFSET:SIZE]... (Model2A work RAM, guarded)\n");
         return 2;
     }
@@ -530,7 +531,7 @@ int main(int argc, char **argv) {
     std::string board = "model2o", main_data_path, report_path;
     std::vector<uint32_t> seeds;
     size_t chunk = 1500;
-    bool blocks = false, chain = false, indexed_dispatch = false;
+    bool blocks = false, chain = false, indexed_dispatch = false, boundary_hook = false;
     for (int i = 3; i < argc; ++i) {
         if (!std::strcmp(argv[i], "--board") && i + 1 < argc) {
             board = argv[++i];
@@ -553,6 +554,8 @@ int main(int argc, char **argv) {
             chunk = std::strtoul(argv[++i], nullptr, 0);
         } else if (!std::strcmp(argv[i], "--indexed-dispatch")) {
             indexed_dispatch = true;
+        } else if (!std::strcmp(argv[i], "--instruction-boundary-hook")) {
+            boundary_hook = true;
         } else if (!std::strcmp(argv[i], "--fast_inaccuracy")) {
             blocks = true; // 1. block bookkeeping
             chain = true;  // 2. direct chaining
@@ -563,6 +566,10 @@ int main(int argc, char **argv) {
     }
     if (indexed_dispatch && blocks) {
         std::fprintf(stderr, "m2recomp: --indexed-dispatch cannot be combined with --fast_inaccuracy\n");
+        return 2;
+    }
+    if (boundary_hook && (blocks || board != "model2a")) {
+        std::fprintf(stderr, "m2recomp: --instruction-boundary-hook requires exact Model2A generation\n");
         return 2;
     }
     if (board != "model2o" && board != "model2a") {
@@ -686,7 +693,15 @@ int main(int argc, char **argv) {
             const bool next_is_following = k + 1 < end && insns[k + 1]->addr == next;
             if (falls && !next_is_following) em.line("{ c.m_IP = " + hex(next) + "; goto dispatch; }");
         }
-        em.o << "}\n\n} // namespace gen\n";
+        em.o << "}\n\n";
+        if (boundary_hook) {
+            em.o << "uint64_t " << name << "_boundary_abi() {\n"
+                 << "#ifdef M2_INSTRUCTION_BOUNDARY_HOOK\n"
+                 << "    constexpr uint64_t abi = rt::Lockstep::boundary_hook_abi();\n"
+                 << "    return abi;\n"
+                 << "#else\n    return 0;\n#endif\n}\n\n";
+        }
+        em.o << "} // namespace gen\n";
         std::ofstream(out + "/" + name + ".cpp") << em.o.str();
         native += em.native;
         ranges.emplace_back(insns[start]->addr, insns[end - 1]->addr);
@@ -700,6 +715,21 @@ int main(int argc, char **argv) {
     t << "#include \"runtime/gen_support.h\"\n\n"
       << "#include <algorithm>\n\nnamespace gen {\n\n";
     for (size_t i = 0; i < ranges.size(); ++i) t << "void chunk_" << (i < 10 ? "00" : i < 100 ? "0" : "") << i << "(Env &);\n";
+    if (boundary_hook) {
+        for (size_t i = 0; i < ranges.size(); ++i)
+            t << "uint64_t chunk_" << (i < 10 ? "00" : i < 100 ? "0" : "") << i << "_boundary_abi();\n";
+        t << "bool instruction_boundary_hook_compatible() {\n"
+          << "#ifdef M2_INSTRUCTION_BOUNDARY_HOOK\n";
+        if (ranges.empty()) t << "    return false;\n";
+        else {
+            t << "    constexpr uint64_t expected = rt::Lockstep::boundary_hook_abi();\n"
+              << "    return expected != 0";
+            for (size_t i = 0; i < ranges.size(); ++i)
+                t << "\n        && chunk_" << (i < 10 ? "00" : i < 100 ? "0" : "") << i << "_boundary_abi() == expected";
+            t << ";\n";
+        }
+        t << "#else\n    return false;\n#endif\n}\n\n";
+    }
     if (indexed_dispatch) {
         // A zero entry means no compiled instruction. Page and word lookup
         // replace only the address search and chunk selection; the exact same
@@ -819,6 +849,8 @@ int main(int argc, char **argv) {
                << ",\n  \"chunk_count\": " << ranges.size()
                << ",\n  \"complete_game_coverage\": false";
         if (indexed_dispatch) report << ",\n  \"indexed_dispatch\": true";
+        if (boundary_hook) report << ",\n  \"instruction_boundary_hook\": true"
+                                  << ",\n  \"instruction_boundary_hook_version\": 1";
         report << ",\n  \"relocated_code\": [";
         for (size_t i = 0; i < g_relocations.size(); ++i) {
             const auto &r = g_relocations[i];

@@ -210,6 +210,19 @@ and is not a GPU completion measurement. Hidden-window acquisition does not
 measure visible VSync blocking. Optimization must preserve per-instruction
 timing, live instruction guards and exact event/IRQ boundaries; changing the
 game clock is not a speed fix.
+An optional instruction-boundary hook now keeps exact generated execution
+inside chunks while retaining every boundary synchronization, IRQ delivery,
+live-word guard and cycle charge. All 51 instruction bodies remain byte-identical
+apart from separate capability markers. Generator/source/object audits and
+per-chunk version/layout checks reject stale or incompatible builds; ordinary
+builds and the old outer-loop path remain available.
+Actual old/new Machine comparison matches 600 million driving instructions,
+19,641,024 ordered writes, 32,576 IRQ entries and all 3,142 framebuffers. The
+independent CPU transcript remains byte-identical to the prior checkpoint.
+The sound-enabled old/new comparison also matches each PCM drain, with the full
+54.6297052-second WAV byte-identical to the earlier capture. These are exact
+execution-path comparisons; continuous real-device audio still requires a
+separate pacing measurement.
 Bundled assets are verified Xcode resource inputs so signing follows copying,
 including incremental builds; post-signing bundle mutation is not allowed.
 

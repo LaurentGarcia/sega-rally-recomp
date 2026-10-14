@@ -1,5 +1,79 @@
 # Handoff
 
+## Exact instruction boundary hook and driving equivalence (2026-10-14)
+
+The opt-in `M2_INSTRUCTION_BOUNDARY_HOOK` path lets exact generated chunks
+continue between instructions while the Machine callback retains the original
+clock/IRQ preparation at each boundary. Frame and budget stop priority,
+same-count IRQ redispatch, resumed calls, live guards and sticky frontiers are
+preserved. Count-based Lockstep callbacks cannot share that event authority.
+Ordinary builds retain their original layout and generated-symbol dependencies;
+compatible hook builds can run either old or new scheduling for comparison.
+
+Generation requires `--instruction-boundary-hook`, records a source/header and
+generated-source/object hash contract, and emits separately compiled version/
+layout markers for every chunk. Dedicated CMake uses
+`SEGARALLY_INSTRUCTION_BOUNDARY_HOOK=ON`; the host, launcher and bounded boot
+runner also require the runtime flag to enable it. Inexact generator/CPU modes,
+stale objects, missing markers and mismatched host capability are rejected.
+All prebuilt Rally-object consumers were reviewed. The raw independent CPU
+wrapper needed matching compile definitions and an early marker check too;
+without this correction it would have linked incompatible Lockstep layouts.
+Its callback remains disabled, so that wrapper does not test Machine scheduling.
+
+The isolated `build/worktrees/boundary-hook/build/segarally-boundary-v13`
+generation matches frozen v13's 75,205 instruction addresses, 51 instruction
+chunks and 52 objects. All non-capability reachability fields match; stripping
+only the new markers leaves every instruction chunk byte-identical. Coverage
+SHA-256 is `d9c578b3f1bc7e016029143cce8ba2358fa991d5b098a5c10ab4402f8f71980d`.
+The root integration byte-checks all 25 source/test files against this tested
+worktree; `build/validation/boundary-integration/source-hashes.json` records them.
+The four unrelated GPU prototype files remain outside this change.
+
+Strict and ASan/UBSan fixtures pass, including 28 old/new Machine comparisons
+and two incompatible-build rejections. They cover IRQ reentry, entry-produced
+edges, frame/budget ties, same-count resume, exceptions and missing targets.
+The only initial fixture correction was pairing FAST_GEN with its prerequisite
+FAST_CPU in the negative case; it was not a runtime defect. Forty-five Python
+cases pass across capability/audit/packaging/default-generation and sound-link
+checks. All four newly registered Release CTests pass; compile commands verify
+assertions remain active in the core and Machine test targets.
+
+Actual old/new Machine comparison passes 600,000,000 driving instructions,
+1,365,742,448 cycles, 19,641,024 exact ordered attempted writes, 32,576 IRQs,
+all nineteen input events and all 3,142 framebuffer comparisons. CPU registers,
+cache, FP bits, observable device counters and saves match. Private event-queue
+snapshots and sound are excluded from that harness. Two-million-instruction
+boot and mixed-resume checks also pass. Driving evidence is under the worktree's
+`build/validation/boundary-game-driving`; report SHA-256 is
+`19b1e08a46ee141c680a96f984ae121aaf694fe0e3b3340db88b5ac8e18f36c1` and transcript
+`b308f1b658b2b639b6e3f975818bf4f6a11b9e0ca08bec620f8af285a5e47db7`.
+
+The separate raw independent CPU comparison also passes 600 million instructions
+and is byte-identical to the previous v6 transcript, SHA-256
+`329abd243d6299723a28ad2ca071da4b6cbcdbbe8da2bccb474127a98346ddb4`.
+Its binary SHA-256 is
+`04e3bc4d1c18fa8786ab901ee696eb6a961faeaa6e2a9f920a7effc5ef23a3cf`;
+52 source/header hashes are recorded in the native build's
+`evidence/raw-parity-600m/provenance.json`, SHA-256
+`72b6cc4659ac670d53b4eb8f329fed6e7b81c310cb4aeb62a60c6b5b7975986d`.
+Both comparisons still share board implementations and do not establish full
+MAME-machine or physical-hardware fidelity.
+
+The stable-GPU sound host under the worktree's `build/mac-boundary-sound-v13`
+also passes the sound-enabled 600-million comparison against its old-loop
+reference Machine. Main state and PCM match every resumed batch. The full
+2,409,170-frame WAV is byte-identical to the previous sound capture, SHA-256
+`7353902ba5af44d8af2a25b8f0b6fab033c3bd9544e1d18e35eba74ba2df8fc7`.
+Its software and Metal images independently match their prior captures; they
+still differ from each other. The executable SHA-256 is
+`87a6aa3ecfe0b2748b132b8a192c8d975633ca903849184a37664089a9013da6`.
+This run was unthrottled with no audio device; it does not prove playback pacing.
+Next is a quiet, normal-paced real-output run through frame 2,760 with fresh
+saves and the same input replay. Measure actual elapsed time and SDL input
+demand before selecting the next windowed playtest; if the queue still runs
+dry, profile the remaining runtime cost. The new path remains opt-in.
+
 ## Mac documentation and real audio output checks (2026-10-14)
 
 The repository now has a wiki index, Mac player manual, build/validation guide,

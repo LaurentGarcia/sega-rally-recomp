@@ -75,6 +75,7 @@ int segarally_host_main(int argc,char **argv) {
     std::filesystem::path data,saves,capture_path,reference_path,log_path,replay_path,audio_path;
     uint64_t frame_limit=0,instruction_limit=0;
     bool touch_visible=false,unthrottled=false,hidden=false,fullscreen=false,sound=false;
+    bool instruction_boundary_hook=false;
     if(const char *env=std::getenv("SEGARALLY_DATA_DIR")) data=env;
     if(const char *env=std::getenv("SEGARALLY_SAVE_DIR")) saves=env;
     for(int i=1;i<argc;++i) {
@@ -90,13 +91,17 @@ int segarally_host_main(int argc,char **argv) {
         else if(arg=="--log") log_path=value();
         else if(arg=="--input-replay") replay_path=value();
         else if(arg=="--sound") sound=true;
+        else if(arg=="--instruction-boundary-hook") instruction_boundary_hook=true;
         else if(arg=="--audio-capture") audio_path=value();
-        else if(arg=="--help") {puts("Sega Rally native: --data DIR --save-dir DIR --frames N --instructions N --capture FILE.ppm --reference-capture FILE.ppm --touch --unthrottled --hidden --fullscreen --log FILE --input-replay FILE --sound --audio-capture FILE.wav\nSound is opt-in and uses diagnostic instruction-boundary timing. Unthrottled runs capture/drain audio without device playback.\nKeys: arrows steer, Z gas, X brake, C coin, Return start, V view, A/S gear down/up, Space handbrake, F2 service, F3 test, Escape quit.");return 0;}
+        else if(arg=="--help") {puts("Sega Rally native: --data DIR --save-dir DIR --frames N --instructions N --capture FILE.ppm --reference-capture FILE.ppm --touch --unthrottled --hidden --fullscreen --log FILE --input-replay FILE --sound --audio-capture FILE.wav --instruction-boundary-hook\nSound is opt-in and uses diagnostic instruction-boundary timing. Unthrottled runs capture/drain audio without device playback.\nKeys: arrows steer, Z gas, X brake, C coin, Return start, V view, A/S gear down/up, Space handbrake, F2 service, F3 test, Escape quit.");return 0;}
         else throw std::runtime_error("Unknown argument "+arg);
     }
     if(!audio_path.empty() && !sound) throw std::runtime_error("--audio-capture requires --sound");
 #ifndef M2_SRALLY_SOUND
     if(sound) throw std::runtime_error("Build with SEGARALLY_SOUND=ON before using --sound");
+#endif
+#ifndef M2_INSTRUCTION_BOUNDARY_HOOK
+    if(instruction_boundary_hook) throw std::runtime_error("Build with SEGARALLY_INSTRUCTION_BOUNDARY_HOOK=ON before using --instruction-boundary-hook");
 #endif
     if(!log_path.empty()) {
         if(!freopen(log_path.string().c_str(),"w",stderr)) throw std::runtime_error("Cannot open native host log");
@@ -130,8 +135,12 @@ int segarally_host_main(int argc,char **argv) {
         images.polygons=read_file(data/"polygons.bin");images.textures=read_file(data/"textures.bin");
         if(sound) {images.sound_program=read_file(data/"sound_program.bin");images.sound_samples=read_file(data/"sound_samples.bin");}
         Machine::Options options;options.external_video=true;options.sound=sound;
+        options.instruction_boundary_hook=instruction_boundary_hook;
         if(!reference_path.empty()) {Machine::Options ref_options;ref_options.sound=sound;reference=std::make_unique<Machine>(images,ref_options);}
         machine=std::make_unique<Machine>(std::move(images),options);
+#ifdef M2_INSTRUCTION_BOUNDARY_HOOK
+        fprintf(stderr,"Exact instruction boundary hook=%d (reference comparison uses outer loop)\n",int(instruction_boundary_hook));
+#endif
         static_assert(Machine::kAudioRate==rally::AudioOutput::kRate);
         if(sound && !unthrottled) audio.open();
         if(!audio_path.empty()) audio_capture=std::make_unique<rally::AudioCapture>(audio_path);

@@ -19,6 +19,9 @@ public:
         bool tgp = true, io = true, comm = true, control = true;
         bool video = true, screen = true, uart = true, external_video = false;
         bool sound = false; // Diagnostic 68000 instruction-boundary timing.
+        // Requires an enabled runtime and separately verified generated chunks.
+        // False retains the original one-instruction outer loop for comparison.
+        bool instruction_boundary_hook = false;
     };
     enum class Reason { Frame, Budget, MissingCode, DeviceAccess, RuntimeError };
     struct RunResult {

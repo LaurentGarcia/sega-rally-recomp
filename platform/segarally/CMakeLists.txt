@@ -9,6 +9,7 @@ set(ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 get_filename_component(ROOT "${ROOT}" ABSOLUTE)
 set(SEGARALLY_NATIVE_BUILD "${ROOT}/build/segarally-timed" CACHE PATH "Audited native generation directory")
 option(SEGARALLY_SOUND "Build optional diagnostic native SCSP sound support" OFF)
+option(SEGARALLY_INSTRUCTION_BOUNDARY_HOOK "Build audited exact per-instruction hook support (runtime opt-in)" OFF)
 set(SEGARALLY_SOUND_BUILD "${ROOT}/build/validation/segarally-pipeline" CACHE PATH "Audited timed sound generation directory")
 set(SEGARALLY_SDL_SOURCE "${ROOT}/extern/sdl3" CACHE PATH "Pinned SDL3 3.4.16 source")
 execute_process(COMMAND git -C "${SEGARALLY_SDL_SOURCE}" rev-parse HEAD
@@ -31,17 +32,33 @@ set(RUNTIME cpu lockstep model2a_bus model2a_clock model2a_machine model2a_contr
 set(SOURCES "${ROOT}/src/app/segarally_main.cpp" "${ROOT}/src/app/gpu/gpu_renderer.cpp"
     ${GENERATED} "${SEGARALLY_NATIVE_BUILD}/tgp/program.cpp")
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
-set(SOUND_STAGE_ARGS)
+set(STAGE_ARGS)
+if(SEGARALLY_INSTRUCTION_BOUNDARY_HOOK)
+    list(APPEND STAGE_ARGS --instruction-boundary-hook)
+endif()
 if(SEGARALLY_SOUND)
-    list(APPEND SOUND_STAGE_ARGS --sound-build "${SEGARALLY_SOUND_BUILD}")
-    execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/stage_data.py"
-        --native-build "${SEGARALLY_NATIVE_BUILD}" --output "${CMAKE_BINARY_DIR}/assets" ${SOUND_STAGE_ARGS}
-        RESULT_VARIABLE SOUND_VERIFY_RESULT)
-    if(NOT SOUND_VERIFY_RESULT EQUAL 0)
-        message(FATAL_ERROR "Verified native sound generation/assets required")
-    endif()
+    list(APPEND STAGE_ARGS --sound-build "${SEGARALLY_SOUND_BUILD}")
     list(APPEND RUNTIME model2a_sound model2a_sound_bus snd_cpu model2_scsp model2_scsp_dsp)
     list(APPEND SOURCES "${SEGARALLY_SOUND_BUILD}/sound/native-timed/snd_gen.cpp")
+endif()
+# Refuse capability/macro mismatches before compiling. This also checks the
+# generated source/header inventory before the host rebuilds all native chunks.
+file(READ "${SEGARALLY_NATIVE_BUILD}/coverage.json" NATIVE_AUDIT)
+string(JSON GENERATED_BOUNDARY_HOOK ERROR_VARIABLE BOUNDARY_JSON_ERROR GET "${NATIVE_AUDIT}" reachability instruction_boundary_hook)
+if(BOUNDARY_JSON_ERROR)
+    set(GENERATED_BOUNDARY_HOOK OFF)
+endif()
+if((GENERATED_BOUNDARY_HOOK AND NOT SEGARALLY_INSTRUCTION_BOUNDARY_HOOK) OR
+   (SEGARALLY_INSTRUCTION_BOUNDARY_HOOK AND NOT GENERATED_BOUNDARY_HOOK))
+    message(FATAL_ERROR "SEGARALLY_INSTRUCTION_BOUNDARY_HOOK must match the audited native generation")
+endif()
+if(SEGARALLY_SOUND OR SEGARALLY_INSTRUCTION_BOUNDARY_HOOK)
+    execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/stage_data.py"
+        --native-build "${SEGARALLY_NATIVE_BUILD}" --output "${CMAKE_BINARY_DIR}/assets" ${STAGE_ARGS}
+        RESULT_VARIABLE OPTIONAL_VERIFY_RESULT)
+    if(NOT OPTIONAL_VERIFY_RESULT EQUAL 0)
+        message(FATAL_ERROR "Verified optional native generation/assets required")
+    endif()
 endif()
 foreach(NAME IN LISTS RUNTIME)
     list(APPEND SOURCES "${ROOT}/src/runtime/${NAME}.cpp")
@@ -51,7 +68,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     # incremental builds where imported data changes without a relink.
     set(ASSET_STAGE "${CMAKE_BINARY_DIR}/assets")
     execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/stage_data.py"
-        --native-build "${SEGARALLY_NATIVE_BUILD}" --output "${ASSET_STAGE}" ${SOUND_STAGE_ARGS}
+        --native-build "${SEGARALLY_NATIVE_BUILD}" --output "${ASSET_STAGE}" ${STAGE_ARGS}
         RESULT_VARIABLE STAGE_RESULT)
     if(NOT STAGE_RESULT EQUAL 0)
         message(FATAL_ERROR "Verified iOS asset staging failed")
@@ -69,7 +86,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     add_executable(segarally_native MACOSX_BUNDLE ${SOURCES} ${ASSETS})
     add_custom_target(segarally_assets
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/stage_data.py"
-            --native-build "${SEGARALLY_NATIVE_BUILD}" --output "${ASSET_STAGE}" ${SOUND_STAGE_ARGS}
+            --native-build "${SEGARALLY_NATIVE_BUILD}" --output "${ASSET_STAGE}" ${STAGE_ARGS}
         BYPRODUCTS ${ASSETS} VERBATIM COMMENT "Verify personally imported Sega Rally assets")
     add_dependencies(segarally_native segarally_assets)
     target_compile_definitions(segarally_native PRIVATE SEGARALLY_IOS=1)
@@ -90,14 +107,20 @@ target_compile_definitions(segarally_native PRIVATE M2_SRALLY_TGP=1 M2_SRALLY_IO
     M2_SRALLY_COMM=1 M2_SRALLY_CONTROL=1 M2_SRALLY_VIDEO=1 M2_SRALLY_SCREEN=1 M2_SRALLY_UART=1 SDL_MAIN_HANDLED)
 if(SEGARALLY_SOUND)
     target_compile_definitions(segarally_native PRIVATE M2_SRALLY_SOUND=1)
+endif()
+if(SEGARALLY_INSTRUCTION_BOUNDARY_HOOK)
+    # One target owns runtime AND generated C++: no stale prebuilt main objects.
+    target_compile_definitions(segarally_native PRIVATE M2_INSTRUCTION_BOUNDARY_HOOK=1)
+endif()
+if(SEGARALLY_SOUND OR SEGARALLY_INSTRUCTION_BOUNDARY_HOOK)
     # Repeat provenance checks for incremental builds, before linking changed
     # native code. A successful older configure is insufficient evidence.
     if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
-        add_custom_target(segarally_sound_verify
+        add_custom_target(segarally_native_verify
             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/stage_data.py"
-                --native-build "${SEGARALLY_NATIVE_BUILD}" --output "${CMAKE_BINARY_DIR}/assets" ${SOUND_STAGE_ARGS}
+                --native-build "${SEGARALLY_NATIVE_BUILD}" --output "${CMAKE_BINARY_DIR}/assets" ${STAGE_ARGS}
             VERBATIM)
-        add_dependencies(segarally_native segarally_sound_verify)
+        add_dependencies(segarally_native segarally_native_verify)
     endif()
 endif()
 target_compile_options(segarally_native PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fno-fast-math;-ffp-contract=off>
@@ -113,6 +136,6 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     add_test(NAME segarally_audio COMMAND test_segarally_audio "${CMAKE_CURRENT_BINARY_DIR}/audio-fixture.wav")
     add_custom_command(TARGET segarally_native POST_BUILD
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/stage_data.py"
-            --native-build "${SEGARALLY_NATIVE_BUILD}" --output "${ASSET_DEST}" ${SOUND_STAGE_ARGS}
+            --native-build "${SEGARALLY_NATIVE_BUILD}" --output "${ASSET_DEST}" ${STAGE_ARGS}
         VERBATIM COMMENT "Verify and package personally imported Sega Rally assets")
 endif()

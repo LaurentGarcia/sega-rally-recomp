@@ -55,5 +55,10 @@ inline float u2f(uint32_t u) { return std::bit_cast<float>(u); }
 bool has_code(uint32_t addr);   // generated
 void run(Env &e);               // generated: dispatches into the chunk holding c.m_IP
 uint64_t native_instructions(); // generated: instructions recompiled (all of them: there is no fallback)
+#ifdef M2_INSTRUCTION_BOUNDARY_HOOK
+// Only emitted by --instruction-boundary-hook. Calls each chunk's separately
+// compiled marker: a table rebuilt around stale/missing chunks cannot pass.
+bool instruction_boundary_hook_compatible();
+#endif
 
 } // namespace gen

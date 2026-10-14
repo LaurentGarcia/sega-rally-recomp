@@ -28,6 +28,15 @@ Machine::Images images() {
 Machine::Options options() { return {false, true, false, true, false, false, false, false}; }
 }
 int main() {
+#ifndef M2_INSTRUCTION_BOUNDARY_HOOK
+    bool hook_rejected = false;
+    try {
+        auto unsupported = options();
+        unsupported.instruction_boundary_hook = true;
+        Machine unavailable(images(), unsupported);
+    } catch (const rt::Fatal &) { hook_rejected = true; }
+    assert(hook_rejected);
+#endif
     Machine machine(images(), options());
     assert(machine.cpu().m_IP == 0x420);
     assert(machine.take_audio().empty());

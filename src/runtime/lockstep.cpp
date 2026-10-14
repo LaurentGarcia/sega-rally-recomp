@@ -39,6 +39,16 @@ Lockstep::Lockstep(Cpu &core) : core_(core), free_run_(true) {
     refresh_next();
 }
 
+#ifdef M2_INSTRUCTION_BOUNDARY_HOOK
+void Lockstep::set_boundary_hook(BoundaryHook hook, void *context) {
+    if (hook && (!boundary_hook_abi() || !free_run_ || next_ != log_.size()))
+        throw Divergence("instruction boundary hook requires exact free run without count callbacks");
+    boundary_hook_ = hook;
+    boundary_context_ = context;
+    boundary_yielded_ = false;
+}
+#endif
+
 void Lockstep::refresh_next() {
     next_count = next_ < log_.size() ? log_[next_].count : UINT64_MAX;
     if (next_ < log_.size() && log_[next_].kind == Event::Pend) next_count += 1; // checked after it should happen
@@ -107,6 +117,10 @@ bool Lockstep::apply() {
 }
 
 void Lockstep::add_callback(uint64_t at, std::function<void()> fn) {
+#ifdef M2_INSTRUCTION_BOUNDARY_HOOK
+    if (boundary_hook_)
+        throw Divergence("count callback cannot be combined with an instruction boundary hook");
+#endif
     Event e{};
     e.kind = Event::Call;
     e.count = at;

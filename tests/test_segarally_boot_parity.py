@@ -4,6 +4,9 @@
 Requires an audited generation from scripts/segarally_recompile.py. This checks
 CPU state, reference cycles and cycle-stamped ordered writes through the same
 bus implementation, not independent MAME scheduler or PCB behavior.
+
+Hook-capable objects use their matching Lockstep ABI with a null callback. This
+raw CPU harness does not exercise Model2AMachine's resident-chunk scheduling.
 """
 import argparse
 import hashlib
@@ -12,8 +15,11 @@ import os
 from pathlib import Path
 import shlex
 import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+from segarally_recompile import boundary_compile_flags, verify_boundary_contract
 
 
 def main():
@@ -51,6 +57,7 @@ def main():
     reachability = json.loads((directory / "reachability.json").read_text())
     if not reachability.get("reference_cycle_accounting") or reachability.get("reference_cycle_accounting_version") != 1:
         parser.error("regenerate native objects with reference cycle accounting before timed parity")
+    boundary = verify_boundary_contract(directory, audit)
     objects = sorted((directory / "objects").glob("*.o"))
     assert len(objects) == audit["native_object_count"]
     images = []
@@ -61,9 +68,14 @@ def main():
         assert hashlib.sha256(path.read_bytes()).hexdigest() == entry["sha256"]
         images.append(path)
     executable = directory / "boot_parity"
-    command = shlex.split(args.compiler) + ["-std=c++20", "-O1", "-fno-fast-math", "-ffp-contract=off", "-Isrc", "-I.",
+    compiler = shlex.split(args.compiler)
+    command = compiler + ["-std=c++20", "-O1", "-fno-fast-math", "-ffp-contract=off", "-Isrc", "-I.",
         "tests/test_segarally_boot_parity.cpp", "src/runtime/model2a_bus.cpp", "src/runtime/cpu.cpp",
         "src/runtime/lockstep.cpp", "src/refcore/i960_ref.cpp", "src/runtime/model2a_clock.cpp"]
+    if boundary is not None:
+        # This is ABI compatibility only: the independent instruction oracle
+        # continues using the ordinary null-callback boundary path.
+        command += boundary_compile_flags(compiler)
     tgp_images = []
     if args.tgp:
         tgp_audit = json.loads((directory / "tgp/audit.json").read_text())
@@ -98,7 +110,15 @@ def main():
             video_images.append(path)
         command += ["-DM2_SRALLY_VIDEO", "src/runtime/model2a_video.cpp", "src/runtime/geo.cpp",
                     "src/runtime/video.cpp", "src/runtime/raster.cpp"]
-    subprocess.run(command + list(map(str, objects)) + ["-o", str(executable)], cwd=ROOT, check=True)
+    command += list(map(str, objects)) + ["-o", str(executable)]
+    subprocess.run(command, cwd=ROOT, check=True)
+    if boundary is not None:
+        metadata = {"scope": "raw native CPU versus test-only reference; shared board implementations",
+            "instruction_boundary_hook_build": True, "instruction_boundary_callback_enabled": False,
+            "model2a_machine_scheduling_tested": False, "boundary_contract": boundary,
+            "coverage_sha256": hashlib.sha256((directory / "coverage.json").read_bytes()).hexdigest(),
+            "compile_command": command}
+        (directory / "boot-parity-build.json").write_text(json.dumps(metadata, indent=2) + "\n")
     arguments = [str(executable), *map(str, images), str(args.instructions), *map(str, tgp_images), *map(str, video_images)]
     if args.io:
         arguments.append("--io")

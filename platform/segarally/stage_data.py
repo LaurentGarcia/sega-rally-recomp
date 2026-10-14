@@ -11,9 +11,11 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 from segarally_boot import sound_inputs
+from segarally_recompile import verify_boundary_contract
 
 
-def stage(source: Path, destination: Path, sound_source: Path | None = None) -> None:
+def stage(source: Path, destination: Path, sound_source: Path | None = None,
+          instruction_boundary_hook: bool = False) -> None:
     source, destination = source.resolve(), destination.resolve()
     if not source.is_relative_to(ROOT / "build") or not destination.is_relative_to(ROOT / "build"):
         raise ValueError("source and destination must be inside the ignored project build directory")
@@ -25,6 +27,11 @@ def stage(source: Path, destination: Path, sound_source: Path | None = None) -> 
         raise ValueError("native Model2A compilation audit required")
     if not timing.get("reference_cycle_accounting") or timing.get("reference_cycle_accounting_version") != 1:
         raise ValueError("timed native generation required")
+    # The host recompiles these sources itself. Object hashes are checked by
+    # runners that link pipeline objects; source/header provenance still applies.
+    boundary = verify_boundary_contract(source, coverage, verify_objects=False)
+    if bool(boundary) != instruction_boundary_hook:
+        raise ValueError("host boundary support must match the audited native generation")
     if any(a.get("romset") != "srallycb" for a in audits) or not tgp.get("native_code_compiled"):
         raise ValueError("matching srallycb native TGP and video imports required")
     manifest = ROOT / "config/segarally_video.json"
@@ -56,6 +63,10 @@ def stage(source: Path, destination: Path, sound_source: Path | None = None) -> 
     report = {"romset": "srallycb", "images": {}, "native_coverage_is_partial": True}
     if sound_audit is not None:
         report["sound"] = sound_audit
+    if boundary is not None:
+        report["instruction_boundary_hook"] = {"version": boundary["version"],
+            "runtime_enabled_by_default": False,
+            "coverage_sha256": hashlib.sha256((source / "coverage.json").read_bytes()).hexdigest()}
     for path, output, digest in verified:
         target = destination / f"{output}.bin"
         if not target.exists() or hashlib.sha256(target.read_bytes()).hexdigest() != digest:
@@ -73,8 +84,10 @@ if __name__ == "__main__":
     parser.add_argument("--native-build", type=Path, default=ROOT / "build/segarally-timed")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--sound-build", type=Path, help="Optional audited native sound generation")
+    parser.add_argument("--instruction-boundary-hook", action="store_true",
+                        help="Require audited exact per-chunk boundary support")
     args = parser.parse_args()
     try:
-        stage(args.native_build, args.output, args.sound_build)
+        stage(args.native_build, args.output, args.sound_build, args.instruction_boundary_hook)
     except (OSError, ValueError, KeyError) as error:
         parser.exit(2, f"stage_data: {error}\n")

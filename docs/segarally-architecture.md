@@ -37,6 +37,16 @@ page/word lookup. Membership remains exact, including holes and displacement
 words. Instruction bodies, guards, cycle charges and boundary checks remain
 unchanged. It is incompatible with the generator's `--fast_inaccuracy` mode.
 
+An additional opt-in instruction boundary hook keeps execution inside a native
+chunk across successive instructions. The shared clock and IRQ checks still
+run before every instruction, and live-word guards and cycle charges remain
+unchanged. Frame stops and budget stops preserve the old execution boundaries.
+Each compiled chunk exports a version/layout marker; source and object audits
+reject stale or incompatible builds. The original outer loop remains available
+in the same binary for comparison. Actual old/new execution matches through
+600 million driving instructions, including every frame, ordered write and IRQ;
+the sound-enabled comparison also preserves every captured PCM sample.
+
 ## Machine and time
 
 [Model2AMachine](../src/runtime/model2a_machine.cpp) owns the resumable CPU and

@@ -429,6 +429,24 @@ target_include_directories(test_model2a_machine PRIVATE src)
 target_compile_definitions(test_model2a_machine PRIVATE M2_SRALLY_IO M2_SRALLY_CONTROL)
 add_test(NAME model2a_machine COMMAND test_model2a_machine)
 
+add_executable(test_lockstep_boundary_hook tests/test_lockstep_boundary_hook.cpp
+    src/runtime/cpu.cpp src/runtime/lockstep.cpp)
+target_include_directories(test_lockstep_boundary_hook PRIVATE src)
+target_compile_definitions(test_lockstep_boundary_hook PRIVATE M2_INSTRUCTION_BOUNDARY_HOOK)
+target_compile_options(test_lockstep_boundary_hook PRIVATE $<IF:$<CXX_COMPILER_ID:MSVC>,/UNDEBUG,-UNDEBUG>)
+add_test(NAME lockstep_boundary_hook COMMAND test_lockstep_boundary_hook "${CMAKE_CURRENT_BINARY_DIR}/boundary-hook-irq.txt")
+
+add_executable(test_model2a_boundary_hook tests/test_model2a_boundary_hook.cpp
+    src/runtime/model2a_machine.cpp src/runtime/model2a_bus.cpp src/runtime/model2a_clock.cpp
+    src/runtime/model2a_control.cpp src/runtime/cpu.cpp src/runtime/lockstep.cpp
+    src/runtime/tgp.cpp src/runtime/m2_tgp_board.cpp src/runtime/model2a_video.cpp
+    src/runtime/video.cpp src/runtime/raster.cpp src/runtime/geo.cpp)
+target_include_directories(test_model2a_boundary_hook PRIVATE src)
+target_compile_definitions(test_model2a_boundary_hook PRIVATE M2_INSTRUCTION_BOUNDARY_HOOK
+    M2_SRALLY_CONTROL M2_SRALLY_SCREEN M2_SRALLY_VIDEO M2_SRALLY_TGP)
+target_compile_options(test_model2a_boundary_hook PRIVATE $<IF:$<CXX_COMPILER_ID:MSVC>,/UNDEBUG,-UNDEBUG>)
+add_test(NAME model2a_boundary_hook COMMAND test_model2a_boundary_hook)
+
 add_executable(test_model2a_machine_audio tests/test_model2a_machine_audio.cpp
     src/runtime/model2a_machine.cpp src/runtime/model2a_bus.cpp src/runtime/model2a_clock.cpp
     src/runtime/model2a_control.cpp src/runtime/model2_io.cpp src/runtime/model2a_io.cpp
@@ -623,6 +641,10 @@ add_test(NAME trace COMMAND test_trace ${CMAKE_CURRENT_BINARY_DIR})
 # The MAME plugin's Lua core against the C++ trace library (needs lupa).
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_FOUND)
+    add_test(NAME segarally_boundary_contract
+        COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tests/test_segarally_boundary_contract.py)
+    add_test(NAME segarally_boundary_audit
+        COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tests/test_segarally_boundary_audit.py)
     add_test(NAME i960_runtime_timing
         COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tests/test_i960_runtime_timing.py
                 --compiler ${CMAKE_CXX_COMPILER})

@@ -124,6 +124,10 @@ int main(int argc,char** argv) {
     if(enable_uart && !enable_control) return 2;
     if(replay_path && (!enable_screen || !enable_io)) return 2;
     try {
+#ifdef M2_INSTRUCTION_BOUNDARY_HOOK
+        if(!rt::Lockstep::boundary_hook_abi() || !gen::instruction_boundary_hook_compatible())
+            throw rt::Fatal("raw CPU parity has incompatible generated boundary chunks");
+#endif
         std::optional<srally::InputReplay> native_replay,reference_replay;
         if(replay_path) {
             std::ifstream stream(replay_path);

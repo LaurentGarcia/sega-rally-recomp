@@ -13,6 +13,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import struct
 import subprocess
@@ -23,6 +24,105 @@ import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / "build" / "segarally"
+
+BOUNDARY_DEFINITION = "M2_INSTRUCTION_BOUNDARY_HOOK"
+BOUNDARY_SOURCE_ROOTS = ("scripts/segarally_recompile.py", "tools/m2recomp/main.cpp",
+    "tools/srally_continuations/main.cpp",
+    "src/i960/isa.cpp", "src/i960/decode.cpp", "src/i960/reach.cpp", "src/i960/timing.cpp",
+    "src/runtime/gen_support.h")
+
+
+def boundary_source_hashes() -> dict[str, str]:
+    """Pin generation logic and the complete quoted-header ABI dependency set."""
+    hashes, pending = {}, [ROOT / name for name in BOUNDARY_SOURCE_ROOTS]
+    while pending:
+        path = pending.pop().resolve()
+        if not path.is_relative_to(ROOT) or not path.is_file():
+            raise ValueError("boundary source dependency is outside this checkout")
+        name = path.relative_to(ROOT).as_posix()
+        if name in hashes:
+            continue
+        data = path.read_bytes()
+        hashes[name] = hashlib.sha256(data).hexdigest()
+        for include in re.findall(r'^\s*#include\s+"([^"\n]+)"', data.decode(), re.MULTILINE):
+            candidates = (path.parent / include, ROOT / "src" / include, ROOT / include)
+            match = next((candidate for candidate in candidates if candidate.is_file()), None)
+            if match is None:
+                raise ValueError(f"unresolved boundary source dependency: {include}")
+            pending.append(match)
+    return dict(sorted(hashes.items()))
+
+
+def boundary_compile_flags(compiler: list[str]) -> list[str]:
+    if re.search(r'(?:^|\s)-D\s*(?:M2_FAST_GEN|M2_FAST_CPU|M2_DC_MEMORY|M2_DC_SPEED)(?:=|\s|$)',
+                 " ".join(compiler)):
+        raise ValueError("instruction boundary hook rejects inexact compiler definitions")
+    return ["-D" + BOUNDARY_DEFINITION]
+
+
+def boundary_artifact_hashes(build: Path, directory: str, names: set[str]) -> dict[str, str]:
+    folder = (build / directory).resolve()
+    if not folder.is_relative_to(build):
+        raise ValueError("boundary artifact directory escaped its build")
+    suffix = ".cpp" if directory == "gen" else ".o"
+    if {path.name for path in folder.glob("*" + suffix)} != names:
+        raise ValueError(f"boundary {directory} set differs from exact chunk inventory")
+    hashes = {}
+    for name in sorted(names):
+        path = (folder / name).resolve()
+        if not path.is_relative_to(folder):
+            raise ValueError("boundary artifact escaped its audited directory")
+        hashes[name] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return hashes
+
+
+def make_boundary_contract(build: Path, reach: dict) -> dict:
+    names = {f"chunk_{index:03d}.cpp" for index in range(reach["chunk_count"])} | {"gen_table.cpp"}
+    return {"version": 1, "compile_definitions": [BOUNDARY_DEFINITION],
+        "reachability_sha256": hashlib.sha256((build / "reachability.json").read_bytes()).hexdigest(),
+        "sources_sha256": boundary_source_hashes(),
+        "generated_sha256": boundary_artifact_hashes(build, "gen", names),
+        "objects_sha256": boundary_artifact_hashes(build, "objects", {name[:-4] + ".o" for name in names})}
+
+
+def verify_boundary_contract(build: Path, coverage: dict, verify_objects: bool = True) -> dict | None:
+    """Reject stale hook builds; ordinary generation keeps its existing path."""
+    build = build.resolve()
+    if not build.is_relative_to((ROOT / "build").resolve()):
+        raise ValueError("boundary build must be beneath this checkout's ignored build directory")
+    reach = coverage.get("reachability", {})
+    if not reach.get("instruction_boundary_hook") and "boundary_contract" not in coverage:
+        table = build / "gen/gen_table.cpp"
+        if table.is_file() and "instruction_boundary_hook_compatible" in table.read_text():
+            raise ValueError("boundary-capable generated table is missing its compile audit")
+        return None
+    if (coverage.get("board") != "model2a" or not coverage.get("native_objects_compiled") or
+        reach.get("instruction_boundary_hook") is not True or reach.get("instruction_boundary_hook_version") != 1 or
+        reach.get("reference_cycle_accounting") is not True or reach.get("reference_cycle_accounting_version") != 1 or
+        reach.get("board") != "model2a" or reach.get("missing_template_count") != 0 or
+        not isinstance(reach.get("chunk_count"), int) or reach["chunk_count"] <= 0 or
+        not isinstance(reach.get("instruction_count"), int) or reach["instruction_count"] < reach["chunk_count"] or
+        reach.get("native_template_count") != reach["instruction_count"] or
+        coverage.get("native_object_count") != reach["chunk_count"] + 1):
+        raise ValueError("exact compatible Model2A boundary generation audit required")
+    contract = coverage.get("boundary_contract", {})
+    if contract.get("version") != 1 or contract.get("compile_definitions") != [BOUNDARY_DEFINITION]:
+        raise ValueError("boundary compile contract or definitions differ")
+    report_path = (build / "reachability.json").resolve()
+    if (not report_path.is_relative_to(build) or json.loads(report_path.read_text()) != reach or
+        hashlib.sha256(report_path.read_bytes()).hexdigest() != contract.get("reachability_sha256")):
+        raise ValueError("boundary reachability report differs from the compile audit")
+    if contract.get("sources_sha256") != boundary_source_hashes():
+        raise ValueError("boundary generation source or header ABI changed; rebuild native objects")
+    names = {f"chunk_{index:03d}.cpp" for index in range(reach["chunk_count"])} | {"gen_table.cpp"}
+    if contract.get("generated_sha256") != boundary_artifact_hashes(build, "gen", names):
+        raise ValueError("boundary generated sources differ from the compile audit")
+    object_names = {name[:-4] + ".o" for name in names}
+    if set(contract.get("objects_sha256", {})) != object_names:
+        raise ValueError("boundary object audit inventory differs")
+    if verify_objects and contract["objects_sha256"] != boundary_artifact_hashes(build, "objects", object_names):
+        raise ValueError("boundary native objects differ from the compile audit")
+    return contract
 
 
 def load_manifest(path: Path) -> dict:
@@ -136,14 +236,16 @@ def relocation_seeds(program: bytes, seeds: dict, config: dict) -> tuple[list[st
     return flags, aliases
 
 
-def compile_generated(compiler: list[str], generated: Path, output: Path, jobs: int) -> int:
+def compile_generated(compiler: list[str], generated: Path, output: Path, jobs: int,
+                      instruction_boundary_hook: bool = False) -> int:
     sources = sorted(generated.glob("*.cpp"))
     if not sources:
         raise RuntimeError("The recompiler produced no sources")
     output.mkdir(parents=True, exist_ok=True)
+    definitions = boundary_compile_flags(compiler) if instruction_boundary_hook else []
     def compile_one(source: Path) -> None:
         run_logged(compiler + ["-std=c++20", "-O1", "-fno-fast-math", "-ffp-contract=off", "-Isrc",
-                              "-c", str(source), "-o", str(output / (source.stem + ".o"))],
+                              *definitions, "-c", str(source), "-o", str(output / (source.stem + ".o"))],
                    output / (source.stem + ".log"))
     with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as workers:
         list(workers.map(compile_one, sources))
@@ -430,6 +532,8 @@ def main() -> int:
     parser.add_argument("--verify-only", action="store_true")
     parser.add_argument("--indexed-dispatch", action="store_true",
                         help="Use exact page/word dispatch lookup; retain instruction timing and live guards")
+    parser.add_argument("--instruction-boundary-hook", action="store_true",
+                        help="Build audited exact per-chunk boundary support; runtime remains opt-in")
     parser.add_argument("--seed-profile", choices=("bootstrap", "lift-labels"), default="bootstrap",
                         help="Sparse known bootstrap labels or opt-in prior-lift address candidates")
     args = parser.parse_args()
@@ -440,6 +544,8 @@ def main() -> int:
         parser.error("--jobs must be between 1 and 8")
     compiler = shlex.split(args.compiler)
     dispatch_flags = ["--indexed-dispatch"] if args.indexed_dispatch else []
+    if args.instruction_boundary_hook:
+        dispatch_flags.append("--instruction-boundary-hook")
     try:
         manifest = load_manifest(ROOT / "config" / "segarally_roms.json")
         audit = extract(args.roms.expanduser().resolve(), manifest, BUILD / "rom_cache")
@@ -515,7 +621,7 @@ def main() -> int:
             reach = json.loads(report.read_text())
         else:
             raise ValueError("continuation proof did not reach a fixed point within 16 passes")
-        compiled = compile_generated(compiler, generated, objects, args.jobs)
+        compiled = compile_generated(compiler, generated, objects, args.jobs, args.instruction_boundary_hook)
         audit.update({"seed_profile": args.seed_profile, "seed_provenance": seeds,
                       "observed_seed_provenance": observed, "relocation_provenance": relocations,
                       "table_seed_provenance": table_config, "table_derived_candidates": derived,
@@ -531,6 +637,9 @@ def main() -> int:
                       "relocated_seed_provenance": aliases, "reachability": reach,
                       "native_objects_compiled": True, "native_object_count": compiled,
                       "compiler_command": compiler})
+        if args.instruction_boundary_hook:
+            audit["boundary_contract"] = make_boundary_contract(BUILD, reach)
+            verify_boundary_contract(BUILD, audit)
         (BUILD / "coverage.json").write_text(json.dumps(audit, indent=2) + "\n")
         print(f"Generated {reach['instruction_count']} seeded instructions; compiled {compiled} native objects")
         print(f"Unresolved indirect sites: {len(reach['indirect_sites'])}; "

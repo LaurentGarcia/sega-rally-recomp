@@ -13,6 +13,7 @@ from pathlib import Path
 import shlex
 import subprocess
 import sys
+from segarally_recompile import boundary_compile_flags, verify_boundary_contract
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -70,6 +71,8 @@ def main() -> int:
     parser.add_argument("--capture-frame", action="store_true", help="Save the latest rendered startup frame as boot-frame.ppm (requires --with-screen)")
     parser.add_argument("--step-frames", action="store_true", help="Resume the shared machine once per rendered frame (requires --with-screen)")
     parser.add_argument("--input-replay", type=Path, help="Replay complete cabinet snapshots at completed-frame boundaries (requires --with-screen --with-io)")
+    parser.add_argument("--instruction-boundary-hook", action="store_true",
+                        help="Use audited exact resident chunks (requires compatible generation and --with-control)")
     args = parser.parse_args()
     output = args.build_dir.resolve()
     if not output.is_relative_to(ROOT / "build"):
@@ -92,6 +95,8 @@ def main() -> int:
         parser.error("--step-frames requires --with-screen")
     if args.input_replay and not (args.with_screen and args.with_io):
         parser.error("--input-replay requires --with-screen and --with-io")
+    if args.instruction_boundary_hook and not args.with_control:
+        parser.error("--instruction-boundary-hook requires --with-control")
     try:
         input_replay = None
         if args.input_replay:
@@ -111,6 +116,9 @@ def main() -> int:
         objects = sorted((output / "objects").glob("*.o"))
         if len(objects) != audit["native_object_count"] or not (output / "gen/gen_table.cpp").exists():
             raise ValueError("generated object set does not match the compile audit")
+        boundary = verify_boundary_contract(output, audit)
+        if args.instruction_boundary_hook and boundary is None:
+            raise ValueError("regenerate with --instruction-boundary-hook before selecting it at runtime")
         images = []
         for name in ("program", "main_data"):
             item = audit["images"][name]
@@ -125,6 +133,9 @@ def main() -> int:
         command = compiler + ["-std=c++20", "-O1", "-fno-fast-math", "-ffp-contract=off", "-Isrc",
             "tools/srally_boot/main.cpp", "src/runtime/model2a_machine.cpp", "src/runtime/model2a_bus.cpp", "src/runtime/cpu.cpp",
             "src/runtime/lockstep.cpp", "src/runtime/model2a_clock.cpp"] + [str(p) for p in objects] + ["-o", str(executable)]
+        if boundary is not None:
+            # The old/new runtime comparison must use the same object ABI.
+            command += boundary_compile_flags(compiler)
         tgp_images = []
         video_images = []
         sound_images = []
@@ -180,6 +191,8 @@ def main() -> int:
         if input_replay:
             Path(input_replay["path"]).write_bytes(replay_bytes)
         replay_args = ["--input-replay", input_replay["path"]] if input_replay else []
+        if args.instruction_boundary_hook:
+            replay_args.append("--instruction-boundary-hook")
         result = subprocess.run([str(executable), *map(str, images), str(args.instructions), *map(str, tgp_images), *map(str, video_images), *map(str, sound_images), *capture, *replay_args],
             cwd=ROOT, capture_output=True, text=True,
             timeout=180 if args.instructions <= 1_000_000_000 else 360)
@@ -200,6 +213,10 @@ def main() -> int:
                   "input_replay": input_replay,
                   "image_sha256": {name: audit["images"][name]["sha256"] for name in ("program", "main_data")},
                   "transcript": transcript}
+        if boundary is not None:
+            report["instruction_boundary_hook_build"] = True
+            report["instruction_boundary_hook"] = args.instruction_boundary_hook
+            report["boundary_coverage_sha256"] = hashlib.sha256((output / "coverage.json").read_bytes()).hexdigest()
         for line in result.stdout.splitlines():
             if line.startswith("status="):
                 report["frontier"] = dict(token.split("=", 1) for token in line.split() if "=" in token)

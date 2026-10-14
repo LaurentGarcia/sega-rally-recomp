@@ -75,6 +75,24 @@ window. [The player manual](mac-player-manual.md) explains controls and saves.
 The convenience `platform/segarally/build.sh mac` uses
 `SEGARALLY_NATIVE_BUILD` but always builds the host in `build/segarally-mac`.
 
+### Optional instruction boundary hook
+
+For the exact execution candidate, add `--instruction-boundary-hook` to the
+recompile command and generate into a separate build directory. Retain
+`--seed-profile lift-labels --indexed-dispatch` and import TGP/video into that
+same directory. Configure its Mac host with
+`-DSEGARALLY_INSTRUCTION_BOUNDARY_HOOK=ON`, then pass
+`--instruction-boundary-hook` to the launcher or direct host to enable it.
+Omitting the runtime flag keeps the old outer loop in that compatible binary.
+Sound can be enabled alongside it with the options below.
+
+This requires rebuilding every native object. The pipeline records matching
+source, header, generated-code and object hashes; staging and runners reject
+stale or mixed artifacts. The boot runner accepts the runtime flag with
+`--with-control`. The independent CPU harness links the matching build layout
+but keeps its boundary callback disabled; actual Machine scheduling equivalence
+is tested separately by `tests/test_segarally_boundary_game.py`.
+
 ## Bounded checks and independent comparison
 
 First reproduce a bounded boot with the generated components:

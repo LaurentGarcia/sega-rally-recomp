@@ -58,6 +58,33 @@ class HostAssets(unittest.TestCase):
     def test_external_destination(self):
         with self.assertRaises(ValueError):stage_data.stage(self.source,ROOT/"assets")
 
+    def test_boundary_staging_records_audited_opt_in_support(self):
+        # The independent boundary audit suite verifies source/header/object
+        # mutations. This fixture checks packaging consumes that verifier and
+        # advertises compile support without enabling the runtime by default.
+        with patch.object(stage_data,"verify_boundary_contract",return_value={"version":1}) as verify:
+            stage_data.stage(self.source,self.target,instruction_boundary_hook=True)
+        verify.assert_called_once_with(self.source.resolve(),self.audits[0],verify_objects=False)
+        report=json.loads((self.target/"assets.json").read_text())
+        self.assertEqual(report["instruction_boundary_hook"],{"version":1,
+            "runtime_enabled_by_default":False,
+            "coverage_sha256":hashlib.sha256((self.source/"coverage.json").read_bytes()).hexdigest()})
+        self.assertEqual(len(report["images"]),6)
+
+    def test_boundary_build_and_staging_support_must_match(self):
+        for contract,enabled in ((None,True),({"version":1},False)):
+            with self.subTest(contract=contract,enabled=enabled), \
+                 patch.object(stage_data,"verify_boundary_contract",return_value=contract):
+                with self.assertRaisesRegex(ValueError,"boundary support must match"):
+                    stage_data.stage(self.source,self.target,instruction_boundary_hook=enabled)
+                self.assertFalse(self.target.exists())
+
+    def test_rejected_boundary_audit_prevents_any_asset_copy(self):
+        with patch.object(stage_data,"verify_boundary_contract",side_effect=ValueError("stale native objects")):
+            with self.assertRaises(ValueError):
+                stage_data.stage(self.source,self.target,instruction_boundary_hook=True)
+        self.assertFalse(self.target.exists())
+
     def sound_fixture(self):
         source=self.base/"sound-build"
         native=source/"sound/native-timed";native.mkdir(parents=True)
