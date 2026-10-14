@@ -1,5 +1,44 @@
 # Handoff
 
+## Native I/O and EEPROM checkpoint (2026-10-14)
+
+The 315-5649 register device, Rally cabinet wiring and 93C46 EEPROM now run as
+native components through Model2ABus. The bus accepts multiple independent
+device adapters so I/O and TGP coexist. Byte lanes, direction/latch behavior,
+analog and counter auto-increment, EEPROM pin order and input mux follow the
+pinned reference. Neutral controls are explicit editable input values. Drive
+commands and lamps are latched; no missing drive CPU firmware is substituted.
+
+With `--with-tgp --with-io`, native startup reaches PC `0x005abe00`, byte write
+zero to communication CN mirror `0x01a14000`, after 1,334,542 instructions.
+Two independently instantiated native/reference device sets agree after each
+instruction on architectural state, I/O state, EEPROM image and 367,940
+ordered writes. The reference CPU is the inherited interpreter over the same
+native board implementation, not full MAME. This checkpoint freezes device
+time at zero: it cannot establish EEPROM startup or busy-completion timing,
+and its next task is per-opcode CPU reference cycles and board timing.
+
+Chip tests sweep all 256 direction masks, analog selectors and 65,536 counter
+values. Adapter tests exercise real masked bus accesses, unconnected byte
+lanes, reset, cabinet inputs and a serial EEPROM read. EEPROM tests cover all
+64 words, seven commands, disabled writes, partial aborts, edge cases, reset,
+optional streaming wrap, exact busy boundaries and persistence. Strict and
+ASan/UBSan runs pass. An independent ignored harness extracted hash-checked
+MAME event/decode/read/write methods and passed 30,638,679 comparisons over
+60,000 randomized transactions across both streaming modes.
+
+Reference caveats remain explicit: the chip's serial status is a fixed MAME
+shortcut; 93C46 programming begins at the final serial bit in MAME, while the
+modern ST datasheet begins it on CS falling; WRAL ANDs existing cells; fixed
+busy durations are reference estimates. Clock polling never advances time.
+
+Clean pinned SoftFloat, ymfm and LZMA dependency repositories were locally
+cloned from the Daytona checkout into ignored `extern/`, with editor Git
+exclusions. CMake configured with Unix Makefiles because Ninja is unavailable.
+Dedicated CMake targets cover the new devices. Next: connect the CPU cycle
+clock, implement the communication register interface, and follow actual
+startup into the remaining hardware without inventing ready responses.
+
 ## Guarded RAM code and native Rally TGP (2026-10-14)
 
 The expanded generation profile compiles 66,523 native instructions into 46

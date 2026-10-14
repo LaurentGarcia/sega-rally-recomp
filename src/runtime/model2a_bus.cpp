@@ -83,13 +83,13 @@ Model2ABus::Mapping Model2ABus::mapping(uint32_t address)
 
 uint32_t Model2ABus::read(uint32_t address, unsigned width)
 {
-    if (model_ && model_->claims(address)) {
+    for (DeviceModel *model : models_) if (model->claims(address)) {
         const unsigned lane = address & 3;
-        if (lane + width > 4 || !model_->claims(address + width - 1))
+        if (lane + width > 4 || !model->claims(address + width - 1))
             throw Model2AAccess(address, width, false, 0);
         const uint32_t mask = uint32_t((uint64_t(1) << (width * 8)) - 1);
         uint32_t value = 0;
-        (void)model_->read(address & ~3u, mask << (lane * 8), value);
+        (void)model->read(address & ~3u, mask << (lane * 8), value);
         return (value >> (lane * 8)) & mask;
     }
     // IRQ request/enable reset to zero. Enabling any source remains fenced
@@ -109,12 +109,12 @@ uint32_t Model2ABus::read(uint32_t address, unsigned width)
 
 void Model2ABus::write(uint32_t address, unsigned width, uint32_t value)
 {
-    if (model_ && model_->claims(address)) {
+    for (DeviceModel *model : models_) if (model->claims(address)) {
         const unsigned lane = address & 3;
-        if (lane + width > 4 || !model_->claims(address + width - 1))
+        if (lane + width > 4 || !model->claims(address + width - 1))
             throw Model2AAccess(address, width, true, value);
         const uint32_t mask = uint32_t((uint64_t(1) << (width * 8)) - 1);
-        model_->write(address & ~3u, (value & mask) << (lane * 8), mask << (lane * 8));
+        model->write(address & ~3u, (value & mask) << (lane * 8), mask << (lane * 8));
         return;
     }
     if (address >= 0x00e80000 && uint64_t(address) + width <= 0x00e80008) {

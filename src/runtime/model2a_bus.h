@@ -28,7 +28,8 @@ public:
     Model2ABus(std::vector<uint8_t> program, std::vector<uint8_t> main_data);
     const Diagnostics &diagnostics() const { return diagnostics_; }
     // Attach before CPU reset. The caller owns the shared native device model.
-    void set_model(DeviceModel *model) { model_ = model; }
+    void set_model(DeviceModel *model) { models_.clear(); add_model(model); }
+    void add_model(DeviceModel *model) { if (model) models_.push_back(model); }
     // Width accesses stay within one mapping. Cpu's unaligned instruction
     // helpers split into byte accesses, preserving mirror/boundary behavior.
     uint32_t fetch(uint32_t address) override;
@@ -46,7 +47,7 @@ private:
     uint32_t read(uint32_t address, unsigned width);
     void write(uint32_t address, unsigned width, uint32_t value);
     Diagnostics diagnostics_;
-    DeviceModel *model_ = nullptr;
+    std::vector<DeviceModel *> models_;
     std::vector<uint8_t> program_, data_, ram_, work_, buffer_, cpu_control_, backup_;
 };
 

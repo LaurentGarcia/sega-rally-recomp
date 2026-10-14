@@ -21,6 +21,7 @@ def main():
     parser.add_argument("--instructions", type=int, default=2_000_000)
     parser.add_argument("--compiler", default=os.environ.get("CXX", "c++"))
     parser.add_argument("--tgp", action="store_true", help="Attach independently instantiated native TGP boards")
+    parser.add_argument("--io", action="store_true", help="Attach independent I/O+EEPROM devices with explicit frozen clocks")
     args = parser.parse_args()
     directory = args.build_dir.resolve()
     if not directory.is_relative_to(ROOT / "build") or directory == ROOT / "build":
@@ -54,8 +55,14 @@ def main():
             tgp_images.append(path)
         command += ["-DM2_SRALLY_TGP", "src/runtime/tgp.cpp", "src/runtime/m2_tgp_board.cpp",
                     str(directory / "tgp/program.cpp")]
+    if args.io:
+        command += ["-DM2_SRALLY_IO", "src/runtime/model2_io.cpp", "src/runtime/model2a_io.cpp",
+                    "src/runtime/model2_eeprom.cpp"]
     subprocess.run(command + list(map(str, objects)) + ["-o", str(executable)], cwd=ROOT, check=True)
-    result = subprocess.run([str(executable), *map(str, images), str(args.instructions), *map(str, tgp_images)],
+    arguments = [str(executable), *map(str, images), str(args.instructions), *map(str, tgp_images)]
+    if args.io:
+        arguments.append("--io")
+    result = subprocess.run(arguments,
                             cwd=ROOT, capture_output=True, text=True, timeout=60)
     transcript = result.stdout + result.stderr
     (directory / "boot-parity.txt").write_text(transcript)

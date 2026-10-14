@@ -25,6 +25,33 @@ and `3a4014cdb03eb6239b340832dd02b34ee17e1eeab0ded10f8824483448239d92`.
 The adapter confines this behavior to the observed four-byte gaps and counts
 its accesses; it does not silently answer unimplemented hardware devices.
 
+The native `model2_io` register chip adapts MAME `src/mame/sega/315_5649.cpp`
+and `.h` at the same pinned commit (BSD-3-Clause, Dirk Best). SHA-256:
+`06cc79c2b00b478bbcbba7c5ec7735f0cb48fe25795bc5b3d94a77ebca03943d`
+and `2524f4e9581f224e1494c176457654374851e496b31bb55096638af1d0f4e2f4`.
+The framework becomes callbacks and explicit register state, with a peek flag
+for reads without side effects. The reference's fixed serial-status shortcut
+is retained and named. `model2a_io` adapts Rally's wiring/default inputs from
+the pinned `model2.cpp` above; drive firmware execution is absent, with raw
+drive/lamp output callbacks instead.
+
+The native `model2_eeprom` adapts MAME's 93C46 behavior from
+`src/devices/machine/eepromser.{cpp,h}` and `eeprom.{cpp,h}`, same commit,
+BSD-3-Clause (Aaron Giles and contributors, notice retained). The respective
+SHA-256 values are
+`51431fe4a70163b0bf56a30bbb293c0ba8872e7cd6fe051a6bdf2e17f8824caa`,
+`0877cdad4d2e8c300386d2dce1737c51210c40d94115837c00482b628a7adf74`,
+`e28f650aa8eda8c54897ae08047092bab3053f4dd84c66c72d6711a950423ef6`,
+and `415e84a2e995904615f4c7532c6b73664a4e513832c0bdbde1844af8ef8887fb`.
+Device timers become explicit monotonic nanosecond arguments; NVRAM becomes
+a 128-byte image with no host file access. MAME's non-streaming default,
+write/erase completion edges, WRAL bitwise programming, and fixed busy times
+remain reference contracts, not measured arcade hardware facts.
+[ST M93C46 DS1077](https://www.st.com/resource/en/datasheet/m93c46-w.pdf),
+revision 20 sections 5–8, was read as an independent command-format reference;
+no text or code was copied. Its CS-falling programming behavior differs from
+the pinned MAME implementation and is recorded in the EEPROM source.
+
 This project's own code is under the BSD-3-Clause licence (`LICENSE`). The
 code below keeps its own licence and notices; every component linked into the
 game is under a licence compatible with it (BSD, zlib, MIT, public domain).

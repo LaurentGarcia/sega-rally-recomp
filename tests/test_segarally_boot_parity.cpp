@@ -9,6 +9,10 @@
 #include <iterator>
 #include <tuple>
 #include <vector>
+#ifdef M2_SRALLY_IO
+#include "runtime/model2a_io.h"
+#include "runtime/model2_eeprom.h"
+#endif
 #ifdef M2_SRALLY_TGP
 #include "runtime/m2_tgp_board.h"
 #include <memory>
@@ -55,22 +59,52 @@ static bool same(const rt::Cpu& a,const rt::Cpu& b) {
         a.m_immediate_pri==b.m_immediate_pri;
 }
 int main(int argc,char** argv) {
-    if(argc!=4 && argc!=6) return 2;
+    const bool enable_io=argc>1 && std::strcmp(argv[argc-1],"--io")==0;
+    const int positional_argc=argc-int(enable_io);
+    if(positional_argc!=4 && positional_argc!=6) return 2;
     try {
         auto p=load(argv[1]),d=load(argv[2]);
         ObservedBus nb(p,d),rb(p,d);
+#ifdef M2_SRALLY_IO
+        // Independent instances, not a shared device replay. These explicit
+        // clock callbacks can later observe each CPU's reference-cycle clock.
+        // Frozen time currently cannot finish EEPROM write/erase busy delays.
+        uint64_t native_time_ns=0,reference_time_ns=0;
+        rt::Model2Eeprom native_eeprom,reference_eeprom;
+        native_eeprom.reset();reference_eeprom.reset();
+        rt::Model2AIO native_io(native_eeprom,[&] { return native_time_ns; });
+        rt::Model2AIO reference_io(reference_eeprom,[&] { return reference_time_ns; });
+        if(enable_io) {
+            nb.board.add_model(&native_io);rb.board.add_model(&reference_io);
+            std::puts("I/O parity clock_ns=0 clock_connected=false independent_devices=true");
+        }
+        const auto same_io=[&] {
+            if(!enable_io) return true;
+            const auto& a=native_io.chip().state();const auto& b=reference_io.chip().state();
+            return a.port_value==b.port_value && a.port_config==b.port_config &&
+                a.mode==b.mode && a.analog_channel==b.analog_channel &&
+                native_io.drive_command()==reference_io.drive_command() &&
+                native_io.lamp_output()==reference_io.lamp_output() &&
+                native_io.eeprom_mux()==reference_io.eeprom_mux() &&
+                native_eeprom.write_enabled()==reference_eeprom.write_enabled() &&
+                native_eeprom.save_image()==reference_eeprom.save_image();
+        };
+#else
+        if(enable_io) throw rt::Fatal("I/O support not linked into test");
+        const auto same_io=[] { return true; };
+#endif
 #ifdef M2_SRALLY_TGP
         std::unique_ptr<rt::TgpBoard> nt,rtgp;
         std::unique_ptr<NativeTgpModel> nm,rm;
-        if(argc==6) {
+        if(positional_argc==6) {
             auto tables=load(argv[4]),data=load(argv[5]);
             nt=std::make_unique<rt::TgpBoard>(tables,data);
             rtgp=std::make_unique<rt::TgpBoard>(tables,data);
             nm=std::make_unique<NativeTgpModel>(*nt);rm=std::make_unique<NativeTgpModel>(*rtgp);
-            nb.board.set_model(nm.get());rb.board.set_model(rm.get());
+            nb.board.add_model(nm.get());rb.board.add_model(rm.get());
         }
 #else
-        if(argc==6) throw rt::Fatal("TGP support not linked into test");
+        if(positional_argc==6) throw rt::Fatal("TGP support not linked into test");
 #endif
         rt::Cpu native(&nb);rt::I960Ref ref(&rb);
         native.reset();ref.reset();
@@ -98,7 +132,7 @@ int main(int argc,char** argv) {
                     ref.m_IP=native.m_IP;
                     if(access.address==other.address && access.width==other.width &&
                        access.write==other.write && access.value==other.value &&
-                       nb.writes==rb.writes && same(native,ref)) {
+                       nb.writes==rb.writes && same(native,ref) && same_io()) {
                         std::printf("PASS native/reference parity instructions=%llu writes=%llu frontier=device pc=%08x address=%08x\n",
                             (unsigned long long)ls.count,(unsigned long long)writes,pc,access.address);
                         return 0;
@@ -110,7 +144,7 @@ int main(int argc,char** argv) {
                 throw rt::Fatal("device frontier parity mismatch");
             }
             ref.execute_one();
-            if(!same(native,ref) || nb.writes!=rb.writes) {
+            if(!same(native,ref) || nb.writes!=rb.writes || !same_io()) {
                 std::fprintf(stderr,"Parity mismatch count=%llu pc=%08x native_ip=%08x reference_ip=%08x\n",
                     (unsigned long long)ls.count,pc,native.m_IP,ref.m_IP);
                 for(unsigned i=0;i<32;i++) if(native.m_r[i]!=ref.m_r[i])

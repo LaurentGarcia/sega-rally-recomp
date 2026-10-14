@@ -72,6 +72,15 @@ is still a frontier until the board clock, delayed mask update, timers, and
 asynchronous sources are connected. Buffer reset and fresh backup SRAM match
 the reference's `0x07800f0f` word pattern and all-ones initialization.
 
+The 315-5649 register chip, Model 2A byte-lane/cabinet wiring, and 93C46
+EEPROM are separate native devices. The EEPROM requires explicit monotonic
+nanosecond timestamps; serial edges never advance time themselves. The current
+bounded runner freezes that clock, so this checkpoint cannot establish EEPROM
+startup or write-completion timing. Independent device tests exercise real
+advancing clocks. The chip's inherited serial-status constant is a documented
+MAME shortcut, not a simulated UART-ready signal. Drive commands and lamps
+are latched; the missing drive-board firmware is not executed.
+
 The older lifted-C prototype already reaches desert practice on the phone, but
 contains incomplete game paths. It is a useful source of address annotations and
 capture tooling. Its C implementation is not a substitute for verifying the new

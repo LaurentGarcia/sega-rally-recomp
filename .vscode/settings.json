@@ -1,6 +1,9 @@
 {
     "git.ignoredRepositories": [
         "extern/mame",
-        "extern/kos-dc"
+        "extern/kos-dc",
+        "extern/softfloat",
+        "extern/ymfm",
+        "extern/lzma"
     ]
 }
