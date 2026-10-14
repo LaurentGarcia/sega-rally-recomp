@@ -1,5 +1,51 @@
 # Handoff
 
+## Mac-first validation and finish-line coverage (2026-10-14)
+
+Current user direction is to defer the iPhone build and concentrate on making
+the decompiled game ready on Mac. Phone work is stopped; an isolated checkpoint
+at `build/worktrees/iphone-drive` completed configuration only, without a new
+device binary, installation or launch. Resume phone work only when requested.
+The user reports that feel and visuals are good, with a slow sensation of speed.
+Measure active wall time, board time, core execution and presentation costs
+before changing performance behavior; the game clock is not a tuning knob.
+
+The independent CPU/device comparison passes the full v6 driving replay:
+600,000,000 instructions, 19,641,024 ordered writes, 1,365,742,448 reference
+cycles, 32,576 IRQs, 3,142 renders and final hash `f6c10714158f5366`. All nineteen
+input events match the shared machine's exact instruction/cycle boundaries.
+The physical UART comparison observes 54,629,697 edges. Evidence is the frozen
+profile's `boot-parity.txt` and `parity-input.json`; the test remains independent
+CPU parity with shared board implementations, not full MAME-machine or PCB proof.
+
+A second versioned replay, `config/segarally_lancia_hold_gas.inputs`, holds
+centered steering and full gas after selection. Exact SHA-256 is
+`c031b82a2c7b17a7fc33de2e86e7fe9f4afdfc423a65098bce6cf5507e9cab61`.
+At one billion instructions the car reaches the mountain section and has
+received a checkpoint time extension. The bounded extended run reaches the
+FINISH banner at 229 km/h, fourth gear and race time 1:12.13, then stops at
+actual callback `0x005bc680` from CALLX `0x005bba60`: 1,245,399,197 instructions,
+2,894,016,626 reference cycles, 70,084 IRQs and 6,658 renders. This is finish-line
+approach evidence, not completed results. The user's manual windowed run also
+reaches this callback, at its own 1,104,021,132 instructions / 5,965 frames;
+different input histories correctly give different execution counts.
+
+The runner's explicit maximum budget increases from one to two billion
+instructions, while its one-million default and existing 180-second timeout
+through one billion are unchanged. Larger runs have a bounded 360-second
+timeout. Python/native argument probes verify zero, negative and over-limit
+rejection, two-billion acceptance, and unchanged defaults/help.
+
+The separate v7 generation adds only the observed finish-line callback and
+the reviewed leaf proof: 74,427 instructions, 51 objects, zero missing
+templates, 116 table rows, ten continuation rows and sixteen registrations.
+Source-set SHA-256 is
+`111ee1a80f2469fec8c7c9b00e404b695a7f3bf6bf2f57cecac8b9ccbabf0a75`,
+coverage `8975656db7c418b193cdc6ece286b09b15437dd6764b7809b6cebf3a1a8a10da`.
+Next: finish/results and restart coverage, measured Mac performance, native
+sound presentation, and Metal comparisons on real race scenes. Keep the
+stable playable build separate from these diagnostics.
+
 ## Decoded returning-leaf callback proof (2026-10-14)
 
 The scoped registration pass now tracks saved object aliases and constant

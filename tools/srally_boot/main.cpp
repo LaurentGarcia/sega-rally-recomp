@@ -39,8 +39,8 @@ int main(int argc, char **argv) {
         size_t used = 0;
         const std::string requested = argv[3];
         const uint64_t limit = std::stoull(requested, &used, 10);
-        if (used != requested.size() || !limit || limit > 1000000000)
-            throw std::runtime_error("instruction limit must be 1..1000000000");
+        if (used != requested.size() || !limit || limit > 2000000000)
+            throw std::runtime_error("instruction limit must be 1..2000000000");
         Machine::Images images;
         images.program = load(argv[1]); images.main_data = load(argv[2]);
         Machine::Options options{false, false, false, false, false, false, false, false};

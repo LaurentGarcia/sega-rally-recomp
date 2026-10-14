@@ -56,11 +56,25 @@ after braking and coasting. These are bounded driving observations, not a
 complete race or hardware-fidelity claim. Use the selection-only replay for
 interactive play so scripted steering and pedals do not override the player.
 
+`config/segarally_lancia_hold_gas.inputs` preserves the same event boundaries
+while keeping steering centered and gas pressed after selection. On v6 it
+reaches the FINISH banner at displayed race time 1:12.13, then stops at the
+actually reached callback `0x005bc680` after 1,245,399,197 instructions and
+6,658 rendered frames. This establishes the course traversal, including a
+checkpoint time extension, but not the finish/results transition. V7 compiles
+the observed callback for the next bounded replay.
+
 The runner preserves the submitted bytes as `boot-input.txt`, hashes them in
 `boot.json`, and logs the exact frame/instruction/cycle boundary of each input.
 The final event counts distinguish applied and pending inputs. Missing, duplicate,
 backwards or skipped frame events fail explicitly. This diagnostic replay does
 not establish full MAME or PCB input-timing parity.
+
+The native boot runner accepts an explicit `--instructions` budget from 1 to
+2,000,000,000; its default remains 1,000,000. Budgets up to one billion retain
+the 180-second process timeout. Larger diagnostic runs have a 360-second
+timeout so later course and race-end callbacks can be exercised without an
+unbounded run. The live app and its current generation are unaffected.
 
 The independent CPU/device harness accepts the same file with
 `tests/test_segarally_boot_parity.py --input-replay FILE --screen --io` and its
@@ -77,5 +91,8 @@ Every input event's instruction/cycle boundary matches the native machine.
 The v5 selection replay also passes independent CPU/device comparison through
 GO: 451,072,711 instructions, 11,880,004 ordered writes, 1,012,631,901 cycles,
 23,911 IRQs and 2,329 rendered frames. Its missing callback `0x005c0d60` is
-compiled in v6; independent comparison through the later driving sequence is
-the next validation step.
+compiled in v6. The full nineteen-event v6 driving replay now also passes:
+600,000,000 instructions, 19,641,024 ordered writes, 1,365,742,448 cycles,
+32,576 IRQs and 3,142 rendered frames, hash `f6c10714158f5366`. All nineteen
+event boundaries match the shared machine, with no missing-code frontier.
+Longer course and race-end comparisons remain outstanding.

@@ -286,6 +286,23 @@
       "input_replay": "config/segarally_lancia_select.inputs",
       "input_replay_sha256": "797df95862beda36fd9ab54f8c440b701897bc0561b0cf8630f29e30b4f25f6e",
       "provenance": "Actual native CALLX(g4) target0x5c0d60 at0x5c17e0 after LD0x20afa0,g4. Generated decoded instructions show earlier LDA0x5c0d60,g5 at0x5c1784 and STg5 to0x20afa0 at0x5c178c. Captured race START/GO HUD with course geometry1504polygons, gear1 and0km/h. Canonical ROM target=runtime-0x59f000 in verified reset copy; no game state or instruction patched."
+    },
+    {
+      "address": "0x0001d680",
+      "observed_runtime_address": "0x005bc680",
+      "name": "observed_finish_line_dispatch_callback_005bc680",
+      "evidence": "build/segarally-timed-v6/evidence/lancia-centered-gas-005bc680/boot.json",
+      "observed_after_instructions": 1245399197,
+      "observed_reference_cycles": 2894016626,
+      "observed_previous_dispatch": "0x005bba60",
+      "observed_rip": "0x005bba64",
+      "observed_rendered_frames": 6658,
+      "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+      "source_baseline_commit": "2821205",
+      "execution_variant": "hardware_input_replay",
+      "input_replay": "config/segarally_lancia_hold_gas.inputs",
+      "input_replay_sha256": "c031b82a2c7b17a7fc33de2e86e7fe9f4afdfc423a65098bce6cf5507e9cab61",
+      "provenance": "Actual native CALLX(g4) target0x5bc680 at0x5bba60, selected by decoded LD0x5bba10[g4*4],g4 and null-check. Index is live RAM-derived and no bounded table proof is claimed. Captured Lancia229km/h approaching the FINISH banner at race time1:12.13 and countdown8; post-race completion remains unverified. Canonical ROM target=runtime-0x59f000 in verified reset copy; only cabinet inputs changed, no game state or instruction patched."
     }
   ]
 }
