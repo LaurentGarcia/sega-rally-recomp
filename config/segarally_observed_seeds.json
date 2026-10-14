@@ -31,6 +31,57 @@
       "observed_reference_cycles": 404204373,
       "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
       "provenance": "Actual generated-code dispatcher frontier after the startup warning, 929 rendered frames and 37414 native TGP instructions. Canonical ROM PC = 0x1000 + (0x5ae9c4 - 0x5a0000); no game state or instruction patched."
+    },
+    {
+      "address": "0x00031700",
+      "observed_runtime_address": "0x005d0700",
+      "name": "observed_title_dispatch_target_005d0700",
+      "evidence": "build/segarally-timed-v2/evidence/table-seeds-300m/boot.json",
+      "observed_after_instructions": 266511166,
+      "observed_reference_cycles": 588906789,
+      "observed_previous_dispatch": "0x005d06e8",
+      "observed_rip": "0x005af8ec",
+      "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+      "provenance": "Actual missing-code frontier after verified table-derived targets executed, 1354 rendered frames and a captured title screen and 63764 native TGP instructions. Canonical ROM PC = 0x1000 + (0x5d0700 - 0x5a0000). This entry was observed at runtime and remains separate from static table candidates; no game state or instruction was patched."
+    },
+    {
+      "address": "0x0002bba0",
+      "observed_runtime_address": "0x005caba0",
+      "name": "observed_title_dispatch_target_005caba0",
+      "evidence": "build/segarally-timed-v2/evidence/machine-300m-005caba0/boot.json",
+      "observed_after_instructions": 266518444,
+      "observed_reference_cycles": 588916392,
+      "observed_previous_dispatch": "0x005cab9c",
+      "observed_rip": "0x005de2a8",
+      "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+      "source_evidence_sha256": "01e8168c184394cbed0dd2f6f91c37b4b7e0929e4812f85ebe0c7a8deb9828c4",
+      "source_evidence_rom_address": "0x0002bb80",
+      "source_evidence_size": 32,
+      "provenance": "Actual native dispatcher frontier after 1354 rendered frames and a captured title screen. The verified ROM sequence at canonical 0x2bb80 loads runtime 0x5caba0 into g14, moves it into g1, then branches through g1 at 0x5cab9c. Canonical target = 0x1000 + (0x5caba0 - 0x5a0000); no game state, instruction, or return value patched."
+    },
+    {
+      "address": "0x00045550",
+      "observed_runtime_address": "0x005e4550",
+      "name": "observed_title_callback_target_005e4550",
+      "evidence": "build/segarally-timed-v3/evidence/native-005e4550/boot.json",
+      "observed_after_instructions": 266518846,
+      "observed_reference_cycles": 588917533,
+      "observed_previous_dispatch": "0x005de2a4",
+      "observed_rip": "0x005de2a8",
+      "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+      "provenance": "Actual native callx(g5) dispatcher frontier at runtime 0x5de2a4 after 1354 rendered frames and captured title screen; g5 was loaded indirectly from the game callback data. No bounded table proof claimed. Canonical ROM target = runtime - 0x59f000 in verified reset copy; no game state, instruction, or return value patched."
+    },
+    {
+      "address": "0x00045920",
+      "observed_runtime_address": "0x005e4920",
+      "name": "observed_title_callback_target_005e4920",
+      "evidence": "build/segarally-timed-v3/evidence/native-005e4920/boot.json",
+      "observed_after_instructions": 266519130,
+      "observed_reference_cycles": 588918441,
+      "observed_previous_dispatch": "0x005de2a4",
+      "observed_rip": "0x005de2a8",
+      "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+      "provenance": "Actual native callx(g5) dispatcher frontier at runtime 0x5de2a4 after executing earlier game callbacks; captured title screen remains unchanged. No bounded table proof claimed. Canonical ROM target = runtime - 0x59f000 in verified reset copy; no game state, instruction, or return value patched."
     }
   ]
 }

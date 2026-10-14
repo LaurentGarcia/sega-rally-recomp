@@ -58,6 +58,14 @@ execution. The opt-in label profile uses address annotations only; a separate
 observed-target manifest records native missing-code evidence. No lifted
 game implementation is copied into the new runtime.
 
+An individually audited startup table at `0x005af85c` supplies three additional
+targets across seven entries. The importer verifies the unsigned index bound,
+scaled load, indirect branch register, contiguous control flow, code/data
+hashes and exact reset-copy aliases before adding candidates. Table candidates
+remain distinct from executed targets; neither is evidence of complete game
+coverage. Later callback frontiers are added only after actual native dispatch
+and retain their instruction/cycle counts and ignored execution-report paths.
+
 Daytona's unchanged TGP generator and TgpBoard compile Rally's own 1,665-word
 upload, not Daytona's microcode. A bus-level upload/startup probe returns `8`
 after 108 native instructions and then waits on an empty FIFO. Tables and

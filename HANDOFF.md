@@ -1,5 +1,33 @@
 # Handoff
 
+## Bounded table and title callback coverage (2026-10-14)
+
+The seven-entry table at runtime `0x005af85c` has three distinct targets:
+`0x005af878`, `0x005af88c`, `0x005af8a0`. A checked unsigned bound rejects
+indices above six, followed by a four-byte scaled load and indirect branch
+through the same register. The new manifest stores addresses/hashes only.
+Generation independently checks operands, code/data spans, relocation aliases
+and exact target contents. Seven tests include semantic mutations with
+recomputed hashes; the eight bootstrap tests also pass.
+
+Native execution then exposes real entries `0x005d0700`, `0x005caba0`,
+`0x005e4550`, and `0x005e4920`. These remain observed seeds, distinct from
+table candidates and prior label annotations. The latter callback was reached
+after 266,519,130 instructions / 588,918,441 reference cycles. The latest
+capture remains the original title screen at 1,354 rendered frames; it does
+not establish attract or driving. The guarded native profile now contains
+66,597 instructions / 46 objects, 402 unresolved indirect sites, 13 invalid
+decode stops, no missing templates and no unmapped direct targets.
+
+The frozen `build/segarally-timed-v2` profile has 66,557 instructions for
+the first Metal/iPhone build. Further discovery uses fresh verified imports
+in `build/segarally-timed-v3`, avoiding concurrent changes to compiled app
+sources. The current v3 aggregate generated-source SHA-256 (sorted filename,
+NUL, bytes) is `fcfd0d874697ebb1daa0e0743e5e85796cce5f7fb4d8f42ee642392d19461037`.
+The original `build/segarally-timed` remains the independent 100-million
+instruction baseline. Continue collecting actual missing entries without
+patching game instructions, fabricated return values or unchecked table scans.
+
 ## Native sound CPU reset checkpoint (2026-10-14)
 
 The shared 68000 generator now supports an explicit `--board model2a` map and

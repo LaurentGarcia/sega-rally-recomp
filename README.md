@@ -11,7 +11,7 @@ from the user's ROMs, not Sega's original source code.
 ## Current state
 
 The repository is in bring-up. The expanded address-label profile produces
-66,537 native i960 instructions and 46 compiled objects. The core executes
+66,597 native i960 instructions and 46 compiled objects. The core executes
 reset at `0x420`, copies and checks its RAM code, initializes the I/O chip,
 and displays the original startup warning and Sega Rally 1995 logo. Independent
 CPU execution agrees through 100 million instructions and 513 startup frames.
@@ -59,8 +59,8 @@ code target; those are incomplete frontiers, not successful game boots.
 Use `--instructions 10000000` to run past the initial RAM-copy loop; the
 default one-million-instruction limit stops inside it.
 
-The expanded profile has 403 annotated label candidates, three separately
-recorded executed target, and checked RAM aliases. It retains 400 unresolved
+The expanded profile has 403 annotated label candidates, seven separately
+recorded executed targets, three checked table-derived targets, and RAM aliases. It retains 402 unresolved
 indirect sites and 13 invalid decode stops for analysis. The default
 `--seed-profile bootstrap` uses a smaller label set. Every generated RAM
 instruction checks its live word(s) before execution. Generation success does
@@ -71,6 +71,7 @@ and TGP inputs are:
 
 ```sh
 python3 tests/test_segarally_bootstrap.py
+python3 tests/test_segarally_table_seeds.py
 python3 tests/test_segarally_native_templates.py
 python3 tests/test_segarally_boot_parity.py --tgp --io --comm --control --video --screen --uart
 python3 tests/test_i960_runtime_timing.py

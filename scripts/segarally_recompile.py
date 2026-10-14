@@ -149,6 +149,92 @@ def compile_generated(compiler: list[str], generated: Path, output: Path, jobs: 
     return len(sources)
 
 
+def table_seeds(program: bytes, config: dict, relocations: dict) -> list[dict]:
+    """Verify individually audited bounded dispatch tables, not arbitrary scans.
+
+    The hashes identify exact code/data in the supplied revision. Independent
+    operand checks prove the bound, index scale, load/branch register and reset
+    copy aliases; candidates retain provenance separate from observed seeds.
+    """
+    if (config["romset"] != "srallycb" or config["board"] != "model2a" or
+            hashlib.sha256(program).hexdigest() != config["program_sha256"]):
+        raise ValueError("table seed provenance belongs to a different program image")
+    candidates = []
+    number = lambda value: int(value, 16) if isinstance(value, str) else value
+    for table in config["tables"]:
+        matches = [row for row in relocations["relocations"] if row["name"] == table["relocation"]]
+        if len(matches) != 1:
+            raise ValueError("table requires one named verified relocation")
+        relocation = matches[0]
+        guest, source, size = (number(relocation[key]) for key in ("guest", "program_offset", "size"))
+        if (guest < 0x500000 or size <= 0 or guest + size > 0x600000 or source < 0 or
+                source + size > len(program) or (guest | source | size) & 3):
+            raise ValueError("table relocation exceeds aligned program/work RAM")
+
+        def verified_span(offset: int, runtime: int, length: int, digest: str) -> bytes:
+            if (length <= 0 or (offset | runtime | length) & 3 or offset < source or
+                    offset + length > source + size or runtime != guest + offset - source):
+                raise ValueError("table evidence lies outside its exact reset-copy alias")
+            data = program[offset:offset + length]
+            if hashlib.sha256(data).hexdigest() != digest:
+                raise ValueError("table code/data evidence hash differs from supplied program")
+            return data
+
+        evidence = {}
+        for row in table["code_evidence"]:
+            role = row["role"]
+            if role not in ("bound", "load", "branch") or role in evidence:
+                raise ValueError("table requires unique bound/load/branch evidence")
+            data = verified_span(number(row["program_offset"]), number(row["runtime_address"]),
+                                 row["size"], row["sha256"])
+            evidence[role] = (number(row["runtime_address"]), data)
+        if set(evidence) != {"bound", "load", "branch"}:
+            raise ValueError("incomplete table control-flow evidence")
+        count, index = table["entry_count"], table["index_register"]
+        if not 1 <= count <= 32 or not 0 <= index < 32 or table["maximum_index"] != count - 1:
+            raise ValueError("table bound must prove exactly the declared entry count")
+        bound_pc, bound = evidence["bound"]
+        load_pc, load = evidence["load"]
+        branch_pc, branch = evidence["branch"]
+        if len(bound) != 4 or len(load) != 8 or len(branch) != 4 or load_pc != bound_pc + 4 or branch_pc != load_pc + 8:
+            raise ValueError("table control flow is not a contiguous bound/load/bx sequence")
+        bound_word, load_word, branch_word = (struct.unpack_from("<I", data)[0] for data in (bound, load, branch))
+        # COBR cmpobl compares literal maximum to unsigned index; taken on
+        # maximum < index. Its signed13 displacement is relative to opcode PC.
+        displacement = bound_word & 0x1ffc
+        if displacement & 0x1000:
+            displacement -= 0x2000
+        rejected = number(table["rejected_index_target"])
+        if (bound_word >> 24 != 0x34 or not bound_word & 0x2000 or
+                (bound_word >> 19) & 31 != count - 1 or (bound_word >> 14) & 31 != index or
+                bound_word & 3 or bound_pc + displacement != rejected or not guest <= rejected < guest + size):
+            raise ValueError("table unsigned bounds check differs from audited proof")
+        address, offset = number(table["runtime_address"]), number(table["program_offset"])
+        # MEMB index+displacement, scale2 (=4 bytes); destination==index.
+        if (load_word >> 24 != 0x90 or (load_word >> 10) & 15 != 14 or
+                (load_word >> 7) & 7 != 2 or (load_word & 31) != index or
+                (load_word >> 19) & 31 != index or load_word & 0x60 or
+                struct.unpack_from("<I", load, 4)[0] != address):
+            raise ValueError("table indexed load differs from audited proof")
+        if (branch_word >> 24 != 0x84 or (branch_word >> 14) & 31 != index or
+                branch_word & 0x3fff != 0x1000):
+            raise ValueError("table indirect branch does not use the loaded register")
+        data = verified_span(offset, address, count * 4, table["table_sha256"])
+        targets = list(struct.unpack("<" + "I" * count, data))
+        if targets != [number(target) for target in table["targets"]]:
+            raise ValueError("table entries differ from audited target metadata")
+        for target in dict.fromkeys(targets):
+            if target & 3 or not guest <= target < guest + size:
+                raise ValueError("table target lies outside its aligned reset-copy code range")
+            candidates.append({"address": f"0x{source + target - guest:08x}",
+                "runtime_address": f"0x{target:08x}", "table": table["name"],
+                "table_indices": [i for i, value in enumerate(targets) if value == target],
+                "name": f"verified_table_{table['name']}_target_{target:08x}",
+                "evidence": "config/segarally_table_seeds.json",
+                "provenance": "Verified bounded table candidate; runtime observation and full coverage are not implied."})
+    return candidates
+
+
 def main() -> int:
     global BUILD
     parser = argparse.ArgumentParser(description=__doc__)
@@ -198,7 +284,9 @@ def main() -> int:
             if row["program_sha256"] != program_hash:
                 raise ValueError("Observed target provenance belongs to a different program image")
         relocations = json.loads((ROOT / "config" / "segarally_relocations.json").read_text())
-        combined = {"seeds": seeds["seeds"] + observed["seeds"]}
+        table_config = json.loads((ROOT / "config/segarally_table_seeds.json").read_text())
+        derived = table_seeds(program, table_config, relocations)
+        combined = {"seeds": seeds["seeds"] + observed["seeds"] + derived}
         relocation_flags, aliases = relocation_seeds(program, combined, relocations)
         seedfile = BUILD / "seeds.txt"
         seedfile.write_text("".join(row["address"][2:] + "\n" for row in combined["seeds"] + aliases))
@@ -210,6 +298,7 @@ def main() -> int:
         compiled = compile_generated(compiler, generated, objects, args.jobs)
         audit.update({"seed_profile": args.seed_profile, "seed_provenance": seeds,
                       "observed_seed_provenance": observed, "relocation_provenance": relocations,
+                      "table_seed_provenance": table_config, "table_derived_candidates": derived,
                       "relocated_seed_provenance": aliases, "reachability": reach,
                       "native_objects_compiled": True, "native_object_count": compiled,
                       "compiler_command": compiler})

@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "romset": "srallycb",
+  "board": "model2a",
+  "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+  "scope": "Only this individually audited seven-entry table. Addresses and hashes are metadata; no game bytes or game implementation are included. Static table derivation does not prove runtime execution or complete coverage.",
+  "tables": [
+    {
+      "name": "startup_dispatch_005af85c",
+      "relocation": "reset_workram_copy",
+      "program_offset": "0x0001085c",
+      "runtime_address": "0x005af85c",
+      "entry_count": 7,
+      "index_register": 20,
+      "maximum_index": 6,
+      "rejected_index_target": "0x005af8b0",
+      "code_evidence": [
+        {
+          "role": "bound",
+          "program_offset": "0x0001084c",
+          "runtime_address": "0x005af84c",
+          "size": 4,
+          "sha256": "b4645d5b25eeccd6a0513ff17691fb28c81d7bdec8780e6e1a1fea6f12732f8c"
+        },
+        {
+          "role": "load",
+          "program_offset": "0x00010850",
+          "runtime_address": "0x005af850",
+          "size": 8,
+          "sha256": "67a596f63862aad21cc48077ad709dbaed7801cc168b0cc4b1b715c6ba1b9bca"
+        },
+        {
+          "role": "branch",
+          "program_offset": "0x00010858",
+          "runtime_address": "0x005af858",
+          "size": 4,
+          "sha256": "319ca02e90e424ddd1f97474f4daf664c64518829054b778a70cc81683dbc889"
+        }
+      ],
+      "table_sha256": "98c13eb206ed61aa21237fe3eb725894bcc52cfc794b5fb0da189e358e8f8654",
+      "targets": [
+        "0x005af878",
+        "0x005af88c",
+        "0x005af88c",
+        "0x005af8a0",
+        "0x005af8a0",
+        "0x005af8a0",
+        "0x005af8a0"
+      ],
+      "proof": "Unsigned cmpobl6,g4 rejects indices above6; ld table[g4*4] replacesg4, then bx(g4). Code, data and targets are inside the verified reset work-RAM copy. These are bounded table-derived candidates, separate from execution-observed targets."
+    }
+  ]
+}
