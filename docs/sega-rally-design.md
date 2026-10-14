@@ -76,13 +76,18 @@ recorded with instruction/cycle counts and ignored execution-report paths.
 Unsigned compare/branch tables also admit intervening frame spills only when
 they preserve both the comparison flags and index. The bounded index and
 loaded branch destination are checked independently. Twenty-two audited tables
-now contribute 116 candidate rows. Fourteen scoped object-update registrations
+now contribute 116 candidate rows. Sixteen scoped object-update registrations
 add a separately recorded candidate class: constructor/update roots must
 preserve the object base and absolute callback definition through decoded
 operations to its +4 pointer cell, with the caller's load/null guard/same-object
 argument independently verified. Already-labeled targets retain inferred roles
-for subsequent update-chain analysis. Unknown calls, object aliases across calls
-and conditional paths remain outside this proof. The frozen first-car profile reaches its
+for subsequent update-chain analysis. MOV explicitly propagates saved object
+aliases and callback constants. A direct BAL may cross a decoded straight-line
+leaf only when its BX return uses the preserved incoming link; every written
+register and BAL's own g14 write kills matching facts. Each leaf span, hash,
+call site and clobber set is retained in provenance. This recovers two known
+constructor registrations without an assumed callee-save ABI. Unknown calls,
+nested control flow and conditional paths remain outside this proof. The frozen first-car profile reaches its
 first geometry at rendered frame 1,357 and a visible textured car/course scene
 by frame 1,634; this is CPU-renderer evidence, pending Metal and race validation.
 

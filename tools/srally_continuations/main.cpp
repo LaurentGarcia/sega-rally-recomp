@@ -18,6 +18,39 @@ static uint32_t number(const std::string &text) {
     return uint32_t(value);
 }
 
+// Only these decoded operations may cross an object reaching definition or a
+// returning leaf. Footprints follow the shared executor: wide memory loads
+// round their register base down, whereas emul writes dst and dst+1 directly.
+static std::optional<uint32_t> written_registers(const i960::Insn &in) {
+    using namespace i960;
+    if (!in.valid() || in.quirks || in.op->flow!=Flow::None) return {};
+    if (in.fmt==Format::Mem && in.ea!=EaMode::Reserved) {
+        switch(in.op->code) {
+        case 0x82: case 0x92: case 0x9a: case 0xb2: return 0;
+        case 0x80: case 0x8c: case 0x90: return uint32_t(1)<<in.src1;
+        case 0x98: return uint32_t(3)<<(in.src1&0x1e);
+        case 0xb0: return uint32_t(15)<<(in.src1&0x1c);
+        default: return {};
+        }
+    }
+    if (in.fmt!=Format::Reg) return {};
+    // chkbit has no destination: its otherwise unused m3 bit is ignored by
+    // the executor (and is set in the returning leaf used by this ROM).
+    if(in.op->code==0x5ae) return 0;
+    if(in.m3) return {};
+    switch(in.op->code) {
+    case 0x5cc: case 0x581: case 0x58c: case 0x590: case 0x592:
+    case 0x5b0: return uint32_t(1)<<in.dst;
+    case 0x670:
+        if(in.dst<31) return uint32_t(3)<<in.dst;
+        return {};
+    default: return {};
+    }
+}
+
+struct LeafProof { uint32_t start, size, clobbers; };
+struct LeafCall { uint32_t call; LeafProof leaf; };
+
 struct CallbackProof { uint32_t table, count, size, fallback=0; };
 static std::optional<CallbackProof> compare_proof(uint32_t start,
     const std::function<i960::Insn(uint32_t)> &decode) {
@@ -77,10 +110,11 @@ static std::optional<CallbackProof> callback_proof(uint32_t start,
                 (in.offset<8 && in.offset+width>4)) return {};
         } else if (in.op->code==0x90 || in.op->code==0x98) {
             const unsigned width=in.op->code==0x98?2:1;
+            const unsigned base=in.src1 & (width==2?0x1e:0x1f);
             // Descriptor reads use r4; never overwrite object base/pointer,
             // or the table value before it has been saved.
             if ((in.ea!=EaMode::AbaseOffset && in.ea!=EaMode::Abase) || in.src2!=4 || in.src1+width>32) return {};
-            for(unsigned r=in.src1;r<in.src1+width;++r)
+            for(unsigned r=base;r<base+width;++r)
                 if(r==16 || r==21 || (!saved && r==20)) return {};
         } else return {};
         p+=in.length;
@@ -153,6 +187,27 @@ int main(int argc, char **argv) {
             auto found=entries.upper_bound(start);
             return found!=entries.end() && *found<end;
         };
+        auto returning_leaf=[&](uint32_t start)->std::optional<LeafProof> {
+            // BAL shares the caller's registers; there is no callee-save ABI
+            // assumption. Prove a straight-line return to its incoming g14.
+            uint32_t links=uint32_t(1)<<30, clobbers=0, p=start;
+            for(unsigned n=0;n<64;++n) {
+                auto in=decode(p);
+                if(!in.valid() || interior_entry(start,p+in.length)) return {};
+                if(in.op->code==0x84 && in.ea==i960::EaMode::Abase &&
+                    (links & (uint32_t(1)<<in.src2)))
+                    return LeafProof{start,p+in.length-start,clobbers};
+                const auto writes=written_registers(in);
+                if(!writes) return {};
+                const bool copied_link=in.op->code==0x5cc && !in.m1 &&
+                    (links & (uint32_t(1)<<in.src1));
+                links &= ~*writes;
+                if(copied_link) links |= uint32_t(1)<<in.dst;
+                clobbers |= *writes;
+                p+=in.length;
+            }
+            return {};
+        };
         if(updates) {
             using namespace i960;
             const auto dispatcher=number(argv[9]);
@@ -169,36 +224,66 @@ int main(int argc, char **argv) {
             bool comma=false;std::cout<<'[';
             for(auto start:trusted) {
                 // A trusted constructor/update receives the object in g0.
-                // Preserve that base and every pending constant definition.
+                // Track saved aliases explicitly, including across proven
+                // returning leaves. Unknown control flow remains a barrier.
                 std::array<std::optional<std::pair<uint32_t,uint32_t>>,32> definitions{};
+                uint32_t objects=uint32_t(1)<<16;
+                std::vector<LeafCall> calls;
+                auto kill=[&](uint32_t writes) {
+                    objects &= ~writes;
+                    for(unsigned r=0;r<32;++r)
+                        if(writes & (uint32_t(1)<<r)) definitions[r]={};
+                };
                 uint32_t p=start;
                 for(unsigned n=0;n<64;++n) {
                     auto in=decode(p);
-                    if(!in.valid() || in.op->flow!=Flow::None || interior_entry(start,p+in.length)) break;
-                    if(in.fmt==Format::Mem && in.ea!=EaMode::Reserved) {
-                        if(in.op->code==0x92 || in.op->code==0x82 || in.op->code==0x9a || in.op->code==0xb2) {
-                            const unsigned width=in.op->code==0x9a?2:in.op->code==0xb2?4:1;
-                            if(in.src1+width>32) break;
-                            if(in.op->code==0x92 && in.ea==EaMode::AbaseOffset && in.src2==16 &&
-                                in.offset==4 && definitions[in.src1]) {
+                    if(!in.valid() || interior_entry(start,p+in.length)) break;
+                    if(in.op->code==0x0b && in.has_target) {
+                        auto target=in.target;
+                        if(target>=guest && uint64_t(target)<uint64_t(guest)+size)
+                            target=source+target-guest;
+                        if(target&3) break;
+                        const auto leaf=returning_leaf(target);
+                        if(!leaf) break;
+                        kill(leaf->clobbers | (uint32_t(1)<<30));
+                        calls.push_back({p,*leaf});
+                    } else {
+                        const auto writes=written_registers(in);
+                        if(!writes) break;
+                        if(in.fmt==Format::Mem) {
+                            if(in.op->code==0x92 && in.ea==EaMode::AbaseOffset &&
+                                (objects & (uint32_t(1)<<in.src2)) && in.offset==4 && definitions[in.src1]) {
                                 auto [definition,target]=*definitions[in.src1];
                                 if(comma) std::cout<<',';comma=true;
                                 std::cout<<"{\"root\":"<<start<<",\"definition\":"<<definition<<
-                                    ",\"store\":"<<p<<",\"target\":"<<target<<",\"register\":"<<unsigned(in.src1)<<"}";
+                                    ",\"store\":"<<p<<",\"target\":"<<target<<",\"register\":"<<unsigned(in.src1)<<
+                                    ",\"object_base_register\":"<<unsigned(in.src2)<<",\"leaf_calls\":[";
+                                for(size_t i=0;i<calls.size();++i) {
+                                    const auto &c=calls[i];if(i) std::cout<<',';
+                                    std::cout<<"{\"call\":"<<c.call<<",\"source\":"<<c.leaf.start<<
+                                        ",\"size\":"<<c.leaf.size<<",\"clobbered_registers\":[";
+                                    bool separator=false;
+                                    for(unsigned r=0;r<32;++r) if(c.leaf.clobbers & (uint32_t(1)<<r)) {
+                                        if(separator) std::cout<<','; separator=true; std::cout<<r;
+                                    }
+                                    std::cout<<"]}";
+                                }
+                                std::cout<<"]}";
                             }
-                        } else if(in.op->code==0x8c || in.op->code==0x80 || in.op->code==0x90 ||
-                                  in.op->code==0x98 || in.op->code==0xb0) {
-                            const unsigned width=in.op->code==0x98?2:in.op->code==0xb0?4:1;
-                            if(in.src1+width>32 || (in.src1<=16 && in.src1+width>16)) break;
-                            for(unsigned r=in.src1;r<in.src1+width;++r) definitions[r]={};
+                            kill(*writes);
                             if(in.op->code==0x8c && in.ea==EaMode::Disp && !(in.disp&3) &&
                                 in.disp>=guest && uint64_t(in.disp)<uint64_t(guest)+size)
                                 definitions[in.src1]=std::pair{p,in.disp};
-                        } else break;
-                    } else if(in.fmt==Format::Reg && !in.m3 && in.dst!=16 &&
-                        (in.op->code==0x5cc || in.op->code==0x581 || in.op->code==0x58c ||
-                         in.op->code==0x590 || in.op->code==0x592)) definitions[in.dst]={};
-                    else break;
+                        } else {
+                            const auto constant=definitions[in.src1];
+                            const bool object=objects & (uint32_t(1)<<in.src1);
+                            kill(*writes);
+                            if(in.op->code==0x5cc && !in.m1) {
+                                definitions[in.dst]=constant;
+                                if(object) objects |= uint32_t(1)<<in.dst;
+                            }
+                        }
+                    }
                     p+=in.length;
                 }
             }

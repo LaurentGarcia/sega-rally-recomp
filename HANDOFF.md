@@ -1,5 +1,39 @@
 # Handoff
 
+## Decoded returning-leaf callback proof (2026-10-14)
+
+The scoped registration pass now tracks saved object aliases and constant
+definitions through MOV and direct BAL calls to a proven returning leaf. The
+leaf must consist entirely of reached, whitelisted straight-line instructions
+and return by BX through its original incoming link. Exact decoded register
+writes and BAL's implicit g14 write invalidate facts; there is no callee-save
+ABI assumption. Known interior entries, missing bytes, unknown or nested calls,
+branches and overwritten links reject the candidate. Every call keeps its own
+leaf span, SHA-256 and clobber set in the generated audit.
+
+The actual graph adds exactly two registration proofs, `0x005e29d0` from
+constructor `0x005e2b20` and `0x005e4380` from `0x005e4550`, bringing the count
+from 14 to 16. A second pass adds nothing. Both were already separately observed
+targets; this improves justified coverage inference, not the frozen v6 code.
+Their 60-byte leaf has SHA-256
+`6196e10030caee5ecd5a1a586df152d4637972f853e6f9f8301c7d0b9a7470aa` and writes
+g0, g1, g2, g4, g5, g6, g7 and g14. Actual proof report SHA-256 is
+`a9ff17ef57817744942bb9f452f7da8d35cce59c0484266c7a077a73bd4e5b24`.
+
+The review also corrected wide-load clobber footprints: LDL/LDQ round their
+register base down, whereas EMUL writes its encoded destination and successor.
+Treating an odd encoded LDL base literally could incorrectly preserve an
+object or callback register. Mutation checks now cover those cases in both
+the registration and table proof. CHKBIT's ignored destination-mode bit is
+accepted because the executor does not write a general register.
+
+All 25 proof tests pass under strict warnings and ASan/UBSan; the applied main
+tree passes the same 25 tests plus eight bootstrap checks. Independent review
+reproduced the two-target closure. Conditional diamonds, including the separately
+identified `0x005ca740` case, remain unsupported. Next: use this helper in a
+separate v7 generation for the newly observed finish-line callback, preserving
+v6 and its ongoing independent driving comparison.
+
 ## Native Lancia driving and full-screen Metal launch (2026-10-14)
 
 The frozen v6 generation reaches actual driving: 74,181 native instructions,

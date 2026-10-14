@@ -246,6 +246,24 @@ def object_update_seeds(program: bytes, reach: dict, relocations: dict, proof_to
         root, definition, store, target = (proof[key] for key in ("root", "definition", "store", "target"))
         if root not in trusted or not source <= root <= definition < store < source + size or not guest <= target < guest + size:
             raise ValueError("object registration target/span differs from verified roots/copy")
+        if any(not isinstance(proof[key], int) or not 0 <= proof[key] < 32
+               for key in ("register", "object_base_register")):
+            raise ValueError("object registration register exceeds the architectural file")
+        leaves = []
+        previous_call = root - 1
+        for leaf in proof["leaf_calls"]:
+            call, address, length = (leaf[key] for key in ("call", "source", "size"))
+            clobbers = leaf["clobbered_registers"]
+            if ((call | address | length) & 3 or not root <= call < store or call <= previous_call or
+                address < source or length < 4 or address + length > source + size or
+                not all(isinstance(r, int) and 0 <= r < 32 for r in clobbers) or
+                clobbers != sorted(set(clobbers))):
+                raise ValueError("returning leaf proof exceeds its verified call/span/register bounds")
+            previous_call = call
+            leaves.append({"call_address": f"0x{call:08x}", "source_address": f"0x{address:08x}",
+                "source_size": length, "source_sha256": hashlib.sha256(program[address:address+length]).hexdigest(),
+                "clobbered_registers": clobbers, "link_register": 30,
+                "return_contract": "Decoded straight-line BX through preserved incoming BAL link; no callee-save ABI assumed"})
         candidates.append({"address": f"0x{source + target - guest:08x}",
             "runtime_address": f"0x{target:08x}", "root_role": "object_update",
             "name": f"verified_registered_object_update_{target:08x}",
@@ -253,9 +271,10 @@ def object_update_seeds(program: bytes, reach: dict, relocations: dict, proof_to
             "source_address": f"0x{root:08x}", "source_size": store + 4 - root,
             "source_sha256": hashlib.sha256(program[root:store+4]).hexdigest(),
             "definition_address": f"0x{definition:08x}", "store_address": f"0x{store:08x}",
-            "value_register": proof["register"], "dispatcher_provenance": dispatcher,
+            "value_register": proof["register"], "object_base_register": proof["object_base_register"],
+            "leaf_calls": leaves, "dispatcher_provenance": dispatcher,
             "source_seed_provenance": [row for row in qualified if canonical(row["address"]) == root],
-            "provenance": "Static object update registration candidate from a scoped constructor/update root, preserved object base and constant value, known side-entry rejection, and the pinned +4/null-guard/call dispatcher. Runtime observation, immutable pointer cells and exclusive target coverage are not implied."})
+            "provenance": "Static object update registration candidate from a scoped constructor/update root, preserved object aliases and constant value, explicit decoded returning-leaf clobbers, known side-entry rejection, and the pinned +4/null-guard/call dispatcher. Runtime observation, immutable pointer cells and exclusive target coverage are not implied."})
     return candidates
 
 

@@ -226,6 +226,153 @@ class ProofTests(unittest.TestCase):
         self.reach["instruction_addresses"].remove("0x500204")
         self.assertEqual(self.updates(config), [])
 
+    def leaf_fixture(self):
+        config = self.update_fixture()
+        self.install(0x40, [reg(0x5cc, 4, 16), 0x0b0000bc,
+            mem(0x8c, 20, mode=12), 0x500180, mem(0x92, 20, 4, 4), 0x0a000000])
+        self.install(0x100, [reg(0x5cc, 18, 30), reg(0x5cc, 30, 0, m1=1),
+            reg(0x5cc, 16, 0, m1=1), mem(0x84, 0, 18, mode=4)])
+        self.reach["instruction_addresses"] = [hex(0x500000+p) for p in
+            (0x40, 0x44, 0x48, 0x50, 0x54, 0x100, 0x104, 0x108, 0x10c, 0x200, 0x204, 0x208, 0x20c)]
+        self.update_hashes(config)
+        return config
+
+    def test_saved_object_alias_across_decoded_returning_leaf(self):
+        config = self.leaf_fixture()
+        rows = self.updates(config)
+        self.assertEqual([r["address"] for r in rows], ["0x00000180"])
+        row = rows[0]
+        self.assertEqual(row["object_base_register"], 4)
+        self.assertEqual(row["definition_address"], "0x00000048")
+        self.assertEqual(row["source_seed_provenance"], self.update_roots)
+        self.assertEqual(row["source_sha256"], hashlib.sha256(self.program[0x40:0x54]).hexdigest())
+        leaf = row["leaf_calls"][0]
+        self.assertEqual(leaf["call_address"], "0x00000044")
+        self.assertEqual(leaf["source_address"], "0x00000100")
+        self.assertEqual(leaf["source_size"], 16)
+        self.assertEqual(leaf["clobbered_registers"], [16, 18, 30])
+        self.assertEqual(leaf["source_sha256"], hashlib.sha256(self.program[0x100:0x110]).hexdigest())
+        # Copy an alias again, and preserve the original constant's definition.
+        self.install(0x50, [reg(0x5cc, 7, 4), reg(0x5cc, 22, 20), mem(0x92, 22, 7, 4)])
+        self.reach["instruction_addresses"].append("0x500058")
+        self.update_hashes(config)
+        row = self.updates(config)[0]
+        self.assertEqual((row["object_base_register"], row["value_register"]), (7, 22))
+        self.assertEqual(row["definition_address"], "0x00000048")
+
+    def test_leaf_rejects_register_clobbers_including_wide_and_paired_results(self):
+        for word in (reg(0x5cc, 4, 0, m1=1), mem(0x90, 4, 10, 0),
+                     mem(0x98, 5, 10, 0), mem(0xb0, 7, 10, 0), reg(0x670, 3, 20, 21)):
+            with self.subTest(word=word):
+                config = self.leaf_fixture()
+                self.install(0x108, [word])
+                self.update_hashes(config)
+                self.assertEqual(self.updates(config), [])
+        # Both halves of emul and the rounded memory-load footprint also kill
+        # callback constants saved before a leaf, even when Object survives.
+        for word in (reg(0x5cc, 20, 0, m1=1), reg(0x670, 19, 22, 23),
+                     mem(0x98, 21, 10, 0), mem(0xb0, 23, 10, 0)):
+            with self.subTest(constant_clobber=word):
+                config = self.leaf_fixture()
+                self.install(0x44, [mem(0x8c, 20, mode=12), 0x500180, 0x0b0000b4])
+                self.reach["instruction_addresses"].remove("0x500048")
+                self.reach["instruction_addresses"].append("0x50004c")
+                self.install(0x108, [word])
+                self.update_hashes(config)
+                self.assertEqual(self.updates(config), [])
+
+    def test_leaf_requires_exact_saved_link_return_and_no_nested_control(self):
+        for address, word in ((0x100, reg(0x5cc, 18, 29)),
+                (0x108, reg(0x5cc, 18, 0, m1=1)), (0x108, mem(0x98, 19, 10, 0)),
+                (0x108, 0x08000004), (0x108, 0x0b000078), (0x108, 0x09000078),
+                (0x108, 0x0a000000), (0x108, 0x42000000),
+                (0x108, reg(0x670, 31, 20, 21)),
+                (0x10c, mem(0x84, 0, 30, mode=4)), (0x10c, mem(0x84, 0, 18, 4))):
+            with self.subTest(address=address, word=word):
+                config = self.leaf_fixture()
+                self.install(address, [word])
+                self.update_hashes(config)
+                self.assertEqual(self.updates(config), [])
+
+    def test_leaf_requires_reached_bytes_and_rejects_known_interior_entries(self):
+        for pc in (0x100, 0x104, 0x108, 0x10c):
+            config = self.leaf_fixture()
+            self.reach["instruction_addresses"].remove(hex(0x500000+pc))
+            self.assertEqual(self.updates(config), [])
+        for pc in (0x104, 0x108, 0x10c):
+            config = self.leaf_fixture()
+            self.reach["seeds"].append(hex(0x500000+pc))
+            self.assertEqual(self.updates(config), [])
+        config = self.leaf_fixture()
+        self.install(0x20, [0x080000e8])  # direct external edge to leaf interior
+        self.reach["instruction_addresses"].append("0x500020")
+        self.update_hashes(config)
+        self.assertEqual(self.updates(config), [])
+        for target in (0x102, 0x400):
+            config = self.leaf_fixture()
+            self.install(0x44, [0x0b000000 | (target-0x44)])
+            self.update_hashes(config)
+            self.assertEqual(self.updates(config), [])
+
+    def test_bal_implicit_link_clobber_and_unknown_call_are_not_abi_preserved(self):
+        config = self.leaf_fixture()
+        self.install(0x40, [reg(0x5cc, 30, 16)])
+        self.install(0x50, [mem(0x92, 20, 30, 4)])
+        # A leaf which changes no register still receives a newly written g14.
+        self.install(0x100, [mem(0x84, 0, 30, mode=4)])
+        self.update_hashes(config)
+        self.assertEqual(self.updates(config), [])
+        config = self.leaf_fixture()
+        self.install(0x44, [mem(0x85, 30, 10, mode=4)])  # unknown balx
+        self.update_hashes(config)
+        self.assertEqual(self.updates(config), [])
+
+    def test_multiple_leaf_calls_keep_separate_hashed_provenance(self):
+        config = self.leaf_fixture()
+        self.install(0x48, [0x0b0000b8, mem(0x8c, 20, mode=12), 0x500180,
+                           mem(0x92, 20, 4, 4)])
+        self.reach["instruction_addresses"].remove("0x500050")
+        self.reach["instruction_addresses"].append("0x50004c")
+        self.update_hashes(config)
+        row = self.updates(config)[0]
+        self.assertEqual([r["call_address"] for r in row["leaf_calls"]], ["0x00000044", "0x00000048"])
+        self.assertEqual(row["leaf_calls"][0]["source_sha256"], row["leaf_calls"][1]["source_sha256"])
+
+    def test_leaf_integer_flags_do_not_write_gprs_and_all_clobbers_are_recorded(self):
+        config = self.leaf_fixture()
+        body = [reg(0x5cc, 18, 30), reg(0x5cc, 30, 0, m1=1),
+            mem(0x90, 17, mode=12), 0x200000,
+            mem(0x8c, 21, mode=12), 0x24681234, reg(0x670, 22, 21, 17),
+            reg(0x5ae, 4, 31, 22, m1=1) | (1 << 13),  # unused dst/m3
+            reg(0x5b0, 20, 23, 23), reg(0x590, 20, 22, 20),
+            reg(0x58c, 20, 31, 20, m1=1), reg(0x5cc, 16, 20),
+            mem(0x92, 20, mode=12), 0x200000, mem(0x84, 0, 18, mode=4)]
+        self.install(0x100, body)
+        self.reach["instruction_addresses"] = [pc for pc in self.reach["instruction_addresses"]
+            if not 0x500100 <= int(pc, 16) < 0x50013c]
+        self.reach["instruction_addresses"] += [hex(0x500000+p) for p in
+            (0x100, 0x104, 0x108, 0x110, 0x118, 0x11c, 0x120, 0x124, 0x128, 0x12c, 0x130, 0x138)]
+        self.update_hashes(config)
+        leaf = self.updates(config)[0]["leaf_calls"][0]
+        self.assertEqual(leaf["source_size"], 60)
+        self.assertEqual(leaf["clobbered_registers"], [16, 17, 18, 20, 21, 22, 23, 30])
+        self.assertEqual(leaf["source_sha256"], hashlib.sha256(self.program[0x100:0x13c]).hexdigest())
+        # A seed at a displacement word is also a forbidden interior entry.
+        self.reach["seeds"].append("0x500114")
+        self.assertEqual(self.updates(config), [])
+
+    def test_rounded_wide_load_cannot_preserve_original_object_base(self):
+        for word in (mem(0x98, 17, 4, 0), mem(0xb0, 19, 4, 0)):
+            config = self.update_fixture()
+            self.install(0x48, [word])
+            self.update_hashes(config)
+            self.assertEqual(self.updates(config), [])
+        config = self.callback_fixture()
+        self.install(0x94, [mem(0x98, 17, 4, 0)])
+        self.callback_hashes(config)
+        with self.assertRaises(ValueError):
+            table_seeds(self.program, config, self.relocations, self.tool)
+
     def callback_hashes(self, config):
         config["program_sha256"] = hashlib.sha256(self.program).hexdigest()
         table = config["tables"][0]
