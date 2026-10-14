@@ -1,5 +1,27 @@
 # Handoff
 
+## Coupled sound reaches the first extended 3D sequence (2026-10-14)
+
+A separate copy of the 73,657-instruction v4 main profile, under ignored
+`build/segarally-coupled-v4`, keeps the sound diagnostic independent of ongoing
+main generation. One additional actually reached byte-table entry, `0x601682`
+from `0x601662`, expands the sound profile to 2,635 instructions / 59 unique
+seeds with no missing timing or templates. No new inferred byte-table bound
+was introduced. Sound source SHA-256 is
+`b7e39697f4e23f008e10c4131ac719f23b21d03dfc1f7c367084c86cc14af441`.
+
+The coupled neutral run reaches main callback `0x005e29d0` after 397,603,063
+instructions / 880,982,159 main cycles. It renders 2,027 frames, including
+671 with geometry. Sound runs 28,781,289 instructions / 397,837,458 cycles,
+32,818 IRQs and 1,554,053 sample frames, with 142 main UART pin transitions.
+The final capture is still attract mode with CREDIT 0/2. It is not verified
+driving or host audio playback. Evidence is in that copy's
+`evidence/neutral-main-5e29d0`; boot report SHA-256 is
+`d9c6c849fef831a8c8efd77d92d9ccc78a00cda54c668987192da3b9c1d6c7c5`
+and sound audit `13e92c05a32fec4889afb9fb6f6d4e5c8687b5cfc68224aa0929a80b8aebd092`.
+Next: exercise the exact two-coin/start/car-selection replay through this linked
+board, while the main coverage lane follows newly observed object callbacks.
+
 ## Cabinet replay in independent CPU/device parity (2026-10-14)
 
 The independent harness now accepts the same bounded cabinet replay, with

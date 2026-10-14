@@ -197,6 +197,23 @@
       "dispatch_evidence_size": 16,
       "dispatch_evidence_sha256": "2ec628e69364e490a057054163059ab6266c7ec21aea1982db39fc7a1303f119",
       "provenance": "Actual native target reached through the verified indexed address computation and indirect jump at 0x601662. This adds only the reached program-ROM entry; commands still originate in the main CPU and pass through the physical UART/SCSP serializer."
+    },
+    {
+      "address": "0x601682",
+      "name": "observed_sound_dispatch_601682",
+      "observed_status": "missing_code",
+      "observed_after_instructions": 20196947,
+      "observed_modeled_cycles": 271965328,
+      "observed_irq_entries": 21974,
+      "observed_previous_dispatch": "0x601662",
+      "observed_shared_deadline_ns": 24089899377,
+      "observed_main_instructions": 272452541,
+      "evidence": "build/segarally-coupled-v4/evidence/sound-linked-601682/boot.json",
+      "evidence_sha256": "29be5403d810dce22c935cdf305638f68ee4fd10e6c9a8cdae4447243416c3a4",
+      "dispatch_evidence_program_offset": "0x001654",
+      "dispatch_evidence_size": 16,
+      "dispatch_evidence_sha256": "2ec628e69364e490a057054163059ab6266c7ec21aea1982db39fc7a1303f119",
+      "provenance": "Actual native target reached through the verified indexed address computation and indirect jump at 0x601662. This adds only the reached program-ROM entry; commands still originate in the main CPU and pass through the physical UART/SCSP serializer."
     }
   ]
 }
