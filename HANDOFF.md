@@ -1,5 +1,32 @@
 # Handoff
 
+## Visible Mac Metal car scene and packaged launch (2026-10-14)
+
+The frozen v3 core now runs in a normal Mac application and leaves the last
+car/course frame visible at missing callback `0x005e4980`. The verified asset
+package belongs in `Contents/Resources/assets`: SDL's bundled base path does
+not point at `Contents/MacOS`. The first bundle failed for that reason; a
+detached process also disappeared without a conclusive cause. The launcher
+now uses LaunchServices, keeps a startup log, activates an existing instance
+without replacing its files, and ad-hoc signs newly packaged Mac applications.
+The current live instance was left open during hidden comparison runs.
+
+At rendered frame 1,634, separate Metal/CPU instances agree on 320,920,953
+instructions, 710,177,427 cycles and PC `0x005aae90`. Their pixels do not yet
+match: 15,830 of 190,464 RGB pixels differ (8.31%), with mean absolute channel
+error 0.7278/255. There are 839 pixels with a channel error over 32 and 406
+over 64. CPU hash is `04dde2bc10bbfabe`, GPU hash `cb05ac08103a1d01`. Actual
+paired images and difference/metrics are under ignored `build/segarally-mac-v3`.
+The apparent car fidelity is not a claim of exact rasterization or full-race
+correctness. Texture and edge differences remain under investigation.
+
+The host adds `--hidden` for bounded Metal captures and `--log` for startup
+diagnostics. Strict host compilation, seven packaging tests, Mac/iOS Release
+builds and strict external verification of the signed v3 iPhone app pass.
+The new phone artifact has not been installed or relaunched since the locked
+device denied launch. Next: extend callback coverage, exercise actual coin/start
+inputs, resolve measured graphics differences and verify phone gameplay.
+
 ## Independent CPU parity through the first car scene (2026-10-14)
 
 The frozen v3 native core and independent CPU/device instances agree through

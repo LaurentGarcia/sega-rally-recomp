@@ -68,9 +68,9 @@ void capture_reference(const rt::Video &video,const std::filesystem::path &path)
 } // namespace
 
 int segarally_host_main(int argc,char **argv) {
-    std::filesystem::path data,saves,capture_path,reference_path;
+    std::filesystem::path data,saves,capture_path,reference_path,log_path;
     uint64_t frame_limit=0,instruction_limit=0;
-    bool touch_visible=false,unthrottled=false;
+    bool touch_visible=false,unthrottled=false,hidden=false;
     if(const char *env=std::getenv("SEGARALLY_DATA_DIR")) data=env;
     if(const char *env=std::getenv("SEGARALLY_SAVE_DIR")) saves=env;
     for(int i=1;i<argc;++i) {
@@ -81,10 +81,18 @@ int segarally_host_main(int argc,char **argv) {
         else if(arg=="--capture") capture_path=value();else if(arg=="--touch") touch_visible=true;
         else if(arg=="--reference-capture") reference_path=value();
         else if(arg=="--unthrottled") unthrottled=true;
-        else if(arg=="--help") {puts("Sega Rally native: --data DIR --save-dir DIR --frames N --instructions N --capture FILE.ppm --reference-capture FILE.ppm --touch --unthrottled\nKeys: arrows steer, Z gas, X brake, C coin, Return start, V view, A/S gear down/up, Space handbrake, F2 service, F3 test, Escape quit.");return 0;}
+        else if(arg=="--hidden") hidden=true;
+        else if(arg=="--log") log_path=value();
+        else if(arg=="--help") {puts("Sega Rally native: --data DIR --save-dir DIR --frames N --instructions N --capture FILE.ppm --reference-capture FILE.ppm --touch --unthrottled --hidden --log FILE\nKeys: arrows steer, Z gas, X brake, C coin, Return start, V view, A/S gear down/up, Space handbrake, F2 service, F3 test, Escape quit.");return 0;}
         else throw std::runtime_error("Unknown argument "+arg);
     }
+    if(!log_path.empty()) {
+        if(!freopen(log_path.string().c_str(),"w",stderr)) throw std::runtime_error("Cannot open native host log");
+        setvbuf(stderr,nullptr,_IONBF,0);
+    }
+    fprintf(stderr,"Sega Rally native host startup\n");
     SDL_SetMainReady();SDL_SetHint(SDL_HINT_GPU_DRIVER,"metal");
+    if(hidden) SDL_SetHint(SDL_HINT_MAC_BACKGROUND_APP,"1");
     if(!SDL_Init(SDL_INIT_VIDEO)) {fprintf(stderr,"SDL_Init: %s\n",SDL_GetError());return 1;}
     if(data.empty()) data=std::filesystem::path(SDL_GetBasePath())/"assets";
     if(saves.empty()) {char *path=SDL_GetPrefPath("sega-rally-recomp","SegaRallyNative");if(path) {saves=path;SDL_free(path);}else saves="saves";}
@@ -93,8 +101,10 @@ int segarally_host_main(int argc,char **argv) {
     int result=0;
     try {
         std::filesystem::create_directories(saves);
-        Machine::Images images{read_file(data/"program.bin"),read_file(data/"main_data.bin"),read_file(data/"tgp_tables.bin"),
-            read_file(data/"copro_data.bin"),read_file(data/"polygons.bin"),read_file(data/"textures.bin")};
+        Machine::Images images;
+        images.program=read_file(data/"program.bin");images.main_data=read_file(data/"main_data.bin");
+        images.tgp_tables=read_file(data/"tgp_tables.bin");images.copro_data=read_file(data/"copro_data.bin");
+        images.polygons=read_file(data/"polygons.bin");images.textures=read_file(data/"textures.bin");
         Machine::Options options;options.external_video=true;
         if(!reference_path.empty()) {Machine::Options ref_options;reference=std::make_unique<Machine>(images,ref_options);}
         machine=std::make_unique<Machine>(std::move(images),options);
@@ -102,6 +112,7 @@ int segarally_host_main(int argc,char **argv) {
         if(!eeprom.empty()) machine->load_eeprom(eeprom);if(!backup.empty()) machine->load_backup(backup);
         if(reference) {if(!eeprom.empty()) reference->load_eeprom(eeprom);if(!backup.empty()) reference->load_backup(backup);}
         SDL_WindowFlags flags=SDL_WINDOW_RESIZABLE|SDL_WINDOW_HIGH_PIXEL_DENSITY;
+        if(hidden) flags|=SDL_WINDOW_HIDDEN;
 #ifdef SEGARALLY_IOS
         flags|=SDL_WINDOW_FULLSCREEN;touch_visible=true;
 #endif

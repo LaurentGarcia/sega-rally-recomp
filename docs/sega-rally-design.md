@@ -147,6 +147,12 @@ boundaries during render comparison. The startup warning at frame 513 matches
 all RGB pixels; no polygon or racing-scene parity is inferred from this tile
 screen. The host provides touch/keyboard inputs, persistence, pause/resume,
 and board-time pacing. A separate iOS bundle preserves the earlier prototype.
+The first paired car scene at frame 1,634 has matching CPU state but 15,830
+different RGB pixels out of 190,464, with mean absolute channel error 0.7278/255;
+graphics fidelity remains under investigation. Hidden Metal captures preserve
+the visible Mac instance. The Mac launcher validates assets, packages them in
+SDL's `Contents/Resources` base path, and starts a normal application through
+LaunchServices with a persistent diagnostic log.
 Bundled assets are verified Xcode resource inputs so signing follows copying,
 including incremental builds; post-signing bundle mutation is not allowed.
 
