@@ -14,7 +14,8 @@ The repository is in bring-up. The expanded address-label profile produces
 68,953 native i960 instructions and 47 compiled objects. The core executes
 reset at `0x420`, copies and checks its RAM code, initializes the I/O chip,
 and displays the original startup warning and Sega Rally 1995 logo. Independent
-CPU execution agrees through 266,518,444 instructions and 1,354 startup frames.
+CPU execution agrees through 321,115,347 instructions and 1,634 rendered frames,
+including the first car/course scene.
 The longer native run renders the Martini Lancia, another rally car and a
 forest/gravel course before an unresolved callback. This establishes a first
 3D scene; completed attract mode and racing are not established. I/O, EEPROM, communication, UART, video, timers and screen

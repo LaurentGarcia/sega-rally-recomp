@@ -1,5 +1,22 @@
 # Handoff
 
+## Independent CPU parity through the first car scene (2026-10-14)
+
+The frozen v3 native core and independent CPU/device instances agree through
+321,115,347 instructions, 4,869,617 ordered cycle-stamped writes, 710,610,287
+reference cycles and 16,545 IRQ entries. They stop at the same callback
+`0x005e4980`. All 1,634 rendered frames / 1,635 parses and final pixel hash
+`04dde2bc10bbfabe` match, as do 28,424,411 physical UART edges. This includes
+the car/course scene. RX remains idle in this comparison; the diagnostic
+sound CPU is not attached. Shared TGP/renderer code and reference timing
+limitations remain outside independent full-MAME/PCB validation.
+
+Reproduce with `python3 tests/test_segarally_boot_parity.py --build-dir
+build/segarally-timed-v3 --instructions 400000000 --timeout 900 --tgp --io
+--comm --control --video --screen --uart`. The live Mac Metal process has
+also reached the same native frontier and keeps its last frame visible;
+pixel comparison of the GPU path is being checked separately.
+
 ## First native car and course capture (2026-10-14)
 
 The generated native core now renders the textured Martini Lancia, a second
