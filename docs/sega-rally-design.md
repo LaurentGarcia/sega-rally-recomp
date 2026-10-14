@@ -40,11 +40,37 @@ hardware mappings are evidence to inspect, not defaults for Sega Rally.
 The initial native bootstrap uses the inherited MAME-compatible host-double
 FP state and operand semantics for differential analysis. New single/long
 arithmetic, conversion, FP register/literal, and flushreg templates have
-10,344 generated-code/reference comparisons. This diagnostic mode deliberately
+14,496 generated-code/reference comparisons, including additional long-real,
+transcendental, and carry forms. This diagnostic mode deliberately
 does not satisfy the inherited design's hardware extF80 requirement. There is
 no claim that finite host-double parity proves the i960KB's extended precision,
 exception handling, or all rounding modes. Resolve that gap with SoftFloat
 state and tests before treating FP-dependent game behavior as hardware exact.
+Other inherited reference details also remain diagnostic limitations:
+`addc` currently preserves the reference's 32-bit intermediate sum (and its
+carry loss), and `cpysre` follows its `>= 0` sign test for negative zero.
+Reference equality is reported separately from hardware correctness.
+
+The verified reset copy maps program bytes `0x1000..0x60fff` to writable
+RAM `0x5a0000..0x5fffff`. Recompilation decodes at the RAM addresses to preserve
+relative branches and loads, and checks every live instruction word before
+execution. The opt-in label profile uses address annotations only; a separate
+observed-target manifest records native missing-code evidence. No lifted
+game implementation is copied into the new runtime.
+
+Daytona's unchanged TGP generator and TgpBoard compile Rally's own 1,665-word
+upload, not Daytona's microcode. A bus-level upload/startup probe returns `8`
+after 108 native instructions and then waits on an empty FIFO. Tables and
+collision data are independently checked against the pinned ROM map. Full
+TGP command and race parity are still required.
+
+The current bus exposes unsupported hardware accesses. Two observed unmapped
+probes (`0x00f80000` and `0x01c00202`) follow the pinned reference's zero-read,
+discarded-write contract with counters; these are not invented ready devices.
+Only timing-independent IRQ reset operations are supported. Enabling a source
+is still a frontier until the board clock, delayed mask update, timers, and
+asynchronous sources are connected. Buffer reset and fresh backup SRAM match
+the reference's `0x07800f0f` word pattern and all-ones initialization.
 
 The older lifted-C prototype already reaches desert practice on the phone, but
 contains incomplete game paths. It is a useful source of address annotations and
@@ -59,10 +85,14 @@ metadata incorrectly hid a roof decal and drew a tan ground polygon. That
 candidate was withheld from installation.
 
 The prototype had dropped a real GEO Z-adjust command emitted during bootstrap
-and did not retain window/culling metadata. Daytona's shared priority functions
-and explicit command-state tests are now the basis for correcting that path.
-Fresh captures with full metadata are required before accepting the rendering
-change. A green unit test alone does not establish full-game fidelity.
+and did not retain window/culling metadata. Restoring the complete Daytona
+priority/culling path and exact header palette fixes the roof, windows, and
+tan shadow on 16 real captured frames. A direct raw-command audit matches
+3,370 face/attribute records over 141 objects. The apparent cloud regression
+was a comparison of different captures: the matched sky regions are identical
+across all 16 frames. The corrected prototype was built and installed on the
+phone; its launch was blocked by the locked device. This does not establish
+full-game visual parity or on-phone play validation of that build.
 
 ## Repository boundaries
 

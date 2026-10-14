@@ -1,6 +1,20 @@
 #include "runtime/model2a_bus.h"
+#include "runtime/m2_replay_bus.h"
 #include <cassert>
 #include <cstdio>
+
+struct RecordingDevice : rt::DeviceModel {
+    unsigned reads = 0, writes = 0;
+    uint32_t last_address = 0, last_mask = 0, last_value = 0;
+    bool claims(uint32_t a) const override { return a >= 0x00884000 && a <= 0x00887fff; }
+    Check read(uint32_t a, uint32_t mask, uint32_t &value) override {
+        ++reads; last_address = a; last_mask = mask; value = 0x87654321; return Strict;
+    }
+    void write(uint32_t a, uint32_t value, uint32_t mask) override {
+        ++writes; last_address = a; last_mask = mask; last_value = value;
+    }
+    void measured_mismatch(uint32_t, uint32_t, uint32_t) override {}
+};
 
 int main()
 {
@@ -8,6 +22,19 @@ int main()
     program[0x20000] = 0xa5;
     data[0x1000000] = 0x12; data[0x1000001] = 0x34;
     rt::Model2ABus bus(std::move(program), std::move(data));
+    assert(bus.read_dword(0x00900000) == 0x07800f0f);
+    assert(bus.read_dword(0x0097fffc) == 0x07800f0f);
+    assert(bus.read_dword(0x01d00000) == 0xffffffff);
+    assert(bus.read_byte(0x01d03fff) == 0xff);
+    bus.write_dword(0x00e80004, 0);
+    bus.write_dword(0x00e80000, 0xffffffff);
+    assert(bus.read_dword(0x00e80000) == 0);
+    assert(bus.read_dword(0x00e80004) == 0);
+    assert(bus.diagnostics().irq_reset_writes == 2);
+    bool irq_fenced = false;
+    try { bus.write_dword(0x00e80004, 1); }
+    catch (const rt::Model2AAccess &) { irq_fenced = true; }
+    assert(irq_fenced);
     // The upper half of CRX RAM must not alias the original Model 2 ROM.
     assert(bus.read_byte(0x00020000) == 0xa5);
     // A documented reference-map gap reads zero and never stores writes.
@@ -18,6 +45,8 @@ int main()
     assert(bus.diagnostics().reference_gap_writes == 1);
     assert(bus.diagnostics().reference_gap_last_write == 2);
     assert(bus.flags(0x00f80000) == 0);
+    bus.write_word(0x01c00202, 0x4d);
+    assert(bus.read_word(0x01c00202) == 0);
     for (uint32_t address : {0x00f7ffffu, 0x00f80004u}) {
         bool gap_end = false;
         try { (void)bus.read_byte(address); }
@@ -59,5 +88,16 @@ int main()
     cpu.i960_write_dword_unaligned(0x0091fffe, 0x88776655);
     assert(bus.read_word(0x0091fffe) == 0x6655);
     assert(bus.read_word(0x00900000) == 0x8877);
+    RecordingDevice device;
+    bus.set_model(&device);
+    assert(bus.read_word(0x00884002) == 0x8765);
+    assert(device.reads == 1 && device.last_address == 0x00884000 && device.last_mask == 0xffff0000);
+    bus.write_byte(0x00884001, 0xa5);
+    assert(device.writes == 1 && device.last_address == 0x00884000);
+    assert(device.last_mask == 0x0000ff00 && device.last_value == 0x0000a500);
+    assert(bus.flags(0x00884000) == 0);
+    assert(bus.flags(0x00880000) == rt::Cpu::BURST);
+    assert(bus.flags(0x00804000) == rt::Cpu::BURST);
+    assert(bus.flags(0x00800000) == 0);
     std::puts("Model 2A bus: RAM, ROM aliases, widths, burst flags and explicit device stops passed");
 }

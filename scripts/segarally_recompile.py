@@ -102,6 +102,39 @@ def build_generator(compiler: list[str], output: Path) -> Path:
     return tool
 
 
+def relocation_seeds(program: bytes, seeds: dict, config: dict) -> tuple[list[str], list[dict]]:
+    """Verify the reset-copy operands and add provenance-backed RAM aliases.
+
+    Full loop semantics were decoded from this checksum-verified Revision B
+    image; these checks fence the source/destination/count operands as well.
+    This is analysis metadata, never a mutable-RAM bus mapping.
+    """
+    flags, aliases = [], []
+    for row in config["relocations"]:
+        guest, source, size = (int(row[key], 16) for key in ("guest", "program_offset", "size"))
+        evidence = row["evidence"]
+        for key, expected, register in (("destination_lda_pc", guest, 22), ("source_lda_pc", source, 21)):
+            pc = int(evidence[key], 16)
+            word, value = struct.unpack_from("<II", program, pc)
+            if word >> 24 != 0x8c or (word >> 19) & 31 != register or (word >> 10) & 15 != 12 or value != expected:
+                raise ValueError(f"Reset relocation {key} operand does not match verified copy")
+        word = struct.unpack_from("<I", program, int(evidence["count_shlo_pc"], 16))[0]
+        opcode = (word >> 20) & 0xff0 | (word >> 7) & 15
+        if (opcode != 0x59c or not word & (1 << 11) or not word & (1 << 12)
+                or (word >> 19) & 31 != 29 or ((word >> 14) & 31) << (word & 31) != size // 4):
+            raise ValueError("Reset relocation word count does not match verified copy")
+        if size % 4 or source + size > len(program) or not 0x500000 <= guest < guest + size <= 0x600000:
+            raise ValueError("Relocation exceeds verified program or work RAM")
+        flags += ["--relocated-code", f"{guest:x}:{source:x}:{size:x}"]
+        for seed in seeds["seeds"]:
+            pc = int(seed["address"], 16)
+            if source <= pc < source + size:
+                aliases.append({"address": f"0x{guest + pc - source:08x}", "original_rom_address": seed["address"],
+                                "name": seed["name"], "evidence": seed["evidence"],
+                                "relocation": row["name"]})
+    return flags, aliases
+
+
 def compile_generated(compiler: list[str], generated: Path, output: Path, jobs: int) -> int:
     sources = sorted(generated.glob("*.cpp"))
     if not sources:
@@ -125,6 +158,8 @@ def main() -> int:
     parser.add_argument("--build-dir", type=Path, default=BUILD,
                         help="Separate pipeline output directory beneath this checkout's build/")
     parser.add_argument("--verify-only", action="store_true")
+    parser.add_argument("--seed-profile", choices=("bootstrap", "lift-labels"), default="bootstrap",
+                        help="Sparse known bootstrap labels or opt-in prior-lift address candidates")
     args = parser.parse_args()
     BUILD = (args.build_dir if args.build_dir.is_absolute() else ROOT / args.build_dir).resolve()
     if not BUILD.is_relative_to((ROOT / "build").resolve()) or BUILD == (ROOT / "build").resolve():
@@ -154,16 +189,28 @@ def main() -> int:
             stale.unlink()
         for stale in objects.glob("*.o"):
             stale.unlink()
-        seeds = json.loads((ROOT / "config" / "segarally_seeds.json").read_text())
+        seed_config = "segarally_seeds.json" if args.seed_profile == "bootstrap" else "segarally_lift_seeds.json"
+        seeds = json.loads((ROOT / "config" / seed_config).read_text())
+        observed = json.loads((ROOT / "config/segarally_observed_seeds.json").read_text())
+        program = (BUILD / "rom_cache/program.bin").read_bytes()
+        program_hash = hashlib.sha256(program).hexdigest()
+        for row in observed["seeds"]:
+            if row["program_sha256"] != program_hash:
+                raise ValueError("Observed target provenance belongs to a different program image")
+        relocations = json.loads((ROOT / "config" / "segarally_relocations.json").read_text())
+        combined = {"seeds": seeds["seeds"] + observed["seeds"]}
+        relocation_flags, aliases = relocation_seeds(program, combined, relocations)
         seedfile = BUILD / "seeds.txt"
-        seedfile.write_text("".join(row["address"][2:] + "\n" for row in seeds["seeds"]))
+        seedfile.write_text("".join(row["address"][2:] + "\n" for row in combined["seeds"] + aliases))
         report = BUILD / "reachability.json"
         run_logged([str(tool), str(BUILD / "rom_cache" / "program.bin"), str(generated),
                     "--board", "model2a", "--main-data", str(BUILD / "rom_cache" / "main_data.bin"),
-                    "--seeds", str(seedfile), "--report", str(report)], BUILD / "recompile.log")
+                    "--seeds", str(seedfile), "--report", str(report)] + relocation_flags, BUILD / "recompile.log")
         reach = json.loads(report.read_text())
         compiled = compile_generated(compiler, generated, objects, args.jobs)
-        audit.update({"seed_provenance": seeds, "reachability": reach,
+        audit.update({"seed_profile": args.seed_profile, "seed_provenance": seeds,
+                      "observed_seed_provenance": observed, "relocation_provenance": relocations,
+                      "relocated_seed_provenance": aliases, "reachability": reach,
                       "native_objects_compiled": True, "native_object_count": compiled,
                       "compiler_command": compiler})
         (BUILD / "coverage.json").write_text(json.dumps(audit, indent=2) + "\n")

@@ -152,6 +152,16 @@ inline bool block_boundary(rt::Lockstep &ls) {
 // Enhancement hooks: address -> name (rt::hook_<name>), from --hooks.
 std::map<uint32_t, std::string> g_hooks;
 
+// Explicit, ROM-backed analysis ranges. These never change the runtime bus:
+// every emitted RAM instruction checks the live bytes before executing.
+struct Relocation { uint32_t guest, source, size; };
+std::vector<Relocation> g_relocations;
+bool relocated(uint32_t a) {
+    for (const auto &r : g_relocations)
+        if (uint64_t(a) >= r.guest && uint64_t(a) < uint64_t(r.guest) + r.size) return true;
+    return false;
+}
+
 struct Emitter {
     const std::set<uint32_t> *chunk_addrs; // instructions emitted in this chunk
     std::ostringstream o;
@@ -189,6 +199,14 @@ struct Emitter {
             line("c.m_IP = " + hex(pc) + ";");
             line(blocks ? "if (block_boundary(ls)) goto dispatch;" : "if (ls.boundary()) goto dispatch;");
             if (const auto h = g_hooks.find(pc); h != g_hooks.end()) line("rt::hook_" + h->second + "(c);");
+        }
+        if (relocated(pc)) {
+            // Guard both words of long instructions, including fallthrough and
+            // direct-goto entries. Self-modifying code must fail closed.
+            std::string differs = "c.bus->read_dword(" + hex(pc) + ") != " + hex(in.word);
+            if (in.length == 8) differs += " || c.bus->read_dword(" + hex(pc + 4) + ") != " + hex(in.disp);
+            line("if (" + differs + ") { c.m_IP = " + hex(pc) +
+                 "; throw rt::Fatal(\"relocated code differs at " + hex(pc) + "\"); }");
         }
 
         std::string body, exit;   // body runs before ++count; exit transfers control
@@ -326,6 +344,12 @@ struct Emitter {
                                "if ((t1 & 0xff000000) == (t2 & 0xff000000) || (t1 & 0x00ff0000) == (t2 & 0x00ff0000) || "
                                "(t1 & 0x0000ff00) == (t2 & 0x0000ff00) || (t1 & 0x000000ff) == (t2 & 0x000000ff)) AC |= 2; }"; break; // scanbyte
             case 0x5ae: body = "{ const uint32_t t1 = " + s1(in) + " & 0x1f, t2 = " + s2(in) + "; AC = (t2 & (1u << t1)) ? ((AC & ~7u) | 2u) : (AC & ~7u); }"; break; // chkbit
+            case 0x5b0: // addc: preserve the reference's 32-bit sum before uint64_t assignment
+                body = "{ const uint32_t t1 = " + s1(in) + ", t2 = " + s2(in) + "; "
+                       "const uint64_t res = t2 + (t1 + ((AC >> 1) & 1u)); " + d + " = uint32_t(res); "
+                       "AC &= ~3u; AC |= (res & (uint64_t(1) << 32)) ? 2u : 0u; "
+                       "AC |= ((res ^ t1) & (res ^ t2) & 0x80000000u) ? 1u : 0u; }";
+                break;
             case 0x5cc: set(s1(in)); break;                                // mov
             case 0x5dc: case 0x5ec: case 0x5fc: {                          // movl/movt/movq
                 const int n = code == 0x5dc ? 2 : code == 0x5ec ? 3 : 4;
@@ -375,8 +399,12 @@ struct Emitter {
                 break;
             }
             case 0x685: body = "AC = (AC & ~7u) | gen::cc_d(" + fr1() + ", " + fr2() + ");"; break;
+            case 0x695: body = "AC = (AC & ~7u) | gen::cc_d(" + fr1(true) + ", " + fr2(true) + ");"; break;
+            case 0x680: if (!real_dest("std::atan2(" + fr2() + ", " + fr1() + ")")) return unsupported(in); break;
+            case 0x683: if (!real_dest("std::fmod(" + fr2() + ", " + fr1() + ")")) return unsupported(in); break;
             case 0x688: if (!real_dest("std::sqrt(" + fr1() + ")")) return unsupported(in); break;
             case 0x68a: if (!real_dest("std::logb(" + fr1() + ")")) return unsupported(in); break;
+            case 0x68c: if (!real_dest("std::sin(" + fr1() + ")")) return unsupported(in); break;
             case 0x6c0: set("uint32_t(int32_t(gen::round_to_int(" + fr1() + ", AC)))"); break;
             case 0x6c2: set("uint32_t(int32_t(" + fr1() + "))"); break;
             case 0x6c3: // cvtzril: MAME reads a single real and writes two adjacent integer registers
@@ -389,6 +417,9 @@ struct Emitter {
                 if (!real_dest(fr1(wide), wide)) return unsupported(in);
                 break;
             }
+            case 0x6e2: // cpysre uses long-real helpers in the inherited reference
+                if (!real_dest("(" + fr2(true) + " >= 0.0 ? std::fabs(" + fr1(true) + ") : -std::fabs(" + fr1(true) + "))", true)) return unsupported(in);
+                break;
             case 0x701: two("t2 * t1"); break;                             // mulo
             case 0x708: two("t2 % t1"); break;                             // remo (MAME: undefined on 0)
             case 0x70b: two("t1 == 0 ? 0u : t2 / t1"); break;              // divo (MAME: 0 on divide by zero)
@@ -482,7 +513,8 @@ std::vector<uint32_t> load_seeds(const std::string &path) {
 int main(int argc, char **argv) {
     if (argc < 3) {
         std::fprintf(stderr, "usage: m2recomp PROGRAM.bin OUTDIR [--seeds FILE]... [--hooks FILE] [--chunk N] [--fast_inaccuracy]\n"
-                             "  [--board model2o|model2a] [--main-data FILE] [--report FILE]\n");
+                             "  [--board model2o|model2a] [--main-data FILE] [--report FILE]\n"
+                             "  [--relocated-code GUEST:PROGRAM_OFFSET:SIZE]... (Model2A work RAM, guarded)\n");
         return 2;
     }
     const std::vector<uint8_t> img = load(argv[1]);
@@ -498,6 +530,12 @@ int main(int argc, char **argv) {
             main_data_path = argv[++i];
         } else if (!std::strcmp(argv[i], "--report") && i + 1 < argc) {
             report_path = argv[++i];
+        } else if (!std::strcmp(argv[i], "--relocated-code") && i + 1 < argc) {
+            unsigned guest, source, size; char tail;
+            if (std::sscanf(argv[++i], "%x:%x:%x%c", &guest, &source, &size, &tail) != 3) {
+                std::fprintf(stderr, "m2recomp: invalid relocated range (three hex fields required)\n"); return 2;
+            }
+            g_relocations.push_back({guest, source, size});
         } else if (!std::strcmp(argv[i], "--seeds") && i + 1 < argc) {
             auto s = load_seeds(argv[++i]);
             seeds.insert(seeds.end(), s.begin(), s.end());
@@ -518,6 +556,20 @@ int main(int argc, char **argv) {
         return 2;
     }
     const std::vector<uint8_t> main_data = main_data_path.empty() ? std::vector<uint8_t>{} : load(main_data_path);
+    for (size_t i = 0; i < g_relocations.size(); ++i) {
+        const auto &r = g_relocations[i];
+        if (board != "model2a" || !r.size || ((r.guest | r.source | r.size) & 3) ||
+            r.guest < 0x00500000 || uint64_t(r.guest) + r.size > 0x00600000 ||
+            uint64_t(r.source) + r.size > std::min<uint64_t>(img.size(), 0x00200000)) {
+            std::fprintf(stderr, "m2recomp: relocated code must be aligned Model2A work RAM backed by program bytes\n"); return 2;
+        }
+        for (size_t j = 0; j < i; ++j) {
+            const auto &p = g_relocations[j];
+            if (r.guest < uint64_t(p.guest) + p.size && p.guest < uint64_t(r.guest) + r.size) {
+                std::fprintf(stderr, "m2recomp: overlapping relocated code ranges\n"); return 2;
+            }
+        }
+    }
 
     // Model2A has RAM, not Daytona's program-ROM alias, at 0x00220000.
     // Main-data ROM follows model2_base_mem; only mapped bytes can seed code.
@@ -528,7 +580,15 @@ int main(int argc, char **argv) {
         else if (board == "model2o" && a >= 0x220000 && a < 0x240000) off = a - 0x200000;
         else if (a >= 0x02000000 && a < 0x04000000) { off = a - 0x02000000; region = &main_data; }
         else if (a >= 0x06000000 && a < 0x07000000) { off = a - 0x06000000 + 0x01000000; region = &main_data; }
-        else return std::nullopt;
+        else {
+            bool found = false;
+            for (const auto &r : g_relocations) {
+                if (a >= r.guest && uint64_t(a) + 4 <= uint64_t(r.guest) + r.size) {
+                    off = uint64_t(a) - r.guest + r.source; found = true; break;
+                }
+            }
+            if (!found) return std::nullopt;
+        }
         if (off + 4 > region->size()) return std::nullopt;
         uint32_t v;
         std::memcpy(&v, &(*region)[off], 4);
@@ -536,7 +596,7 @@ int main(int argc, char **argv) {
     };
     std::vector<uint32_t> all = i960::boot_seeds(read).all();
     all.insert(all.end(), seeds.begin(), seeds.end());
-    const i960::ReachResult r = i960::reach(all, read);
+    const i960::ReachResult r = i960::reach(all, read, !g_relocations.empty());
 
     std::vector<const Insn *> insns;
     for (const auto &[a, in] : r.insns) insns.push_back(&in);
@@ -686,6 +746,14 @@ int main(int argc, char **argv) {
                << ",\n  \"missing_template_count\": " << missing.size()
                << ",\n  \"chunk_count\": " << ranges.size()
                << ",\n  \"complete_game_coverage\": false";
+        report << ",\n  \"relocated_code\": [";
+        for (size_t i = 0; i < g_relocations.size(); ++i) {
+            const auto &r = g_relocations[i];
+            if (i) report << ", ";
+            report << "{\"guest\": " << r.guest << ", \"program_offset\": " << r.source
+                   << ", \"size\": " << r.size << ", \"runtime_word_guard\": true}";
+        }
+        report << "]";
         addresses("seeds", all);
         addresses("instruction_addresses", instruction_addresses);
         addresses("indirect_sites", r.indirect_sites);

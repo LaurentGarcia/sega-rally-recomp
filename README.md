@@ -10,13 +10,13 @@ from the user's ROMs, not Sega's original source code.
 
 ## Current state
 
-The repository is in bring-up. The initial annotated seed set produces 4,081
-native i960 instructions and four compiled objects. The bounded native core
-executes reset at `0x420`, copies the game's RAM code, and currently reaches
-an unresolved RAM entry at `0x005a2150` after 1,182,186 instructions. The
-observed boot gap at `0x00f80000` follows pinned MAME's read-zero and discarded
-write contract, counted in the boot report. This is a bring-up frontier, not
-a complete game boot. The existing lifted-C iPhone prototype lives
+The repository is in bring-up. The expanded address-label profile produces
+66,523 native i960 instructions and 46 compiled objects. The core executes
+reset at `0x420`, copies and checks its RAM code, and reaches the first mapped
+I/O-chip access after 1,183,027 instructions. The native TGP independently
+uploads its actual 1,665-word program and answers the startup command through
+Daytona's shared hardware code. These are bring-up checks, not a complete game
+boot. The existing lifted-C iPhone prototype lives
 separately in `../segarally95-recomp`; its rendering captures provide regression
 evidence, not proof that this new runtime already runs a race.
 
@@ -35,8 +35,9 @@ tests are versioned.
 With Python 3 and a C++20 compiler, run:
 
 ```sh
-python3 scripts/segarally_recompile.py --roms /path/to/srallyc.zip
-python3 scripts/segarally_boot.py
+python3 scripts/segarally_recompile.py --roms /path/to/srallyc.zip --seed-profile lift-labels
+python3 scripts/segarally_tgp.py --roms /path/to/srallyc.zip
+python3 scripts/segarally_boot.py --instructions 10000000 --with-tgp
 ```
 
 The importer verifies the Revision B (`srallycb`) program pair present in the
@@ -48,16 +49,28 @@ code target; those are incomplete frontiers, not successful game boots.
 Use `--instructions 10000000` to run past the initial RAM-copy loop; the
 default one-million-instruction limit stops inside it.
 
-The initial coverage report has 71 indirect sites and 10 invalid decode stops
-requiring analysis. Generation success does not prove that every game path has
-been found. Tests for the bootstrap and added instruction templates are:
+The expanded profile has 403 annotated label candidates, one separately
+recorded executed target, and checked RAM aliases. It retains 400 unresolved
+indirect sites and 13 invalid decode stops for analysis. The default
+`--seed-profile bootstrap` uses a smaller label set. Every generated RAM
+instruction checks its live word(s) before execution. Generation success does
+not prove that every game path has been found.
+
+Tests for the bootstrap, instruction templates, native/reference execution,
+and TGP inputs are:
 
 ```sh
 python3 tests/test_segarally_bootstrap.py
 python3 tests/test_segarally_native_templates.py
+python3 tests/test_segarally_boot_parity.py
+python3 tests/test_segarally_tgp_import.py
 ```
 
 See [the project design](docs/sega-rally-design.md) for scope and validation.
+Full MAME tracing currently needs three files absent from the supplied archive:
+`epr-17891.ic12` (drive), `epr-16726.bin` (communication), and `epr-18022.ic2`
+(billboard). This does not prevent native CPU/TGP bring-up; a full reference
+race has not been captured.
 The [inherited Daytona documentation](docs/daytona-upstream-readme.md) describes
 the upstream reference build; its claims do not establish Sega Rally support.
 

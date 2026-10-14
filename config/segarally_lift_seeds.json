@@ -1,0 +1,3269 @@
+{
+  "schema": 1,
+  "romset": "srallycb",
+  "notes": "Opt-in lift-label coverage profile. Label candidates overapproximate execution; generated coverage never proves full-game reachability. No data/CGM scanning, no inherited generated C copied. The single RAM @rom label is normalized only through the verified reset-copy mapping.",
+  "symbol_evidence": {
+    "path": "segarally95-recomp/src/i960_host_syms.c",
+    "sha256": "107183454db8d5acb36ecd7963289cb826487ac0f153eaecf63ccef452638f44"
+  },
+  "seeds": [
+    {
+      "address": "0x00000310",
+      "name": "boot_entry",
+      "declared_size": 32,
+      "evidence": "segarally95-recomp/src/boot/boot_entry.c:3",
+      "source_sha256": "fefcc52dcd1ca400e65283655b78300e7ad9543721973d0cdb314ffaff15e7e7",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00000420",
+      "name": "maincpu_reset_entry",
+      "declared_size": 324,
+      "evidence": "segarally95-recomp/src/boot/maincpu_reset_entry.c:3",
+      "source_sha256": "212f00bcb2965dc46c9a57a6fbbb23caa9f15593933da5552a4f1277ee536335",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00000570",
+      "name": "post_reset_dispatch",
+      "declared_size": 128,
+      "evidence": "segarally95-recomp/src/boot/post_reset_dispatch.c:3",
+      "source_sha256": "72f0f22740c63d288c3ed29145bd246fef338833b9ca003b67c87b0c0345d13d",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00001490",
+      "name": "irq_init_major",
+      "declared_size": 96,
+      "evidence": "segarally95-recomp/src/irq/irq_init_major.c:3",
+      "source_sha256": "13db0175a493255cbf13d2384c0cc334a92e7ca8b7598795a0a4f7b44b77bd7d",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00001560",
+      "name": "irq_mask_helper",
+      "declared_size": 240,
+      "evidence": "segarally95-recomp/src/irq/irq_mask_helper.c:3",
+      "source_sha256": "380245e3392bfa40d9106674c2f61454e262272fcc8d214533441128acd2af6f",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00001650",
+      "name": "irq_timer_arm",
+      "declared_size": 256,
+      "evidence": "segarally95-recomp/src/irq/irq_timer_arm.c:3",
+      "source_sha256": "09ddb58a410ad5cfabc58ed64946d51a2f603ba7b1457fa7e3e0a6a7a481a1f2",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00001758",
+      "name": "game_irq_wr_stub",
+      "declared_size": 40,
+      "evidence": "segarally95-recomp/src/irq/game_irq_wr_stub.c:3",
+      "source_sha256": "7f27c0efaf454904baa5ba8faa03cbf01517403e46f5453bf56ee9a1690425a4",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00001780",
+      "name": "irq_enable_dispatch",
+      "declared_size": 128,
+      "evidence": "segarally95-recomp/src/irq/irq_enable_dispatch.c:3",
+      "source_sha256": "7c44f73b2684cc01bf0916de21429cd005ee3006a29a049d117e5ef9be765530",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00001788",
+      "name": "game_mmio_boot_init",
+      "declared_size": 120,
+      "evidence": "segarally95-recomp/src/game/game_mmio_boot_init.c:2",
+      "source_sha256": "5287e86cc71f947c33b12b368d2ed6407ceb581185c125eaf504cf62091d7175",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000018d8",
+      "name": "irq_dispatcher",
+      "declared_size": 216,
+      "evidence": "segarally95-recomp/src/irq/irq_dispatcher.c:3",
+      "source_sha256": "8459e63c4da25c20e32dd3716c24bad560a294f6499303c85703d6f5356cb75e",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00001a58",
+      "name": "comm_bx_return_g0",
+      "declared_size": 8,
+      "evidence": "segarally95-recomp/src/game/comm_bx_return_g0.c:2",
+      "source_sha256": "b2bccc07d2bf7f233d1503f24292d0c0e2f97bd8ee6a0e82cf3e900b790f2538",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00001bd0",
+      "name": "comm_board_absent_init",
+      "declared_size": 120,
+      "evidence": "segarally95-recomp/src/game/comm_board_absent_init.c:2",
+      "source_sha256": "384f15cc761b57ed84cdc1fefd0b19f42f50f162808579b593eea0ddca95ffd3",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00001c50",
+      "name": "comm_board_present_init",
+      "declared_size": 16,
+      "evidence": "segarally95-recomp/src/game/comm_board_present_init.c:2",
+      "source_sha256": "9705bd1a0a74aa94d128fa4a85bf4beafbff2766574d96bfb86b835c4a528620",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00001c60",
+      "name": "comm_board_probe",
+      "declared_size": 72,
+      "evidence": "segarally95-recomp/src/game/comm_board_probe.c:2",
+      "source_sha256": "ac2e5c8bf800754799fcb32ef7ef3777b7f937ea8dddcacba6f1bd58149dd265",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00001cb8",
+      "name": "comm_board_absent_xfer",
+      "declared_size": 120,
+      "evidence": "segarally95-recomp/src/game/comm_board_absent_xfer.c:2",
+      "source_sha256": "b4edfd09791d830d39cef9710257fc67828fcc142e8961373ea45553a30d06d6",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00001d38",
+      "name": "comm_bx_return_g1",
+      "declared_size": 8,
+      "evidence": "segarally95-recomp/src/game/comm_bx_return_g1.c:2",
+      "source_sha256": "f50ef54a9a3860399e1ef714d3673781d71b64453d239a1f0f5943a9fc00a09e",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00001db8",
+      "name": "boot_io_xmit",
+      "declared_size": 16,
+      "evidence": "segarally95-recomp/src/game/boot_io_xmit.c:2",
+      "source_sha256": "1b555b2fcbee552ad98d9360550dc98f0966878c2cdbacfb0e93655076e13e18",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00001dd8",
+      "name": "boot_io_ready_wait",
+      "declared_size": 24,
+      "evidence": "segarally95-recomp/src/game/boot_io_ready_wait.c:2",
+      "source_sha256": "684d21a782c5a3579acd70af8791f5a883523b25a5336d1118318b84b116760c",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00001e20",
+      "name": "boot_io_glyph_stream",
+      "declared_size": 52,
+      "evidence": "segarally95-recomp/src/game/boot_io_glyph_stream.c:2",
+      "source_sha256": "287f6db7ce21e033db973ac8b35c99f07734adb1febcc16778ce40ee99cfab55",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00001e80",
+      "name": "boot_io_glyph_finish",
+      "declared_size": 52,
+      "evidence": "segarally95-recomp/src/game/boot_io_glyph_finish.c:2",
+      "source_sha256": "e781745eec0e316eceb022b57f33c65d0d8638d053fe53612174bbd68cbd0b6a",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00002080",
+      "name": "comm_io_glyph_slot",
+      "declared_size": 192,
+      "evidence": "segarally95-recomp/src/game/comm_io_glyph_slot.c:2",
+      "source_sha256": "fddc472c577d68cd498eef090596a4bfc3b38d2bca250f4ccaca79c69b8e117e",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00002180",
+      "name": "comm_present_io_init",
+      "declared_size": 8,
+      "evidence": "segarally95-recomp/src/game/comm_present_io_init.c:2",
+      "source_sha256": "8dc9f5a4dd8915af96a9a49b2ba6b470b540d0cc3803a0745e852b95cc6fc269",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000021c0",
+      "name": "comm_board_present_glyph_loop",
+      "declared_size": 52,
+      "evidence": "segarally95-recomp/src/game/comm_board_present_glyph_loop.c:2",
+      "source_sha256": "76cbeced1b1c7ec7b4705146db000dd17eaa8a1552bae39fa487c03e7ac7381c",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00002200",
+      "name": "comm_flag_gate",
+      "declared_size": 20,
+      "evidence": "segarally95-recomp/src/game/comm_flag_gate.c:2",
+      "source_sha256": "27af11b62d23a7c3f04f0cb03f0b900f39539a02534b1ad5064a29d1588e41dc",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00002220",
+      "name": "comm_board_idle_gate",
+      "declared_size": 24,
+      "evidence": "segarally95-recomp/src/game/comm_board_idle_gate.c:2",
+      "source_sha256": "310d83cd32cd0bfa86bc727cfbe241d932dc24b3747af5564d5ded5c7816a596",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00002240",
+      "name": "game_io_coin_sense",
+      "declared_size": 40,
+      "evidence": "segarally95-recomp/src/game/game_io_coin_sense.c:6",
+      "source_sha256": "6de35614b1724cfd538b340b1ec7c6359a54d5869b84c10830eeaa08228770e2",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000024c0",
+      "name": "game_io_poll",
+      "declared_size": 40,
+      "evidence": "segarally95-recomp/src/game/game_io_poll.c:5",
+      "source_sha256": "698adb9fb11dc74fe4aa1cf17a5dd53d5c3d05b29db1be8cd517f58ce2cc39c0",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00002920",
+      "name": "geo_view_boot_apply",
+      "declared_size": 16,
+      "evidence": "segarally95-recomp/src/game/geo_view_boot_apply.c:2",
+      "source_sha256": "b3515d5838a94fccd4bb7799879b9983f09fd604b98f793589de7abff3052647",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00002930",
+      "name": "game_mode_index_step",
+      "declared_size": 64,
+      "evidence": "segarally95-recomp/src/game/game_mode_index_step.c:2",
+      "source_sha256": "d990d66d452cc799604d5e7fd736c5a12cd6d04f8fe0322afcb6a9abfc5f6e7c",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00002970",
+      "name": "game_option_flags_init",
+      "declared_size": 112,
+      "evidence": "segarally95-recomp/src/game/game_option_flags_init.c:3",
+      "source_sha256": "9ebe950423edf54129fef99c8f62a4b4f948837c3974d8faf4ed956a273b1db0",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00002a20",
+      "name": "game_coin_option_boot",
+      "declared_size": 24,
+      "evidence": "segarally95-recomp/src/game/game_coin_option_boot.c:4",
+      "source_sha256": "b2704a747f75921fd313caef7480ad71d63f2ce5790f870f18cc502cfad1aae0",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00002c80",
+      "name": "game_subsys_boot",
+      "declared_size": 352,
+      "evidence": "segarally95-recomp/src/game/game_subsys_boot.c:3",
+      "source_sha256": "869a9be195a2a772a6feaa0f2a536f60bd10050573f756855cdaa28707c22563",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00003150",
+      "name": "game_dispatch_main",
+      "declared_size": 272,
+      "evidence": "segarally95-recomp/src/game/game_dispatch_main.c:3",
+      "source_sha256": "2a5d99c428541763d81e60ec7a65c29caa02dd67b7ec1cc353a2b29e1b40804d",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00003260",
+      "name": "boot_attract_flags_init",
+      "declared_size": 60,
+      "evidence": "segarally95-recomp/src/game/boot_attract_flags_init.c:2",
+      "source_sha256": "45d4815f77f6439afe0d3f1cdfc8297e78b271221f40ee68bb46d47a39850c7f",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000032a0",
+      "name": "game_cold_boot_init",
+      "declared_size": 60,
+      "evidence": "segarally95-recomp/src/game/game_cold_boot_init.c:3",
+      "source_sha256": "4810b5bdbf898909d9583921ef0282f78a457ddf8f14a5b6207f550bd09f4f70",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00003650",
+      "name": "game_mode_apply",
+      "declared_size": 84,
+      "evidence": "segarally95-recomp/src/game/game_mode_apply.c:3",
+      "source_sha256": "464f50b8f4ae1667b3610dc95a406c9663e95f9dfb6c06dfee33fea8e5a110a8",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000036b0",
+      "name": "game_seed_globals",
+      "declared_size": 100,
+      "evidence": "segarally95-recomp/src/game/game_seed_globals.c:3",
+      "source_sha256": "eeded5fd5b63df160ce9df4722d8676497ce1763a0ed14dc60ef5a24f6bfd033",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00003720",
+      "name": "geo_renderer_init",
+      "declared_size": 112,
+      "evidence": "segarally95-recomp/src/game/geo_renderer_init.c:2",
+      "source_sha256": "279c8d7bd0d4f91b4a15fa98e1e5ecd124ecf818e76f10412b55aa769b160e95",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000037a8",
+      "name": "geo_lut_byte_pack",
+      "declared_size": 72,
+      "evidence": "segarally95-recomp/src/game/geo_lut_byte_pack.c:2",
+      "source_sha256": "c8bfeceeb441f5b3b3f6f5dc02916e9d63c3c7672cfa930896da95e31bfaba61",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000037f0",
+      "name": "geo_crx_lut_upload",
+      "declared_size": 136,
+      "evidence": "segarally95-recomp/src/game/geo_crx_lut_upload.c:2",
+      "source_sha256": "edae14da3ad14baabc928545d596977daf4ffb7d39577a324488df113d07e08a",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00003940",
+      "name": "texture_bank_select",
+      "declared_size": 588,
+      "evidence": "segarally95-recomp/src/game/texture_bank_select.c:2",
+      "source_sha256": "ea939b723b02dfcc5d271d3a522cf71b7e2b0e496b75ae356a00f9fa7ff815a9",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00003ba0",
+      "name": "geo_reg_flip_wait",
+      "declared_size": 104,
+      "evidence": "segarally95-recomp/src/game/geo_reg_flip_wait.c:2",
+      "source_sha256": "58542755b24e1e63bd636daa2f0f5133cd0fb1377be157b91250daa8395f414b",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00003c18",
+      "name": "geo_fp_lerp3",
+      "declared_size": 80,
+      "evidence": "segarally95-recomp/src/game/geo_fp_lerp3.c:3",
+      "source_sha256": "138cbbab9d1e836ce804f2fdbef050e179f2accc0f2fa14c6cc3dc262a3522d0",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00003c80",
+      "name": "geo_palette_lut_upload",
+      "declared_size": 524,
+      "evidence": "segarally95-recomp/src/game/geo_palette_lut_upload.c:3",
+      "source_sha256": "701799bb0d225a3514d8db05e6babf5de30a57f0d15077ae3a99b1354affa7cb",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00004350",
+      "name": "geo_lumaram_init",
+      "declared_size": 564,
+      "evidence": "segarally95-recomp/src/game/geo_lumaram_init.c:3",
+      "source_sha256": "d96f02f7405f1459ee4b954250039c24712251a2d00e7390532ea57f3d1daabb",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00004590",
+      "name": "geo_lumaram_pattern",
+      "declared_size": 128,
+      "evidence": "segarally95-recomp/src/game/geo_lumaram_pattern.c:3",
+      "source_sha256": "5f602ffc2938719764e3bcbb133a21e24d0b32247969c1a5bebce10a963631a2",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00004658",
+      "name": "geo_reg_bootstrap",
+      "declared_size": 152,
+      "evidence": "segarally95-recomp/src/game/geo_reg_bootstrap.c:2",
+      "source_sha256": "c4d8c28ec2da13e60584f87cb5f7c843652272b7a357aa8579a679d55c76babd",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00004708",
+      "name": "geo_mode_setup",
+      "declared_size": 68,
+      "evidence": "segarally95-recomp/src/game/geo_mode_setup.c:3",
+      "source_sha256": "2f2500850c8538c779ad4bb74cfb406ca73fb0a9314d89411f1c3a0a6196a8d1",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00004758",
+      "name": "geo_vsync_wait",
+      "declared_size": 136,
+      "evidence": "segarally95-recomp/src/game/geo_vsync_wait.c:2",
+      "source_sha256": "b3c16a5041626940562f50b27de2b4f229cee66f1afd6a9f974a0d43e1bfd0a2",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000048e8",
+      "name": "geo_texture_addr_write",
+      "declared_size": 88,
+      "evidence": "segarally95-recomp/src/game/geo_texture_addr_write.c:2",
+      "source_sha256": "e34a4dcb46079d823322be012fd2fd7581e7de66e0d912d3ca22347147302e33",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00004958",
+      "name": "geo_fifo_matrix_emit",
+      "declared_size": 96,
+      "evidence": "segarally95-recomp/src/host/geo_fifo_matrix_emit.c:3",
+      "source_sha256": "5c107354d332f25fe2ea138d2eae81ce67b9531fde38b4416b8e48e84cba6f56",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00004ac0",
+      "name": "geo_fifo_bootstrap",
+      "declared_size": 248,
+      "evidence": "segarally95-recomp/src/game/geo_fifo_bootstrap.c:3",
+      "source_sha256": "2d85c9eb17e634715ee308c298a118912907e292a27cd643d32b771792232f43",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00004ca8",
+      "name": "copro_fifo_init",
+      "declared_size": 128,
+      "evidence": "segarally95-recomp/src/game/copro_fifo_init.c:3",
+      "source_sha256": "efbdebdd41389cce41c7d04f39e1f89748ec26d94df9e88b76a07c832accf00c",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00004d50",
+      "name": "copro_bootstrap_entry",
+      "declared_size": 8,
+      "evidence": "segarally95-recomp/src/game/copro_bootstrap_entry.c:2",
+      "source_sha256": "7e133be0d55e5233b7c431d8811d1f2b50313852ea96e8f54441265198fc5c2c",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00004dd0",
+      "name": "geo_submode_dispatch",
+      "declared_size": 92,
+      "evidence": "segarally95-recomp/src/game/geo_submode_dispatch.c:2",
+      "source_sha256": "d61e682230cbe8e7e7d26d882c23b4c0fe8f1ccb087d1561c8d5047f7ccafda5",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00004e90",
+      "name": "geo_draw_frame_entry",
+      "declared_size": 180,
+      "evidence": "segarally95-recomp/src/game/geo_draw_frame_entry.c:3",
+      "source_sha256": "12a7df722c7671743578d0fa3eb400bd5c934429eaaf0b6da2e72882666089b5",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00005830",
+      "name": "geo_scene_mode_dispatch",
+      "declared_size": 96,
+      "evidence": "segarally95-recomp/src/game/geo_scene_mode_dispatch.c:2",
+      "source_sha256": "43248d1e3bad14499655147d0b3569e71a54cfdbb726b37f9b5591effd50dc1f",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000058f0",
+      "name": "geo_scene_palette_gate",
+      "declared_size": 628,
+      "evidence": "segarally95-recomp/src/game/geo_scene_palette_gate.c:4",
+      "source_sha256": "9381e230e584e635390e928d123791ba036fb87e393679e23c0cd94449acb7e2",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00005c50",
+      "name": "geo_scene_row_print",
+      "declared_size": 100,
+      "evidence": "segarally95-recomp/src/game/geo_scene_row_print.c:3",
+      "source_sha256": "265277b4153293b3828874c7489f40604e0284c56f7cc5d595c30187eb4182a5",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00005cc0",
+      "name": "geo_scene_glyph_pair",
+      "declared_size": 56,
+      "evidence": "segarally95-recomp/src/game/geo_scene_glyph_pair.c:3",
+      "source_sha256": "11a845dae6a07bcefa6cf2aa784b71938c8e6ff1723fa65716b1838e7ab3c546",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00005e30",
+      "name": "geo_scene_string_prep",
+      "declared_size": 488,
+      "evidence": "segarally95-recomp/src/game/geo_scene_string_prep.c:3",
+      "source_sha256": "15893ac980a21b40d9ff505f7d3695c3e066b6156c7886bf8837b0cfa6eba7d4",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000061e0",
+      "name": "test_menu_input_draw",
+      "declared_size": 516,
+      "evidence": "segarally95-recomp/src/game/test_menu_input_draw.c:3",
+      "source_sha256": "cf3cb99eeab73b63a6276d17fd99e29ce22ae44b50440b54152dfb0c99feb712",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00006400",
+      "name": "test_menu_input",
+      "declared_size": 248,
+      "evidence": "segarally95-recomp/src/game/test_menu_input.c:3",
+      "source_sha256": "505e6d8a50e6a86e711d72e4ef3faf548bb32d9ab3589a07331dad2d247b4fb9",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00006a20",
+      "name": "test_menu_crt",
+      "declared_size": 4,
+      "evidence": "segarally95-recomp/src/game/test_menu_stubs.c:5",
+      "source_sha256": "70dfddecf38f1c34860ab4b87dc5e293c5aafcb3ba92d65717775bd734da03e0",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00006f80",
+      "name": "test_menu_game_assign",
+      "declared_size": 1696,
+      "evidence": "segarally95-recomp/src/game/test_menu_game_assign.c:3",
+      "source_sha256": "10b65c03fe5a7f275442eebeee1a357616064a16af9ddeffab4bceb02e47f1e0",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00007670",
+      "name": "test_menu_output",
+      "declared_size": 4,
+      "evidence": "segarally95-recomp/src/game/test_menu_stubs.c:7",
+      "source_sha256": "70dfddecf38f1c34860ab4b87dc5e293c5aafcb3ba92d65717775bd734da03e0",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00007910",
+      "name": "test_menu_backup",
+      "declared_size": 4,
+      "evidence": "segarally95-recomp/src/game/test_menu_stubs.c:10",
+      "source_sha256": "70dfddecf38f1c34860ab4b87dc5e293c5aafcb3ba92d65717775bd734da03e0",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00007d80",
+      "name": "test_menu_drive",
+      "declared_size": 4,
+      "evidence": "segarally95-recomp/src/game/test_menu_stubs.c:8",
+      "source_sha256": "70dfddecf38f1c34860ab4b87dc5e293c5aafcb3ba92d65717775bd734da03e0",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00007fd0",
+      "name": "test_menu_exit",
+      "declared_size": 328,
+      "evidence": "segarally95-recomp/src/game/test_menu_exit.c:3",
+      "source_sha256": "89a7e7b40c28d95a5b9cd11f7a0db4e170f1bc0523698a9521d36bb5bee5d7b5",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00008840",
+      "name": "test_menu_memory",
+      "declared_size": 4,
+      "evidence": "segarally95-recomp/src/game/test_menu_stubs.c:3",
+      "source_sha256": "70dfddecf38f1c34860ab4b87dc5e293c5aafcb3ba92d65717775bd734da03e0",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00008b00",
+      "name": "test_menu_sound",
+      "declared_size": 4,
+      "evidence": "segarally95-recomp/src/game/test_menu_stubs.c:4",
+      "source_sha256": "70dfddecf38f1c34860ab4b87dc5e293c5aafcb3ba92d65717775bd734da03e0",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00008f28",
+      "name": "backup_sram_sync",
+      "declared_size": 452,
+      "evidence": "segarally95-recomp/src/game/backup_sram_sync.c:3",
+      "source_sha256": "ab51fdbb4a8f1d6b96d8b929f12bf4a0575c3336065efdb7a33db1b30d1d12ab",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000a3d0",
+      "name": "test_menu_bookkeeping",
+      "declared_size": 4,
+      "evidence": "segarally95-recomp/src/game/test_menu_stubs.c:9",
+      "source_sha256": "70dfddecf38f1c34860ab4b87dc5e293c5aafcb3ba92d65717775bd734da03e0",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000a7a0",
+      "name": "coin_option_validate",
+      "declared_size": 244,
+      "evidence": "segarally95-recomp/src/game/coin_option_validate.c:4",
+      "source_sha256": "3dbb5cb418dec9695f71930cf838d674176b5d47de45a69ddea1e85da99c344b",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000a940",
+      "name": "coin_option_defaults",
+      "declared_size": 128,
+      "evidence": "segarally95-recomp/src/game/coin_option_defaults.c:4",
+      "source_sha256": "1da110dc806011a5f9641eec4b00ff9653744d73f796c5815dec0807b6bfe6bc",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000a9d0",
+      "name": "game_coin_sram_reset",
+      "declared_size": 116,
+      "evidence": "segarally95-recomp/src/game/game_coin_sram_reset.c:4",
+      "source_sha256": "62439a6f3f89c1847c4568358ebf4f30ba2e160c19d9baa869c1d3b189aff555",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000ab10",
+      "name": "game_coin_chute_slot",
+      "declared_size": 280,
+      "evidence": "segarally95-recomp/src/game/game_coin_chute_slot.c:4",
+      "source_sha256": "bd539a01a9ec9e23a83fd6a6ce5989c48ce1afec9d49709e413cc3e09850c188",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000ac30",
+      "name": "game_coin_chute_scan",
+      "declared_size": 24,
+      "evidence": "segarally95-recomp/src/game/game_coin_chute_scan.c:3",
+      "source_sha256": "cb46ea2f5dcafaee3194614cb6dbf0c13a30f8fd278755281f85e118f112e330",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000ac50",
+      "name": "game_coin_credit_apply",
+      "declared_size": 448,
+      "evidence": "segarally95-recomp/src/game/game_coin_credit_apply.c:4",
+      "source_sha256": "df13553869e50f8a21c72ace9ec22e508e0b932ee86a4802d37574378a85a563",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000ae28",
+      "name": "game_coin_service_edge",
+      "declared_size": 216,
+      "evidence": "segarally95-recomp/src/game/game_coin_service_edge.c:4",
+      "source_sha256": "79df8cd6a9ad6023d5b7e3b6818dc105400f9c0107b553e36f4b0d1ed6d49fed",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000af00",
+      "name": "game_coin_frame",
+      "declared_size": 100,
+      "evidence": "segarally95-recomp/src/game/game_coin_frame.c:4",
+      "source_sha256": "99ef001e5cca290c48904b462ea02a91fa8319532df8e4ad87ef53e19893127f",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000be30",
+      "name": "test_menu_coin",
+      "declared_size": 4,
+      "evidence": "segarally95-recomp/src/game/test_menu_stubs.c:6",
+      "source_sha256": "70dfddecf38f1c34860ab4b87dc5e293c5aafcb3ba92d65717775bd734da03e0",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000be68",
+      "name": "attract_credit_query",
+      "declared_size": 56,
+      "evidence": "segarally95-recomp/src/game/attract_credit_query.c:4",
+      "source_sha256": "d48fd75bfb880cec77a2075d484b785f2268d808b90ca5be43e494c29bb18538",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000bea0",
+      "name": "attract_credit_spend",
+      "declared_size": 64,
+      "evidence": "segarally95-recomp/src/game/attract_credit_spend.c:5",
+      "source_sha256": "ddb6bb707fea130987a0e0cc7ea9bc7e84b0e145f2866833c4d6d83c654886b8",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000bee0",
+      "name": "attract_credit_stamp_empty",
+      "declared_size": 192,
+      "evidence": "segarally95-recomp/src/game/attract_credit_stamp_empty.c:3",
+      "source_sha256": "a3f03422cd6f5ced14b9231be294179a225d43b835a4b898a945825555fe6bc2",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000bfa0",
+      "name": "attract_credit_stamp_paid",
+      "declared_size": 184,
+      "evidence": "segarally95-recomp/src/game/attract_credit_stamp_paid.c:3",
+      "source_sha256": "2b7cfeaab4811d2ce105fa9046b33cfb1a9b687be5fceba925a6a0dd05894fe7",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000c060",
+      "name": "comm_scene_catalog_init",
+      "declared_size": 768,
+      "evidence": "segarally95-recomp/src/game/comm_scene_catalog_init.c:5",
+      "source_sha256": "46e865aa8029c9be1492fb940ce37057ca8c1c5a172f557219d37a0fab5358b5",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000c5d0",
+      "name": "tile_attract_phase_comm",
+      "declared_size": 128,
+      "evidence": "segarally95-recomp/src/game/tile_attract_phase_comm.c:2",
+      "source_sha256": "fc22ca5f53bd9655eabe956d3fe1292857feb218a99208ef5cf336fc37f10ead",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000c640",
+      "name": "tile_attract_text_dispatch",
+      "declared_size": 224,
+      "evidence": "segarally95-recomp/src/game/tile_attract_text_dispatch.c:2",
+      "source_sha256": "44dbf613aca1612dde1bcad46ebe210e280983e2e57761bbcbe6033b02deaad3",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000c750",
+      "name": "tile_attract_phase_slave",
+      "declared_size": 80,
+      "evidence": "segarally95-recomp/src/game/tile_attract_phase_slave.c:2",
+      "source_sha256": "aa16d30e221ffdbeb2ff2d2d1af55e199d02a04269fa1a9a3c1b00abe7910a88",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000c840",
+      "name": "tile_attract_phase_network",
+      "declared_size": 80,
+      "evidence": "segarally95-recomp/src/game/tile_attract_phase_network.c:2",
+      "source_sha256": "24b0a3685db697483f9c36876317f3e6549dd652c6414c23ff2c947adc48bb92",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000c990",
+      "name": "tile_attract_phase_node",
+      "declared_size": 80,
+      "evidence": "segarally95-recomp/src/game/tile_attract_phase_node.c:2",
+      "source_sha256": "f1d87b3ed98fc1c85b184f004205254be466637b41bcd23a14fd98c02d1fb04d",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000cb30",
+      "name": "tile_attract_phase_pair",
+      "declared_size": 80,
+      "evidence": "segarally95-recomp/src/game/tile_attract_phase_pair.c:2",
+      "source_sha256": "b84686959c570971a13389ef041ff077a7c134c007d022e0d517438328c7a6dd",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof",
+      "metadata_address": "0x005abb30",
+      "normalization": "reset_workram_copy: original ROM PC = 0x1000 + (RAM PC - 0x5a0000)"
+    },
+    {
+      "address": "0x0000cbf0",
+      "name": "tile_attract_phase_finalize",
+      "declared_size": 80,
+      "evidence": "segarally95-recomp/src/game/tile_attract_phase_finalize.c:2",
+      "source_sha256": "0d2f9baf48b948555ef17af5f19561d2636c06e840a34e0a90e654ebda6ab1f5",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000cc70",
+      "name": "tile_attract_mode_dispatch",
+      "declared_size": 80,
+      "evidence": "segarally95-recomp/src/game/tile_attract_mode_dispatch.c:2",
+      "source_sha256": "5771c97068e8c86e998ea8155eab264093ae3f1a097fa5e10fd30e9af1579213",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000ccb0",
+      "name": "comm_board_dispatch",
+      "declared_size": 192,
+      "evidence": "segarally95-recomp/src/game/comm_board_dispatch.c:3",
+      "source_sha256": "55be748e49e9885acb54181f49c29865b99ea9b5776442093275848a70124707",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000cdf8",
+      "name": "comm_board_setup_probe",
+      "declared_size": 64,
+      "evidence": "segarally95-recomp/src/game/comm_board_setup_probe.c:2",
+      "source_sha256": "427372590b9e582209b5e14e97ad10db1da2cb9a92fa05a4cec654442b278c94",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000f4d0",
+      "name": "attract_credit_hud_init",
+      "declared_size": 272,
+      "evidence": "segarally95-recomp/src/game/attract_credit_hud_init.c:3",
+      "source_sha256": "44432f9777cc36a452c66d8337378728bef8631cd1aa907e61d02ccb41898892",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000f5f0",
+      "name": "attract_credit_hud_frame",
+      "declared_size": 48,
+      "evidence": "segarally95-recomp/src/game/attract_credit_hud_frame.c:3",
+      "source_sha256": "cfee721b7355adea3a1fffa934ff92dbb7f41cbfc95edd9dee77b680f6354d74",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000f620",
+      "name": "comm_attract_threshold_tile_clear",
+      "declared_size": 72,
+      "evidence": "segarally95-recomp/src/game/comm_attract_threshold_tile_clear.c:3",
+      "source_sha256": "f78c9e4d5b2dfa67fb74367f1e1c796b2ae88b43763330afcd7ffec5ac449147",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000f670",
+      "name": "comm_attract_splash_bind",
+      "declared_size": 80,
+      "evidence": "segarally95-recomp/src/game/comm_attract_splash_bind.c:3",
+      "source_sha256": "1e182f28ef8973907f5e2519d04503619c6609884aa9d275d700256dda9805b6",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000f6d0",
+      "name": "comm_attract_board_frame",
+      "declared_size": 240,
+      "evidence": "segarally95-recomp/src/game/comm_attract_board_frame.c:5",
+      "source_sha256": "d77dc765592a587099056eba100b1289ca8b528762e98374a4f09417a2d53104",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000f7d0",
+      "name": "comm_attract_inner_8",
+      "declared_size": 48,
+      "evidence": "segarally95-recomp/src/game/comm_attract_inner_8.c:4",
+      "source_sha256": "192d9f6e6d367302c91b33e03ae2510844243d28ce641d97029f24dca56cbc46",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000f818",
+      "name": "game_inner_flags_clear",
+      "declared_size": 28,
+      "evidence": "segarally95-recomp/src/game/game_inner_flags_clear.c:2",
+      "source_sha256": "9bffdaa8f74faedf9c1c0f06dc3d65a0a5c364d991f418b4f53a96490ca30d90",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000f840",
+      "name": "comm_attract_inner_0",
+      "declared_size": 304,
+      "evidence": "segarally95-recomp/src/game/comm_attract_inner_0.c:2",
+      "source_sha256": "31887ba95172544b018585e84c4548622dd990b2ac570b6abcceb1b051fcdd70",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000f970",
+      "name": "comm_attract_inner_1",
+      "declared_size": 84,
+      "evidence": "segarally95-recomp/src/game/comm_attract_inner_1.c:2",
+      "source_sha256": "300c1b61db636c31ee68d2343bf66dbd67b2b80d75a1a36f38bcd80603d16f5b",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000f9d0",
+      "name": "comm_attract_countdown_tick",
+      "declared_size": 48,
+      "evidence": "segarally95-recomp/src/game/comm_attract_countdown_tick.c:2",
+      "source_sha256": "7b97c86c77688d67ed94e9a15dde524be1f3415f0258f61d563b30445a044b2c",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000fa00",
+      "name": "comm_attract_board_dispatch",
+      "declared_size": 688,
+      "evidence": "segarally95-recomp/src/game/comm_attract_board_dispatch.c:3",
+      "source_sha256": "3129262786fdcdeac8e5e4eb7cee5f2deb28e3175921b5a60fe8cdac252d62ce",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000fdc8",
+      "name": "comm_attract_carousel_advance",
+      "declared_size": 116,
+      "evidence": "segarally95-recomp/src/game/comm_attract_carousel_advance.c:2",
+      "source_sha256": "becf6b2b42441d97bfba9ea41f79804f05ce16530a97358384ec61668e838080",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0000fe40",
+      "name": "comm_attract_slot_scan",
+      "declared_size": 544,
+      "evidence": "segarally95-recomp/src/game/comm_attract_slot_scan.c:2",
+      "source_sha256": "5d19eb4a7b82ef1434e862c4df46e1d720ec354f297d3d49c12e398c11ba4f02",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00010310",
+      "name": "comm_attract_script_glyph_dispatch",
+      "declared_size": 144,
+      "evidence": "segarally95-recomp/src/game/comm_attract_script_glyph_dispatch.c:3",
+      "source_sha256": "ec503f6cb5133be4d5abed3312f413016698f6f772b9770886b664d10d6a01ec",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000104a0",
+      "name": "comm_attract_script_frame_setup",
+      "declared_size": 612,
+      "evidence": "segarally95-recomp/src/game/comm_attract_script_frame_setup.c:3",
+      "source_sha256": "fdd60d6b1beed8612866a1ab0ba213bf8bb6c2fa1f723fa80d3582a5d5ee9bb5",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00010710",
+      "name": "comm_attract_inner_2",
+      "declared_size": 192,
+      "evidence": "segarally95-recomp/src/game/comm_attract_inner_2.c:2",
+      "source_sha256": "e591162ff51753acbc69b5c7f3a5546679cb17d0d9db14b3a6a4866913d0fd67",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00010940",
+      "name": "comm_attract_inner_3",
+      "declared_size": 1264,
+      "evidence": "segarally95-recomp/src/game/comm_attract_inner_3.c:2",
+      "source_sha256": "4649c4cea96c12d5cc2ff163845d57abd6d2c5b133e4ed8d03200286c39a59cd",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00010e30",
+      "name": "comm_attract_inner_4",
+      "declared_size": 512,
+      "evidence": "segarally95-recomp/src/game/comm_attract_inner_4.c:3",
+      "source_sha256": "7d1d05aed3bd59e39799393bc05414170a1ee3c7cc406b12b8267b125c77296c",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00011040",
+      "name": "comm_attract_inner_5",
+      "declared_size": 864,
+      "evidence": "segarally95-recomp/src/game/comm_attract_inner_5.c:3",
+      "source_sha256": "cc97c1418dd503ca1d88c2afd198a53f62871d266fdbfb296d50e27df9eb6f6d",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000113a0",
+      "name": "comm_attract_inner_6",
+      "declared_size": 512,
+      "evidence": "segarally95-recomp/src/game/comm_attract_inner_6.c:3",
+      "source_sha256": "5ca8d54a72561fc41a28e984923c9445f95c4f1bb7f60e581f1b64e70d9da2ca",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000115a0",
+      "name": "comm_attract_inner_7",
+      "declared_size": 1248,
+      "evidence": "segarally95-recomp/src/game/comm_attract_inner_7.c:3",
+      "source_sha256": "5490c673b7cc222f629a8e7e9b3abd6cdd54bc1de1651e779d71d3fe1e78aeac",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00011a80",
+      "name": "geo_attract_copro_vec_scale",
+      "declared_size": 264,
+      "evidence": "segarally95-recomp/src/game/geo_attract_copro_vec_scale.c:3",
+      "source_sha256": "c00a86cdf0fccccd255503604b527eb990c8662714496ab26047c4f483d5e72d",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00011b90",
+      "name": "comm_attract_geo_script_finish",
+      "declared_size": 3836,
+      "evidence": "segarally95-recomp/src/game/comm_attract_geo_script_finish.c:3",
+      "source_sha256": "2434162239610f99b589eae486f83fd0e51372853cdb7b40cab57915503d0f79",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00012b70",
+      "name": "comm_attract_scene_alloc",
+      "declared_size": 252,
+      "evidence": "segarally95-recomp/src/game/comm_attract_scene_alloc.c:2",
+      "source_sha256": "9c4382a32cc4cff9fc9716ad38dea52c76cbbe6ebf6416b91d73ed3b9069959f",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00012c70",
+      "name": "comm_attract_hud_copyright_stamps",
+      "declared_size": 64,
+      "evidence": "segarally95-recomp/src/game/comm_attract_hud_copyright_stamps.c:2",
+      "source_sha256": "a9cd1da555aa0327711c91f4f38e5f465b9b58b4707e9df49ad1967931302d37",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00012cc0",
+      "name": "comm_attract_scene_hud",
+      "declared_size": 208,
+      "evidence": "segarally95-recomp/src/game/comm_attract_scene_hud.c:4",
+      "source_sha256": "7ed390dc2f85cca80ed14f8541f481d6d657f2c074f60d36fd26cdd77e5de060",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00012d90",
+      "name": "comm_attract_scene_hud_alt",
+      "declared_size": 640,
+      "evidence": "segarally95-recomp/src/game/comm_attract_scene_hud_alt.c:8",
+      "source_sha256": "708bc18a8c2e7b3b160cc902ee4c83a45909fa01cef4ca611af6a1484e82b97a",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00013238",
+      "name": "comm_attract_hud_scroll_fill",
+      "declared_size": 96,
+      "evidence": "segarally95-recomp/src/game/comm_attract_hud_scroll_fill.c:3",
+      "source_sha256": "43375b8648b4986db1169a83b0c1f40d1cbdeb41eb5d598c42eb9d9fd1b0f19b",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00013340",
+      "name": "comm_attract_hud_scroll_step",
+      "declared_size": 352,
+      "evidence": "segarally95-recomp/src/game/comm_attract_hud_scroll_step.c:5",
+      "source_sha256": "a542f4a547242d09ba540752d11ab3db4868ebd3a402ead3eccab6078d7aef28",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000134a0",
+      "name": "comm_attract_hud_post_rank",
+      "declared_size": 304,
+      "evidence": "segarally95-recomp/src/game/comm_attract_hud_post_rank.c:7",
+      "source_sha256": "c7f3cfc1dbd1fca19a23a643f5a92b3cb1d365814efc88dc9a1b00c5d18b81f1",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000137d0",
+      "name": "comm_attract_phase_setup",
+      "declared_size": 64,
+      "evidence": "segarally95-recomp/src/game/comm_attract_phase_setup.c:2",
+      "source_sha256": "8545191ec21d9b16fe9d9dfd781ef7367dcc284da36ad3b40361e8233c05eb82",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00013ce0",
+      "name": "game_start_mode_select_frame",
+      "declared_size": 880,
+      "evidence": "segarally95-recomp/src/game/game_start_mode_select_frame.c:4",
+      "source_sha256": "7950196df1ffe8d2b1f2893c9140a3ed8ef24ac71dc2195eaef82ac35e39d587",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00014160",
+      "name": "game_start_display_setup",
+      "declared_size": 736,
+      "evidence": "segarally95-recomp/src/game/game_start_display_setup.c:4",
+      "source_sha256": "624570969f4a26bb1051465e99663262e5f7fd2f060c45db6c596d3401c463bf",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00014440",
+      "name": "game_start_mode_select",
+      "declared_size": 128,
+      "evidence": "segarally95-recomp/src/game/game_start_mode_select.c:5",
+      "source_sha256": "3b2291b5865e9adec0be7cd3b0d24cbd635fb16beb977a36f13b7355b1186eb5",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000144f0",
+      "name": "game_start_catalog_seed",
+      "declared_size": 56,
+      "evidence": "segarally95-recomp/src/game/game_start_catalog_seed.c:4",
+      "source_sha256": "b28e43c504ceb0521e408b858e5c5a187abf5afcf4a72a9dd40addbd69dc48bb",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00014530",
+      "name": "game_start_select_icons",
+      "declared_size": 304,
+      "evidence": "segarally95-recomp/src/game/game_start_select_icons.c:4",
+      "source_sha256": "8ca972a50695fb7891c3a688a782c1e273012f7ae10142a1ccf4af800a97af30",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00014678",
+      "name": "game_start_select_timer_arm",
+      "declared_size": 24,
+      "evidence": "segarally95-recomp/src/game/game_start_select_timer.c:5",
+      "source_sha256": "133098aa20bf315555abf9d677aebc14e1347ad7c64521736e523e099424d7cb",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000146a8",
+      "name": "game_start_select_timer_gate",
+      "declared_size": 56,
+      "evidence": "segarally95-recomp/src/game/game_start_select_timer.c:4",
+      "source_sha256": "133098aa20bf315555abf9d677aebc14e1347ad7c64521736e523e099424d7cb",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00014788",
+      "name": "scene_lookup_fn",
+      "declared_size": 112,
+      "evidence": "segarally95-recomp/src/game/scene_lookup_fn.c:4",
+      "source_sha256": "619ef93b7d01f750aba61ba3b6cbd51759ad02149e787d177ef3376fe329d53b",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00014820",
+      "name": "game_start_car_select_frame",
+      "declared_size": 1320,
+      "evidence": "segarally95-recomp/src/game/game_start_car_select_frame.c:5",
+      "source_sha256": "7e0ada1fb4e4dffec24a67e3ff4c787df19f3fe1ca156d734a94d146f90d36c4",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00014d60",
+      "name": "game_start_car_display",
+      "declared_size": 712,
+      "evidence": "segarally95-recomp/src/game/game_start_car_display.c:5",
+      "source_sha256": "5ffa32be17d85ac9dfb247081ad3fc1e5d27f91ec74dbbf0ae1e631d87bf4c52",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00015030",
+      "name": "game_start_select_confirm",
+      "declared_size": 456,
+      "evidence": "segarally95-recomp/src/game/game_start_select_confirm.c:4",
+      "source_sha256": "93a58f039ee14983736ce5ad34feaf5e617a2a673f2d8798198f530a24300c66",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00015200",
+      "name": "game_start_car_select",
+      "declared_size": 224,
+      "evidence": "segarally95-recomp/src/game/game_start_car_select.c:4",
+      "source_sha256": "90a5cd373b408678999adbe45cd829fbecaf00d78c757c0e70fee06470565223",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00015380",
+      "name": "game_start_course_select_frame",
+      "declared_size": 3132,
+      "evidence": "segarally95-recomp/src/game/game_start_course_select_frame.c:8",
+      "source_sha256": "3627ecc054f5df55dd4d37c7fb9f88b01fe105cebbb8e33f9369a9f09d15826c",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00015fd0",
+      "name": "game_start_course_display",
+      "declared_size": 784,
+      "evidence": "segarally95-recomp/src/game/game_start_course_display.c:5",
+      "source_sha256": "b045fc21a6965ca033f1f4512693a44744dafb439bd530cd8e508ac7065afd01",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000162e0",
+      "name": "game_start_course_select",
+      "declared_size": 232,
+      "evidence": "segarally95-recomp/src/game/game_start_course_select.c:6",
+      "source_sha256": "892e08a1eff58719b71c7e01ba23fb1276047ef8c382db67a3394768ab10730a",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00016540",
+      "name": "comm_attract_board_tick",
+      "declared_size": 1496,
+      "evidence": "segarally95-recomp/src/game/comm_attract_board_tick.c:3",
+      "source_sha256": "06cd1e8ae47ee91ed6736243fe51cbc17cddd33ef356cb92c6e7e797edf79e6c",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00016b28",
+      "name": "comm_attract_bal_trampoline",
+      "declared_size": 20,
+      "evidence": "segarally95-recomp/src/game/comm_attract_bal_trampoline.c:2",
+      "source_sha256": "83652fc91d6f3516ebab8795d83c0bfcc5e1f058d7b9e35e04bd04b0ba71dcb2",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00018248",
+      "name": "game_start_race_lap_bank_seed",
+      "declared_size": 24,
+      "evidence": "segarally95-recomp/src/game/game_start_race_lap_bank_seed.c:8",
+      "source_sha256": "fc1015885c397ff2fadac43752c86a4bd204078d802dea42f4887c7407a6af09",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001a7b8",
+      "name": "game_comm_aa24_seed",
+      "declared_size": 24,
+      "evidence": "segarally95-recomp/src/game/game_comm_aa24_seed.c:3",
+      "source_sha256": "c820e13854ccd786c12311d6def6706ee597abd4c2c27d0e1b89ff3a300f783f",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001a990",
+      "name": "boot_copyright_notice_show",
+      "declared_size": 128,
+      "evidence": "segarally95-recomp/src/game/boot_copyright_notice_show.c:2",
+      "source_sha256": "c5594cb1344c028a3fb347eb49fd72949d67fbdfe1ec10d9ecda1105a82260f5",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001aa30",
+      "name": "game_inner_dispatch",
+      "declared_size": 368,
+      "evidence": "segarally95-recomp/src/game/game_inner_dispatch.c:3",
+      "source_sha256": "80a80378ed769befdafd605e9978c5c8bf4e0940ab1c61d8884cc8eb090ee080",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001abb0",
+      "name": "game_start_flags_init",
+      "declared_size": 40,
+      "evidence": "segarally95-recomp/src/game/game_start_flags_init.c:3",
+      "source_sha256": "426b2c5ea2c3c9041478e97e3e67196318dd94b2b9bf3f138774bec4a55883a1",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001b4d0",
+      "name": "game_start_phase_0",
+      "declared_size": 128,
+      "evidence": "segarally95-recomp/src/game/game_start_phase_0.c:4",
+      "source_sha256": "55cb0d7dd404e4cb556000274a3c525205a4a9a3998fc7f0fefd7977dd0d4288",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001b8c0",
+      "name": "attract_mode3_dispatch",
+      "declared_size": 80,
+      "evidence": "segarally95-recomp/src/game/attract_mode3_dispatch.c:3",
+      "source_sha256": "29270ead5416b40bd2d36710ab3e8ddd9d6162352f6d98f0897d741b9e2c2d7f",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001b940",
+      "name": "attract_hud_setup",
+      "declared_size": 608,
+      "evidence": "segarally95-recomp/src/game/attract_hud_setup.c:4",
+      "source_sha256": "95d6334345e3fcd27760aead04dadb1dbde365928c4c2e030b6a667b53d855e4",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001bba0",
+      "name": "game_start_race_frame",
+      "declared_size": 664,
+      "evidence": "segarally95-recomp/src/game/game_start_race_frame.c:6",
+      "source_sha256": "91ebf62a9c15951da3abf1aee504ed99117a39758450761a1d19a4c67a581a5f",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001bf50",
+      "name": "game_start_race_timer_arm",
+      "declared_size": 320,
+      "evidence": "segarally95-recomp/src/game/game_start_race_timer_arm.c:8",
+      "source_sha256": "609da5b09c3f38f205ccc9b8f9e5b833a402ad6c2897373094973e1c16b61a82",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001c090",
+      "name": "game_start_champ_enter",
+      "declared_size": 80,
+      "evidence": "segarally95-recomp/src/game/game_start_champ_enter.c:4",
+      "source_sha256": "17112fe24454dcee17f17f3a94926e16bcd277fce3996b6ea51ec931fe23aec8",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001c0e0",
+      "name": "attract_scene_slot_dispatch",
+      "declared_size": 88,
+      "evidence": "segarally95-recomp/src/game/attract_scene_slot_dispatch.c:15",
+      "source_sha256": "4300dfe0ab8f268f48b53003f3fd95ac3ae8a9d898f590d738efb0d4172b9e1d",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001c140",
+      "name": "game_start_practice_enter",
+      "declared_size": 96,
+      "evidence": "segarally95-recomp/src/game/game_start_practice_enter.c:4",
+      "source_sha256": "a9c898754d19a46a9ad5a7d4b22e5f44e647e5efb415170a1f26bbcfc609df8a",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001c1a0",
+      "name": "game_start_practice_slot_dispatch",
+      "declared_size": 88,
+      "evidence": "segarally95-recomp/src/game/game_start_practice_slot_dispatch.c:4",
+      "source_sha256": "a98bd23910fff990cc8086548f18cb8c57ded3dd19a01634f70f923ded398835",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001c2a0",
+      "name": "game_start_race_list_flag_prep",
+      "declared_size": 432,
+      "evidence": "segarally95-recomp/src/game/game_start_race_list_flag_prep.c:11",
+      "source_sha256": "b8a066c9ab5d7997f177cab75409f6fb588622b201261314766a6890db76279c",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001c450",
+      "name": "game_start_race_prg_budget",
+      "declared_size": 640,
+      "evidence": "segarally95-recomp/src/game/game_start_race_prg_budget.c:12",
+      "source_sha256": "d5059d16dc49e14feae994bd9dad95bfd9fa10481afbd0ee85ca335dff896d67",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001c808",
+      "name": "game_start_race_aea8_set",
+      "declared_size": 28,
+      "evidence": "segarally95-recomp/src/game/game_start_race_aea8_set.c:4",
+      "source_sha256": "8dfeccad032aa0dfca169a6abb9096789ebd0dfa0a62816f3aed33e37e438203",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001c830",
+      "name": "game_start_race_lap_bank_clear",
+      "declared_size": 120,
+      "evidence": "segarally95-recomp/src/game/game_start_race_lap_bank_clear.c:11",
+      "source_sha256": "b6bb618013981655d44eacbfc6110e7d241c404eb9aefa8cfd93ffa5143c5ce4",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001c8b8",
+      "name": "game_start_race_lap_tick",
+      "declared_size": 136,
+      "evidence": "segarally95-recomp/src/game/game_start_race_lap_tick.c:5",
+      "source_sha256": "b0c59fcc040c41fdc4e96cbae9f239a79da6c2daac9f4ec6515e06cef365acea",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001c9c0",
+      "name": "game_start_race_sub_reset",
+      "declared_size": 68,
+      "evidence": "segarally95-recomp/src/game/game_start_race_sub_reset.c:5",
+      "source_sha256": "556115aad94fe65b2cda86b79573f55ec1d77f2b85b1e166a91110a49eebd905",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001ca30",
+      "name": "game_start_race_sub_dispatch",
+      "declared_size": 56,
+      "evidence": "segarally95-recomp/src/game/game_start_race_sub_dispatch.c:15",
+      "source_sha256": "26f4913008a03d028be3f5fb97e9d53a99b32cc93f2f6e3d8415a8d8239c1a8e",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001ca70",
+      "name": "game_start_race_slot0",
+      "declared_size": 424,
+      "evidence": "segarally95-recomp/src/game/game_start_race_slot0.c:6",
+      "source_sha256": "35769c034a61a70a332fd30270a7f67724c00bcf21499bee1eb2cd4d8308a4c1",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001cd20",
+      "name": "game_start_race_slot1",
+      "declared_size": 272,
+      "evidence": "segarally95-recomp/src/game/game_start_race_slot1.c:14",
+      "source_sha256": "3db78baa3f45486cc32d52cea714a2cafaf4080bc6a35ced91d6bd3f92de140c",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001ce30",
+      "name": "game_start_race_slot2",
+      "declared_size": 800,
+      "evidence": "segarally95-recomp/src/game/game_start_race_slot2.c:12",
+      "source_sha256": "6e7af5bc001f600052c1e8a2891f140d74c88b56b1a878af75aaf5ea92360560",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001d160",
+      "name": "game_start_race_slot3",
+      "declared_size": 1296,
+      "evidence": "segarally95-recomp/src/game/game_start_race_slot3.c:7",
+      "source_sha256": "07edf813ac901983a57340b7a2b05fcf6dbd548dc41a57d04ccb60918c96bc03",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001dad0",
+      "name": "game_start_race_cgm_batch_seed",
+      "declared_size": 288,
+      "evidence": "segarally95-recomp/src/game/game_start_race_cgm_batch_seed.c:9",
+      "source_sha256": "7d23e22a854195b7ee8f3d904ee12626fa6361c20721373b929cf6e57ee041fb",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001dc00",
+      "name": "game_start_race_hud_string_draw",
+      "declared_size": 292,
+      "evidence": "segarally95-recomp/src/game/game_start_race_hud_string_draw.c:8",
+      "source_sha256": "c1b98e0b3dc6a1b54156918d2602889bc4f1615f1fb2106d44b1ba62e68f299e",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001dd30",
+      "name": "game_start_race_cgm_seed",
+      "declared_size": 496,
+      "evidence": "segarally95-recomp/src/game/game_start_race_cgm_seed.c:8",
+      "source_sha256": "6e1b74a9eb16cbd71a5eb4010dd3ef57200f8e1b7ad67118b319af73fa9e5ba6",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001df40",
+      "name": "game_start_race_hud_speed",
+      "declared_size": 652,
+      "evidence": "segarally95-recomp/src/game/game_start_race_hud_speed.c:8",
+      "source_sha256": "3dc363f175a07e40dbe7324fd6f9a2641c5a49b2c3d1c2decb85defa6cae0119",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001e1d0",
+      "name": "game_start_race_hud_layers",
+      "declared_size": 672,
+      "evidence": "segarally95-recomp/src/game/game_start_race_hud_layers.c:8",
+      "source_sha256": "e81874ac4fcd7a7242667589b6ed2f6d3e90aafd6e4f2ffd8736d1284e5eac20",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001e498",
+      "name": "game_start_race_hud_row_seed",
+      "declared_size": 88,
+      "evidence": "segarally95-recomp/src/game/game_start_race_hud_row_seed.c:4",
+      "source_sha256": "3c4658af6fb3b68ad776c4bddfd33302c5e14a87260f9460ea14958f902b0b02",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001e500",
+      "name": "game_start_race_hud_tach",
+      "declared_size": 188,
+      "evidence": "segarally95-recomp/src/game/game_start_race_hud_tach.c:12",
+      "source_sha256": "f2f022036df9de95075ea7b32524f927640dbd1460e4e0bf7f5a394f9ec728af",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001e610",
+      "name": "game_start_race_hud_lap_time",
+      "declared_size": 372,
+      "evidence": "segarally95-recomp/src/game/game_start_race_hud_lap_time.c:9",
+      "source_sha256": "7309eee2f994980cf7cb0db12a511a952f76f9ffd50e9d76c568b7cc797f0395",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001ecc0",
+      "name": "game_start_race_hud_position",
+      "declared_size": 228,
+      "evidence": "segarally95-recomp/src/game/game_start_race_hud_position.c:5",
+      "source_sha256": "bbcea0d51c1a7df9c41fa0014c3909aa2527e44082043a7a8fbf0ac5c7c283bc",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001edb0",
+      "name": "game_start_race_hud_progress",
+      "declared_size": 356,
+      "evidence": "segarally95-recomp/src/game/game_start_race_hud_progress.c:6",
+      "source_sha256": "2b02726bff852ef8b27cca03d5af76c9f6744c50618649eb61522a3684a26ffe",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001f0d0",
+      "name": "game_start_race_cam_boot",
+      "declared_size": 112,
+      "evidence": "segarally95-recomp/src/game/game_start_race_cam_boot.c:14",
+      "source_sha256": "386f306bfcf33c030b0308121a7488e3062eadd0a957a59e351c4d63d24eedc5",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001f1d0",
+      "name": "game_start_race_cam_seed",
+      "declared_size": 2064,
+      "evidence": "segarally95-recomp/src/game/game_start_race_cam_seed.c:13",
+      "source_sha256": "33667e4ae7d655e532a5e2f7dd8bbe0db946397b3f70dc9ee095922736cae1be",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001fa20",
+      "name": "game_start_race_cam_desert",
+      "declared_size": 924,
+      "evidence": "segarally95-recomp/src/game/game_start_race_cam_desert.c:11",
+      "source_sha256": "421755b94f5e17d300212328a66a5deb73c2ce41f1a9c9bbbf9ccb9eab5fa06e",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001fdc0",
+      "name": "game_start_race_cam_chase",
+      "declared_size": 408,
+      "evidence": "segarally95-recomp/src/game/game_start_race_cam_chase.c:12",
+      "source_sha256": "2fed8e6e853ed210e9f041343faff28fbb2451e94330deb4d6476d8e91defca8",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0001ff60",
+      "name": "game_start_race_cam_chase_alt",
+      "declared_size": 892,
+      "evidence": "segarally95-recomp/src/game/game_start_race_cam_chase_alt.c:10",
+      "source_sha256": "7c76090ed984707dff48a5edc8493746fe5e73fe9e86ab70363fb75bf654372d",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000202e0",
+      "name": "game_start_race_cam_rebind",
+      "declared_size": 48,
+      "evidence": "segarally95-recomp/src/game/game_start_race_cam_rebind.c:9",
+      "source_sha256": "a1fa274071f56652a976af30cb6faf9c44760f86e8b80051493cd0f0435c2f44",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00020310",
+      "name": "game_start_race_cam_bind",
+      "declared_size": 116,
+      "evidence": "segarally95-recomp/src/game/game_start_race_cam_bind.c:16",
+      "source_sha256": "cae5b89fa0dda3032fe38eaefc4cc7fa49bf2a791d0e7160d7a3cdb671f724c6",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00020390",
+      "name": "game_start_race_cam_matrix",
+      "declared_size": 64,
+      "evidence": "segarally95-recomp/src/game/game_start_race_cam_matrix.c:11",
+      "source_sha256": "e8243d976c9022737f4e39bf9acd64bf7ec8d79a2240d55ffe4ac46c88014f91",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000203d0",
+      "name": "game_start_race_cam_matrix_long",
+      "declared_size": 768,
+      "evidence": "segarally95-recomp/src/game/game_start_race_cam_matrix_long.c:8",
+      "source_sha256": "888f30bca2502b8c627bf7b30fa028cfa7ddf7034c6af00e941638463047eb01",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000206e0",
+      "name": "game_start_race_cam_init",
+      "declared_size": 84,
+      "evidence": "segarally95-recomp/src/game/game_start_race_cam_init.c:8",
+      "source_sha256": "e7814c5a2fedf61045a3bd17109512eda750bf8fb56cde885b555eb243c315cf",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00020740",
+      "name": "game_start_race_hud_frame",
+      "declared_size": 76,
+      "evidence": "segarally95-recomp/src/game/game_start_race_hud_frame.c:6",
+      "source_sha256": "add97f0129ceded50ab7c62d182ef58b94ce36ea341782598eb2c0a901a7ed49",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000211f0",
+      "name": "game_start_race_countdown_prg",
+      "declared_size": 312,
+      "evidence": "segarally95-recomp/src/game/game_start_race_countdown_prg.c:8",
+      "source_sha256": "5fe6305682230e7b8320d5d934a7fe8b91a974c04cd2bd14fc4cba9bb8c51a25",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00021330",
+      "name": "game_start_race_geo_prg_thunk",
+      "declared_size": 8,
+      "evidence": "segarally95-recomp/src/game/game_start_race_hud_frame.c:7",
+      "source_sha256": "add97f0129ceded50ab7c62d182ef58b94ce36ea341782598eb2c0a901a7ed49",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00021340",
+      "name": "game_start_race_geo_prg_hud_go",
+      "declared_size": 40,
+      "evidence": "segarally95-recomp/src/game/game_start_race_hud_frame.c:8",
+      "source_sha256": "add97f0129ceded50ab7c62d182ef58b94ce36ea341782598eb2c0a901a7ed49",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00021370",
+      "name": "game_start_race_geo_prg_slot",
+      "declared_size": 188,
+      "evidence": "segarally95-recomp/src/game/game_start_race_geo_prg_slot.c:8",
+      "source_sha256": "13750df31880a7b1468348e71c82e74241639495547c0dcbd83e903e22d26fbe",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000217e0",
+      "name": "game_start_race_obj_seed_cars",
+      "declared_size": 288,
+      "evidence": "segarally95-recomp/src/game/game_start_race_obj_seed_cars.c:12",
+      "source_sha256": "713d08565f4a5ee465d5c1632eeac2e5275d18def9a9ac3c3325873d3ce8d07d",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00021918",
+      "name": "game_start_race_obj_seed_practice",
+      "declared_size": 56,
+      "evidence": "segarally95-recomp/src/game/game_start_race_obj_seed.c:11",
+      "source_sha256": "aaeeef00e17909079d1926d8c4ad0bbacff0ae6ae2acded538712e1694ab9bc3",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000219c0",
+      "name": "game_start_race_obj_seed",
+      "declared_size": 48,
+      "evidence": "segarally95-recomp/src/game/game_start_race_obj_seed.c:10",
+      "source_sha256": "aaeeef00e17909079d1926d8c4ad0bbacff0ae6ae2acded538712e1694ab9bc3",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00021cd8",
+      "name": "game_start_race_cam_pose_table",
+      "declared_size": 120,
+      "evidence": "segarally95-recomp/src/game/game_start_race_cam_pose_table.c:7",
+      "source_sha256": "daf6b096f0a7aaec71c69e8d8c37624c2ef7573619bfde6c9283424505682dfb",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00022768",
+      "name": "game_start_race_gate_bind",
+      "declared_size": 68,
+      "evidence": "segarally95-recomp/src/game/game_start_race_gate_bind.c:6",
+      "source_sha256": "50b6bd5ea7f8687f0cfaf6018627db8402352df1c7431a32f839523858c01713",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000227b0",
+      "name": "game_start_race_gate_walk",
+      "declared_size": 156,
+      "evidence": "segarally95-recomp/src/game/game_start_race_gate_walk.c:6",
+      "source_sha256": "e104e25770399d8157de44f2b56c22885ece64e4861bc3dc26124574bf5fa7f1",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00022850",
+      "name": "game_start_race_obj_span_test",
+      "declared_size": 224,
+      "evidence": "segarally95-recomp/src/game/game_start_race_obj_span_test.c:11",
+      "source_sha256": "2ef4e79c2c95db40126144566f3c5f6dd4c74f4ae7af0265d6b9f6e9032561c8",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00022940",
+      "name": "game_start_race_obj_scan",
+      "declared_size": 196,
+      "evidence": "segarally95-recomp/src/game/game_start_race_obj_scan.c:7",
+      "source_sha256": "1304baccba75021eeb917d1b6477d5d432c270b9fc383cb2650ca1d57a9d2e5a",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00022b60",
+      "name": "game_frame_update",
+      "declared_size": 260,
+      "evidence": "segarally95-recomp/src/game/game_frame_update.c:3",
+      "source_sha256": "bd8402249b98a67f931b45288958ec849c3e4f7f2752323a18a2e55e34dbeb06",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00022c70",
+      "name": "game_start_race_obj_publish",
+      "declared_size": 424,
+      "evidence": "segarally95-recomp/src/game/game_start_race_obj_publish.c:8",
+      "source_sha256": "d0cb7ec5bcf19335afd0903ecbea57be5a192d6dba6e9d070c1e7a14cf09c25c",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00022e20",
+      "name": "game_start_race_obj_list",
+      "declared_size": 752,
+      "evidence": "segarally95-recomp/src/game/game_start_race_obj_bind.c:54",
+      "source_sha256": "19ec9af9c4f0be34155dfb5e0ddff7cd24c3be2132118c610f694c57fab56ec0",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00023110",
+      "name": "game_start_race_obj_bind",
+      "declared_size": 20,
+      "evidence": "segarally95-recomp/src/game/game_start_race_obj_bind.c:13",
+      "source_sha256": "19ec9af9c4f0be34155dfb5e0ddff7cd24c3be2132118c610f694c57fab56ec0",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000231f0",
+      "name": "game_start_race_obj_sort_index",
+      "declared_size": 128,
+      "evidence": "segarally95-recomp/src/game/game_start_race_obj_sort_index.c:7",
+      "source_sha256": "85cd86fe95c46d68ced4ed1b4f38b528f41baff3a325c121ff78dd9ee3424a62",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00023280",
+      "name": "game_start_race_obj_depth_pass",
+      "declared_size": 592,
+      "evidence": "segarally95-recomp/src/game/game_start_race_obj_depth_pass.c:9",
+      "source_sha256": "de1fcbabf0481b07843a0f4eb549fa950d44004411c594eafc75318138e70ee0",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00023a80",
+      "name": "geo_attract_glyph_emit",
+      "declared_size": 1600,
+      "evidence": "segarally95-recomp/src/game/geo_attract_glyph_emit.c:3",
+      "source_sha256": "fb0a57bf1b91ddb5f1d7bb217b39a7d24ec1cf4dfad2deabb2b2506bbd39f8fa",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00023cc8",
+      "name": "placement_geo_feeder",
+      "declared_size": 2304,
+      "evidence": "segarally95-recomp/src/game/placement_geo_feeder.c:3",
+      "source_sha256": "eacbf74946b60c1e55a702f9c163d59c0a4daf6981a9e555f6bceb2aad6b2cbf",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000240c0",
+      "name": "game_start_race_object_pen_mid",
+      "declared_size": 4,
+      "evidence": "segarally95-recomp/src/game/game_start_race_object_pen_far.c:19",
+      "source_sha256": "9115f65274fae00ad62515277cd3c4e712d9547f74d05db8690f55f1399f06f1",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00024560",
+      "name": "game_start_race_object_pen_far",
+      "declared_size": 616,
+      "evidence": "segarally95-recomp/src/game/game_start_race_object_pen_far.c:18",
+      "source_sha256": "9115f65274fae00ad62515277cd3c4e712d9547f74d05db8690f55f1399f06f1",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000247d0",
+      "name": "geo_attract_object_pen",
+      "declared_size": 112,
+      "evidence": "segarally95-recomp/src/game/geo_attract_object_pen.c:3",
+      "source_sha256": "51393a15b0d6296f85e6b560de03c4f038a59fccff8ae8ddfb0ee6939cb4c73a",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000248b0",
+      "name": "game_start_race_object_pen_desc",
+      "declared_size": 192,
+      "evidence": "segarally95-recomp/src/game/game_start_race_object_pen_desc.c:7",
+      "source_sha256": "a3c85c67b92085c8e30e303f6ceffe96eba0d46cf6c326c1cf75763e7e4dfd05",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00024c50",
+      "name": "game_start_race_object_pen_walk",
+      "declared_size": 132,
+      "evidence": "segarally95-recomp/src/game/game_start_race_object_pen_walk.c:8",
+      "source_sha256": "34459ee8f50a2f68b77538c3f685f67c6a8035d27d11d7d93168f07a88456515",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00025bc0",
+      "name": "sound_uart_toggle",
+      "declared_size": 56,
+      "evidence": "segarally95-recomp/src/game/sound_uart_toggle.c:2",
+      "source_sha256": "f6c637e8c8daf2e68fce3e0b91330b868edf3c7b53f2daa31c5ce043bb74b704",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00025bf8",
+      "name": "sound_uart_finish",
+      "declared_size": 8,
+      "evidence": "segarally95-recomp/src/game/sound_uart_finish.c:2",
+      "source_sha256": "2416566c05aaa4086b33c90d274356fd2fd2eafd60f0c6acaf5f52871285fcfb",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00025c68",
+      "name": "irq_timer0_latch",
+      "declared_size": 112,
+      "evidence": "segarally95-recomp/src/irq/irq_timer0_latch.c:2",
+      "source_sha256": "d475e34c44844b1083ef4cbaa1b734a2e40fd17d215acb5cef7ddd9163499745",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00025ce0",
+      "name": "sound_comm_init",
+      "declared_size": 84,
+      "evidence": "segarally95-recomp/src/game/sound_comm_init.c:2",
+      "source_sha256": "b4e5c0e5b4388f6a26eb0aac1aa8bf82209f12bbf76d3271eb1212b9218daef5",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00026140",
+      "name": "comm_palette_index_call",
+      "declared_size": 16,
+      "evidence": "segarally95-recomp/src/game/comm_palette_index_call.c:2",
+      "source_sha256": "aa79b4146d3669802b2d006482a447b6c57fa20e0391146c4ec12c0a8c8819e4",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00026150",
+      "name": "comm_draw_setup",
+      "declared_size": 176,
+      "evidence": "segarally95-recomp/src/game/comm_draw_setup.c:3",
+      "source_sha256": "b7f34f7760c5eec01f2a058c746dda8537be1189d9dc13f66450af94a51272f1",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00026228",
+      "name": "comm_attract_reset",
+      "declared_size": 24,
+      "evidence": "segarally95-recomp/src/game/comm_attract_reset.c:2",
+      "source_sha256": "3099797fa4f8a8a60f47c145705f67a8ac8de47da55b7060d22e1af5d05c10ef",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00026690",
+      "name": "boot_tile_splash_init",
+      "declared_size": 184,
+      "evidence": "segarally95-recomp/src/game/boot_tile_splash_init.c:2",
+      "source_sha256": "37e2a4771b4df517aaafd27e8dd9c0102e971ae8109e90b8ed9e80ba7d410282",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00026758",
+      "name": "boot_palette_splash_upload",
+      "declared_size": 152,
+      "evidence": "segarally95-recomp/src/game/boot_palette_splash_upload.c:2",
+      "source_sha256": "3dff613669556a7d7287dfbc14a090055ecdc65a49144208fa62af823f83ff3c",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00026800",
+      "name": "boot_tile_blit_chain",
+      "declared_size": 88,
+      "evidence": "segarally95-recomp/src/game/boot_tile_blit_chain.c:2",
+      "source_sha256": "1bc08fd584c1270735d5894130d8843cd2b37505dbf6638e4cc15f0b89d1ea1c",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00026860",
+      "name": "boot_tile_blit_register",
+      "declared_size": 72,
+      "evidence": "segarally95-recomp/src/game/boot_tile_blit_register.c:2",
+      "source_sha256": "7944bda5c8c2b3ce80bad1c175c36b90ab599e1d0bb36d5896f96a7d521d272d",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000268b0",
+      "name": "boot_tile_scroll_copy",
+      "declared_size": 88,
+      "evidence": "segarally95-recomp/src/game/boot_tile_scroll_copy.c:2",
+      "source_sha256": "9aaac796128fa784a19fbaf5ac5c1d78a6420f6a954dd5822fd270c2b3fcaf9d",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00026918",
+      "name": "palram_colorbase_upload",
+      "declared_size": 96,
+      "evidence": "segarally95-recomp/src/game/palram_colorbase_upload.c:2",
+      "source_sha256": "583b407067271e2b4a4d2e252f12bd73c81ad0cfc0f7beef821522224fee1a2b",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00026980",
+      "name": "boot_tile_splash_frame",
+      "declared_size": 72,
+      "evidence": "segarally95-recomp/src/game/boot_tile_splash_frame.c:2",
+      "source_sha256": "c7f5d1b23547929319420265bcf9e89126d28c5f406f43602723d6a28252976f",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000269d0",
+      "name": "tile_map_banks_clear",
+      "declared_size": 24,
+      "evidence": "segarally95-recomp/src/game/tile_map_banks_clear.c:4",
+      "source_sha256": "4c3116da56f572e77a5553192d75077119601f009864f66621279101dfb21773",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000269f0",
+      "name": "tile_map_banks_clear_odd",
+      "declared_size": 24,
+      "evidence": "segarally95-recomp/src/game/tile_map_banks_clear_odd.c:4",
+      "source_sha256": "66cc8cd0f06b7a8f72b890ceecc6f9230240c4427d402fbca3d3a6e1d20c2151",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00026a10",
+      "name": "boot_tile_map_init",
+      "declared_size": 328,
+      "evidence": "segarally95-recomp/src/game/boot_tile_map_init.c:2",
+      "source_sha256": "b8d08e895ce68e33b653e5483160d0026b1b75c9501d720307a109ea09770f6a",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00026b60",
+      "name": "tile_map_bank_clear",
+      "declared_size": 44,
+      "evidence": "segarally95-recomp/src/game/tile_map_bank_clear.c:2",
+      "source_sha256": "820c0d0dc2519809069f6e30ebe1b9c82ea99d0bc6636dbc3ae2d829b2aa4a1d",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00026b90",
+      "name": "tile_char_upload",
+      "declared_size": 160,
+      "evidence": "segarally95-recomp/src/game/tile_char_upload.c:8",
+      "source_sha256": "02a95f5c81697be658c7dc47003a0fd5b631e1de513d9e2e961db3f5240de311",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00026c40",
+      "name": "tile_char_upload_fb",
+      "declared_size": 144,
+      "evidence": "segarally95-recomp/src/game/tile_char_upload_fb.c:7",
+      "source_sha256": "6d74c0ffce2b85b2e723ab0ded10d2fc2101f4a7523a15ddaa118714c528889c",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00026e18",
+      "name": "tile_cursor_seed",
+      "declared_size": 36,
+      "evidence": "segarally95-recomp/src/game/tile_cursor_seed.c:2",
+      "source_sha256": "f38939c6d686c9a7c1b5674059a1b34a4f93f34ec51b8acf112484a8f37a0e50",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00026fd8",
+      "name": "scene_view_scale",
+      "declared_size": 24,
+      "evidence": "segarally95-recomp/src/game/scene_view_scale.c:2",
+      "source_sha256": "40d660d21688068844af632d690bca44c18d1c0af58e2a3d826784c815798923",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00027008",
+      "name": "boot_tile_opcode_dispatch",
+      "declared_size": 296,
+      "evidence": "segarally95-recomp/src/game/boot_tile_opcode_dispatch.c:3",
+      "source_sha256": "8bf735c4883c9670bf7c84b786665008f01ef1be7586ef742aec66de10be0be0",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00027130",
+      "name": "boot_tile_script_run",
+      "declared_size": 36,
+      "evidence": "segarally95-recomp/src/game/boot_tile_script_run.c:3",
+      "source_sha256": "34d6ba66920720c48bfcbeff9919c7e7a4b62d0e6c5abf4681e15973a46a15f9",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00027160",
+      "name": "boot_tile_script_blank_n",
+      "declared_size": 112,
+      "evidence": "segarally95-recomp/src/game/boot_tile_script_blank_n.c:3",
+      "source_sha256": "a3c7b5ea54ff33fab1ade82fcafa285619fcfcac365a905653af9fa5d0b920cb",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000271d8",
+      "name": "boot_tile_script_format",
+      "declared_size": 120,
+      "evidence": "segarally95-recomp/src/game/boot_tile_script_format.c:4",
+      "source_sha256": "c78b3826c02541023a3ae8ee9d86bce742484630209999ccc213deab03a6f8e9",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00027260",
+      "name": "boot_tile_map_fill",
+      "declared_size": 80,
+      "evidence": "segarally95-recomp/src/game/boot_tile_map_fill.c:2",
+      "source_sha256": "ad721aab39a28e047469894bba24f1bade881df53be8925666d25d343e2ef0f5",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000272b0",
+      "name": "tile_attract_palram_gate",
+      "declared_size": 24,
+      "evidence": "segarally95-recomp/src/game/tile_attract_palram_gate.c:2",
+      "source_sha256": "7bdcd079a0e2b392db46e91fd3804b5ba7cd8ae6ab9a5d53c776293665037a99",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00027b28",
+      "name": "geo_view_float_clamp",
+      "declared_size": 156,
+      "evidence": "segarally95-recomp/src/game/geo_view_float_clamp.c:4",
+      "source_sha256": "a2d1fec0944d35a5b8fb52e36de3ffdbba2ca30fc6b8224939c173dc4b28a4c7",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00027bd8",
+      "name": "tile_attract_angle_fixup",
+      "declared_size": 132,
+      "evidence": "segarally95-recomp/src/game/tile_attract_angle_fixup.c:4",
+      "source_sha256": "c605ea819592aa449e6d81d7e56b0d6b746e71faf24fc185d1d40324de69c02b",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000282d0",
+      "name": "copy_catalog_index_table",
+      "declared_size": 1024,
+      "evidence": "segarally95-recomp/src/game/copy_catalog_index_table.c:3",
+      "source_sha256": "c1f8f23a4adc717175e596368a04c7bf06147aa6d7c6e47abe5eca0e16514bcf",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00028990",
+      "name": "tile_attract_string_draw",
+      "declared_size": 1104,
+      "evidence": "segarally95-recomp/src/game/tile_attract_string_draw.c:3",
+      "source_sha256": "269bb6128d87c1981ea98ea509dcf154afb5e1c96a8463c527360ef4de7763bd",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00029100",
+      "name": "boot_tile_script_gate",
+      "declared_size": 24,
+      "evidence": "segarally95-recomp/src/boot/boot_tile_script_gate.c:3",
+      "source_sha256": "dd0653884485a370399dd3df9e0cb719ea3db13fd177fd5f21ff6dc17499ffc6",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00029120",
+      "name": "geo_view_matrix_dir_emit",
+      "declared_size": 416,
+      "evidence": "segarally95-recomp/src/game/geo_view_matrix_dir_emit.c:11",
+      "source_sha256": "9ee53bc0adbabe0d605f4f45b3b889275516dc224e6d9bf26ec8a93c94011599",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000297e0",
+      "name": "game_mode_table_fetch",
+      "declared_size": 96,
+      "evidence": "segarally95-recomp/src/game/game_mode_table_fetch.c:2",
+      "source_sha256": "841eebd42dd16d876572d41fffec518447524eab557248d5df97c16684624c7a",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00029958",
+      "name": "cgm_thunk_walk",
+      "declared_size": 12,
+      "evidence": "segarally95-recomp/src/game/cgm_thunk_walk.c:3",
+      "source_sha256": "53dda3c32ef5bba295bd63a325700a418d5047ae6a8eaea5b0cf99f74ff66ed2",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00029a68",
+      "name": "scene_list_seed",
+      "declared_size": 40,
+      "evidence": "segarally95-recomp/src/game/scene_list_seed.c:2",
+      "source_sha256": "13db3ccb94241a7d6471bc031beb4c5584eebd9f07aae46ba4a8725ace79ddbe",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00029c10",
+      "name": "draw_scene_dispatch",
+      "declared_size": 296,
+      "evidence": "segarally95-recomp/src/game/draw_scene_dispatch.c:3",
+      "source_sha256": "edfc387dea3562bd2cd58fe82e44a4bf0c3e4608bc39db0bf9f6c23211bfa98d",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00029d60",
+      "name": "erase_scene_dispatch",
+      "declared_size": 296,
+      "evidence": "segarally95-recomp/src/game/erase_scene_dispatch.c:4",
+      "source_sha256": "1e48ff91ea38de772f596f41d68c98e3223c66301331ed82b14749356b30b7d1",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00029eb0",
+      "name": "catalog_draw_setup",
+      "declared_size": 400,
+      "evidence": "segarally95-recomp/src/game/catalog_draw_setup.c:3",
+      "source_sha256": "e61164c028e9448c37f6ced5aa9e0eca4c53c1b497800aac9b046e5d788c3a58",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002a050",
+      "name": "cgm_leading_colorbase",
+      "declared_size": 160,
+      "evidence": "segarally95-recomp/src/game/cgm_leading_colorbase.c:3",
+      "source_sha256": "9c94715d561366db7ef22801484a618c71e2d9aedaf99307fd7000e5fabc70c7",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002a0f8",
+      "name": "cgm_record_dispatch",
+      "declared_size": 40,
+      "evidence": "segarally95-recomp/src/game/cgm_record_dispatch.c:3",
+      "source_sha256": "dd6bf06fdbd15cf00545a0f4a514acef32a3cccdefa90c6cf0a18625e97cebbe",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002a120",
+      "name": "cgm_1111_flush",
+      "declared_size": 224,
+      "evidence": "segarally95-recomp/src/game/cgm_1111_flush.c:4",
+      "source_sha256": "de89917602a56f899e70ff81401f0f6b792723481a667021cea63e3bc9a93399",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002a200",
+      "name": "palram_batch_upload",
+      "declared_size": 128,
+      "evidence": "segarally95-recomp/src/game/palram_batch_upload.c:3",
+      "source_sha256": "907b08cded116d8d4d1fe6e813bee08bdf3d551989a25f24ec8c4ef629cc71d3",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002a290",
+      "name": "cgm_record_prepare_batch",
+      "declared_size": 68,
+      "evidence": "segarally95-recomp/src/game/cgm_record_prepare_batch.c:3",
+      "source_sha256": "f316a4418961a312aaf80580ecb298f6eba844052dbf9ab112b70a42e1c01639",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002a2e0",
+      "name": "cgm_digit_staging",
+      "declared_size": 296,
+      "evidence": "segarally95-recomp/src/game/cgm_digit_staging.c:3",
+      "source_sha256": "2a92e08348d3f98aac1bdb312964ec538ed44390f17e671713678c1b9e097c13",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002a490",
+      "name": "cgm_palette_scratch_write",
+      "declared_size": 72,
+      "evidence": "segarally95-recomp/src/game/cgm_palette_scratch_write.c:3",
+      "source_sha256": "b00134a2644171acdd9001ec0a4e6fe775070ccc89d8ea8c35e1214f87e22873",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002a5a0",
+      "name": "cgm_fifo_upload_runner",
+      "declared_size": 304,
+      "evidence": "segarally95-recomp/src/game/cgm_fifo_upload_runner.c:3",
+      "source_sha256": "8a2024e96ba7bda03af624e195ef67b02fd6fb26e19dbcdb521cddf76ac4404f",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002a6d0",
+      "name": "cgm_fifo_upload_wrapper",
+      "declared_size": 112,
+      "evidence": "segarally95-recomp/src/game/cgm_fifo_upload_wrapper.c:3",
+      "source_sha256": "ded390ce2ce78d28d29f26ec838fbdef8cfa1a743f47423eb1b9eef283989907",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002a7a0",
+      "name": "cgm_scratch_pool_reset",
+      "declared_size": 88,
+      "evidence": "segarally95-recomp/src/game/cgm_scratch_pool_reset.c:3",
+      "source_sha256": "d786ef146cb97b748be90aa3f6fb5ac5334f09a1a942f311f6717552871b8d73",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002a928",
+      "name": "game_start_race_list_free_a",
+      "declared_size": 48,
+      "evidence": "segarally95-recomp/src/game/game_start_race_list_unlink.c:11",
+      "source_sha256": "5ae01ff490f6e0d00af38f34899354fa7827f81002a6cf1928955a011162d570",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002a968",
+      "name": "game_start_race_list_free_b",
+      "declared_size": 48,
+      "evidence": "segarally95-recomp/src/game/game_start_race_list_unlink.c:12",
+      "source_sha256": "5ae01ff490f6e0d00af38f34899354fa7827f81002a6cf1928955a011162d570",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002aa90",
+      "name": "cgm_scratch_pool_alloc_link",
+      "declared_size": 12,
+      "evidence": "segarally95-recomp/src/game/cgm_scratch_pool_alloc_link.c:8",
+      "source_sha256": "6f673cde3ef09bfe052a8d477026778c71a2934253d0e372aab8f78acfc6e8ca",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002aaf0",
+      "name": "game_start_race_list_unlink",
+      "declared_size": 68,
+      "evidence": "segarally95-recomp/src/game/game_start_race_list_unlink.c:10",
+      "source_sha256": "5ae01ff490f6e0d00af38f34899354fa7827f81002a6cf1928955a011162d570",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002ab48",
+      "name": "game_start_race_list_head_fetch",
+      "declared_size": 20,
+      "evidence": "segarally95-recomp/src/game/game_start_race_list_head_fetch.c:7",
+      "source_sha256": "4a67b1523797f68035f6e3aeb888ae2946bd252e3d140bfdf8d3f0f2503a3e57",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002ab80",
+      "name": "game_start_race_list_walk",
+      "declared_size": 64,
+      "evidence": "segarally95-recomp/src/game/game_start_race_list_walk.c:8",
+      "source_sha256": "deeaad082ae1790d05ba8093c6b0aefe5870dc3531c2158258f33204a806c422",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002abc0",
+      "name": "geo_view_table_index_a",
+      "declared_size": 256,
+      "evidence": "segarally95-recomp/src/game/geo_view_table_index_a.c:3",
+      "source_sha256": "e616eebe81d218b541d646c7cd193ecf11b15fa54655e2dbd517612e17e4f881",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002acc0",
+      "name": "geo_view_table_index_b",
+      "declared_size": 528,
+      "evidence": "segarally95-recomp/src/game/geo_view_table_index_b.c:3",
+      "source_sha256": "d1ad66c95cd989df3232f1cfa183d49eee00e9658d8d60fd154a68eb216c7402",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002aed0",
+      "name": "geo_view_slot_word_probe",
+      "declared_size": 480,
+      "evidence": "segarally95-recomp/src/game/geo_view_slot_word_probe.c:8",
+      "source_sha256": "9ea3783c9d0daecbdddb238b3fc2ea419febd9560f15887cf6836130e1256b21",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002b0b0",
+      "name": "geo_view_slot_word_pack",
+      "declared_size": 196,
+      "evidence": "segarally95-recomp/src/game/geo_view_slot_word_pack.c:3",
+      "source_sha256": "25ee6f12ccd3fa46780b8cec52759421a45b72b14c822a1440ce8acfa3185f9b",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002b420",
+      "name": "game_start_race_course_obj_draw_4",
+      "declared_size": 348,
+      "evidence": "segarally95-recomp/src/game/game_start_race_course_obj.c:10",
+      "source_sha256": "566face9d692a27f717a46460308c0aec7620f2398c6808aa582d79503bbe731",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002b580",
+      "name": "game_start_race_course_obj_init_4",
+      "declared_size": 32,
+      "evidence": "segarally95-recomp/src/game/game_start_race_course_obj.c:9",
+      "source_sha256": "566face9d692a27f717a46460308c0aec7620f2398c6808aa582d79503bbe731",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002bb50",
+      "name": "game_start_race_course_obj_draw_21",
+      "declared_size": 44,
+      "evidence": "segarally95-recomp/src/game/game_start_race_course_obj.c:12",
+      "source_sha256": "566face9d692a27f717a46460308c0aec7620f2398c6808aa582d79503bbe731",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002bb80",
+      "name": "game_start_race_course_obj_init_21",
+      "declared_size": 32,
+      "evidence": "segarally95-recomp/src/game/game_start_race_course_obj.c:11",
+      "source_sha256": "566face9d692a27f717a46460308c0aec7620f2398c6808aa582d79503bbe731",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002bc08",
+      "name": "game_start_race_obj_pose_publish",
+      "declared_size": 224,
+      "evidence": "segarally95-recomp/src/game/game_start_race_obj_pose_publish.c:4",
+      "source_sha256": "b8a8ca500feffd9f43a2a6da21a3fa8c9828339164a1e90d3139015712bc1c4a",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002bcf0",
+      "name": "game_start_race_obj_car_frame",
+      "declared_size": 2688,
+      "evidence": "segarally95-recomp/src/game/game_start_race_obj_car_frame.c:18",
+      "source_sha256": "ce66b28b5881a296f203d0d6244f3c875e983f71039f1d060bbb4ba52d0eb1b6",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002c850",
+      "name": "game_start_race_obj_car_attach",
+      "declared_size": 116,
+      "evidence": "segarally95-recomp/src/game/game_start_race_obj_car_attach.c:5",
+      "source_sha256": "98281e03f0a5faf5a3585e6c5b495e4c2ebb3f585648bde0572c67c49ee65a19",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002c8d0",
+      "name": "game_start_race_obj_road_attach",
+      "declared_size": 852,
+      "evidence": "segarally95-recomp/src/game/game_start_race_obj_road_attach.c:10",
+      "source_sha256": "924a183aaa5bcdadee709baf4c0209183fd6448501ac2d2edd23605f66606ac5",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002cc78",
+      "name": "game_start_race_obj_car_peer",
+      "declared_size": 104,
+      "evidence": "segarally95-recomp/src/game/game_start_race_obj_car_peer.c:7",
+      "source_sha256": "016f7a4a0f8af78befc571a66d8406640945dad08661b2763dbaa9a7f65ff837",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002cce0",
+      "name": "game_start_race_obj_car_integrate",
+      "declared_size": 6508,
+      "evidence": "segarally95-recomp/src/game/game_start_race_obj_car_integrate.c:8",
+      "source_sha256": "968bf377871f084310f857b7bc808884f430d68525d0c9fa16dc127564977437",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002f3c0",
+      "name": "game_start_race_obj_car_yaw_step",
+      "declared_size": 348,
+      "evidence": "segarally95-recomp/src/game/game_start_race_obj_car_yaw_step.c:12",
+      "source_sha256": "514e8844aff4919b065682da828f113aec0ed47abf66fd4add204a4dcc76eeae",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002f520",
+      "name": "game_start_race_obj_road_angles",
+      "declared_size": 888,
+      "evidence": "segarally95-recomp/src/game/game_start_race_obj_road_angles.c:9",
+      "source_sha256": "3fb4ecce0fbd0b5ecc04e10454142ca621fd3a4af53ee59f4cd5f77a5d7e0161",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0002f8a0",
+      "name": "game_start_race_obj_car_contact_solve",
+      "declared_size": 2196,
+      "evidence": "segarally95-recomp/src/game/game_start_race_obj_car_contact_solve.c:9",
+      "source_sha256": "71188b9fbea53181defc125aa22e6b3f641685fd0b9d65bd2d80de271f860918",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000304f0",
+      "name": "game_start_race_obj_car_motion",
+      "declared_size": 2184,
+      "evidence": "segarally95-recomp/src/game/game_start_race_obj_car_motion.c:11",
+      "source_sha256": "e1e14d1af63f90c90c6e4b9cafb72a1f13ce0943cab59d8d38164d0c1859a423",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00030e00",
+      "name": "game_start_race_obj_car_velocity_step",
+      "declared_size": 984,
+      "evidence": "segarally95-recomp/src/game/game_start_race_obj_car_velocity_step.c:9",
+      "source_sha256": "43b8ea6ad13b4f6a3ea85817141c2eb716f5d1f1af95dceac4ca5bba345f7712",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000311e0",
+      "name": "game_start_race_obj_road_span",
+      "declared_size": 304,
+      "evidence": "segarally95-recomp/src/game/game_start_race_obj_road_span.c:10",
+      "source_sha256": "d120404ecd29603d024c3ea128b770dba60b21464497f81a04ee11f97a6ff0e2",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00031320",
+      "name": "game_start_race_obj_road_span_basis",
+      "declared_size": 800,
+      "evidence": "segarally95-recomp/src/game/game_start_race_obj_road_span_basis.c:17",
+      "source_sha256": "45865e2e6c27e6d39996fdf6fad6d1d5572b6ec36ed12ffdf35b0efe14472b32",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00031650",
+      "name": "game_subsys_init_stub",
+      "declared_size": 8,
+      "evidence": "segarally95-recomp/src/game/game_subsys_init_stub.c:3",
+      "source_sha256": "4ee04df5e4bcf07d089c3a03d2a6c1a68ac41d40f27e2517ec4c277ae8ebba54",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000316c8",
+      "name": "game_d6_mode_apply",
+      "declared_size": 148,
+      "evidence": "segarally95-recomp/src/game/game_d6_mode_apply.c:2",
+      "source_sha256": "741031b1852f35ef05113984b616b5ad13835d0a5f294724daf4ad8b6b7ad75a",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00031768",
+      "name": "game_d6_count_apply",
+      "declared_size": 68,
+      "evidence": "segarally95-recomp/src/game/game_d6_count_apply.c:2",
+      "source_sha256": "eb717f9a4c7232b77fa2972ec1fe610e200db39788ac8ce03c9ddf6bab0f57a1",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000317b0",
+      "name": "geo_attract_object_extra",
+      "declared_size": 2060,
+      "evidence": "segarally95-recomp/src/game/geo_attract_object_extra.c:3",
+      "source_sha256": "f007ce9a9436c5e85ea0f5af9ccb91cdf24f5aef54d372629aa8b2adde20768a",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00031fc0",
+      "name": "geo_attract_copro_submit",
+      "declared_size": 400,
+      "evidence": "segarally95-recomp/src/game/geo_attract_copro_submit.c:3",
+      "source_sha256": "f87eaa9d79edee6d64803a27a8e3d1c79d041aff4422a98d7d5ada2928896cd3",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00032150",
+      "name": "geo_attract_copro_object",
+      "declared_size": 580,
+      "evidence": "segarally95-recomp/src/game/geo_attract_copro_object.c:3",
+      "source_sha256": "bc7c459e65885289abbfe3f564c9af712cfcb1e5ff057d5363fdfba0cc3e21cb",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000323a0",
+      "name": "game_d6_tracker_init",
+      "declared_size": 108,
+      "evidence": "segarally95-recomp/src/game/game_d6_tracker_init.c:3",
+      "source_sha256": "565737e6938b655fc6530054d282ef3501337e3aa32f4497ddbe5907e928a625",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00032410",
+      "name": "geo_attract_copro_marker_burst",
+      "declared_size": 628,
+      "evidence": "segarally95-recomp/src/game/geo_attract_copro_marker_burst.c:3",
+      "source_sha256": "7f5bce42269b8c2df2c3bbd6d0fa011cb7252bd352985ad914e11da890e84818",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000326c8",
+      "name": "attract_logo_tile_stripe",
+      "declared_size": 88,
+      "evidence": "segarally95-recomp/src/game/attract_logo_tile_stripe.c:3",
+      "source_sha256": "6a951a0af95d91e71101b2870026a85de64c1a523ed18801678c39209dde3615",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00032720",
+      "name": "attract_logo_cgm_scale_clear",
+      "declared_size": 112,
+      "evidence": "segarally95-recomp/src/game/attract_logo_cgm_scale_clear.c:3",
+      "source_sha256": "44276658170fd30aa32156295a3fc263a19077ef3c6784c04c35dc43c89433e2",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00032790",
+      "name": "attract_logo_cgm_submit",
+      "declared_size": 352,
+      "evidence": "segarally95-recomp/src/game/attract_logo_cgm_submit.c:3",
+      "source_sha256": "145ece78b39f8aabe1027179a2254b1a04995d04cfaa0ba3b9a8f06d8d56906c",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00032f70",
+      "name": "attract_logo_dispatch",
+      "declared_size": 48,
+      "evidence": "segarally95-recomp/src/game/attract_logo_dispatch.c:4",
+      "source_sha256": "d20c0d429568a6f9c2cdf46a802ad98e69cd097ab90bbd7c1ee662764b5075f3",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00032fa0",
+      "name": "game_staging_init",
+      "declared_size": 48,
+      "evidence": "segarally95-recomp/src/game/game_staging_init.c:3",
+      "source_sha256": "7bf84f4ca858fc42fced3651fe25c5cd25bf4e8df95d4cea430c4d4e1f70fddc",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00033038",
+      "name": "geo_palette_fade_step",
+      "declared_size": 92,
+      "evidence": "segarally95-recomp/src/game/geo_palette_fade_step.c:2",
+      "source_sha256": "14dd307c085c75fc33eaf50987966658db967f9e1cbad582ec1c296ff58a6525",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000330a0",
+      "name": "geo_palette_fade_commit",
+      "declared_size": 208,
+      "evidence": "segarally95-recomp/src/game/geo_palette_fade_commit.c:2",
+      "source_sha256": "7b92fbc4fb77d46d3101728d633942a5580a8ed6470d24433958a877c247ab6c",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00033180",
+      "name": "geo_palette_irq_frame",
+      "declared_size": 60,
+      "evidence": "segarally95-recomp/src/game/geo_palette_irq_frame.c:2",
+      "source_sha256": "d80863c081b6e043b0228395bbf55c3c7522ba806bd348a784894f15072527e4",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000331d8",
+      "name": "geo_palette_mode2_stage",
+      "declared_size": 248,
+      "evidence": "segarally95-recomp/src/game/geo_palette_mode2_stage.c:2",
+      "source_sha256": "ea47ed2675249d2213d860d086402cbbe55b0e21fb98bbbce0bbfbe36502d378",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000332d0",
+      "name": "geo_palette_mode6_commit",
+      "declared_size": 248,
+      "evidence": "segarally95-recomp/src/game/geo_palette_mode6_commit.c:2",
+      "source_sha256": "56e607695d5aafc9d7ff29f76c2b57794989b0d20120c8f6543dead24107b3d3",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000333c8",
+      "name": "palram_geo_colorbase_refresh",
+      "declared_size": 140,
+      "evidence": "segarally95-recomp/src/game/palram_geo_colorbase_refresh.c:2",
+      "source_sha256": "a3efbdbe6cf9195c06822ee48b4c32d94026a57eeab76aa66f04994bb6bfa7bb",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000335b4",
+      "name": "geo_palette_mode4_fade",
+      "declared_size": 396,
+      "evidence": "segarally95-recomp/src/game/geo_palette_mode4_fade.c:2",
+      "source_sha256": "61cd92d325dd2b26cce8ebc0700c2b27dd107351c2244669e4d91980b40f8ff3",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00033744",
+      "name": "geo_palette_mode5_colorbase",
+      "declared_size": 284,
+      "evidence": "segarally95-recomp/src/game/geo_palette_mode5_colorbase.c:7",
+      "source_sha256": "bb65b880468f308615d9d0b8fc243f53e0795873690a202d225446b826f63c8f",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00033864",
+      "name": "geo_palette_mode0_promote",
+      "declared_size": 44,
+      "evidence": "segarally95-recomp/src/game/geo_palette_mode0_promote.c:2",
+      "source_sha256": "54d71cffbd51b0fa2b91bda7a8f8183fa02d965091a5dd48eb298fcf81bac79d",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00033a50",
+      "name": "geo_view_matrix_row_swap_upload",
+      "declared_size": 428,
+      "evidence": "segarally95-recomp/src/game/geo_view_matrix_row_swap_upload.c:8",
+      "source_sha256": "4361dc7a25bc67b953e2c7aa7fd104b0615584da33bf4e39c8fee0e2d128c93b",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00033c00",
+      "name": "geo_attract_fp_series",
+      "declared_size": 440,
+      "evidence": "segarally95-recomp/src/game/geo_attract_fp_series.c:3",
+      "source_sha256": "344ef27e0292a2417e3a66ae533f1031a3c24a83d8328ea57537c0fad6993f49",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00033dc8",
+      "name": "geo_rng_next",
+      "declared_size": 64,
+      "evidence": "segarally95-recomp/src/game/geo_rng_next.c:3",
+      "source_sha256": "e74d2290054b17940cf98850a5f70cfcf4b4fd2da5af34621c362292b7ad8e4a",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00033e18",
+      "name": "game_staging_bx",
+      "declared_size": 20,
+      "evidence": "segarally95-recomp/src/game/game_staging_bx.c:3",
+      "source_sha256": "8bc6174314876d4044a9812d9734fd1db83e98745328282fa97097c660048967",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00033e90",
+      "name": "geo_view_object_bind",
+      "declared_size": 468,
+      "evidence": "segarally95-recomp/src/game/geo_view_object_bind.c:11",
+      "source_sha256": "d4f833239cdf4b397c7ee3b24d17e8dda5a4107504882630078003c8460d4090",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00034078",
+      "name": "geo_view_scene_epilogue",
+      "declared_size": 188,
+      "evidence": "segarally95-recomp/src/game/geo_view_scene_epilogue.c:8",
+      "source_sha256": "ceaa02ef42507c2b5a692459844de448325bc320ae43c828cbb02d91f0de1fd1",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00034140",
+      "name": "game_start_race_cam_object_init",
+      "declared_size": 564,
+      "evidence": "segarally95-recomp/src/game/game_start_race_cam_object_init.c:7",
+      "source_sha256": "b177fd7e0a0420865dc4eb647fc25b27d083ad414dd962272502a11e57dda5b9",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00034380",
+      "name": "geo_view_scene_prep",
+      "declared_size": 2392,
+      "evidence": "segarally95-recomp/src/game/geo_view_scene_prep.c:13",
+      "source_sha256": "1337c090d842171fe3018ebe967662b532531ecb07eaf7f23b92e65f39fa4d51",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00034ce0",
+      "name": "geo_view_mode_latch",
+      "declared_size": 348,
+      "evidence": "segarally95-recomp/src/game/geo_view_mode_latch.c:4",
+      "source_sha256": "be06250ba32789ae99957faa4104fb99c0c8f921e0fa13747bd6d0b69d32fc25",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00034f40",
+      "name": "geo_view_scene_frame",
+      "declared_size": 8884,
+      "evidence": "segarally95-recomp/src/game/geo_view_scene_frame.c:3",
+      "source_sha256": "c10da1d96adf65cc2fe3e92c4ba652364a812fec86793e313839bbd535c0bc38",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00037200",
+      "name": "geo_view_copro_vec_push",
+      "declared_size": 1144,
+      "evidence": "segarally95-recomp/src/game/geo_view_copro_vec_push.c:9",
+      "source_sha256": "273aceedd322f9d9f5c29934d9365b09fd37215a660c445112e4cbeffa8dbbee",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000377e0",
+      "name": "geo_view_table_seed",
+      "declared_size": 144,
+      "evidence": "segarally95-recomp/src/game/geo_view_table_seed.c:8",
+      "source_sha256": "13af6293948893c4ce9da7309cff7bb3d902e70b3983a31319e3c22ea2f99e6a",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00037870",
+      "name": "geo_view_frame_update",
+      "declared_size": 3584,
+      "evidence": "segarally95-recomp/src/game/geo_view_frame_update.c:3",
+      "source_sha256": "26f22fb9b1a3b9cfbe802ba388931dcebf26486219dc2d851589363202c01a87",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00038680",
+      "name": "geo_view_latch_apply",
+      "declared_size": 588,
+      "evidence": "segarally95-recomp/src/game/geo_view_latch_apply.c:3",
+      "source_sha256": "e5b59721bf58677f0644c177ba8b3525cd73634fae9830694a5ee71365248af4",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000388d0",
+      "name": "geo_view_input_gate",
+      "declared_size": 124,
+      "evidence": "segarally95-recomp/src/game/geo_view_input_gate.c:4",
+      "source_sha256": "15ee2d22309b277dcd97726b55190884869465e8a68d7c240446398ecf6ff633",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00038958",
+      "name": "geo_view_sqrt_mix_a",
+      "declared_size": 84,
+      "evidence": "segarally95-recomp/src/game/geo_view_sqrt_mix_a.c:3",
+      "source_sha256": "2f1e9eb8ed9a37889a05908a9dc52acdaf21ac33e80e76a7479a8a10574bc6a0",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000389b8",
+      "name": "geo_view_sqrt_mix_b",
+      "declared_size": 84,
+      "evidence": "segarally95-recomp/src/game/geo_view_sqrt_mix_b.c:3",
+      "source_sha256": "2fe20af14b07a31604637889d7a8656cf72c2e22ed29678b0aa90a1baf74009e",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00038a18",
+      "name": "geo_view_sin_mix",
+      "declared_size": 180,
+      "evidence": "segarally95-recomp/src/game/geo_view_sin_mix.c:4",
+      "source_sha256": "63c0c1ccc2be4f5f529804d79bd3cc33fd17b44ddce1b70f99720fff8f5ff73b",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00039540",
+      "name": "geo_view_params",
+      "declared_size": 144,
+      "evidence": "segarally95-recomp/src/game/geo_view_params.c:3",
+      "source_sha256": "8d9a495525ac5c784bc48be408d621efa08a6acc83124b915263b76e45cf4d05",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000395d8",
+      "name": "geo_view_fov_scale",
+      "declared_size": 144,
+      "evidence": "segarally95-recomp/src/game/geo_view_fov_scale.c:2",
+      "source_sha256": "375c271ceffae425d6613f32309f2a671c06d8a0485f645e4869792c8efc3a92",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00039690",
+      "name": "geo_view_matrix_seed",
+      "declared_size": 136,
+      "evidence": "segarally95-recomp/src/game/geo_view_matrix_seed.c:2",
+      "source_sha256": "7f925d4a1c1b67a54c7e9a4be9fe2a872d2bd2b28f27fe02ed2de16885ebcccf",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00039750",
+      "name": "geo_view_scene_apply",
+      "declared_size": 832,
+      "evidence": "segarally95-recomp/src/game/geo_view_scene_apply.c:4",
+      "source_sha256": "24a809089b3ed9175b34d2dc789f01b376003ab968b4b632e8c9228ee6517ed5",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00039a90",
+      "name": "geo_view_pitch_smooth",
+      "declared_size": 88,
+      "evidence": "segarally95-recomp/src/game/geo_view_pitch_smooth.c:3",
+      "source_sha256": "42ced63cba526cf33cbf1d253ab042593f3b84cc55b7aca34b307ab2f59ed6b3",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00039af0",
+      "name": "geo_view_pitch_clamp",
+      "declared_size": 128,
+      "evidence": "segarally95-recomp/src/game/geo_view_pitch_clamp.c:3",
+      "source_sha256": "7f66cf3370eddb953da631fbb3d8b0341444298df88722d76ac644048d64e8db",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00039b80",
+      "name": "geo_view_trig_scale",
+      "declared_size": 184,
+      "evidence": "segarally95-recomp/src/game/geo_view_trig_scale.c:4",
+      "source_sha256": "857b751ac20b131f13b3860bf979ef702dc190b53415e25c3ac467bca6e357a8",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00039c40",
+      "name": "geo_view_mode_apply",
+      "declared_size": 720,
+      "evidence": "segarally95-recomp/src/game/geo_view_mode_apply.c:4",
+      "source_sha256": "66013f59390b8183475dec0afeaa955ddcb326ee2af1841f937e133500fca7a8",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003a280",
+      "name": "geo_view_control_seed",
+      "declared_size": 128,
+      "evidence": "segarally95-recomp/src/game/geo_view_control_seed.c:9",
+      "source_sha256": "19689ca243957af071fb5f0d7537a33722d99d7e571a3afc17beb37ebb2f8130",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003a320",
+      "name": "geo_view_matrix_prep",
+      "declared_size": 1796,
+      "evidence": "segarally95-recomp/src/game/geo_view_matrix_prep.c:3",
+      "source_sha256": "7d35b806713d3fd4c9b4e02a3437b1fc98d098b189a5fadeb6e88d18d7363837",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003aa38",
+      "name": "geo_view_pitch_blend",
+      "declared_size": 168,
+      "evidence": "segarally95-recomp/src/game/geo_view_pitch_blend.c:3",
+      "source_sha256": "5ffecd87fe6142702b62faeee6a306d77a4322d4462e431a16170dabb5c42b2b",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003aae8",
+      "name": "geo_view_angle_frac",
+      "declared_size": 164,
+      "evidence": "segarally95-recomp/src/game/geo_view_angle_frac.c:3",
+      "source_sha256": "54a644116d635b46b930c0acc44e5ec2c22c8798bc97997a9ad68cc91c2706bb",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003ac50",
+      "name": "geo_view_matrix_slot_fill",
+      "declared_size": 424,
+      "evidence": "segarally95-recomp/src/game/geo_view_matrix_slot_fill.c:3",
+      "source_sha256": "93bbc09aa4aa2260c12713f2d1c9bced61b1802367cb0e8a475c3106b1664625",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003ae50",
+      "name": "geo_view_matrix_mode_gate",
+      "declared_size": 244,
+      "evidence": "segarally95-recomp/src/game/geo_view_matrix_mode_gate.c:3",
+      "source_sha256": "74846013e4d14d32aebb199d5fb27a81e3f401b13295c51ec3bba5d20d845282",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003af58",
+      "name": "geo_view_matrix_slot_step",
+      "declared_size": 156,
+      "evidence": "segarally95-recomp/src/game/geo_view_matrix_slot_step.c:3",
+      "source_sha256": "2c4b42eea238ff6c15743ea6dec311fb2e6f909335c42610539e0bd4c3c662b5",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003b008",
+      "name": "geo_view_matrix_slot_init",
+      "declared_size": 276,
+      "evidence": "segarally95-recomp/src/game/geo_view_matrix_slot_init.c:3",
+      "source_sha256": "c64081cad6964e338d6a7132e5f3d0bd6759465192cff666370ef8fb4ae68ba8",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003b128",
+      "name": "geo_view_control_byte_apply",
+      "declared_size": 196,
+      "evidence": "segarally95-recomp/src/game/geo_view_control_byte_apply.c:4",
+      "source_sha256": "1e14d5d72b04f5c6c20bd93c1820c7a76f2484d3242f82a5b30cc2aeb781980c",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003b200",
+      "name": "geo_attract_course_slot_call",
+      "declared_size": 1472,
+      "evidence": "segarally95-recomp/src/game/geo_attract_course_slot_call.c:3",
+      "source_sha256": "db2f7c07d9ad8567cdfe97f38974a1732ed5a04bc390b1e84c3bf474b2def872",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003b7c0",
+      "name": "geo_attract_course_catalog_span",
+      "declared_size": 492,
+      "evidence": "segarally95-recomp/src/game/geo_attract_course_catalog_span.c:3",
+      "source_sha256": "3a91410d006188c50c37b01684da349654ce18370a0ee01741252d6643aa3ad8",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003b9b0",
+      "name": "geo_attract_course_prg_mode",
+      "declared_size": 592,
+      "evidence": "segarally95-recomp/src/game/geo_attract_course_prg_mode.c:3",
+      "source_sha256": "525d69532121b6663a3bac9c7367286161f7ce08b9742f95528473d96984c1b2",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003bcc0",
+      "name": "geo_attract_course_carousel_draw",
+      "declared_size": 224,
+      "evidence": "segarally95-recomp/src/game/geo_attract_course_carousel_draw.c:3",
+      "source_sha256": "0cd8f42d5d1aaabbd1c4188bf63532a890b3dc21fdd6075c495d19b9052ded82",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003be30",
+      "name": "geo_attract_course_view_bind",
+      "declared_size": 632,
+      "evidence": "segarally95-recomp/src/game/geo_attract_course_view_bind.c:3",
+      "source_sha256": "70326183540822c5287cc2fff6600e01f7f2a46caaa3d6f95d473f040b049957",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003de18",
+      "name": "comm_attract_catalog_seed",
+      "declared_size": 32,
+      "evidence": "segarally95-recomp/src/game/comm_attract_catalog_seed.c:2",
+      "source_sha256": "4dba8669aaa576bfa07b69a1bf4417a4d32b2870a444e56082b5c75c8deb0e9f",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003ec78",
+      "name": "geo_fifo_preset",
+      "declared_size": 36,
+      "evidence": "segarally95-recomp/src/game/geo_fifo_preset.c:3",
+      "source_sha256": "ef82ce62b1ddbaf6f8fa4f9d15e236d1385d7165ac0390e07747efb63a6fb8f2",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003eca8",
+      "name": "geo_fifo_emit",
+      "declared_size": 108,
+      "evidence": "segarally95-recomp/src/game/geo_fifo_emit.c:3",
+      "source_sha256": "453778a2130592d3c3b984f4f9a5944d401c0305b7bc58db1f245312d03adfa6",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003ed20",
+      "name": "geo_attract_pen_angle_push",
+      "declared_size": 360,
+      "evidence": "segarally95-recomp/src/game/geo_attract_pen_angle_push.c:3",
+      "source_sha256": "3512efd6f53e9e2d2dc2efe4405b35ca43b3a49d43cb3987fa395f92acca2cc1",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003ee98",
+      "name": "geo_prg_object_opcode_prep",
+      "declared_size": 104,
+      "evidence": "segarally95-recomp/src/game/geo_prg_object_opcode_prep.c:3",
+      "source_sha256": "aeef0eeb2caded5595480472d8b80b5ecfafd5d51b182831466005ca9d9b7474",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003ef10",
+      "name": "geo_attract_pen_prg_push_b",
+      "declared_size": 88,
+      "evidence": "segarally95-recomp/src/game/geo_attract_pen_prg_push_b.c:3",
+      "source_sha256": "58fc6b82f25cd7f569d5805c400be050422c02ac02cedfbf1326ae75e329383c",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003ef70",
+      "name": "geo_attract_pen_prg_push_a",
+      "declared_size": 76,
+      "evidence": "segarally95-recomp/src/game/geo_attract_pen_prg_push_a.c:3",
+      "source_sha256": "38b3a0efc937a8f5d63f80f53c1fc0f660a07b7d76d22eef78fd1615ca4dc11a",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003f1b8",
+      "name": "comm_attract_course_chain_prep",
+      "declared_size": 48,
+      "evidence": "segarally95-recomp/src/game/comm_attract_course_chain_prep.c:3",
+      "source_sha256": "81775d9b3db909a526f6d0b4f7f2339b33b2b7dc56eee4b951c440752593acf5",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003f1f8",
+      "name": "comm_attract_course_chain_restore",
+      "declared_size": 36,
+      "evidence": "segarally95-recomp/src/game/comm_attract_course_chain_restore.c:3",
+      "source_sha256": "830f41e54b24f3c2453c822ae56c6fa86dab89268b08f2a2e8ee8ad7e95ab188",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003f220",
+      "name": "comm_attract_course_record_copy",
+      "declared_size": 140,
+      "evidence": "segarally95-recomp/src/game/comm_attract_course_record_copy.c:3",
+      "source_sha256": "73ebad30f75525ed7cb1a4e368f6d89b46554ab3e9a50b161c504e90de7a2943",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003f2f0",
+      "name": "comm_attract_course_init",
+      "declared_size": 272,
+      "evidence": "segarally95-recomp/src/game/comm_attract_course_init.c:3",
+      "source_sha256": "4488ada7f0c263c116656f757962f27603470d019dcaad4fc193de3f8bd7694e",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003f410",
+      "name": "geo_attract_record_index",
+      "declared_size": 160,
+      "evidence": "segarally95-recomp/src/game/geo_attract_record_index.c:8",
+      "source_sha256": "1c354f50a4ef8baacc1449ee8187d59c10e9e1959e7b0a4cf93c529fafac72b2",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003f4b8",
+      "name": "game_workram_bx_stub",
+      "declared_size": 16,
+      "evidence": "segarally95-recomp/src/game/game_workram_bx_stub.c:3",
+      "source_sha256": "9452f63b13d608fd789601499f6bbb03f3b3bfd4bb1e41b574bf3f35dcf9ea10",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003f4d0",
+      "name": "geo_countdown_keyframe_copy",
+      "declared_size": 120,
+      "evidence": "segarally95-recomp/src/game/geo_countdown_keyframe_copy.c:9",
+      "source_sha256": "03297d44410f81b25d528f30c8e1e16022bb20eb9cd0d31e1ade9780a748bb29",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003f550",
+      "name": "geo_countdown_keyframe_eval",
+      "declared_size": 976,
+      "evidence": "segarally95-recomp/src/game/geo_countdown_keyframe_eval.c:11",
+      "source_sha256": "7cdf0ee725f47c8d3ee82d487f7e9e79a8f2efabda2e327a3c308f1e3fdb8fe2",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0003f9a0",
+      "name": "geo_countdown_object_step",
+      "declared_size": 796,
+      "evidence": "segarally95-recomp/src/game/geo_countdown_object_step.c:10",
+      "source_sha256": "ce93f37778197e19c9b560a3ccc8eab91d8d68a365fddf2351e5bab8ff30ec6f",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00040790",
+      "name": "game_start_race_cgm_colorbase_seed",
+      "declared_size": 136,
+      "evidence": "segarally95-recomp/src/game/game_start_race_cgm_colorbase_seed.c:11",
+      "source_sha256": "ce58d8c788c9b3ccf9cf75787106783587196c6fb590d27c59542e27a33e84a9",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00041b78",
+      "name": "game_start_race_desert_table_pick",
+      "declared_size": 92,
+      "evidence": "segarally95-recomp/src/game/game_start_race_desert_table_pick.c:7",
+      "source_sha256": "6829e0bf0385bd89a5d986b840a8a95be74d01c9fe8221a86079526c128c653e",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00041be0",
+      "name": "game_start_race_desert_rng_jitter",
+      "declared_size": 192,
+      "evidence": "segarally95-recomp/src/game/game_start_race_desert_rng_jitter.c:10",
+      "source_sha256": "6895cb26d15be0db22276d252361ecc7b05b9c2f6c69ed456cc931eb6e2b36f1",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00041ca0",
+      "name": "game_start_race_desert_tgp55_walk",
+      "declared_size": 456,
+      "evidence": "segarally95-recomp/src/game/game_start_race_desert_tgp55_walk.c:8",
+      "source_sha256": "8e788be360ab56ee3c033eba769613d6977e558d1ab1a02aecdf601f30efa3c0",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00041e70",
+      "name": "game_start_race_course_centroid",
+      "declared_size": 256,
+      "evidence": "segarally95-recomp/src/game/game_start_race_course_centroid.c:4",
+      "source_sha256": "4d4327a40a3f2c8fd6fd89f929510e653eece037642379a346bb06cb3a5ab64a",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00041f80",
+      "name": "game_start_race_desert_near_pick",
+      "declared_size": 356,
+      "evidence": "segarally95-recomp/src/game/game_start_race_desert_near_pick.c:7",
+      "source_sha256": "85ae3a52e81914b9d03aca8cd088fa96ff27980781b8e07e2938d41abc826c26",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000420f0",
+      "name": "game_start_race_logo_extra",
+      "declared_size": 144,
+      "evidence": "segarally95-recomp/src/game/game_start_race_logo_extra.c:9",
+      "source_sha256": "47c10e615dcce59a3f9f82c3d65aede80e1dea17fa4c4ba92cac79617523153d",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00042190",
+      "name": "game_start_race_desert_obj_near_flag",
+      "declared_size": 220,
+      "evidence": "segarally95-recomp/src/game/game_start_race_desert_obj_near_flag.c:7",
+      "source_sha256": "2fb5f632d10b699388b0ad39659f417c2ddcdf0d10b583dddc08cf5ec383f8fb",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000422b0",
+      "name": "game_start_race_desert_pose_step",
+      "declared_size": 1260,
+      "evidence": "segarally95-recomp/src/game/game_start_race_desert_pose_step.c:14",
+      "source_sha256": "eab82c41fac27a5970b597971aa0a553a42a4d4c7451634d2dc765621e93761d",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000427a0",
+      "name": "game_start_race_desert_node_frame",
+      "declared_size": 3088,
+      "evidence": "segarally95-recomp/src/game/game_start_race_desert_node_frame.c:9",
+      "source_sha256": "ee6ab7aca9aa9e078dfe694eabf2da4b7b64467684bd89f261455f44e80a181d",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00043790",
+      "name": "game_start_race_desert_node_init",
+      "declared_size": 152,
+      "evidence": "segarally95-recomp/src/game/game_start_race_desert_node_init.c:8",
+      "source_sha256": "37e7145c5d47a3e6434c17848222d3da26520db7a2aa0c7f6fb29b2cb390476d",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00046098",
+      "name": "geo_workram_slot_clear",
+      "declared_size": 64,
+      "evidence": "segarally95-recomp/src/game/geo_workram_slot_clear.c:2",
+      "source_sha256": "d9443a9763979b1a91efa422d456e1a4fe24bd33e0ca3b65d6ede4ec187a23b4",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000460e8",
+      "name": "geo_workram_pose_ring_init",
+      "declared_size": 112,
+      "evidence": "segarally95-recomp/src/game/geo_workram_pose_ring_init.c:11",
+      "source_sha256": "ef0f65169f31422c56c1d4731cba73e321f2016d225270fa25169ff46a34bf32",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00046160",
+      "name": "game_start_race_pose_ring_step",
+      "declared_size": 600,
+      "evidence": "segarally95-recomp/src/game/game_start_race_pose_ring_step.c:9",
+      "source_sha256": "0be24ec737c689302ca6e4a8bd0337d8a5c82f10fe6c4e6b068113e827db05ea",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00046470",
+      "name": "game_start_race_desert_slot_flag",
+      "declared_size": 248,
+      "evidence": "segarally95-recomp/src/game/game_start_race_desert_slot_flag.c:7",
+      "source_sha256": "f05aa28349e828e7dc64d308437ed99495bd7df9c19db9096c17dbb56e954f54",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00047330",
+      "name": "game_start_race_rank_list_seed",
+      "declared_size": 336,
+      "evidence": "segarally95-recomp/src/game/game_start_race_rank_list_seed.c:9",
+      "source_sha256": "cab0fe26461c69dcc59d2e99344f187354cd5c6f360006af3f23f6c1bf01f0fc",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000476f0",
+      "name": "geo_reg_texture_sync",
+      "declared_size": 476,
+      "evidence": "segarally95-recomp/src/game/geo_reg_texture_sync.c:3",
+      "source_sha256": "69825638fe8be6d6a5a2b7a23d32bd3c04f835d4263490f83c5abb3bf842c161",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x000478d0",
+      "name": "geo_render_state_clear",
+      "declared_size": 80,
+      "evidence": "segarally95-recomp/src/game/geo_render_state_clear.c:2",
+      "source_sha256": "6ccb0f42a75d76d0a0137636b5fab6ff872f13d0c6d6c3a78d4eda77fe368c01",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x00047920",
+      "name": "geo_attract_span_table_draw",
+      "declared_size": 384,
+      "evidence": "segarally95-recomp/src/game/geo_attract_span_table_draw.c:3",
+      "source_sha256": "99633408ed00f2a7f6dd4351f4f4c74bc5f673edf1cfdb9f542638fae24dd00d",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0005cce8",
+      "name": "geo_rng_u8",
+      "declared_size": 64,
+      "evidence": "segarally95-recomp/src/game/geo_rng_u8.c:4",
+      "source_sha256": "780056474197dbda7a9d65329e94a1900d79b24ba38f2af011ba0705e6699112",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0005cd38",
+      "name": "format_scan_bx_stub",
+      "declared_size": 20,
+      "evidence": "segarally95-recomp/src/libc/format_scan_bx_stub.c:3",
+      "source_sha256": "3826359a4a15429fc1c2b54edb56a110ab66f483428c224d756028fcdc167bb7",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0005cdc8",
+      "name": "libc_strcpy",
+      "declared_size": 64,
+      "evidence": "segarally95-recomp/src/libc/libc_strcpy.c:3",
+      "source_sha256": "cc26321828223a4175ccdcadae9569a4ffea5ba4a38afb5bd7ae9d1151c8a03d",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0005ce18",
+      "name": "libc_scanf_setup",
+      "declared_size": 160,
+      "evidence": "segarally95-recomp/src/libc/libc_scanf_setup.c:3",
+      "source_sha256": "db8c61f0bd29f2611e31abe74ad655793f356444ec66b62bc07f3c0dc6171ef9",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0005cec0",
+      "name": "libc_printf",
+      "declared_size": 80,
+      "evidence": "segarally95-recomp/src/libc/libc_printf.c:3",
+      "source_sha256": "94bc43020b300d8b2b4cdb91034f972f0b400698aec26e3d865377e7d136e610",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0005cf50",
+      "name": "libc_printf_dispatch",
+      "declared_size": 128,
+      "evidence": "segarally95-recomp/src/libc/libc_printf_dispatch.c:3",
+      "source_sha256": "b3f1b3b3d19ae40691518d9473a29e7caffb60475099b09a0d46d17b8e13781a",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0005cfb8",
+      "name": "libc_printf_format_loop",
+      "declared_size": 20,
+      "evidence": "segarally95-recomp/src/libc/libc_printf_format_loop.c:3",
+      "source_sha256": "d8da5c1abc856ba31817849fe8448f580622f6c537ac5ce98b31b78ff25f23f4",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0005d1c8",
+      "name": "cgm_printf_handler_hash",
+      "declared_size": 8,
+      "evidence": "segarally95-recomp/src/libc/cgm_printf_handler_hash.c:3",
+      "source_sha256": "b100bc955d312dfc78ad6fc4b2828943e7885a3584fc659a43e3d3e1566569f3",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0005d304",
+      "name": "cgm_printf_handler_digit",
+      "declared_size": 8,
+      "evidence": "segarally95-recomp/src/libc/cgm_printf_handler_digit.c:3",
+      "source_sha256": "2ba15afbfebdf3141ad8bb1fa07d52cf8cb9de82d39f5fe693d93ed574d64628",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0005d3dc",
+      "name": "cgm_printf_handler_d",
+      "declared_size": 824,
+      "evidence": "segarally95-recomp/src/libc/cgm_printf_handler_d.c:3",
+      "source_sha256": "5a65b09dc6fd4bef9a02d7d918780e8d8164aacc99e3491d491ed7e277725e3e",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0005d714",
+      "name": "cgm_printf_handler_u",
+      "declared_size": 212,
+      "evidence": "segarally95-recomp/src/libc/cgm_printf_handler_u.c:3",
+      "source_sha256": "7e3ec496cb9f5f2c90c888e7d84b0a2013a5b77cb7688ed73c8887e347217cd6",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0005d7e8",
+      "name": "cgm_template_emit",
+      "declared_size": 476,
+      "evidence": "segarally95-recomp/src/game/cgm_template_emit.c:3",
+      "source_sha256": "f306d1f9a1a5c7b4c6c57512bef9f3c560cd2db9a450f493e2809ecd2ec2d16f",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    },
+    {
+      "address": "0x0005daa0",
+      "name": "libc_memcpy",
+      "declared_size": 112,
+      "evidence": "segarally95-recomp/src/libc/libc_memcpy.c:3",
+      "source_sha256": "e09845ad35323336a8d43f3de35267bdb7e521a3f0b795f3affe19e36cb8ee08",
+      "provenance": "Address-only intersection of lifted=1 symbol labels with identical @rom declarations; a seed candidate, not runtime execution proof"
+    }
+  ],
+  "excluded_labels": [
+    {
+      "address": "0x00012d00",
+      "name": "scene_setup_init",
+      "reason": "No unique matching @rom name/address declaration; not guessed"
+    },
+    {
+      "address": "0x00013810",
+      "name": "comm_attract_inner_9",
+      "reason": "No unique matching @rom name/address declaration; not guessed"
+    },
+    {
+      "address": "0x000261b0",
+      "name": "tile_texture_descriptor_apply",
+      "reason": "No unique matching @rom name/address declaration; not guessed"
+    },
+    {
+      "address": "0x00029ae8",
+      "name": "scene_stream_lookup",
+      "reason": "No unique matching @rom name/address declaration; not guessed"
+    },
+    {
+      "address": "0x0002a4e0",
+      "name": "palram_bus_merge_host",
+      "reason": "No unique matching @rom name/address declaration; not guessed"
+    },
+    {
+      "address": "0x0002a750",
+      "name": "cgm_fifo_upload_span",
+      "reason": "No unique matching @rom name/address declaration; not guessed"
+    }
+  ]
+}

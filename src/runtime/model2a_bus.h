@@ -9,6 +9,8 @@
 
 namespace rt {
 
+class DeviceModel;
+
 struct Model2AAccess : Fatal {
     uint32_t address, value;
     unsigned width;
@@ -21,9 +23,12 @@ public:
     struct Diagnostics {
         uint64_t reference_gap_reads = 0, reference_gap_writes = 0;
         uint32_t reference_gap_last_write = 0;
+        uint64_t irq_reset_writes = 0;
     };
     Model2ABus(std::vector<uint8_t> program, std::vector<uint8_t> main_data);
     const Diagnostics &diagnostics() const { return diagnostics_; }
+    // Attach before CPU reset. The caller owns the shared native device model.
+    void set_model(DeviceModel *model) { model_ = model; }
     // Width accesses stay within one mapping. Cpu's unaligned instruction
     // helpers split into byte accesses, preserving mirror/boundary behavior.
     uint32_t fetch(uint32_t address) override;
@@ -41,6 +46,7 @@ private:
     uint32_t read(uint32_t address, unsigned width);
     void write(uint32_t address, unsigned width, uint32_t value);
     Diagnostics diagnostics_;
+    DeviceModel *model_ = nullptr;
     std::vector<uint8_t> program_, data_, ram_, work_, buffer_, cpu_control_, backup_;
 };
 

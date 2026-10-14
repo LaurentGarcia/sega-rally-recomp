@@ -2,6 +2,10 @@
 // A device not implemented in Model2ABus is an explicit frontier, not a pass.
 #include "runtime/gen_support.h"
 #include "runtime/model2a_bus.h"
+#ifdef M2_SRALLY_TGP
+#include "runtime/m2_tgp_board.h"
+#include <memory>
+#endif
 #include <cinttypes>
 #include <cstdio>
 #include <fstream>
@@ -10,6 +14,21 @@
 #include <vector>
 
 namespace {
+#ifdef M2_SRALLY_TGP
+// Native timing: complete pending FIFO work before reading buffer mailboxes,
+// as M2Board does. Register, FIFO and geometry semantics stay in the shared
+// TgpBoardModel; its trace-comparison policy is unused by this native bus.
+class NativeTgpModel : public rt::TgpBoardModel {
+public:
+    explicit NativeTgpModel(rt::TgpBoard &board) : TgpBoardModel(board), board_(board) {}
+    Check read(uint32_t address, uint32_t mask, uint32_t &value) override {
+        if (address >= 0x00900000 && address <= 0x0097ffff) board_.sync();
+        return TgpBoardModel::read(address, mask, value);
+    }
+private:
+    rt::TgpBoard &board_;
+};
+#endif
 std::vector<uint8_t> load(const char *path)
 {
     std::ifstream file(path, std::ios::binary);
@@ -20,8 +39,8 @@ std::vector<uint8_t> load(const char *path)
 
 int main(int argc, char **argv)
 {
-    if (argc != 4) {
-        std::fprintf(stderr, "usage: srally_boot PROGRAM.bin MAIN_DATA.bin INSTRUCTION_LIMIT\n");
+    if (argc != 4 && argc != 6) {
+        std::fprintf(stderr, "usage: srally_boot PROGRAM.bin MAIN_DATA.bin INSTRUCTION_LIMIT [TGP_TABLES.bin COPRO_DATA.bin]\n");
         return 2;
     }
     try {
@@ -31,11 +50,27 @@ int main(int argc, char **argv)
         if (used != requested.size() || !limit || limit > 100000000)
             throw std::runtime_error("instruction limit must be 1..100000000");
         rt::Model2ABus bus(load(argv[1]), load(argv[2]));
-        const auto report_contracts = [&bus] {
+#ifdef M2_SRALLY_TGP
+        std::unique_ptr<rt::TgpBoard> tgp;
+        std::unique_ptr<NativeTgpModel> tgp_model;
+        if (argc == 6) {
+            tgp = std::make_unique<rt::TgpBoard>(load(argv[4]), load(argv[5]));
+            tgp_model = std::make_unique<NativeTgpModel>(*tgp);
+            bus.set_model(tgp_model.get());
+        }
+#else
+        if (argc == 6) throw std::runtime_error("this runner was built without a native TGP program");
+#endif
+        const auto report_contracts = [&] {
             const auto &d = bus.diagnostics();
-            std::printf("reference_boot_gap reads=%" PRIu64 " writes=%" PRIu64
+            std::printf("reference_unmapped reads=%" PRIu64 " writes=%" PRIu64
                 " last_write=%08x pcb_verified=false\n",
                 d.reference_gap_reads, d.reference_gap_writes, d.reference_gap_last_write);
+            std::printf("irq_reset writes=%" PRIu64 " asynchronous_sources=false\n", d.irq_reset_writes);
+#ifdef M2_SRALLY_TGP
+            if (tgp) std::printf("native_tgp linked=true booted=%s instructions=%llu\n",
+                tgp->booted() ? "true" : "false", (unsigned long long)tgp->tgp_instructions());
+#endif
         };
         rt::Cpu cpu(&bus);
         rt::Lockstep schedule(cpu);

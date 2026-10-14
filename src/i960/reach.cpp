@@ -6,7 +6,7 @@
 
 namespace i960 {
 
-ReachResult reach(const std::vector<uint32_t> &seeds, const ReadWord &read) {
+ReachResult reach(const std::vector<uint32_t> &seeds, const ReadWord &read, bool require_full_instruction) {
     ReachResult r;
     std::set<uint32_t> indirect, stops, unmapped;
     std::deque<uint32_t> work(seeds.begin(), seeds.end());
@@ -21,7 +21,12 @@ ReachResult reach(const std::vector<uint32_t> &seeds, const ReadWord &read) {
                 unmapped.insert(pc);
                 break;
             }
-            const Insn in = decode(pc, *w0, read(pc + 4).value_or(0));
+            const auto w1 = read(pc + 4);
+            const Insn in = decode(pc, *w0, w1.value_or(0));
+            if (require_full_instruction && in.length == 8 && !w1) {
+                unmapped.insert(pc + 4);
+                break;
+            }
             if (!in.executable()) {
                 stops.insert(pc);
                 break;

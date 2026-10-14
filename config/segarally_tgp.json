@@ -1,0 +1,75 @@
+{
+  "schema": 1,
+  "romset": "srallycb",
+  "board": "model2a",
+  "source": {
+    "repository": "https://github.com/mamedev/mame",
+    "commit": "dddd73680656e355bb2b5beecab1167c9f07bf81",
+    "path": "src/mame/sega/model2.cpp",
+    "definition": "ROM_START(srallycb), MODEL2_CPU_BOARD"
+  },
+  "program": {
+    "region": "program",
+    "offset": "0x0005ae94",
+    "count_offset": "0x0005c898",
+    "word_count": 1665,
+    "sha256": "68bc45488a1c24a292c6b384bd3d015e6469ef2babf1037ab6194b951411c346",
+    "crc32": "072484b1",
+    "evidence": "Reset copies program+0x1000 to RAM0x5a0000; uploader ROM0x4bfc..0x4c30 reads RAM0x5f9e94/count0x5fb898, writes each word to FIFO0x884000 with coproctl bit31 set, then clears it."
+  },
+  "regions": [
+    {
+      "name": "copro_tgp_tables",
+      "size": 262144,
+      "fill": 0,
+      "loads": [
+        {
+          "file": "opr-14742a.45",
+          "offset": 0,
+          "size": 131072,
+          "crc32": "90c6b117",
+          "sha1": "f46429fffcee17d056f56d5fe035a33f1fd6c27e",
+          "load": "ROM_LOAD32_WORD"
+        },
+        {
+          "file": "opr-14743a.46",
+          "offset": 2,
+          "size": 131072,
+          "crc32": "ae7f446b",
+          "sha1": "5b9f1fc47caf21e061e930c0d72804e4ec8c7bca",
+          "load": "ROM_LOAD32_WORD"
+        }
+      ]
+    },
+    {
+      "name": "copro_data",
+      "size": 8388608,
+      "fill": 0,
+      "loads": [
+        {
+          "file": "mpr-17754.28",
+          "aliases": [
+            "mpr-17754.29"
+          ],
+          "offset": 0,
+          "size": 2097152,
+          "crc32": "81a84f67",
+          "sha1": "c0a9b690523a529e4015e9af10dc3fb2a1726f08",
+          "load": "ROM_LOAD32_WORD"
+        },
+        {
+          "file": "mpr-17755.29",
+          "aliases": [
+            "mpr-17755.28"
+          ],
+          "offset": 2,
+          "size": 2097152,
+          "crc32": "2a6e7da4",
+          "sha1": "e60803ae951489fe47d66731d15c32249ca547b4",
+          "load": "ROM_LOAD32_WORD"
+        }
+      ]
+    }
+  ],
+  "scope": "Native program generation and bounded boot/FIFO probe; full command-stream parity remains unverified."
+}

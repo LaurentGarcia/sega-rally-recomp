@@ -21,25 +21,26 @@ def reg(code, a, b, dest, m1=0, m2=0, m3=0):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--recompiler", type=Path, default=ROOT / "build/validation/segarally-pipeline/tools/m2recomp")
+    ap.add_argument("--recompiler", type=Path,
+                    help="Use this explicit generator; by default compile a fresh test-local generator")
     ap.add_argument("--compiler", default=os.environ.get("CXX", "c++"))
     args = ap.parse_args()
     compiler = shlex.split(args.compiler)
     OUT.mkdir(parents=True, exist_ok=True)
-    generator = args.recompiler.resolve()
-    if not generator.is_file():
+    generator = args.recompiler.resolve() if args.recompiler else OUT / "m2recomp"
+    if not args.recompiler:
         generator = OUT / "m2recomp"
         subprocess.run(compiler + ["-std=c++20", "-O1", "-Isrc", "tools/m2recomp/main.cpp", "src/i960/isa.cpp", "src/i960/decode.cpp", "src/i960/reach.cpp", "-o", str(generator)], cwd=ROOT, check=True)
     cases = []
     src1 = [(16, 0), (17, 0), (0, 1), (3, 1), (22, 1), (31, 1)]
     src2 = [(18, 0), (19, 0), (1, 1), (2, 1), (22, 1), (31, 1)]
     dests = [(24, 0), (25, 0), (0, 1), (2, 1)]
-    for code in [0x78b, 0x78c, 0x78d, 0x78f, 0x79b, 0x79c, 0x79d, 0x79f]:
+    for code in [0x78b, 0x78c, 0x78d, 0x78f, 0x79b, 0x79c, 0x79d, 0x79f, 0x680, 0x683, 0x6e2]:
         for a, m1 in src1:
             for b, m2 in src2:
                 for d, m3 in dests:
                     cases.append(reg(code, a, b, d, m1, m2, m3))
-    for code in [0x6c9, 0x6d9, 0x688, 0x68a]:
+    for code in [0x6c9, 0x6d9, 0x688, 0x68a, 0x68c]:
         for a, m1 in src1:
             for d, m3 in dests:
                 cases.append(reg(code, a, 0, d, m1, 0, m3))
@@ -51,6 +52,13 @@ def main():
         for d in [24, 25]:
             cases.append(reg(0x6c3, a, 0, d, m1))
     cases.append(reg(0x66d, 0, 0, 0))
+    for a, m1 in src1:
+        for b, m2 in src2:
+            cases.append(reg(0x695, a, b, 0, m1, m2))
+    for a, m1 in [(20, 0), (21, 0), (31, 1)]:
+        for b, m2 in [(22, 0), (23, 0), (31, 1)]:
+            for d in [20, 22, 24]:
+                cases.append(reg(0x5b0, a, b, d, m1, m2))
     image = bytearray(0x10000)
     for addr, value in [(0, 0x100), (4, 0x200), (12, 0x1000), (0x214, 0x300), (0x198, 0x800)]:
         struct.pack_into("<I", image, addr, value)
@@ -93,7 +101,7 @@ struct Memory : rt::Bus {
     void write_dword(uint32_t a,uint32_t v) override { write_word(a,v);write_word(a+2,v>>16); }
 };
 static void seed(rt::Cpu &c,unsigned scenario,uint32_t ip) {
-    c.m_IP=ip;c.m_PC=0x001f2002;c.m_AC=(scenario&3u)<<30;c.m_ICR=0xff000000;
+    c.m_IP=ip;c.m_PC=0x001f2002;c.m_AC=((scenario&3u)<<30)|(scenario&7u);c.m_ICR=0xff000000;
     for(unsigned i=0;i<32;i++) c.m_r[i]=0x12340000u+i;
     const double a[]={8.25,-2.5,0.,-0.,1.e-30,1.e30,0.5,3.141592653589793};
     const double b[]={3.5,2.25,1.,0.,2.e-30,2.e30,-0.5,0.25};
@@ -108,6 +116,10 @@ static void seed(rt::Cpu &c,unsigned scenario,uint32_t ip) {
         uint64_t av=std::bit_cast<uint64_t>(a[scenario]),bv=std::bit_cast<uint64_t>(b[scenario]);
         c.m_r[16]=av;c.m_r[17]=av>>32;c.m_r[18]=bv;c.m_r[19]=bv>>32;
     }
+    const uint32_t carry_a[]={0xffffffffu,0x7fffffffu,0x80000000u,0u,1u,0xfffffffeu,0x80000001u,0x12345678u};
+    const uint32_t carry_b[]={1u,1u,0x80000000u,0xffffffffu,0x7fffffffu,2u,0x80000001u,0x87654321u};
+    c.m_r[20]=carry_a[scenario];c.m_r[21]=carry_b[scenario];
+    c.m_r[22]=carry_b[scenario];c.m_r[23]=carry_a[scenario];
     c.m_rcache_pos=scenario;
     for(unsigned f=0;f<4;f++) {
         c.m_rcache_frame_addr[f]=0x8000+64*f;

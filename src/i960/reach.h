@@ -24,7 +24,8 @@ struct ReachResult {
     std::vector<uint32_t> unmapped_targets; // direct targets outside the image
 };
 
-ReachResult reach(const std::vector<uint32_t> &seeds, const ReadWord &read);
+ReachResult reach(const std::vector<uint32_t> &seeds, const ReadWord &read,
+                  bool require_full_instruction = false);
 
 // Seeds from the i960 boot structures, read the way MAME's i960 core reads
 // them: reset IP (word 12), interrupt handlers (PRCB+20 -> table + 36 +

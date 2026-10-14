@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "romset": "srallycb",
+  "relocations": [
+    {
+      "guest": "0x005a0000",
+      "program_offset": "0x00001000",
+      "size": "0x00060000",
+      "name": "reset_workram_copy",
+      "evidence": {
+        "destination_lda_pc": "0x00000518",
+        "source_lda_pc": "0x00000520",
+        "loop_first_pc": "0x00000528",
+        "count_shlo_pc": "0x00000530",
+        "loop_branch_pc": "0x00000544",
+        "contract": "Reset copies 3 << 15 words, incrementing source and destination by four; source [0x1000,0x61000) becomes work RAM [0x5a0000,0x600000). Original ROM PCs retain their displacement semantics when decoded at the guest RAM PC."
+      },
+      "runtime_contract": "RAM remains writable. Before each native relocated instruction executes, both live RAM instruction words must equal the verified program bytes; mismatch is a hard runtime error. No generic RAM-to-ROM alias is installed."
+    }
+  ]
+}

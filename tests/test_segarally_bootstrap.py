@@ -115,6 +115,63 @@ class MappingTests(unittest.TestCase):
         self.assertIn("0x00220000", report["instruction_addresses"])
         self.assertNotIn("0x00220000", report["unmapped_targets"])
 
+    def test_explicit_relocation_retains_guest_relative_targets_and_bounds(self):
+        program = bytearray(0x100)
+        struct.pack_into("<I", program, 12, 0x40)
+        struct.pack_into("<I", program, 0x40, 0x08000008)  # b +8
+        struct.pack_into("<I", program, 0x48, 0x0a000000)  # ret
+        image = self.directory / "relative.bin"
+        image.write_bytes(program)
+        seedfile = self.directory / "relative-seeds.txt"
+        seedfile.write_text("005a0000\n005a0010\n005a1000\n")
+        generated = self.directory / "relative"
+        generated.mkdir()
+        report = generated / "report.json"
+        result = subprocess.run([str(self.tool), str(image), str(generated), "--board", "model2a",
+                                 "--relocated-code", "5a0000:40:10", "--seeds", str(seedfile),
+                                 "--report", str(report)], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        audit = json.loads(report.read_text())
+        self.assertIn("0x005a0000", audit["instruction_addresses"])
+        self.assertIn("0x005a0008", audit["instruction_addresses"])
+        self.assertIn("0x005a0010", audit["unmapped_targets"])
+        self.assertIn("0x005a1000", audit["unmapped_targets"])
+        self.assertTrue(audit["relocated_code"][0]["runtime_word_guard"])
+
+    def test_invalid_relocated_range_rejected(self):
+        for board, relocation in (("model2o", "5a0000:40:10"), ("model2a", "220000:40:10"),
+                                  ("model2a", "5ffffc:40:8"), ("model2a", "5a0000:3fffc:8"),
+                                  ("model2a", "5a0001:40:10"), ("model2a", "5a0000:40:0")):
+            with self.subTest(board=board, relocation=relocation):
+                result = subprocess.run([str(self.tool), str(self.directory / "program.bin"),
+                    str(self.directory), "--board", board, "--relocated-code", relocation],
+                    capture_output=True, text=True)
+                self.assertEqual(result.returncode, 2, result.stderr)
+
+    def test_long_instruction_relocation_boundary_requires_real_displacement(self):
+        for size in (4, 8):
+            with self.subTest(size=size):
+                image = self.directory / f"long-{size}.bin"
+                program = bytearray(0x80)
+                struct.pack_into("<I", program, 12, 0x20)
+                struct.pack_into("<I", program, 0x20, 0x0a000000)
+                # Self-authored lda absolute fixture. Displacement deliberately
+                # resembles another long opcode: it remains plain operand data.
+                struct.pack_into("<II", program, 0x40, 0x8c003000, 0x8c003000)
+                image.write_bytes(program)
+                seedfile = self.directory / f"long-{size}.txt"
+                seedfile.write_text("005a0000\n")
+                generated = self.directory / f"long-{size}"
+                generated.mkdir()
+                report = generated / "report.json"
+                result = subprocess.run([str(self.tool), str(image), str(generated), "--board", "model2a",
+                    "--relocated-code", f"5a0000:40:{size:x}", "--seeds", str(seedfile),
+                    "--report", str(report)], capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                audit = json.loads(report.read_text())
+                self.assertEqual("0x005a0000" in audit["instruction_addresses"], size == 8)
+                self.assertIn(f"0x005a000{size}", audit["unmapped_targets"])
+
 
 if __name__ == "__main__":
     (ROOT / "build").mkdir(exist_ok=True)

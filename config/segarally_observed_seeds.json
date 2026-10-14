@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "romset": "srallycb",
+  "notes": "Targets actually reached by bounded native reset execution, separate from prior lift-label candidates. Reaching a code target does not prove game boot or board completeness.",
+  "seeds": [
+    {
+      "address": "0x00031710",
+      "observed_runtime_address": "0x005d0710",
+      "name": "observed_reset_dispatch_indirect_target",
+      "evidence": "build/segarally-relocated/boot.json",
+      "observed_after_instructions": 1182657,
+      "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+      "provenance": "Native missing-code frontier after real reset and checked ROM-to-RAM copy; canonical ROM PC = 0x1000 + (0x5d0710 - 0x5a0000). Linear decoding at the canonical ROM address confirms an executable entry; no lifted implementation copied."
+    }
+  ]
+}

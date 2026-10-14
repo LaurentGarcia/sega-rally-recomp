@@ -1,5 +1,69 @@
 # Handoff
 
+## Guarded RAM code and native Rally TGP (2026-10-14)
+
+The expanded generation profile compiles 66,523 native instructions into 46
+objects, with zero missing templates. Its 403 prior-lift label candidates are
+kept distinct from one observed indirect target (`0x005d0710`, canonical ROM
+`0x31710`). This target was initially assumed present in the broader profile;
+an explicit `has_code` audit and native run disproved that assumption, so its
+actual execution evidence now seeds both profiles. There are still 400
+unresolved indirect sites and 13 invalid decode stops; this is static coverage,
+not full-game reachability. The six labels without matching source metadata
+are excluded, not guessed.
+
+The real reset copy is analyzed as a relocation, with each generated RAM
+instruction checking its live first and optional second word. Relative branches
+and loads keep their guest RAM semantics. A changed instruction throws before
+execution. The stricter reachability mode also rejects a missing displacement
+word rather than inventing zero; Daytona's existing callers keep their default
+behavior. Eight bootstrap/mapping tests, independent synthetic relative-code
+and mutation tests, and 14,496 native/reference opcode comparisons pass.
+The inherited reachability test also passes all 19 compatibility checks.
+
+The new bounded native/reference harness compares architectural registers,
+FP/cache/control/IRQ state and every ordered memory write after each completed
+instruction. With independently instantiated native TGP boards, it passed
+1,183,027 instructions and 361,067 writes using the same bus implementation
+on both sides (not independent hardware parity). The native boot
+then stops at PC `0x005a0e34`, byte write `0x11` to the mapped I/O chip at
+`0x01c00000`. The preceding legacy-DPRAM probe at `0x01c00202` is genuinely
+unmapped on Model 2A; its reference zero/discard behavior is counted. Initial
+buffer and backup SRAM now match pinned reset contracts. IRQ acknowledgments
+and zero-mask reset writes are supported; a nonzero enable still stops until
+asynchronous board timing is implemented.
+
+Rally's actual TGP upload is 1,665 words at program offset `0x5ae94`, count at
+`0x5c898`, CRC32 `072484b1`. Daytona's unchanged TGP generator produces native
+code: 1,663 words use implemented instructions and 735 are reached by constant
+flow. The startup probe uploads through Model2ABus and the inherited
+TgpBoardModel/TgpBoard, sends the real first function-port command, and gets
+response `8` after 108 native instructions, with output FIFO empty afterward.
+This is not full command-stream parity. All table/data word lanes, hashes,
+aliases, and padding were independently checked. Six synthetic importer tests
+cover invalid hashes, alias conflicts, swapped contents, missing inputs and
+duplicate names. `--with-tgp` links this code to the main runner; the current
+main-core frontier precedes the upload, so it reports TGP booted=false there.
+
+The prior prototype now defaults to the complete validated Daytona geometry
+priority, culling, and palette contract. Sixteen matched real scenes keep the
+roof decal stable (961 red pixels), window dark coverage at 976–981 pixels,
+and identical sky regions. Header palette zero now yields a black shadow,
+replacing the earlier guessed palette-256 tan patch. A raw-command comparison
+of 141 objects / 3,370 face+attribute records has zero differences from
+Daytona. The earlier claim of lost clouds was a mismatched-capture comparison
+and is disproved. Priority/material/fillmap/Metal tests pass; the signed app
+was installed on iPhone Lauren. Launch failed with iOSLocked, so on-phone play
+of this correction is unverified. Generated apps and captures remain ignored.
+
+Next lanes: exact 315-5649 I/O, 93C46 EEPROM, board timing, further observed
+code targets, and full native startup. Installed MAME 0.289 cannot produce a
+full reference trace without three absent required ROMs: drive `epr-17891.ic12`,
+communication `epr-16726.bin`, billboard `epr-18022.ic2`. No local archive
+contains them; they are fixed devices, not removable slots. The communication
+program was initially mislabeled as SCSP BIOS; the actual SCSP program is the
+present `epr-17890a.30`. No substitute ROMs or downloads were used.
+
 ## Sega Rally native bring-up (2026-10-14)
 
 The next checkpoint follows the pinned reference's read-zero/discarded-write
