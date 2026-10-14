@@ -12,7 +12,7 @@ The [design](sega-rally-design.md) records interpretation and hardware limits.
 | Driving parity | 600 million instructions, 19,641,024 ordered writes, 1,365,742,448 cycles, 32,576 IRQs and 3,142 renders; nineteen replay events match | Independent CPU with shared board implementations; no full MAME race |
 | Later game paths | Held-gas v13 runs two billion instructions and 10,701 renders without a code/device frontier; returns to attract | Game Over overlay and a new credit/start sequence not separately validated |
 | Course progress | Desert clear/results show 1:12.15; forested second course enters, times out, then attract returns | Centered steering does not complete second-course bends; remaining courses unvalidated |
-| Metal fidelity | Startup warning matches CPU renderer pixel for pixel; stable fan path is used | Exact racing-scene raster parity remains open |
+| Metal fidelity | Optional polygon scanlines reduce error in three real scenes; default-off captures match the stable renderer; 243 synthetic cases pass | Still off by default; exact racing-scene raster parity and updated performance remain open |
 | Sound generation | Native linked board captures 2,409,170 stereo frames: 54.6297052 seconds including nonzero 44.1 kHz PCM; shared-core drains agree | Whole-game audio parity unvalidated |
 | Audio output | Windowed session supplies 7,165,805 stereo frames with zero drops or estimated input shortfalls; user heard a separate ten-second native PCM sample | Live-game listening feedback and physical fidelity remain open |
 | Hardware fidelity | Isolated device/reference tests and instruction-timed diagnostics | PCB timing, extF80 precision and full-machine behavior remain open |
@@ -65,8 +65,33 @@ The first paired car frame differs in 15,830 of 190,464 RGB pixels (8.31%),
 with mean absolute channel error 0.7278/255. Re-rendering that frozen CPU scene
 as triangle fans reduces the difference to 1,602 pixels and 0.040408/255,
 attributing 94.45% of mean error to interpolation. This diagnosis does not
-establish a production whole-polygon fix or exact race rendering. A stable
-picture and correct polygon ordering remain distinct from pixel fidelity.
+establish exact race rendering. A stable picture and correct polygon ordering
+remain distinct from pixel fidelity.
+
+The optional polygon scanline implementation now uses the CPU reference's two
+edge chains for 4–8 vertex solids and textures. Rounded spans control coverage
+over a conservative rectangle; texture shading remains on the GPU.
+
+| Captured frame | Stable differing RGB pixels | Candidate differing RGB pixels | Stable mean channel error | Candidate mean channel error |
+| --- | ---: | ---: | ---: | ---: |
+| 1,634, first car | 15,830 | 822 | 0.727817 | 0.019426 |
+| 2,329, race start | 13,896 | 1,244 | 0.577714 | 0.027496 |
+| 2,599, driving | 21,236 | 599 | 0.698309 | 0.013448 |
+
+Each image is 496×384; error is the mean absolute RGB channel difference on a
+0–255 scale. These frozen scenes use the earlier sound-off generations. They
+do not measure current v13 gameplay speed. The option remains off by default;
+disabled captures match the committed stable renderer. The synthetic Metal
+fixture passes 243 native-resolution cases, including rounded edges, clipping,
+crossed chains, checker pixels and layered transparent/opaque texels.
+
+The stray white pixel at (125,75), attributed to solid polygon 353, now matches
+the CPU's black pixel. Ten pixels improve to exact matches versus the previous
+prototype; one at (147,20) worsens and its cutout ownership remains unresolved.
+Other differences include the untouched triangle path and texture precision.
+The CPU's repeated floating-point additions are not reproduced exactly by
+the per-fragment formula. Broader scenes, continuous flicker and performance
+remain to test before enabling this path for play.
 
 ## Next validation work
 

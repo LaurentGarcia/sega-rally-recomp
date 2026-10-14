@@ -194,7 +194,8 @@ target_link_libraries(m2sndrecomp PRIVATE m68k)
 # compiles all of it; the daytona executable itself also needs the generated
 # game code (below).
 option(M2_BUILD_WINDOWED_APP "Build the inherited Daytona SDL3 launcher and windowed app" ON)
-if(M2_BUILD_WINDOWED_APP AND EXISTS ${CMAKE_SOURCE_DIR}/extern/sdl3/CMakeLists.txt)
+option(M2_METAL_TESTS "Build and register tests that require a working macOS Metal device" OFF)
+if((M2_BUILD_WINDOWED_APP OR M2_METAL_TESTS) AND EXISTS ${CMAKE_SOURCE_DIR}/extern/sdl3/CMakeLists.txt)
     if(ANDROID)
         # SDLActivity loads libSDL3.so before the game's libmain.so.
         set(M2_SDL_TARGET SDL3::SDL3-shared)
@@ -215,7 +216,9 @@ if(M2_BUILD_WINDOWED_APP AND EXISTS ${CMAKE_SOURCE_DIR}/extern/sdl3/CMakeLists.t
         add_subdirectory(${CMAKE_SOURCE_DIR}/extern/sdl3 ${CMAKE_BINARY_DIR}/sdl3 EXCLUDE_FROM_ALL SYSTEM)
         set_directory_properties(PROPERTIES COMPILE_OPTIONS "${M2_COMPILE_OPTIONS}")
     endif()
+endif()
 
+if(M2_BUILD_WINDOWED_APP AND EXISTS ${CMAKE_SOURCE_DIR}/extern/sdl3/CMakeLists.txt)
     # Dear ImGui (launcher UI), with its SDL3 and SDL_GPU backends
     if(NOT ANDROID AND NOT IOS)
         add_executable(test_gpu_startup tests/test_gpu_startup.cpp)
@@ -540,6 +543,19 @@ target_include_directories(test_comm_board PRIVATE src)
 add_test(NAME comm_board COMMAND test_comm_board)
 
 # Wheel and pedal bindings against SDL virtual joysticks.
+if(M2_METAL_TESTS)
+    if(NOT APPLE OR IOS OR NOT TARGET SDL3::SDL3-static)
+        message(FATAL_ERROR "M2_METAL_TESTS requires macOS and the pinned SDL3 source")
+    endif()
+    add_executable(test_gpu_polygon_scanlines tests/test_gpu_polygon_scanlines.cpp
+        src/app/gpu/gpu_renderer.cpp src/runtime/video.cpp src/runtime/raster.cpp)
+    target_include_directories(test_gpu_polygon_scanlines PRIVATE src)
+    target_compile_definitions(test_gpu_polygon_scanlines PRIVATE SDL_MAIN_HANDLED)
+    target_link_libraries(test_gpu_polygon_scanlines PRIVATE SDL3::SDL3-static "-framework Metal" "-framework QuartzCore")
+    add_test(NAME gpu_polygon_scanlines COMMAND test_gpu_polygon_scanlines)
+    set_tests_properties(gpu_polygon_scanlines PROPERTIES TIMEOUT 60 LABELS "metal")
+endif()
+
 if(TARGET SDL3::SDL3-static)
     add_executable(test_segarally_audio tests/test_segarally_audio.cpp)
     target_include_directories(test_segarally_audio PRIVATE src)

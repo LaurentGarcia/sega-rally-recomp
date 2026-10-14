@@ -34,6 +34,9 @@ public:
     void shutdown();
     bool ok() const { return poly_pipe_ != nullptr; }
     const std::string &error() const { return error_; }
+    // Diagnostic opt-in: 4–8 vertex polygons use CPU-reference scanline
+    // coverage/interpolation and GPU shading. Default remains the fan path.
+    void set_polygon_scanlines(bool enabled) { polygon_scanlines_ = enabled; }
 
     // Draws the frame into `target` (at least w x h times `scale`, created
     // with COLOR_TARGET usage): the back tilemap layers, the 3D polygons, the
@@ -49,7 +52,10 @@ private:
         float ooz, uoz, voz; // render_one's p[0..2]: 1/z, u/z, v/z
         float r, g, b, a;
         uint32_t info[4], more[2]; // texture state (m2.hlsl PolyIn)
+        uint32_t edges[2]; // storage offset; left/right edge counts and scale
     };
+    struct PolyEdge { float origin[4], step[4], tail[4]; };
+    static_assert(sizeof(PolyEdge) == 48); // HLSL StructuredBuffer stride
     struct QuadVertex {
         float x, y, u, v;
     };
@@ -67,6 +73,10 @@ private:
     SDL_GPUBuffer *vbuf_ = nullptr, *qbuf_ = nullptr;
     // storage buffers: texture RAM (both sheets), luma RAM, colour translation with gamma
     SDL_GPUBuffer *texram_ = nullptr, *luma_ = nullptr, *xlat_ = nullptr;
+    SDL_GPUBuffer *edges_ = nullptr;
+    uint32_t edges_size_ = 0;
+    bool polygon_scanlines_ = false;
+    std::vector<PolyEdge> poly_edges_;
     uint64_t texram_generation_ = ~0ull; // the texture RAM generation texram_ holds
     // the tilemaps: pixmaps (4 x 512 x 512 u16), header + pens + tile words
     SDL_GPUBuffer *tilepix_ = nullptr, *tiledata_ = nullptr;
@@ -87,7 +97,7 @@ private:
     SDL_GPUShader *shader(const unsigned char *spv, size_t spv_len, const unsigned char *dxil, size_t dxil_len,
                           const char *msl, const char *dxil_entry, SDL_GPUShaderStage stage, int uniforms, int samplers,
                           int storage_buffers = 0);
-    bool ensure(int w, int h, int scale, uint32_t vert_bytes);
+    bool ensure(int w, int h, int scale, uint32_t vert_bytes, uint32_t edge_bytes);
     void build(const rt::Video &video, int w, int h, int scale);
 };
 

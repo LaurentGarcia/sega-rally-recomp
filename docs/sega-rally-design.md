@@ -173,10 +173,19 @@ LaunchServices with a persistent diagnostic log.
 An isolated same-scene CPU triangle-fan rerender reduces the GPU difference
 to 1,602 pixels and mean channel error 0.040408/255. This attributes 94.45% of
 mean error to polygon interpolation: the CPU uses outer scanline edges for
-four-to-eight-vertex polygons; the GPU uses triangle fans. Production shaders
-are unchanged at this checkpoint. Residual edge/texture/precision differences
-remain separate. Any correction must preserve the common shader path and the
-existing ordering/tile contracts, with real-scene and performance checks.
+four-to-eight-vertex polygons; the default GPU path uses triangle fans.
+The optional `SEGARALLY_GPU_POLYGON_SCANLINES=1` path now uploads the same two
+edge chains and uses a conservative rectangle plus rounded-span rejection for
+solid and textured polygons. It preserves the common shader, ordering, scissor
+and tile composition. First-car differences fall to 822 pixels and mean channel
+error 0.019426/255; two driving captures also improve. The candidate with the
+option disabled matches the committed stable renderer in those captures.
+The native-resolution synthetic coverage/cutout fixture passes 243 cases.
+This is a diagnostic correction: triangle coverage, repeated floating-point
+addition in the CPU texture span, and residual cutout/texture differences remain.
+One first-car pixel worsens versus the earlier prototype and its exact ownership
+is unresolved. No new performance result or whole-game fidelity claim follows;
+the option stays off by default. See [the evidence table](segarally-status.md#graphics-evidence).
 The host also accepts the bounded cabinet replay and holds its final snapshot
 through one complete frame before handing control to keyboard/touch. Both
 rendering instances receive identical inputs. Normal board-time pacing is the

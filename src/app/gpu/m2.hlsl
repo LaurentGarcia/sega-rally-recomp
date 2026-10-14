@@ -1,3 +1,7 @@
+// license:BSD-3-Clause
+// copyright-holders:R. Belmont, Olivier Galibert, ElSemi, Angelo Salese, Matthew Daniels, Ville Linde, Aaron Giles
+// Raster texture shading and optional polygon interpolation adapt the pinned
+// MAME port in runtime/raster.cpp; see THIRD_PARTY.md.
 // Shaders for the hardware (SDL_GPU) renderer: one source for every backend.
 // scripts/build_shaders.py compiles it with DXC to SPIR-V (Vulkan) and DXIL
 // (Direct3D 12), and SPIRV-Cross turns the SPIR-V into MSL (Metal); the result
@@ -25,6 +29,7 @@ struct PolyIn {
     float4 color : TEXCOORD3;
     uint4 info : TEXCOORD4;
     uint2 more : TEXCOORD5;
+    uint2 edges : TEXCOORD6;
 };
 struct PolyOut {
     float4 pos : SV_Position;
@@ -32,6 +37,7 @@ struct PolyOut {
     nointerpolation float4 color : TEXCOORD1;
     nointerpolation uint4 info : TEXCOORD2;
     nointerpolation uint2 more : TEXCOORD3;
+    nointerpolation uint2 edges : TEXCOORD4;
 };
 
 PolyOut vs_poly(PolyIn i) {
@@ -41,6 +47,7 @@ PolyOut vs_poly(PolyIn i) {
     o.color = i.color;
     o.info = i.info;
     o.more = i.more;
+    o.edges = i.edges;
     return o;
 }
 
@@ -51,6 +58,56 @@ PolyOut vs_poly(PolyIn i) {
 [[vk::binding(0, 2)]] StructuredBuffer<uint> texram : register(t0, space2);
 [[vk::binding(1, 2)]] StructuredBuffer<uint> lumaram : register(t1, space2);
 [[vk::binding(2, 2)]] StructuredBuffer<uint> xlat : register(t2, space2);
+struct PolyEdge { float4 origin; float4 step; float4 tail; };
+[[vk::binding(3, 2)]] StructuredBuffer<PolyEdge> polyedges : register(t3, space2);
+
+// poly.h round_coordinate (float): exact halves go toward negative infinity.
+// Preserve raster.cpp's saturation and pinned NaN result as well.
+int round_coordinate(float value) {
+    if (isnan(value)) return int(0x80000000u);
+    if (value >= 2147483648.0) return 2147483647;
+    const float ipart = floor(value);
+    if (ipart < -2147483648.0) return int(0x80000000u);
+    return int(ipart) + ((value - ipart > 0.5) ? 1 : 0);
+}
+
+// Diagnostic coverage/interpolation from Raster::render_polygon. A rectangle
+// supplies fragment candidates; both solid and textured polygons accept only
+// their rounded, left-inclusive/right-exclusive outer-edge span.
+float3 polygon_oz(PolyOut i) {
+    const uint nl = i.edges.y & 15u, nr = (i.edges.y >> 4) & 15u;
+    if (nl == 0u || nr == 0u) return i.oz;
+    const float scale = float(i.edges.y >> 8);
+    const float2 p = i.pos.xy / scale;
+    const int2 pixel = int2(i.pos.xy);
+    uint l = i.edges.x, r = l + nl;
+    // At scale 1 these are the CPU's exact native row bounds. Enhanced
+    // resolution applies the same half-open rule on the larger pixel grid.
+    if (pixel.y < round_coordinate(polyedges[l].tail.w * scale) ||
+        pixel.y >= round_coordinate(polyedges[l].tail.z * scale)) discard;
+    for (uint k = 1u; k < nl; ++k) {
+        if (!(p.y > polyedges[l].tail.y && p.y < polyedges[l].tail.z)) break;
+        ++l;
+    }
+    for (uint k = 1u; k < nr; ++k) {
+        if (!(p.y > polyedges[r].tail.y && p.y < polyedges[r].tail.z)) break;
+        ++r;
+    }
+    const PolyEdge le = polyedges[l], re = polyedges[r];
+    precise float ldy = p.y - le.origin.y, rdy = p.y - re.origin.y;
+    precise float startx = le.origin.x + ldy * le.step.x;
+    precise float stopx = re.origin.x + rdy * re.step.x;
+    const int left = round_coordinate(startx * scale), right = round_coordinate(stopx * scale);
+    // The reference swaps integer endpoints when the chains cross, without
+    // swapping the float origins used for parameter interpolation.
+    if (pixel.x < min(left, right) || pixel.x >= max(left, right)) discard;
+    if ((i.info.x & 3u) < 2u) return i.oz;
+    precise float3 lp = float3(le.origin.zw, le.tail.x) + ldy * le.step.yzw;
+    precise float3 rp = float3(re.origin.zw, re.tail.x) + rdy * re.step.yzw;
+    precise float3 dpdx = (rp - lp) * (1.0 / (stopx - startx));
+    precise float3 oz = lp + (p.x - startx) * dpdx;
+    return oz;
+}
 
 static const uint log2_table[128] = {0, 2, 5, 8, 11, 14, 16, 19, 22, 25, 27, 30, 33, 35, 38, 40, 43, 46, 48, 51, 53, 56, 58, 61, 63, 65, 68, 70, 73, 75, 77, 80, 82, 84, 87, 89, 91, 93, 96, 98, 100, 102, 104, 106, 109, 111, 113, 115, 117, 119, 121, 123, 125, 127, 129, 132, 134, 136, 138, 140, 141, 143, 145, 147, 149, 151, 153, 155, 157, 159, 161, 162, 164, 166, 168, 170, 172, 173, 175, 177, 179, 181, 182, 184, 186, 188, 189, 191, 193, 194, 196, 198, 200, 201, 203, 205, 206, 208, 209, 211, 213, 214, 216, 218, 219, 221, 222, 224, 225, 227, 229, 230, 232, 233, 235, 236, 238, 239, 241, 242, 244, 245, 247, 248, 250, 251, 253, 254};
 
@@ -158,16 +215,17 @@ float4 ps_poly(PolyOut i) : SV_Target {
         if (((p.x ^ p.y) & 1u) == 0u) discard;
     }
     const uint renderer = flags & 3u;
+    const float3 oz = polygon_oz(i); // coverage must also run for solid polygons
     if (renderer < 2u) return i.color; // solid: its palette colour, from the CPU
 
     // raster.cpp draw_tex_span, one pixel
     const bool translucent = renderer == 3u;
     const int max_level = int((flags >> 12) & 31u);
-    const float z = 1.0 / i.oz.x;
+    const float z = 1.0 / oz.x;
     const int mml = -int(i.more.x) + fast_log2(z);
     const int level = clamp(mml >> 7, 0, max_level);
-    const int u = to_s32(i.oz.y * z * 256.0);
-    const int v = to_s32(i.oz.z * z * 256.0);
+    const int u = to_s32(oz.y * z * 256.0);
+    const int v = to_s32(oz.z * z * 256.0);
     uint t = fetch_texel(i.info, level, u, v, translucent);
     if (mml > 0 && level < max_level) {
         const uint t2 = fetch_texel(i.info, level + 1, u, v, translucent);

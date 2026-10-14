@@ -1,5 +1,51 @@
 # Handoff
 
+## Optional Metal polygon scanlines integrated (2026-10-14)
+
+The corrected four-file GPU candidate and ROM-free fixture are integrated from
+`build/worktrees/mac-raster-fidelity`. The default remains the triangle fan;
+`SEGARALLY_GPU_POLYGON_SCANLINES=1` explicitly selects two-chain span coverage
+and interpolation for 4–8 vertex solids and textures. Conservative rectangles
+provide candidates, then the shared shader rejects pixels outside the CPU's
+rounded half-open spans. Tile composition, scissor and polygon ordering stay
+intact. MAME-derived setup/shading notices and `THIRD_PARTY.md` are updated.
+
+Stable `38abb7c` GPU files compiled separately produce byte-identical output
+to the candidate with the option disabled at frames 513, 1634, 2329 and 2599.
+At first-car frame 1634, mean absolute RGB channel error falls from 0.727817
+to 0.019426 on the 0–255 scale, and differing pixels fall from 15,830 to 822.
+The two driving frames improve from 13,896 to 1,244 and 21,236 to 599 differing
+pixels. These are frozen sound-off v3/v6 scenes, not current v13 speed tests.
+The full first-car CPU image matches the preserved reference byte for byte.
+
+Polygon 353's white pixel at (125,75) now matches CPU black. Relative to the
+previous prototype, ten pixels become exact matches and one at (147,20)
+worsens. Relevant spans contain that pixel; exact cutout ownership remains
+unresolved. The full frozen polygon/raster memory is preserved for analysis.
+Triangle coverage and CPU repeated-addition texture precision remain open.
+No full fidelity, continuous flicker or performance claim; do not enable the
+candidate by default or replace the preserved playable app yet.
+
+All six shader entries regenerated for SPIR-V, DXIL and MSL; Metal executed
+the candidate. The integrated CMake fixture passes 243 cases and 46,282,752
+pixel comparisons, including varying-UV layered cutouts, outside the sandbox.
+The new `M2_METAL_TESTS` option defaults off. An initial attempt to enable the
+inherited windowed app exposed its absent ImGui checkout; tests now initialize
+SDL independently with the launcher disabled, avoiding that unrelated dependency.
+The Debug build emits only the existing unused `gpu_front_hud_` warning.
+
+Evidence is in the isolated `build/validation/report.json` (SHA-256
+`7ff6dc28f93598e66d7bef0064bb44c92431c73e84d5407d1956406b292099f4`) and
+`provenance.json` (SHA-256
+`7b9ed128e2d366b80b5cf322552a21397b6ea3dbf484554cfdc1a54cccdf2256`),
+with exact compiler/linker commands and linked input hashes. Main-tree
+`build/validation/mac-raster-fidelity/integration-results.json` records matching
+source hashes and the registered test. The original uncommitted prototype is
+preserved byte for byte as `original-prototype.patch` in that main evidence
+directory, SHA-256 `88ce63e1875dba182f66722bf69ebc8e0b3023714d32a485324e211c6dd5039b`.
+Next: resolve residual ownership with the saved scene, measure candidate GPU
+cost, and test broader scenes before a player-facing graphics change.
+
 ## Exact host resume transcript core (2026-10-14)
 
 The new bounded `segarally-host-resume-v1` core records every actual

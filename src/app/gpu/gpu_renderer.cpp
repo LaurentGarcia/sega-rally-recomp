@@ -1,11 +1,16 @@
+// license:BSD-3-Clause
+// copyright-holders:R. Belmont, Olivier Galibert, ElSemi, Angelo Salese, Matthew Daniels, Ville Linde, Aaron Giles
+// Polygon edge setup adapts runtime/raster.cpp's pinned MAME poly.h port.
 #include "app/gpu/gpu_renderer.h"
 
 #include "app/gpu/shaders_gen.h"
 #include "runtime/model2_priority.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstring>
+#include <cstdlib>
 #include <limits>
 #include <numeric>
 
@@ -52,13 +57,15 @@ SDL_GPUShader *GpuRenderer::shader(const unsigned char *spv, size_t spv_len, con
 
 bool GpuRenderer::init(SDL_GPUDevice *dev, SDL_GPUTextureFormat format) {
     dev_ = dev;
+    const char *scanlines = std::getenv("SEGARALLY_GPU_POLYGON_SCANLINES");
+    if (scanlines && std::strcmp(scanlines, "1") == 0) polygon_scanlines_ = true;
     for (int i = 0; i < 256; i++) // the rasterizer's gamma (MAME video_start)
         gamma_[i] = uint8_t(std::max((double(i) - 64.0) * 255.0 / 191.0, 0.0));
 
     SDL_GPUShader *vs_poly = shader(k_vs_poly_spv, sizeof k_vs_poly_spv, k_vs_poly_dxil, sizeof k_vs_poly_dxil,
                                     k_vs_poly_msl, "vs_poly", SDL_GPU_SHADERSTAGE_VERTEX, 1, 0);
     SDL_GPUShader *ps_poly = shader(k_ps_poly_spv, sizeof k_ps_poly_spv, k_ps_poly_dxil, sizeof k_ps_poly_dxil,
-                                    k_ps_poly_msl, "ps_poly", SDL_GPU_SHADERSTAGE_FRAGMENT, 0, 0, 3);
+                                    k_ps_poly_msl, "ps_poly", SDL_GPU_SHADERSTAGE_FRAGMENT, 0, 0, 4);
     SDL_GPUShader *vs_quad = shader(k_vs_quad_spv, sizeof k_vs_quad_spv, k_vs_quad_dxil, sizeof k_vs_quad_dxil,
                                     k_vs_quad_msl, "vs_quad", SDL_GPU_SHADERSTAGE_VERTEX, 1, 0);
     SDL_GPUShader *ps_quad = shader(k_ps_quad_spv, sizeof k_ps_quad_spv, k_ps_quad_dxil, sizeof k_ps_quad_dxil,
@@ -83,13 +90,14 @@ bool GpuRenderer::init(SDL_GPUDevice *dev, SDL_GPUTextureFormat format) {
     pvb.slot = 0;
     pvb.pitch = sizeof(PolyVertex);
     pvb.input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
-    SDL_GPUVertexAttribute pattr[6] = {
+    SDL_GPUVertexAttribute pattr[7] = {
         {0, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2, Uint32(offsetof(PolyVertex, x))},
         {1, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT, Uint32(offsetof(PolyVertex, depth))},
         {2, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, Uint32(offsetof(PolyVertex, ooz))},
         {3, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, Uint32(offsetof(PolyVertex, r))},
         {4, 0, SDL_GPU_VERTEXELEMENTFORMAT_UINT4, Uint32(offsetof(PolyVertex, info))},
         {5, 0, SDL_GPU_VERTEXELEMENTFORMAT_UINT2, Uint32(offsetof(PolyVertex, more))},
+        {6, 0, SDL_GPU_VERTEXELEMENTFORMAT_UINT2, Uint32(offsetof(PolyVertex, edges))},
     };
     SDL_GPUGraphicsPipelineCreateInfo pi{};
     pi.vertex_shader = vs_poly;
@@ -97,7 +105,7 @@ bool GpuRenderer::init(SDL_GPUDevice *dev, SDL_GPUTextureFormat format) {
     pi.vertex_input_state.vertex_buffer_descriptions = &pvb;
     pi.vertex_input_state.num_vertex_buffers = 1;
     pi.vertex_input_state.vertex_attributes = pattr;
-    pi.vertex_input_state.num_vertex_attributes = 6;
+    pi.vertex_input_state.num_vertex_attributes = 7;
     pi.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
     pi.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_NONE;
     pi.depth_stencil_state.enable_depth_test = true;
@@ -167,7 +175,10 @@ bool GpuRenderer::init(SDL_GPUDevice *dev, SDL_GPUTextureFormat format) {
     tilepix_ = SDL_CreateGPUBuffer(dev_, &sb);
     sb.size = kTileDataWords * 4;
     tiledata_ = SDL_CreateGPUBuffer(dev_, &sb);
-    if (!sampler_ || !qbuf_ || !texram_ || !luma_ || !xlat_ || !tilepix_ || !tiledata_) {
+    sb.size = sizeof(PolyEdge);
+    edges_ = SDL_CreateGPUBuffer(dev_, &sb);
+    edges_size_ = sb.size;
+    if (!sampler_ || !qbuf_ || !texram_ || !luma_ || !xlat_ || !tilepix_ || !tiledata_ || !edges_) {
         error_ = std::string("SDL_GPU setup: ") + SDL_GetError();
         shutdown();
         return false;
@@ -185,17 +196,18 @@ void GpuRenderer::shutdown() {
     if (depth_) SDL_ReleaseGPUTexture(dev_, depth_), depth_ = nullptr;
     if (vbuf_) SDL_ReleaseGPUBuffer(dev_, vbuf_), vbuf_ = nullptr;
     if (qbuf_) SDL_ReleaseGPUBuffer(dev_, qbuf_), qbuf_ = nullptr;
-    for (SDL_GPUBuffer **b : {&texram_, &luma_, &xlat_, &tilepix_, &tiledata_})
+    for (SDL_GPUBuffer **b : {&texram_, &luma_, &xlat_, &tilepix_, &tiledata_, &edges_})
         if (*b) SDL_ReleaseGPUBuffer(dev_, *b), *b = nullptr;
     texram_generation_ = ~0ull;
     tile_instance_ = 0;
     if (upload_) SDL_ReleaseGPUTransferBuffer(dev_, upload_), upload_ = nullptr;
     vbuf_size_ = upload_size_ = 0;
+    edges_size_ = 0;
     depth_w_ = depth_h_ = front_w_ = front_h_ = 0;
 }
 
 // Textures and buffers big enough for this frame.
-bool GpuRenderer::ensure(int w, int h, int scale, uint32_t vert_bytes) {
+bool GpuRenderer::ensure(int w, int h, int scale, uint32_t vert_bytes, uint32_t edge_bytes) {
     SDL_GPUTextureCreateInfo ti{};
     ti.type = SDL_GPU_TEXTURETYPE_2D;
     ti.layer_count_or_depth = 1;
@@ -229,7 +241,16 @@ bool GpuRenderer::ensure(int w, int h, int scale, uint32_t vert_bytes) {
         vbuf_ = SDL_CreateGPUBuffer(dev_, &bi);
         if (!vbuf_) return false;
     }
-    const uint32_t need = uint32_t(w) * uint32_t(h) * 4 + uint32_t(sizeof(QuadVertex) * 6) + vert_bytes +
+    if (edge_bytes > edges_size_) {
+        SDL_ReleaseGPUBuffer(dev_, edges_);
+        edges_size_ = std::max(edge_bytes, 1u << 16) * 2;
+        SDL_GPUBufferCreateInfo bi{};
+        bi.usage = SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ;
+        bi.size = edges_size_;
+        edges_ = SDL_CreateGPUBuffer(dev_, &bi);
+        if (!edges_) return false;
+    }
+    const uint32_t need = uint32_t(w) * uint32_t(h) * 4 + uint32_t(sizeof(QuadVertex) * 6) + vert_bytes + edge_bytes +
                           kTexramBytes + kLumaBytes + kXlatEntries * 4 + kTilePixBytes + kTileDataWords * 4;
     if (need > upload_size_) {
         if (upload_) SDL_ReleaseGPUTransferBuffer(dev_, upload_);
@@ -247,6 +268,7 @@ bool GpuRenderer::ensure(int w, int h, int scale, uint32_t vert_bytes) {
 void GpuRenderer::build(const rt::Video &video, int w, int h, int scale) {
     verts_.clear();
     batches_.clear();
+    poly_edges_.clear();
     const std::vector<rt::GeoPoly> &polys = video.gpu_polys();
     const rt::VideoMem &mem = video.gpu_mem();
     const int windows = video.gpu_windows();
@@ -328,7 +350,7 @@ void GpuRenderer::build(const rt::Video &video, int w, int h, int scale) {
         more[0] = uint32_t(poly.texlod + lod_bias);
         more[1] = le16(mem.palram, colorbase + 0x1000) & 0x7fff;
 
-        // model2_3d_project, then a fan from vertex 0 (the polygon is convex)
+        // model2_3d_project. The default path uses a fan from vertex 0.
         PolyVertex v[8];
         for (int k = 0; k < poly.num_vertices; k++) {
             const rt::GeoVertex &g0 = poly.v[k];
@@ -336,12 +358,81 @@ void GpuRenderer::build(const rt::Video &video, int w, int h, int scale) {
             const float ooz = 1.0f / z; // render_one, textured: p[0] = 1/z, p[1..2] scaled by it / 8
             v[k] = {float(crtc_x + dx + poly.center[0]) + g0.x / z, float((384 - poly.center[1]) + crtc_y) - g0.y / z, depth,
                     ooz, g0.p[1] * ooz * (1.0f / 8.0f), g0.p[2] * ooz * (1.0f / 8.0f),
-                    r, g, b, 1.0f, {info[0], info[1], info[2], info[3]}, {more[0], more[1]}};
+                    r, g, b, 1.0f, {info[0], info[1], info[2], info[3]}, {more[0], more[1]}, {0, 0}};
         }
-        for (int k = 1; k + 1 < poly.num_vertices; k++) {
-            verts_.push_back(v[0]);
-            verts_.push_back(v[k]);
-            verts_.push_back(v[k + 1]);
+        if (polygon_scanlines_ && poly.num_vertices >= 4) {
+            // Raster::render_polygon's two chains from minimum to maximum y.
+            // Upload geometry and parameter gradients; texture shading stays GPU.
+            int minv = 0, maxv = 0;
+            for (int k = 1; k < poly.num_vertices; ++k) {
+                if (v[k].y < v[minv].y) minv = k;
+                else if (v[k].y > v[maxv].y) maxv = k;
+            }
+            std::array<PolyEdge, 7> forward{}, backward{};
+            uint32_t nf = 0, nb = 0;
+            auto chain = [&](int direction, std::array<PolyEdge, 7> &edges, uint32_t &count) {
+                for (int cur = minv; cur != maxv;) {
+                    const int next = (cur + direction + poly.num_vertices) % poly.num_vertices;
+                    const auto &a = v[cur], &b = v[next];
+                    if (a.y != b.y) {
+                        const float ooy = 1.0f / (b.y - a.y);
+                        edges[count++] = {{a.x, a.y, a.ooz, a.uoz},
+                            {(b.x - a.x) * ooy, (b.ooz - a.ooz) * ooy,
+                             (b.uoz - a.uoz) * ooy, (b.voz - a.voz) * ooy},
+                            {a.voz, b.y, v[maxv].y, float(cur)}};
+                    }
+                    cur = next;
+                }
+            };
+            chain(1, forward, nf);
+            chain(-1, backward, nb);
+            if (nf && nb) {
+                const auto &f = forward.front(), &b = backward.front();
+                if (!((f.tail[3] == b.tail[3] && f.step[0] < b.step[0]) ||
+                      (f.tail[3] != b.tail[3] && f.origin[0] < b.origin[0]))) {
+                    forward.swap(backward);
+                    std::swap(nf, nb);
+                }
+                const uint32_t first = uint32_t(poly_edges_.size());
+                const uint32_t counts = nf | nb << 4 | uint32_t(scale) << 8;
+                poly_edges_.insert(poly_edges_.end(), forward.begin(), forward.begin() + nf);
+                poly_edges_.insert(poly_edges_.end(), backward.begin(), backward.begin() + nb);
+                // The initial-vertex indices were needed only to order the
+                // chains. Supply the global minimum y for the shader's row
+                // bounds, even when a horizontal edge was skipped.
+                for (size_t k = first; k < poly_edges_.size(); ++k) poly_edges_[k].tail[3] = v[minv].y;
+
+                // A fan cannot provide render_polygon coverage for every
+                // outline. Draw a conservative rectangle, then reject pixels
+                // outside the rounded CPU span in the common fragment shader.
+                // One extra native pixel keeps rasterizer subpixel snapping
+                // away from the actual boundary. The existing scissor still
+                // owns window clipping; depth/rank stays one per polygon.
+                float bx0 = v[0].x, bx1 = v[0].x;
+                for (int k = 1; k < poly.num_vertices; ++k) {
+                    bx0 = std::min(bx0, v[k].x);
+                    bx1 = std::max(bx1, v[k].x);
+                }
+                bx0 = std::max(std::floor(bx0) - 1.0f, float(x0));
+                bx1 = std::min(std::ceil(bx1) + 1.0f, float(x1 + 1));
+                const float by0 = std::max(std::floor(v[minv].y) - 1.0f, float(y0));
+                const float by1 = std::min(std::ceil(v[maxv].y) + 1.0f, float(y1 + 1));
+                if (bx0 < bx1 && by0 < by1) {
+                    PolyVertex rect[4] = {v[0], v[0], v[0], v[0]};
+                    rect[0].x = rect[2].x = bx0;
+                    rect[1].x = rect[3].x = bx1;
+                    rect[0].y = rect[1].y = by0;
+                    rect[2].y = rect[3].y = by1;
+                    for (auto &vertex : rect) vertex.edges[0] = first, vertex.edges[1] = counts;
+                    for (int k : {0, 1, 2, 1, 3, 2}) verts_.push_back(rect[k]);
+                }
+            }
+        } else {
+            for (int k = 1; k + 1 < poly.num_vertices; k++) {
+                verts_.push_back(v[0]);
+                verts_.push_back(v[k]);
+                verts_.push_back(v[k + 1]);
+            }
         }
         batches_.back().count = uint32_t(verts_.size()) - batches_.back().first;
     }
@@ -353,7 +444,8 @@ void GpuRenderer::render(SDL_GPUCommandBuffer *cmd, SDL_GPUTexture *target, int 
     scale = std::clamp(scale, 1, 4);
     build(video, w, h, scale);
     const uint32_t vert_bytes = uint32_t(verts_.size() * sizeof(PolyVertex));
-    if (!ensure(w, h, scale, vert_bytes)) return;
+    const uint32_t edge_bytes = uint32_t(poly_edges_.size() * sizeof(PolyEdge));
+    if (!ensure(w, h, scale, vert_bytes, edge_bytes)) return;
 
     // The tilemap pixmaps' rows to upload, per layer: the span of the tile
     // rows changed since tilepix_ was filled (everything for a new Video).
@@ -389,7 +481,9 @@ void GpuRenderer::render(SDL_GPUCommandBuffer *cmd, SDL_GPUTexture *target, int 
     std::memcpy(p + quad_at, quad, sizeof quad);
     const uint32_t verts_at = quad_at + uint32_t(sizeof quad);
     if (vert_bytes) std::memcpy(p + verts_at, verts_.data(), vert_bytes);
-    at = verts_at + vert_bytes;
+    const uint32_t edges_at = verts_at + vert_bytes;
+    if (edge_bytes) std::memcpy(p + edges_at, poly_edges_.data(), edge_bytes);
+    at = edges_at + edge_bytes;
     // luma RAM and the gamma'd colour translation every frame, texture RAM when it changed
     const rt::VideoMem &mem = video.gpu_mem();
     const uint32_t data_at = at;
@@ -452,6 +546,7 @@ void GpuRenderer::render(SDL_GPUCommandBuffer *cmd, SDL_GPUTexture *target, int 
     }
     upload_buffer(quad_at, qbuf_, 0, sizeof quad);
     if (vert_bytes) upload_buffer(verts_at, vbuf_, 0, vert_bytes);
+    if (edge_bytes) upload_buffer(edges_at, edges_, 0, edge_bytes);
     if (have_mem) {
         upload_buffer(data_at, luma_, 0, kLumaBytes);
         upload_buffer(data_at + kLumaBytes, xlat_, 0, kXlatEntries * 4);
@@ -505,8 +600,8 @@ void GpuRenderer::render(SDL_GPUCommandBuffer *cmd, SDL_GPUTexture *target, int 
         SDL_BindGPUGraphicsPipeline(pass, poly_pipe_);
         SDL_GPUBufferBinding vb{vbuf_, 0};
         SDL_BindGPUVertexBuffers(pass, 0, &vb, 1);
-        SDL_GPUBuffer *storage[3] = {texram_, luma_, xlat_};
-        SDL_BindGPUFragmentStorageBuffers(pass, 0, storage, 3);
+        SDL_GPUBuffer *storage[4] = {texram_, luma_, xlat_, edges_};
+        SDL_BindGPUFragmentStorageBuffers(pass, 0, storage, 4);
         for (const Batch &b : batches_) {
             if (!b.count) continue;
             const SDL_Rect clip{b.clip.x * scale, b.clip.y * scale, b.clip.w * scale, b.clip.h * scale};

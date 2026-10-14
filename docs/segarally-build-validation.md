@@ -149,6 +149,29 @@ a recorded race checkpoint for race claims; 180 startup frames do not establish
 racing-scene graphics fidelity. Hidden capture avoids activating another visible
 window but still consumes CPU/GPU time.
 
+### Optional polygon scanlines
+
+Newly compiled hosts accept `SEGARALLY_GPU_POLYGON_SCANLINES=1` in the direct
+process environment to enable the diagnostic polygon span path. It remains
+off by default, and preserved playtest binaries do not acquire it from source
+changes. Compare native 496×384 captures first; enhanced resolution has separate
+sampling behavior. The [status table](segarally-status.md#graphics-evidence)
+records current improvements and remaining differences.
+
+The synthetic fixture needs no game data. It does require the pinned SDL3
+checkout and a working macOS Metal/display session:
+
+```sh
+cmake -S . -B build/metal-tests -DM2_BUILD_WINDOWED_APP=OFF -DM2_METAL_TESTS=ON
+cmake --build build/metal-tests --target test_gpu_polygon_scanlines -j 2
+ctest --test-dir build/metal-tests --output-on-failure -R '^gpu_polygon_scanlines$'
+```
+
+`M2_METAL_TESTS` defaults to off so ordinary headless tests do not require a GPU.
+This explicitly enabled path builds SDL without requiring the inherited launcher.
+The fixture tests native-resolution coverage and layered cutouts against the
+CPU rasterizer; it is not a whole-game texture or performance benchmark.
+
 ## Optional sound experiment
 
 Sound requires both audited generated sound inputs and an explicit build option:
