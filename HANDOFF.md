@@ -1,5 +1,65 @@
 # Handoff
 
+## Exact indexed dispatch and the next Mac playtest (2026-10-14)
+
+`m2recomp --indexed-dispatch` now emits a sparse page/word index for exact
+instruction membership and chunk selection. It replaces binary address search
+and linear chunk scanning only. Every generated instruction, live RAM word
+guard, cycle charge and boundary check remains byte-identical. Unaligned PCs,
+displacement words, missing pages and other holes remain uncompiled. The flag
+is opt-in in the Sega Rally pipeline, including fixed-point generations, and
+cannot be combined with `--fast_inaccuracy`. Default generation is unchanged.
+Ten bootstrap/routing tests pass, including exact holes, page/chunk boundaries,
+high aliases and incompatible-mode rejection; independent code review found
+no blocker.
+
+The indexed v6 replay matches the independent CPU/device comparison through
+600,000,000 instructions, 19,641,024 ordered writes, 1,365,742,448 cycles,
+32,576 IRQs and 3,142 renders, hash `f6c10714158f5366`. All nineteen input
+events match. Its complete parity transcript is byte-identical to the original
+v6 report, SHA-256
+`329abd243d6299723a28ad2ca071da4b6cbcdbbe8da2bccb474127a98346ddb4`.
+Evidence is `build/validation/indexed-v6`; all fifty original instruction
+objects were byte-checked before reusing them with the new routing table.
+This remains independent CPU parity with shared board implementations.
+
+The quiet hidden Metal race comparison improves from 33.8907 to 40.4319 FPS,
+or 58.9156% to 70.2868% board/wall speed. For the same 480 frames, 87,173,426
+main instructions and 8.344320 seconds of board time, wall time falls from
+14.163164 to 11.871813 seconds and core time from 14.082547 to 11.789808 seconds.
+That is 1.193x wall speed / 1.194x core speed; it is still below real time.
+All 66 progress/input/exit rows are byte-identical. The existing hidden-window
+and GPU-encoding measurement limits still apply. Full comparison and source/
+binary hashes are in `build/validation/mac-profile/indexed-comparison.json`.
+
+The frozen v13 held-gas run also completes its full two-billion instruction
+budget without missing code or device errors: 4,650,936,033 cycles, 113,101
+IRQs, 10,701 renders and final PC `0x005a37a8`. The capture shows the Lancia
+back in attract mode with INSERT COIN(S), credit 0/2 and the Sega logo. Its
+boot report SHA-256 is
+`63e395e19955da2ea4653de79a3aac7609330823554e6959025aae2bb8c8ae74` under
+`build/segarally-timed-v13/evidence/lancia-hold-gas-2b-complete`.
+The Game Over overlay was not separately captured and a fresh second-credit
+start remains untested. The independent-parity wrapper now permits an explicit
+two-billion budget for future full-course comparison; its two-million default
+and 180-second default timeout are unchanged. Argument probes verify bounds
+and defaults; full-course independent parity has not yet been run.
+
+The new signed app is
+`build/worktrees/indexed-dispatch/build/mac-playtest-v13/Sega Rally Native.app`.
+It contains frozen v13's 75,205 instructions / 52 native objects, all 51
+instruction chunks verified byte-identical, plus the indexed table. Table
+SHA-256 is `5c56f93d67d67e8e7a18802bd9e8347ea1de6bc536e5ad8729701772f4ef1e1f`;
+app executable `06270afe9577f7a76b964f2dfb09ccbef7c3b12570a7b0981092dcbdd10efb61`.
+It uses the committed stable frontend and fan renderer, normal pacing and
+sound off. Asset hashes and strict bundle signing checks pass. After parity
+passed, LaunchServices opened it in a normal window using the selection-only
+replay and fresh `live-window-save`; `live-window.log` records the session.
+Heavy probes/builds are stopped while the user tests. The older v6 app remains
+preserved. Next: collect this playtest, preserve exact per-instruction semantics
+while reducing remaining runtime overhead, and complete full-course parity,
+audio playback and real-race GPU interpolation checks.
+
 ## Optional native SCSP audio capture and SDL output (2026-10-14)
 
 The Mac host can now build with `SEGARALLY_SOUND=ON` and opt in at runtime

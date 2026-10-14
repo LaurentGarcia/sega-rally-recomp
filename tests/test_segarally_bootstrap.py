@@ -172,6 +172,89 @@ class MappingTests(unittest.TestCase):
                 self.assertEqual("0x005a0000" in audit["instruction_addresses"], size == 8)
                 self.assertIn(f"0x005a000{size}", audit["unmapped_targets"])
 
+    def test_indexed_dispatch_matches_address_membership_and_chunk_routing(self):
+        # Word holes, page holes, chunk splits within a page, high ROM aliases,
+        # and long-instruction displacement words must retain exact membership.
+        image = self.directory / "dispatch.bin"
+        program = bytearray(0x3010)
+        struct.pack_into("<I", program, 12, 0x40)
+        for pc in (0x40, 0xffc, 0x1000, 0x3000):
+            struct.pack_into("<I", program, pc, 0x0a000000)
+        struct.pack_into("<III", program, 0x80, 0x8c003000, 0x12345678, 0x0a000000)
+        image.write_bytes(program)
+        seeds = self.directory / "dispatch-seeds.txt"
+        seeds.write_text("80\nffc\n1000\n3000\n2000000\n6000000\n5a0000\n")
+        outputs = {}
+        for name, extra in (("baseline", []), ("indexed", ["--indexed-dispatch"])):
+            folder = self.directory / ("dispatch-" + name)
+            folder.mkdir()
+            command = [str(self.tool), str(image), str(folder), "--board", "model2a", "--chunk", "2",
+                       "--main-data", str(self.directory / "data.bin"), "--seeds", str(seeds),
+                       "--relocated-code", "5a0000:80:c", "--report", str(folder / "report.json"), *extra]
+            result = subprocess.run(command, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            outputs[name] = (folder, json.loads((folder / "report.json").read_text()))
+        baseline, before = outputs["baseline"]
+        indexed, after = outputs["indexed"]
+        self.assertTrue(after.pop("indexed_dispatch"))
+        self.assertEqual(before, after)
+        for chunk in baseline.glob("chunk_*.cpp"):
+            self.assertEqual(chunk.read_bytes(), (indexed / chunk.name).read_bytes())
+        bodies = "\n".join(path.read_text() for path in indexed.glob("chunk_*.cpp"))
+        self.assertIn("relocated code differs at 0x005a0000u", bodies)
+        addresses = [int(pc, 16) for pc in before["instruction_addresses"]]
+        shim = self.directory / "dispatch-shim/runtime"
+        shim.mkdir(parents=True)
+        (shim / "gen_support.h").write_text("#include <cstdint>\nstruct DispatchCpu { uint32_t m_IP; };\n"
+            "namespace gen { struct Env { DispatchCpu &c; }; }\n")
+        harness = self.directory / "dispatch-test.cpp"
+        source = '#include <cstdint>\n#include <algorithm>\n#include <iterator>\nstruct DispatchCpu { uint32_t m_IP; };\n'
+        for name in outputs:
+            source += f'namespace {name} {{ struct Env {{ DispatchCpu &c; }}; int selected=-1;\nbool has_code(uint32_t); void run(Env &);\n'
+            for i in range(before["chunk_count"]):
+                source += f'void chunk_{i:03d}(Env &) {{ selected={i}; }}\n'
+            source += '}\n'
+        source += 'const uint32_t expected[]={' + ','.join(map(str, addresses)) + '};\n'
+        source += '''bool check(uint32_t pc) {
+    auto found=std::lower_bound(std::begin(expected),std::end(expected),pc);
+    bool valid=found!=std::end(expected) && *found==pc;
+    if(baseline::has_code(pc)!=valid || indexed::has_code(pc)!=valid) return false;
+    DispatchCpu cpu{pc}; baseline::Env a{cpu}; indexed::Env b{cpu};
+    baseline::selected=indexed::selected=-1;
+    indexed::run(b);
+    if(cpu.m_IP!=pc) return false;
+    if(!valid) return indexed::selected==-1;
+    baseline::run(a);
+    return baseline::selected==int((found-std::begin(expected))/2) && baseline::selected==indexed::selected;
+}
+int main() {
+    for(uint32_t pc=0;pc<0x6010;++pc) if(!check(pc)) return 1;
+    for(uint32_t pc:expected) for(int delta=-8;delta<=8;++delta) if(!check(pc+delta)) return 2;
+    for(uint32_t pc:{0x400000u,0x5a1000u,0x3000000u,0x7000000u,0xfffffffcu,0xffffffffu}) if(!check(pc)) return 3;
+    return 0;
+}
+'''
+        harness.write_text(source)
+        objects = []
+        for name, (folder, _) in outputs.items():
+            obj = folder / "table.o"
+            result = subprocess.run(["c++", "-std=c++20", "-O2", "-Wall", "-Wextra", "-Werror",
+                "-I" + str(shim.parent), "-Dgen=" + name, "-c", str(folder / "gen_table.cpp"), "-o", str(obj)],
+                capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            objects.append(str(obj))
+        executable = self.directory / "dispatch-test"
+        result = subprocess.run(["c++", "-std=c++20", "-O2", str(harness), *objects, "-o", str(executable)],
+            capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(subprocess.run([str(executable)]).returncode, 0)
+
+    def test_indexed_dispatch_rejects_inexact_block_mode(self):
+        result = subprocess.run([str(self.tool), str(self.directory / "program.bin"),
+            str(self.directory), "--indexed-dispatch", "--fast_inaccuracy"], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("cannot be combined", result.stderr)
+
 
 if __name__ == "__main__":
     (ROOT / "build").mkdir(exist_ok=True)

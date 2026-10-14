@@ -521,6 +521,7 @@ int main(int argc, char **argv) {
     if (argc < 3) {
         std::fprintf(stderr, "usage: m2recomp PROGRAM.bin OUTDIR [--seeds FILE]... [--hooks FILE] [--chunk N] [--fast_inaccuracy]\n"
                              "  [--board model2o|model2a] [--main-data FILE] [--report FILE]\n"
+                             "  [--indexed-dispatch] (exact instruction lookup; no timing changes)\n"
                              "  [--relocated-code GUEST:PROGRAM_OFFSET:SIZE]... (Model2A work RAM, guarded)\n");
         return 2;
     }
@@ -529,7 +530,7 @@ int main(int argc, char **argv) {
     std::string board = "model2o", main_data_path, report_path;
     std::vector<uint32_t> seeds;
     size_t chunk = 1500;
-    bool blocks = false, chain = false;
+    bool blocks = false, chain = false, indexed_dispatch = false;
     for (int i = 3; i < argc; ++i) {
         if (!std::strcmp(argv[i], "--board") && i + 1 < argc) {
             board = argv[++i];
@@ -550,6 +551,8 @@ int main(int argc, char **argv) {
             load_hooks(argv[++i]);
         } else if (!std::strcmp(argv[i], "--chunk") && i + 1 < argc) {
             chunk = std::strtoul(argv[++i], nullptr, 0);
+        } else if (!std::strcmp(argv[i], "--indexed-dispatch")) {
+            indexed_dispatch = true;
         } else if (!std::strcmp(argv[i], "--fast_inaccuracy")) {
             blocks = true; // 1. block bookkeeping
             chain = true;  // 2. direct chaining
@@ -557,6 +560,10 @@ int main(int argc, char **argv) {
             std::fprintf(stderr, "m2recomp: unknown option %s (--blocks is now --fast_inaccuracy)\n", argv[i]);
             return 2;
         }
+    }
+    if (indexed_dispatch && blocks) {
+        std::fprintf(stderr, "m2recomp: --indexed-dispatch cannot be combined with --fast_inaccuracy\n");
+        return 2;
     }
     if (board != "model2o" && board != "model2a") {
         std::fprintf(stderr, "m2recomp: --board must be model2o or model2a\n");
@@ -693,6 +700,61 @@ int main(int argc, char **argv) {
     t << "#include \"runtime/gen_support.h\"\n\n"
       << "#include <algorithm>\n\nnamespace gen {\n\n";
     for (size_t i = 0; i < ranges.size(); ++i) t << "void chunk_" << (i < 10 ? "00" : i < 100 ? "0" : "") << i << "(Env &);\n";
+    if (indexed_dispatch) {
+        // A zero entry means no compiled instruction. Page and word lookup
+        // replace only the address search and chunk selection; the exact same
+        // instruction bodies, live guards and boundary checks remain intact.
+        std::map<uint32_t, std::vector<uint32_t>> pages;
+        for (size_t i = 0; i < insns.size(); ++i) {
+            const uint32_t address = insns[i]->addr;
+            if (address & 3) {
+                std::fprintf(stderr, "m2recomp: indexed dispatch requires aligned instruction addresses\n");
+                return 2;
+            }
+            auto &page = pages[address >> 12];
+            if (page.empty()) page.resize(1024);
+            page[(address & 4095) >> 2] = uint32_t(i / chunk + 1);
+        }
+        if (pages.empty()) {
+            t << "bool has_code(uint32_t) { return false; }\nvoid run(Env &) {}\n";
+        } else {
+            const uint32_t first_page = pages.begin()->first, last_page = pages.rbegin()->first;
+            t << "\nnamespace {\nconst uint32_t kInstructionPages[][1024] = {\n";
+            for (const auto &[number, entries] : pages) {
+                (void)number;
+                t << "    {";
+                for (size_t i = 0; i < entries.size(); ++i) {
+                    if (i % 32 == 0) t << "\n        ";
+                    t << entries[i] << ',';
+                }
+                t << "\n    },\n";
+            }
+            t << "};\nconst uint32_t kPages[] = {\n";
+            uint32_t index = 0;
+            for (uint32_t number = first_page; number <= last_page; ++number) {
+                if ((number - first_page) % 32 == 0) t << "    ";
+                t << (pages.contains(number) ? ++index : 0) << ',';
+                if ((number - first_page) % 32 == 31) t << '\n';
+            }
+            t << "\n};\nvoid (*const kFunctions[])(Env &) = {\n";
+            for (size_t i = 0; i < ranges.size(); ++i) {
+                char name[32];std::snprintf(name,sizeof name,"chunk_%03zu",i);
+                t << "    " << name << ",\n";
+            }
+            t << "};\nuint32_t chunk_id(uint32_t address) {\n"
+              << "    if (address & 3u) return 0;\n"
+              << "    const uint32_t page = address >> 12;\n"
+              << "    if (page < " << first_page << "u || page > " << last_page << "u) return 0;\n"
+              << "    const uint32_t index = kPages[page - " << first_page << "u];\n"
+              << "    return index ? kInstructionPages[index - 1][(address & 4095u) >> 2] : 0;\n"
+              << "}\n} // namespace\n\n"
+              << "bool has_code(uint32_t address) { return chunk_id(address) != 0; }\n"
+              << "void run(Env &e) {\n"
+              << "    const uint32_t id = chunk_id(e.c.m_IP);\n"
+              << "    if (id) kFunctions[id - 1](e);\n"
+              << "}\n\n";
+        }
+    } else {
     t << "\nnamespace {\nconst uint32_t kAddrs[] = {\n";
     for (const Insn *in : insns) t << "    " << hex(in->addr) << ",\n";
     t << "};\nstruct Range { uint32_t first, last; void (*fn)(Env &); };\nconst Range kChunks[] = {\n";
@@ -729,6 +791,7 @@ int main(int argc, char **argv) {
         t << "void run(Env &e) {\n    const uint32_t a = e.c.m_IP;\n"
           << "    for (const Range &r : kChunks)\n        if (a >= r.first && a <= r.last) { r.fn(e); return; }\n}\n\n";
     }
+    }
     t
       << "uint64_t native_instructions() { return " << native << "ull; }\n\n} // namespace gen\n";
     if (!report_path.empty()) {
@@ -755,6 +818,7 @@ int main(int argc, char **argv) {
                << ",\n  \"missing_template_count\": " << missing.size()
                << ",\n  \"chunk_count\": " << ranges.size()
                << ",\n  \"complete_game_coverage\": false";
+        if (indexed_dispatch) report << ",\n  \"indexed_dispatch\": true";
         report << ",\n  \"relocated_code\": [";
         for (size_t i = 0; i < g_relocations.size(); ++i) {
             const auto &r = g_relocations[i];

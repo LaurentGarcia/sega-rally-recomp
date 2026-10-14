@@ -42,8 +42,8 @@ def main():
     directory = args.build_dir.resolve()
     if not directory.is_relative_to(ROOT / "build") or directory == ROOT / "build":
         parser.error("--build-dir must be below ignored build/")
-    if not 1 <= args.instructions <= 1_000_000_000:
-        parser.error("--instructions must be 1..1000000000")
+    if not 1 <= args.instructions <= 2_000_000_000:
+        parser.error("--instructions must be 1..2000000000")
     if not 1 <= args.timeout <= 3600:
         parser.error("--timeout must be 1..3600 seconds")
     audit = json.loads((directory / "coverage.json").read_text())

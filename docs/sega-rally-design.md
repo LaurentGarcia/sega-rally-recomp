@@ -193,8 +193,11 @@ The separate held-gas replay now completes Desert and its result screen
 (1:12.15), enters the forested second course, and reaches TIME IS UP. It supplies
 centered steering rather than following the second course's bends. Six additional
 actually executed callbacks extend the frozen v13 graph to 75,205 instructions;
-the existing static table and registration proofs are unchanged. Game Over,
-restart and completion of the remaining courses still require validation.
+the existing static table and registration proofs are unchanged. A subsequent
+two-billion-instruction run returns to attract mode without a missing-code or
+device frontier. The Game Over overlay was not separately captured, and a
+second credit/start sequence and completion of the remaining courses still
+require validation.
 Independent v6 driving comparison matches 600 million instructions, all nineteen
 input events, 19,641,024 ordered writes and 3,142 renders against the reference
 CPU with shared board implementations. It is not complete MAME-machine parity.

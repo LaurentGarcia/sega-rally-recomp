@@ -428,6 +428,8 @@ def main() -> int:
     parser.add_argument("--build-dir", type=Path, default=BUILD,
                         help="Separate pipeline output directory beneath this checkout's build/")
     parser.add_argument("--verify-only", action="store_true")
+    parser.add_argument("--indexed-dispatch", action="store_true",
+                        help="Use exact page/word dispatch lookup; retain instruction timing and live guards")
     parser.add_argument("--seed-profile", choices=("bootstrap", "lift-labels"), default="bootstrap",
                         help="Sparse known bootstrap labels or opt-in prior-lift address candidates")
     args = parser.parse_args()
@@ -437,6 +439,7 @@ def main() -> int:
     if args.jobs < 1 or args.jobs > 8:
         parser.error("--jobs must be between 1 and 8")
     compiler = shlex.split(args.compiler)
+    dispatch_flags = ["--indexed-dispatch"] if args.indexed_dispatch else []
     try:
         manifest = load_manifest(ROOT / "config" / "segarally_roms.json")
         audit = extract(args.roms.expanduser().resolve(), manifest, BUILD / "rom_cache")
@@ -478,7 +481,7 @@ def main() -> int:
         report = BUILD / "reachability.json"
         run_logged([str(tool), str(BUILD / "rom_cache" / "program.bin"), str(generated),
                     "--board", "model2a", "--main-data", str(BUILD / "rom_cache" / "main_data.bin"),
-                    "--seeds", str(seedfile), "--report", str(report)] + relocation_flags, BUILD / "recompile.log")
+                    "--seeds", str(seedfile), "--report", str(report)] + relocation_flags + dispatch_flags, BUILD / "recompile.log")
         reach = json.loads(report.read_text())
         continuations, registrations = [], []
         for iteration in range(16):
@@ -507,7 +510,7 @@ def main() -> int:
                 stale.unlink()
             run_logged([str(tool), str(BUILD / "rom_cache/program.bin"), str(generated),
                 "--board", "model2a", "--main-data", str(BUILD / "rom_cache/main_data.bin"),
-                "--seeds", str(seedfile), "--report", str(report)] + relocation_flags,
+                "--seeds", str(seedfile), "--report", str(report)] + relocation_flags + dispatch_flags,
                 BUILD / f"continuations-{iteration}.log")
             reach = json.loads(report.read_text())
         else:
