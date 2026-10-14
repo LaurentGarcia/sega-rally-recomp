@@ -32,11 +32,13 @@ ReachResult reach(const std::vector<uint32_t> &seeds, const ReadWord &read) {
     return r;
 }
 
-std::vector<uint32_t> vector_seeds(const ReadWord &read) {
+std::vector<uint32_t> vector_seeds(const ReadWord &read, uint32_t table_address, uint32_t vector_count) {
     std::vector<uint32_t> out;
-    for (uint32_t v = 1; v < 64; ++v) {
+    for (uint32_t v = 1; v < vector_count; ++v) {
         {
-            const auto hi = read(v * 4), lo = read(v * 4 + 2);
+            const uint64_t address = uint64_t(table_address) + uint64_t(v) * 4;
+            if (address > UINT32_MAX - 2) break;
+            const auto hi = read(uint32_t(address)), lo = read(uint32_t(address + 2));
             if (!hi || !lo) continue;
             const uint32_t t = (uint32_t(*hi) << 16) | *lo;
             if (t & 1 || !read(t)) continue;

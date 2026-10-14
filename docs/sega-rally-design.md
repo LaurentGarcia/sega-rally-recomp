@@ -133,8 +133,18 @@ CPU line delivery stays at instruction boundaries. The real recovery sequence
 briefly programs idle synchronous mode before resetting into asynchronous 8N1
 at x16; rejecting that programming sequence would stop valid startup. Actual
 synchronous transfer remains unsupported. SCSP RX is unconnected and idle,
-with no fake responses. Sound ROMs are verified independently, but the 68000
-map, scheduling and SCSP must be implemented before audio is claimed.
+with no fake responses. The shared 68000 generator now has an explicit Model
+2A map: 512 KiB RAM, SCSP at `0x100000`, 512 KiB program at `0x600000`, and
+8 MiB sample ROM at `0x800000`. The address-space adapter preserves big-endian
+byte lanes and ordered longword accesses. Board reset copies only the first
+16 program bytes to RAM; the generated game code clears RAM itself and must
+install its vectors. Every generated instruction checks its live words.
+The actual reset path executes 278,301 instructions before its first SCSP
+access, a high-byte write at `0x100400` from PC `0x600184`. This establishes
+static sound-code execution and the memory map, not chip or audio parity.
+SCSP, sound CPU cycle accounting and asynchronous IRQ scheduling remain
+required. Daytona's measured instruction-rate shortcut is specific to its
+different Model 1 board and is not reused for Rally.
 
 The older lifted-C prototype already reaches desert practice on the phone, but
 contains incomplete game paths. It is a useful source of address annotations and

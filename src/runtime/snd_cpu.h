@@ -18,6 +18,16 @@
 
 namespace snd {
 
+// Optional board address space. Addresses are aligned 24-bit byte addresses;
+// masks are active-high, with the even byte on bits 15..8. A null bus retains
+// the original Model 1 ROM/RAM/device behavior below.
+class AddressSpace {
+public:
+    virtual ~AddressSpace() = default;
+    virtual uint16_t read16(uint32_t address, uint16_t mask) = 0;
+    virtual void write16(uint32_t address, uint16_t data, uint16_t mask) = 0;
+};
+
 // Device side of the sound board's map: the UART, two MultiPCMs with their
 // bank registers and the YM3438. Addresses are the ones on the 68000 bus:
 // 8-bit devices sit on the odd byte (0xc20001, 0xd00001 ...), the 16-bit
@@ -40,6 +50,7 @@ struct Cpu68k {
     std::vector<uint8_t> ram = std::vector<uint8_t>(0x10000, 0); // 0xf00000-0xf0ffff
     const uint8_t *rom = nullptr;   // 0x000000-0x03ffff, big-endian bytes; 0x080000-0x09ffff mirrors 0x020000
     Devices *dev = nullptr;
+    AddressSpace *bus = nullptr;   // caller-owned; must outlive this CPU
 
     // Reset: SSP and PC from the vector table, supervisor, mask 7.
     void reset();
@@ -55,6 +66,10 @@ struct Cpu68k {
     // Memory: 24-bit bus.
     uint8_t r8(uint32_t addr) {
         addr &= 0xffffff;
+        if (bus) {
+            const uint16_t value = bus->read16(addr & ~1u, addr & 1 ? 0x00ff : 0xff00);
+            return uint8_t(addr & 1 ? value : value >> 8);
+        }
         if (addr >= 0xf00000 && addr < 0xf10000) return ram[addr - 0xf00000];
         if (addr < 0x40000) return rom[addr];
         if (addr >= 0x80000 && addr < 0xa0000) return rom[addr - 0x60000];
@@ -63,20 +78,30 @@ struct Cpu68k {
     uint16_t r16(uint32_t addr) {
         addr &= 0xffffff;
         if (addr & 1) odd(addr);
+        if (bus) return bus->read16(addr, 0xffff);
         if (addr >= 0xf00000 && addr < 0xf10000) return uint16_t(ram[addr - 0xf00000] << 8 | ram[addr - 0xf00000 + 1]);
         if (addr < 0x40000) return uint16_t(rom[addr] << 8 | rom[addr + 1]);
         if (addr >= 0x80000 && addr < 0xa0000) return uint16_t(rom[addr - 0x60000] << 8 | rom[addr - 0x60000 + 1]);
         return dev_r16(addr);
     }
-    uint32_t r32(uint32_t addr) { return uint32_t(r16(addr)) << 16 | r16(addr + 2); }
+    uint32_t r32(uint32_t addr) {
+        const uint32_t high = r16(addr); // preserve bus order for side effects
+        return high << 16 | r16(addr + 2);
+    }
     void w8(uint32_t addr, uint32_t val) {
         addr &= 0xffffff;
+        if (bus) {
+            bus->write16(addr & ~1u, uint16_t(addr & 1 ? val & 0xff : (val & 0xff) << 8),
+                         addr & 1 ? 0x00ff : 0xff00);
+            return;
+        }
         if (addr >= 0xf00000 && addr < 0xf10000) ram[addr - 0xf00000] = uint8_t(val);
         else dev_w(addr, uint16_t(addr & 1 ? (val & 0xff) : (val & 0xff) << 8), addr & 1 ? 0x00ff : 0xff00);
     }
     void w16(uint32_t addr, uint32_t val) {
         addr &= 0xffffff;
         if (addr & 1) odd(addr);
+        if (bus) { bus->write16(addr, uint16_t(val), 0xffff); return; }
         if (addr >= 0xf00000 && addr < 0xf10000) {
             ram[addr - 0xf00000] = uint8_t(val >> 8);
             ram[addr - 0xf00000 + 1] = uint8_t(val);

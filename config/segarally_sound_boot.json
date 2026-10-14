@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "romset": "srallycb",
+  "board": "model2a",
+  "images": {
+    "audiocpu": "6be2a7a6c9c08b55291ceaf7891f2d8418e38291ed00376cf0f569a8a083ad6f",
+    "samples": "4a561c46de5400040ea21322040fbfef1c91e8dc4e9fc7a5123490187b7896ba"
+  },
+  "discovery": "Only the four longwords copied by board reset are exposed at RAM 0; no runtime vector-copy shortcut.",
+  "expected_reset": {"pc": "0x600100", "ssp": "0x5000"},
+  "expected_frontier": {
+    "pc": "0x600184", "address": "0x100400", "data": "0x0300", "mask": "0xff00",
+    "region": "scsp", "write": true,
+    "evidence": "First SCSP access in the verified program's reset path, after its own 512 KiB RAM-clear loop."
+  },
+  "timing_scope": "Completed instruction count only; no board clock, wait states or asynchronous IRQ delivery."
+}

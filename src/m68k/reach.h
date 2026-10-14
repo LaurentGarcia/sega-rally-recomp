@@ -23,6 +23,9 @@ ReachResult reach(const std::vector<uint32_t> &seeds, const ReadWord &read);
 
 // Seeds from the vector table: the reset PC and every exception / interrupt
 // vector (2-63) that points into the image, unique.
-std::vector<uint32_t> vector_seeds(const ReadWord &read);
+// A short reset copy may expose fewer vectors. This is discovery metadata;
+// it does not initialize or alter guest RAM.
+std::vector<uint32_t> vector_seeds(const ReadWord &read, uint32_t table_address = 0,
+                                 uint32_t vector_count = 64);
 
 } // namespace m68k

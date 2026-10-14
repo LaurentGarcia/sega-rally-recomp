@@ -115,6 +115,13 @@ The sound manifest imports public `srallycb` layout/checksum metadata from
 the same `model2.cpp`. Portable big-endian byte normalization was checked
 against `src/emu/romload.cpp` (BSD-3-Clause), SHA-256
 `854873d6f1b33d1dd3614a219b4b744f8fefb11708c8389141157825599f275f`.
+`model2a_sound_bus` implements the same pinned file's `scsp_map` and reset
+contract: 16 vector bytes copied to shared RAM, fixed program/sample windows,
+SCSP word masks, ignored ROM writes and Rally's inert sample-bank register.
+The unchanged 68000 instruction templates come from the Daytona base above;
+the added address-space interface, map-aware reachability and live instruction
+guards keep the existing Daytona mapping as the default. No SCSP device is
+linked into this reset probe.
 The SCSP source was read for the sound-board inventory, not yet linked:
 `src/devices/sound/scsp.cpp/.h`, hashes
 `11750fa03db0324cedc8a56ac481537df1991e58d3ef522e6ca737694dc1a259` and

@@ -1,5 +1,34 @@
 # Handoff
 
+## Native sound CPU reset checkpoint (2026-10-14)
+
+The shared 68000 generator now supports an explicit `--board model2a` map and
+generation audit. The verified Rally program produces 740 native instructions,
+two indirect sites and no missing templates. It executes 278,301 completed
+instructions from PC `0x600100` / SSP `0x5000`, clears its own 512 KiB RAM,
+then stops at PC `0x600184` on SCSP write `0x100400`, data `0x0300`, mask
+`0xff00`. This is the expected unsupported-chip frontier, not working audio.
+The reproducible command is `scripts/segarally_sound_recompile.py` after the
+verified sound import; its report lives under ignored `sound/native/audit.json`.
+
+The optional sound CPU address-space interface preserves the inherited default
+map. Model 2A supplies exact big-endian RAM, program, sample and SCSP lanes,
+including explicitly ordered high/low longword accesses. Reset copies only
+16 bytes; copying the whole vector table would bypass the game's own setup.
+Generated instructions guard all their live words, including writable RAM.
+Unmapped devices remain typed frontiers and no sound replies are fabricated.
+
+Validation passes 66 bus checks, 57 inherited 68000 checks and four generated
+synthetic tests covering RAM mutation, reset size, byte lanes, budgets and
+default-map compatibility. Bus and actual generated reset paths pass ASan/UBSan.
+Repeated Rally generation is deterministic. Actual Daytona generation remains
+byte-identical at 1,916 instructions, SHA-256
+`a0b69c9763dbd5560b58247049a41d4300d9926e19bf20a731cc76a6c61f1042`.
+This probe has no sound CPU clock, wait states or asynchronous IRQ delivery.
+Next: implement and independently compare SCSP, then establish cycle-based
+sound scheduling and connect its real serial pins to the main UART. Do not
+reuse Daytona's Model 1 board or its empirical instruction-rate timing.
+
 ## Native UART and first visible startup screens (2026-10-14)
 
 The timed i8251/uPD71051 path now executes the actual control recovery sequence
