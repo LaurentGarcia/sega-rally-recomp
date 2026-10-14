@@ -2,6 +2,18 @@
 
 ## Sega Rally native bring-up (2026-10-14)
 
+The next checkpoint follows the pinned reference's read-zero/discarded-write
+contract for the observed unmapped boot gap at `0x00f80000`. The bus counts and
+reports that compatibility behavior; adjacent gaps and actual unimplemented
+devices remain explicit stops. PCB behavior is unverified. Tests cover the
+zero value, discarded byte write, diagnostics, flags, and both gap boundaries.
+Native reset now executes 1,182,186 instructions, clears work RAM, copies
+program `0x1000..0x60fff` into RAM `0x005a0000..0x005fffff`, reinitializes the
+CPU, and reaches an unresolved RAM code target at `0x005a2150`. Adding the
+verified relocation to generation is next; aliasing that RAM as ROM would be
+wrong. A one-million-instruction run ends inside the copy loop, so its limit
+is not a complete boot or a hang.
+
 The `sega-rally` branch preserves Daytona upstream history at `b33baeb28`.
 The dedicated project is a research bring-up, not the older lifted-C phone
 prototype in the sibling `segarally95-recomp` checkout. No publication remote

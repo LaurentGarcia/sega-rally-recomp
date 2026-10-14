@@ -31,6 +31,12 @@ int main(int argc, char **argv)
         if (used != requested.size() || !limit || limit > 100000000)
             throw std::runtime_error("instruction limit must be 1..100000000");
         rt::Model2ABus bus(load(argv[1]), load(argv[2]));
+        const auto report_contracts = [&bus] {
+            const auto &d = bus.diagnostics();
+            std::printf("reference_boot_gap reads=%" PRIu64 " writes=%" PRIu64
+                " last_write=%08x pcb_verified=false\n",
+                d.reference_gap_reads, d.reference_gap_writes, d.reference_gap_last_write);
+        };
         rt::Cpu cpu(&bus);
         rt::Lockstep schedule(cpu);
         schedule.end_count = limit;
@@ -41,6 +47,7 @@ int main(int argc, char **argv)
         try {
             while (!schedule.finished()) {
                 if (!gen::has_code(cpu.m_IP)) {
+                    report_contracts();
                     std::printf("status=missing_code instructions=%" PRIu64 " pc=%08x\n",
                         schedule.count, cpu.m_IP);
                     return 4;
@@ -48,16 +55,19 @@ int main(int argc, char **argv)
                 gen::run(env);
             }
         } catch (const rt::Model2AAccess &access) {
+            report_contracts();
             std::printf("status=unimplemented_device instructions=%" PRIu64
                 " pc=%08x access=%s%u address=%08x value=%08x\n",
                 schedule.count, cpu.m_IP, access.write ? "write" : "read",
                 access.width * 8, access.address, access.value);
             return 3;
-        } catch (const rt::Fatal &failure) {
+        } catch (const std::exception &failure) {
+            report_contracts();
             std::printf("status=runtime_error instructions=%" PRIu64 " pc=%08x message=%s\n",
                 schedule.count, cpu.m_IP, failure.what());
             return 1;
         }
+        report_contracts();
         std::printf("status=instruction_limit instructions=%" PRIu64 " pc=%08x\n",
             schedule.count, cpu.m_IP);
         return 0;

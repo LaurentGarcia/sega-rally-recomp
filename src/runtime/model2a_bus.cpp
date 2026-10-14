@@ -4,6 +4,15 @@
 
 namespace rt {
 namespace {
+bool reference_boot_gap(uint32_t address, unsigned width)
+{
+    // Reset reads/ORs/writes a byte here. This range has no device in pinned
+    // MAME's Model 2A map: address_map defaults to unmap=0 and an unmapped
+    // write has no effect. Restrict compatibility to this observed gap so
+    // unsupported real devices still stop. PCB behavior remains unverified.
+    return address >= 0x00f80000 && uint64_t(address) + width <= 0x00f80004;
+}
+
 std::string access_message(uint32_t address, unsigned width, bool write, uint32_t value)
 {
     char message[160];
@@ -60,6 +69,10 @@ Model2ABus::Mapping Model2ABus::mapping(uint32_t address)
 
 uint32_t Model2ABus::read(uint32_t address, unsigned width)
 {
+    if (reference_boot_gap(address, width)) {
+        ++diagnostics_.reference_gap_reads;
+        return 0;
+    }
     Mapping m = mapping(address);
     if (!m.data || m.available < width) throw Model2AAccess(address, width, false, 0);
     uint32_t result = 0;
@@ -69,6 +82,11 @@ uint32_t Model2ABus::read(uint32_t address, unsigned width)
 
 void Model2ABus::write(uint32_t address, unsigned width, uint32_t value)
 {
+    if (reference_boot_gap(address, width)) {
+        ++diagnostics_.reference_gap_writes;
+        diagnostics_.reference_gap_last_write = value;
+        return;
+    }
     Mapping m = mapping(address);
     if (!m.data || m.available < width) throw Model2AAccess(address, width, true, value);
     if (m.read_only) return;

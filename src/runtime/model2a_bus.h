@@ -18,7 +18,12 @@ struct Model2AAccess : Fatal {
 
 class Model2ABus final : public Bus {
 public:
+    struct Diagnostics {
+        uint64_t reference_gap_reads = 0, reference_gap_writes = 0;
+        uint32_t reference_gap_last_write = 0;
+    };
     Model2ABus(std::vector<uint8_t> program, std::vector<uint8_t> main_data);
+    const Diagnostics &diagnostics() const { return diagnostics_; }
     // Width accesses stay within one mapping. Cpu's unaligned instruction
     // helpers split into byte accesses, preserving mirror/boundary behavior.
     uint32_t fetch(uint32_t address) override;
@@ -35,6 +40,7 @@ private:
     Mapping mapping(uint32_t address);
     uint32_t read(uint32_t address, unsigned width);
     void write(uint32_t address, unsigned width, uint32_t value);
+    Diagnostics diagnostics_;
     std::vector<uint8_t> program_, data_, ram_, work_, buffer_, cpu_control_, backup_;
 };
 

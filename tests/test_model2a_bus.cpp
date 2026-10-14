@@ -10,6 +10,20 @@ int main()
     rt::Model2ABus bus(std::move(program), std::move(data));
     // The upper half of CRX RAM must not alias the original Model 2 ROM.
     assert(bus.read_byte(0x00020000) == 0xa5);
+    // A documented reference-map gap reads zero and never stores writes.
+    assert(bus.read_byte(0x00f80000) == 0);
+    bus.write_byte(0x00f80000, 2);
+    assert(bus.read_dword(0x00f80000) == 0);
+    assert(bus.diagnostics().reference_gap_reads == 2);
+    assert(bus.diagnostics().reference_gap_writes == 1);
+    assert(bus.diagnostics().reference_gap_last_write == 2);
+    assert(bus.flags(0x00f80000) == 0);
+    for (uint32_t address : {0x00f7ffffu, 0x00f80004u}) {
+        bool gap_end = false;
+        try { (void)bus.read_byte(address); }
+        catch (const rt::Model2AAccess &) { gap_end = true; }
+        assert(gap_end);
+    }
     assert(bus.read_dword(0x00220000) == 0);
     bus.write_dword(0x00220000, 0x98765432);
     assert(bus.read_dword(0x00220000) == 0x98765432);

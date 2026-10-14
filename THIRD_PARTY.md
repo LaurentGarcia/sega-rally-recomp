@@ -15,6 +15,15 @@ SHA-256 is `359d7fa309c0bca6c93f5c0826011a7054ae8f04068e9df995188a6256c995b6`.
 mirror, and burst contracts. Unsupported device callbacks are explicit runtime
 frontiers during bring-up; the board is not claimed complete.
 
+The observed reset gap at `0x00f80000` uses MAME's unmapped read-zero and
+discarded-write semantics from `src/emu/addrmap.cpp` (constructor,
+`m_unmapval=0`) and `src/emu/emumem_heun.cpp` (unmapped handlers), same pinned
+commit, BSD-3-Clause. These files were read for contracts, not copied.
+SHA-256 respectively: `a7217d512c8b63517d2f17529411036f8f796d1e47c0fc0d33c54d2a75ced469`
+and `3a4014cdb03eb6239b340832dd02b34ee17e1eeab0ded10f8824483448239d92`.
+The adapter confines this behavior to the observed four-byte gap and counts
+its accesses; it does not silently answer unimplemented hardware devices.
+
 This project's own code is under the BSD-3-Clause licence (`LICENSE`). The
 code below keeps its own licence and notices; every component linked into the
 game is under a licence compatible with it (BSD, zlib, MIT, public domain).

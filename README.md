@@ -12,8 +12,10 @@ from the user's ROMs, not Sega's original source code.
 
 The repository is in bring-up. The initial annotated seed set produces 4,081
 native i960 instructions and four compiled objects. The bounded native core
-executes reset at `0x420` and currently stops after 88 instructions at an
-unimplemented read of `0x00f80000`. This is a reported bring-up frontier, not
+executes reset at `0x420`, copies the game's RAM code, and currently reaches
+an unresolved RAM entry at `0x005a2150` after 1,182,186 instructions. The
+observed boot gap at `0x00f80000` follows pinned MAME's read-zero and discarded
+write contract, counted in the boot report. This is a bring-up frontier, not
 a complete game boot. The existing lifted-C iPhone prototype lives
 separately in `../segarally95-recomp`; its rendering captures provide regression
 evidence, not proof that this new runtime already runs a race.
@@ -43,6 +45,8 @@ Output goes to `build/segarally/`: imported images, generated C++, native
 objects, `coverage.json`, and the bounded execution report `boot.json`.
 The boot command exits 3 for an unimplemented board access or 4 for a missing
 code target; those are incomplete frontiers, not successful game boots.
+Use `--instructions 10000000` to run past the initial RAM-copy loop; the
+default one-million-instruction limit stops inside it.
 
 The initial coverage report has 71 indirect sites and 10 invalid decode stops
 requiring analysis. Generation success does not prove that every game path has
