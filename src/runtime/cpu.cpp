@@ -5,9 +5,9 @@
 // call/return with MAME's 4-frame register cache, interrupt entry, IAC.
 // Transplanted from MAME's src/devices/cpu/i960/i960.cpp at
 // dddd73680656e355bb2b5beecab1167c9f07bf81 (BSD-3-Clause; notice above kept
-// as the licence requires). Changes: the device framework and cycle
-// accounting are removed, memory goes through Cpu::bus, fatalerror/logerror
-// map to the runtime. There is no instruction interpreter here: game code
+// as the licence requires). Changes: the device framework is removed;
+// call/return deductions feed the monotonic reference cycle counter, memory
+// goes through Cpu::bus, fatalerror/logerror map to the runtime. There is no instruction interpreter here: game code
 // is statically recompiled. See THIRD_PARTY.md.
 
 #include "runtime/cpu.h"
@@ -250,7 +250,8 @@ void Cpu::do_call(uint32_t adr, int type, uint32_t stack)
 	int i;
 	uint32_t FP;
 
-	// call and callx take 9 cycles base
+    // Pinned MAME charges this before call effects, including IRQ entry.
+    consume_reference_cycles(9);
 
 	// set the new RIP
 	m_r[I960_RIP] = m_IP;
@@ -336,6 +337,7 @@ void Cpu::do_ret_0()
 
 void Cpu::do_ret()
 {
+	consume_reference_cycles(7); // before restored-frame/processor-state reads
 	uint32_t x, y;
 	switch(m_r[I960_PFP] & 7) {
 	case 0:

@@ -13,9 +13,11 @@ from the user's ROMs, not Sega's original source code.
 The repository is in bring-up. The expanded address-label profile produces
 66,523 native i960 instructions and 46 compiled objects. The core executes
 reset at `0x420`, copies and checks its RAM code, initializes the I/O chip,
-and reaches the communication-board registers after 1,334,542 instructions.
-The I/O and EEPROM adapters have isolated reference tests; the current runner
-uses a frozen diagnostic device clock, pending CPU-cycle integration.
+and reaches video synchronization setup after 1,531,005 instructions.
+The I/O, EEPROM and disconnected communication-board adapters have isolated
+reference tests. The runner charges pinned-reference opcode cycles before
+memory effects and supplies device time at 25 MHz; this is not measured PCB
+timing, and asynchronous IRQ/video/sound events remain to be connected.
 The native TGP independently
 uploads its actual 1,665-word program and answers the startup command through
 Daytona's shared hardware code. These are bring-up checks, not a complete game
@@ -40,7 +42,7 @@ With Python 3 and a C++20 compiler, run:
 ```sh
 python3 scripts/segarally_recompile.py --roms /path/to/srallyc.zip --seed-profile lift-labels
 python3 scripts/segarally_tgp.py --roms /path/to/srallyc.zip
-python3 scripts/segarally_boot.py --instructions 10000000 --with-tgp --with-io
+python3 scripts/segarally_boot.py --instructions 10000000 --with-tgp --with-io --with-comm
 ```
 
 The importer verifies the Revision B (`srallycb`) program pair present in the
@@ -65,7 +67,8 @@ and TGP inputs are:
 ```sh
 python3 tests/test_segarally_bootstrap.py
 python3 tests/test_segarally_native_templates.py
-python3 tests/test_segarally_boot_parity.py --tgp --io
+python3 tests/test_segarally_boot_parity.py --tgp --io --comm
+python3 tests/test_i960_runtime_timing.py
 python3 tests/test_segarally_tgp_import.py
 ```
 

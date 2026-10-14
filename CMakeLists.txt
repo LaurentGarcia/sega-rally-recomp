@@ -76,6 +76,7 @@ add_library(i960 STATIC
     src/i960/isa.cpp
     src/i960/decode.cpp
     src/i960/reach.cpp
+    src/i960/timing.cpp
     src/i960/fp.cpp
 )
 target_include_directories(i960 PUBLIC src)
@@ -108,6 +109,7 @@ add_library(runtime STATIC
     src/runtime/model2_io.cpp
     src/runtime/model2a_io.cpp
     src/runtime/model2_eeprom.cpp
+    src/runtime/model2a_comm.cpp
     src/runtime/game_loop.cpp
     src/runtime/zip.cpp
     src/runtime/rom_import.cpp
@@ -372,6 +374,16 @@ add_executable(test_model2a_io tests/test_model2a_io.cpp
 target_include_directories(test_model2a_io PRIVATE src)
 add_test(NAME model2a_io COMMAND test_model2a_io)
 
+add_executable(test_i960_timing tests/test_i960_timing.cpp)
+target_link_libraries(test_i960_timing PRIVATE refcore)
+add_test(NAME i960_timing COMMAND test_i960_timing)
+
+add_executable(test_model2a_comm tests/test_model2a_comm.cpp
+    src/runtime/model2a_comm.cpp src/runtime/comm_board.cpp
+    src/runtime/model2a_bus.cpp src/runtime/cpu.cpp)
+target_include_directories(test_model2a_comm PRIVATE src)
+add_test(NAME model2a_comm COMMAND test_model2a_comm)
+
 add_executable(test_decode tests/test_decode.cpp)
 target_link_libraries(test_decode PRIVATE i960)
 add_test(NAME decode COMMAND test_decode)
@@ -523,6 +535,9 @@ add_test(NAME trace COMMAND test_trace ${CMAKE_CURRENT_BINARY_DIR})
 # The MAME plugin's Lua core against the C++ trace library (needs lupa).
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_FOUND)
+    add_test(NAME i960_runtime_timing
+        COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tests/test_i960_runtime_timing.py
+                --compiler ${CMAKE_CXX_COMPILER})
     add_test(NAME lua_core
         COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tests/lua_core_test.py
                 ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR}/lua_core)

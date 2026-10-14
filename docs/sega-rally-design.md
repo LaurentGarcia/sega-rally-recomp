@@ -74,12 +74,25 @@ the reference's `0x07800f0f` word pattern and all-ones initialization.
 
 The 315-5649 register chip, Model 2A byte-lane/cabinet wiring, and 93C46
 EEPROM are separate native devices. The EEPROM requires explicit monotonic
-nanosecond timestamps; serial edges never advance time themselves. The current
-bounded runner freezes that clock, so this checkpoint cannot establish EEPROM
-startup or write-completion timing. Independent device tests exercise real
-advancing clocks. The chip's inherited serial-status constant is a documented
+nanosecond timestamps; serial edges never advance time themselves. The bounded
+runner now derives time from the CPU's pinned-reference cycle deductions at
+25 MHz. Every opcode charges before its memory effects; call/return helpers
+also charge during interrupt entry/return. This preserves a separate completed
+instruction count and monotonically increasing device time through reset/IAC.
+Unknown costs fail generation, and stale untimed objects are rejected by the
+runner. Costs have independent interpreter comparisons, but retain MAME's
+fixed estimates and omit burst stalls and full scheduler behavior. The chip's
+inherited serial-status constant is a documented
 MAME shortcut, not a simulated UART-ready signal. Drive commands and lamps
 are latched; the missing drive-board firmware is not executed.
+
+The communication adapter reuses the inherited CommBoard simulation with
+explicitly disconnected endpoints. Shared RAM, mirrors and CN/FG register
+semantics match the pinned reference. A null transport would skip the
+reference's no-peer initialization, so the adapter supplies closed endpoints
+without opening sockets. It never manufactures a successful link and does
+not execute the missing Z80 firmware. Frame callbacks will be driven by the
+board's video event, not by polling the registers.
 
 The older lifted-C prototype already reaches desert practice on the phone, but
 contains incomplete game paths. It is a useful source of address annotations and

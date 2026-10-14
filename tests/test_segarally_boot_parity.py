@@ -2,7 +2,8 @@
 """Validate every native boot instruction against the test-only reference CPU.
 
 Requires an audited generation from scripts/segarally_recompile.py. This checks
-CPU state and ordered writes through the same bus, not independent PCB behavior.
+CPU state, reference cycles and cycle-stamped ordered writes through the same
+bus implementation, not independent MAME scheduler or PCB behavior.
 """
 import argparse
 import hashlib
@@ -21,7 +22,8 @@ def main():
     parser.add_argument("--instructions", type=int, default=2_000_000)
     parser.add_argument("--compiler", default=os.environ.get("CXX", "c++"))
     parser.add_argument("--tgp", action="store_true", help="Attach independently instantiated native TGP boards")
-    parser.add_argument("--io", action="store_true", help="Attach independent I/O+EEPROM devices with explicit frozen clocks")
+    parser.add_argument("--io", action="store_true", help="Attach independent I/O+EEPROM devices using each CPU's reference cycle clock")
+    parser.add_argument("--comm", action="store_true", help="Attach independent disconnected communication adapters (no firmware or vblank)")
     args = parser.parse_args()
     directory = args.build_dir.resolve()
     if not directory.is_relative_to(ROOT / "build") or directory == ROOT / "build":
@@ -30,6 +32,9 @@ def main():
         parser.error("--instructions must be 1..100000000")
     audit = json.loads((directory / "coverage.json").read_text())
     assert audit["board"] == "model2a" and audit["native_objects_compiled"]
+    reachability = json.loads((directory / "reachability.json").read_text())
+    if not reachability.get("reference_cycle_accounting") or reachability.get("reference_cycle_accounting_version") != 1:
+        parser.error("regenerate native objects with reference cycle accounting before timed parity")
     objects = sorted((directory / "objects").glob("*.o"))
     assert len(objects) == audit["native_object_count"]
     images = []
@@ -58,10 +63,14 @@ def main():
     if args.io:
         command += ["-DM2_SRALLY_IO", "src/runtime/model2_io.cpp", "src/runtime/model2a_io.cpp",
                     "src/runtime/model2_eeprom.cpp"]
+    if args.comm:
+        command += ["-DM2_SRALLY_COMM", "src/runtime/model2a_comm.cpp", "src/runtime/comm_board.cpp"]
     subprocess.run(command + list(map(str, objects)) + ["-o", str(executable)], cwd=ROOT, check=True)
     arguments = [str(executable), *map(str, images), str(args.instructions), *map(str, tgp_images)]
     if args.io:
         arguments.append("--io")
+    if args.comm:
+        arguments.append("--comm")
     result = subprocess.run(arguments,
                             cwd=ROOT, capture_output=True, text=True, timeout=60)
     transcript = result.stdout + result.stderr

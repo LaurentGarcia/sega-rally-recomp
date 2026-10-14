@@ -30,7 +30,7 @@ def main():
     generator = args.recompiler.resolve() if args.recompiler else OUT / "m2recomp"
     if not args.recompiler:
         generator = OUT / "m2recomp"
-        subprocess.run(compiler + ["-std=c++20", "-O1", "-Isrc", "tools/m2recomp/main.cpp", "src/i960/isa.cpp", "src/i960/decode.cpp", "src/i960/reach.cpp", "-o", str(generator)], cwd=ROOT, check=True)
+        subprocess.run(compiler + ["-std=c++20", "-O1", "-Isrc", "tools/m2recomp/main.cpp", "src/i960/isa.cpp", "src/i960/decode.cpp", "src/i960/reach.cpp", "src/i960/timing.cpp", "-o", str(generator)], cwd=ROOT, check=True)
     cases = []
     src1 = [(16, 0), (17, 0), (0, 1), (3, 1), (22, 1), (31, 1)]
     src2 = [(18, 0), (19, 0), (1, 1), (2, 1), (22, 1), (31, 1)]
@@ -145,7 +145,7 @@ int main() {
         while(!ls.finished()) gen::run(env);
         if(std::memcmp(ref.m_r,native.m_r,sizeof(ref.m_r)) ||
            std::memcmp(ref.m_fp,native.m_fp,sizeof(ref.m_fp)) ||
-           ref.m_AC!=native.m_AC || ref.m_IP!=native.m_IP ||
+           ref.m_AC!=native.m_AC || ref.m_IP!=native.m_IP || ref.reference_cycles!=native.reference_cycles ||
            ref.m_rcache_pos!=native.m_rcache_pos || refmem.bytes!=native_mem.bytes) {
             std::fprintf(stderr,"Parity mismatch opcode=%08x scenario=%u at=%08x\n",words[i],scenario,addresses[i]);
             for(unsigned r=0;r<32;r++) if(ref.m_r[r]!=native.m_r[r]) std::fprintf(stderr," R%u: ref=%08x native=%08x\n",r,ref.m_r[r],native.m_r[r]);

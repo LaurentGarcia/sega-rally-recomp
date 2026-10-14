@@ -79,6 +79,13 @@ public:
 
     explicit Cpu(Bus *b) : bus(b) {}
 
+    // Pinned-reference deductions, not measured PCB cycles. Time advances
+    // before instruction effects; reset/IAC never rewind this board clock.
+    void consume_reference_cycles(uint32_t cycles) {
+        if (reference_cycles > UINT64_MAX - cycles) throw Fatal("reference cycle counter overflow");
+        reference_cycles += cycles;
+    }
+
     void reset();                               // MAME device_reset
     void execute_set_input(int irqline, int state);
     void check_immediate_irqs();                // take an immediate interrupt if one is waiting
@@ -118,10 +125,12 @@ public:
 
 #ifdef M2_FAST_GEN
     // Work RAM (0x00500000-0x005fffff, the board's), for the rewritten
-    // generated code (fast_gen.py: gen::wram_*). Last in the class, so the
-    // members the generated code uses keep their offsets.
+    // generated code (fast_gen.py: gen::wram_*). Appended after architectural
+    // state to retain offsets used by inherited generated fast paths.
     uint8_t *work_ram = nullptr;
 #endif
+    // Append to preserve offsets consumed by inherited generated fast paths.
+    uint64_t reference_cycles = 0;
 };
 
 // Shims for the transplanted MAME code.

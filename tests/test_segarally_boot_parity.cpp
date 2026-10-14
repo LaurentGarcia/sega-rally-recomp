@@ -13,6 +13,9 @@
 #include "runtime/model2a_io.h"
 #include "runtime/model2_eeprom.h"
 #endif
+#ifdef M2_SRALLY_COMM
+#include "runtime/model2a_comm.h"
+#endif
 #ifdef M2_SRALLY_TGP
 #include "runtime/m2_tgp_board.h"
 #include <memory>
@@ -28,16 +31,20 @@ struct NativeTgpModel : rt::TgpBoardModel {
 
 struct ObservedBus : rt::Bus {
     rt::Model2ABus board;
-    std::vector<std::tuple<uint32_t,unsigned,uint32_t>> writes;
+    const rt::Cpu* core=nullptr;
+    // Capture when the write occurs, not just the completed instruction's
+    // total: this checks charging order around MMIO and register-frame spills.
+    std::vector<std::tuple<uint32_t,unsigned,uint32_t,uint64_t>> writes;
     ObservedBus(const std::vector<uint8_t>& p,const std::vector<uint8_t>& d):board(p,d) {}
     uint32_t fetch(uint32_t a) override { return board.fetch(a); }
     uint8_t read_byte(uint32_t a) override { return board.read_byte(a); }
     uint16_t read_word(uint32_t a) override { return board.read_word(a); }
     uint32_t read_dword(uint32_t a) override { return board.read_dword(a); }
     uint16_t flags(uint32_t a) override { return board.flags(a); }
-    void write_byte(uint32_t a,uint8_t v) override { board.write_byte(a,v);writes.emplace_back(a,1,v); }
-    void write_word(uint32_t a,uint16_t v) override { board.write_word(a,v);writes.emplace_back(a,2,v); }
-    void write_dword(uint32_t a,uint32_t v) override { board.write_dword(a,v);writes.emplace_back(a,4,v); }
+    uint64_t cycles() const { return core?core->reference_cycles:0; }
+    void write_byte(uint32_t a,uint8_t v) override { const auto at=cycles();board.write_byte(a,v);writes.emplace_back(a,1,v,at); }
+    void write_word(uint32_t a,uint16_t v) override { const auto at=cycles();board.write_word(a,v);writes.emplace_back(a,2,v,at); }
+    void write_dword(uint32_t a,uint32_t v) override { const auto at=cycles();board.write_dword(a,v);writes.emplace_back(a,4,v,at); }
 };
 
 static std::vector<uint8_t> load(const char* path) {
@@ -56,27 +63,53 @@ static bool same(const rt::Cpu& a,const rt::Cpu& b) {
         a.m_rcache_pos==b.m_rcache_pos && a.m_IP==b.m_IP && a.m_AC==b.m_AC &&
         a.m_PC==b.m_PC && a.m_SAT==b.m_SAT && a.m_PRCB==b.m_PRCB && a.m_ICR==b.m_ICR &&
         a.m_immediate_irq==b.m_immediate_irq && a.m_immediate_vector==b.m_immediate_vector &&
-        a.m_immediate_pri==b.m_immediate_pri;
+        a.m_immediate_pri==b.m_immediate_pri && a.reference_cycles==b.reference_cycles;
 }
 int main(int argc,char** argv) {
-    const bool enable_io=argc>1 && std::strcmp(argv[argc-1],"--io")==0;
-    const int positional_argc=argc-int(enable_io);
+    bool enable_io=false,enable_comm=false;
+    int positional_argc=argc;
+    while(positional_argc>1) {
+        const char* option=argv[positional_argc-1];
+        if(std::strcmp(option,"--io")==0 && !enable_io) enable_io=true;
+        else if(std::strcmp(option,"--comm")==0 && !enable_comm) enable_comm=true;
+        else break;
+        positional_argc--;
+    }
     if(positional_argc!=4 && positional_argc!=6) return 2;
     try {
         auto p=load(argv[1]),d=load(argv[2]);
         ObservedBus nb(p,d),rb(p,d);
+        rt::Cpu native(&nb);rt::I960Ref ref(&rb);
+        nb.core=&native;rb.core=&ref;
+#ifdef M2_SRALLY_COMM
+        rt::Model2AComm native_comm,reference_comm;
+        if(enable_comm) {
+            nb.board.add_model(&native_comm);rb.board.add_model(&reference_comm);
+            std::puts("Communication parity independent_devices=true peer_connected=false firmware_executed=false vblank_connected=false");
+        }
+        const auto same_comm=[&] {
+            if(!enable_comm) return true;
+            return native_comm.link()==reference_comm.link() &&
+                !std::memcmp(native_comm.region(0x01a00000),reference_comm.region(0x01a00000),0x4000);
+        };
+#else
+        if(enable_comm) throw rt::Fatal("communication support not linked into test");
+        const auto same_comm=[] { return true; };
+#endif
 #ifdef M2_SRALLY_IO
-        // Independent instances, not a shared device replay. These explicit
-        // clock callbacks can later observe each CPU's reference-cycle clock.
-        // Frozen time currently cannot finish EEPROM write/erase busy delays.
-        uint64_t native_time_ns=0,reference_time_ns=0;
+        // Each independent board observes its own engine's reference clock.
+        // 25 MHz -> 40 ns/cycle. This is pinned emulator timing, not PCB proof.
+        const auto time_ns=[](const rt::Cpu& cpu) {
+            if(cpu.reference_cycles>UINT64_MAX/40) throw rt::Fatal("board clock overflow");
+            return cpu.reference_cycles*40;
+        };
         rt::Model2Eeprom native_eeprom,reference_eeprom;
         native_eeprom.reset();reference_eeprom.reset();
-        rt::Model2AIO native_io(native_eeprom,[&] { return native_time_ns; });
-        rt::Model2AIO reference_io(reference_eeprom,[&] { return reference_time_ns; });
+        rt::Model2AIO native_io(native_eeprom,[&] { return time_ns(native); });
+        rt::Model2AIO reference_io(reference_eeprom,[&] { return time_ns(ref); });
         if(enable_io) {
             nb.board.add_model(&native_io);rb.board.add_model(&reference_io);
-            std::puts("I/O parity clock_ns=0 clock_connected=false independent_devices=true");
+            std::puts("I/O parity reference_cycle_clock=true ns_per_cycle=40 independent_devices=true pcb_timing_verified=false");
         }
         const auto same_io=[&] {
             if(!enable_io) return true;
@@ -106,7 +139,6 @@ int main(int argc,char** argv) {
 #else
         if(positional_argc==6) throw rt::Fatal("TGP support not linked into test");
 #endif
-        rt::Cpu native(&nb);rt::I960Ref ref(&rb);
         native.reset();ref.reset();
         if(!same(native,ref) || nb.writes!=rb.writes) throw rt::Fatal("reset parity mismatch");
         rt::Lockstep ls(native);gen::Env env{native,ls};
@@ -115,12 +147,13 @@ int main(int argc,char** argv) {
         while(ls.count<limit) {
             const auto pc=native.m_IP;
             if(!gen::has_code(pc)) {
-                std::printf("PASS native/reference parity instructions=%llu writes=%llu frontier=missing_code pc=%08x\n",
-                    (unsigned long long)ls.count,(unsigned long long)writes,pc);
+                std::printf("PASS native/reference parity instructions=%llu writes=%llu cycles=%llu frontier=missing_code pc=%08x\n",
+                    (unsigned long long)ls.count,(unsigned long long)writes,(unsigned long long)native.reference_cycles,pc);
                 return 0;
             }
             nb.writes.clear();rb.writes.clear();
             ls.end_count=ls.count+1;
+            ref.m_icount=0; // per-step oracle metric, avoiding signed accumulation overflow
             try {
                 while(!ls.finished()) gen::run(env);
             } catch(const rt::Model2AAccess& access) {
@@ -132,29 +165,34 @@ int main(int argc,char** argv) {
                     ref.m_IP=native.m_IP;
                     if(access.address==other.address && access.width==other.width &&
                        access.write==other.write && access.value==other.value &&
-                       nb.writes==rb.writes && same(native,ref) && same_io()) {
-                        std::printf("PASS native/reference parity instructions=%llu writes=%llu frontier=device pc=%08x address=%08x\n",
-                            (unsigned long long)ls.count,(unsigned long long)writes,pc,access.address);
+                       nb.writes==rb.writes && same(native,ref) && same_io() && same_comm()) {
+                        std::printf("PASS native/reference parity instructions=%llu writes=%llu cycles=%llu frontier=device pc=%08x access=%s%u address=%08x value=%08x\n",
+                            (unsigned long long)ls.count,(unsigned long long)writes,(unsigned long long)native.reference_cycles,pc,
+                            access.write?"write":"read",access.width*8,access.address,access.value);
                         return 0;
                     }
                     std::fprintf(stderr,"Frontier mismatch count=%llu pc=%08x native=%08x/%u/%d/%08x reference=%08x/%u/%d/%08x state=%d writes=%d\n",
                         (unsigned long long)ls.count,pc,access.address,access.width,access.write,access.value,
                         other.address,other.width,other.write,other.value,same(native,ref),nb.writes==rb.writes);
+                    std::fprintf(stderr,"frontier reference cycles native=%llu oracle=%llu\n",
+                        (unsigned long long)native.reference_cycles,(unsigned long long)ref.reference_cycles);
                 }
                 throw rt::Fatal("device frontier parity mismatch");
             }
             ref.execute_one();
-            if(!same(native,ref) || nb.writes!=rb.writes || !same_io()) {
+            if(!same(native,ref) || nb.writes!=rb.writes || !same_io() || !same_comm()) {
                 std::fprintf(stderr,"Parity mismatch count=%llu pc=%08x native_ip=%08x reference_ip=%08x\n",
                     (unsigned long long)ls.count,pc,native.m_IP,ref.m_IP);
+                std::fprintf(stderr,"reference cycles native=%llu oracle=%llu write_timestamps_equal=%d\n",
+                    (unsigned long long)native.reference_cycles,(unsigned long long)ref.reference_cycles,nb.writes==rb.writes);
                 for(unsigned i=0;i<32;i++) if(native.m_r[i]!=ref.m_r[i])
                     std::fprintf(stderr,"r%u native=%08x reference=%08x\n",i,native.m_r[i],ref.m_r[i]);
                 return 1;
             }
             writes+=nb.writes.size();
         }
-        std::printf("PASS native/reference parity instructions=%llu writes=%llu frontier=instruction_limit pc=%08x\n",
-            (unsigned long long)ls.count,(unsigned long long)writes,native.m_IP);
+        std::printf("PASS native/reference parity instructions=%llu writes=%llu cycles=%llu frontier=instruction_limit pc=%08x\n",
+            (unsigned long long)ls.count,(unsigned long long)writes,(unsigned long long)native.reference_cycles,native.m_IP);
         return 0;
     } catch(const std::exception& e) { std::fprintf(stderr,"boot parity: %s\n",e.what());return 1; }
 }

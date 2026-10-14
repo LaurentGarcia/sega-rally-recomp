@@ -52,6 +52,24 @@ revision 20 sections 5–8, was read as an independent command-format reference;
 no text or code was copied. Its CS-falling programming behavior differs from
 the pinned MAME implementation and is recorded in the EEPROM source.
 
+`src/i960/timing.cpp` converts the fixed deductions from pinned MAME's
+`src/devices/cpu/i960/i960.cpp` into compiler-only metadata, with the BSD-3
+notice retained. Source SHA-256:
+`f7d887add0cb070f91f585b22f3b35acc4fc94ab5c94a527eab5205ee9440fdd`.
+Generated instructions charge the runtime's monotonic counter; the test-only
+interpreter charges at its original deduction sites, independently of the
+metadata table. Shared call/return helpers restore the reference's 9/7 costs.
+Fixed guesses, zero-cost flushreg and absent burst-stall continuation remain
+explicit limits; these are not measured hardware cycles.
+
+`model2a_comm` supplies Model 2A's mapping to the unchanged inherited CommBoard
+simulation listed below. The pinned `src/mame/sega/m2comm.cpp` and `.h` hashes
+are `4fdc712070b8766e76ba03fdf64be1844f159ea48b6023ee865162973467d204`
+and `6f626674189b0c14fb4a576f7e70a846213ca409dbf1ab19b435f8e533e15ae6`.
+The header enables `M2COMM_SIMULATION`; the adapter supplies permanently closed
+transport endpoints to preserve no-peer initialization without socket access.
+This does not execute or replace the missing communication firmware.
+
 This project's own code is under the BSD-3-Clause licence (`LICENSE`). The
 code below keeps its own licence and notices; every component linked into the
 game is under a licence compatible with it (BSD, zlib, MIT, public domain).
@@ -64,7 +82,7 @@ Vendored checkouts live in git-ignored `extern/` and are never committed.
 | --- | --- | --- | --- | --- | --- |
 | MAME `src/devices/cpu/i960/i960dis.cpp`, `i960dis.h` | https://github.com/mamedev/mame | `dddd73680656e355bb2b5beecab1167c9f07bf81` | BSD-3-Clause (file header) | Compiled unmodified into the `mame_oracle` test only, as the reference disassembler. Not linked into any tool or shipped binary. | None. `tests/mame_shim/emu.h` (ours) stands in for MAME's `emu.h`. |
 | MAME `src/devices/cpu/i960/i960.cpp` (decoder reference) | same | same | BSD-3-Clause | Read: the executor's opcode set, operand, EA and branch-target rules are what `src/i960/decode.cpp` follows. | — |
-| MAME `src/devices/cpu/i960/i960.cpp` (instruction semantics) | same | same | BSD-3-Clause | **Code transplanted** into `src/runtime/cpu.cpp` (context, call/return, interrupts, memory; linked into the game) and `src/refcore/i960_ref.cpp` (the instruction interpreter; test oracle only, never linked into the game), BSD-3 notice kept in both. MAME's semantics are used verbatim so the runtime diffs cleanly against MAME in lockstep. Licence-compatible with any project licence. | Device framework, cycle accounting and burst-stall machinery removed; memory through `rt::Bus`; `fatalerror` throws; interrupt-taken hook added. Every change is marked in the file. |
+| MAME `src/devices/cpu/i960/i960.cpp` (instruction semantics) | same | same | BSD-3-Clause | **Code transplanted** into `src/runtime/cpu.cpp` (context, call/return, interrupts, memory; linked into the game) and `src/refcore/i960_ref.cpp` (the instruction interpreter; test oracle only, never linked into the game), BSD-3 notice kept in both. MAME's semantics are used verbatim so the runtime diffs cleanly against MAME in lockstep. Licence-compatible with any project licence. | Device framework and burst-stall machinery removed; reference deductions feed a monotonic cycle counter while generated code uses independent compiler metadata; memory through `rt::Bus`; `fatalerror` throws; interrupt-taken hook added. Every change is marked in the file. |
 | MAME `src/mame/sega/model2*.cpp`, `src/mame/shared/segam1audio.cpp` | same | same | BSD-3-Clause | Read, not compiled: hardware figures in the design document. | — |
 | MAME `src/devices/cpu/mb86233/mb86233.cpp` (TGP semantics) | same | same | BSD-3-Clause | **Code transplanted** into `src/runtime/tgp.h` as inline templates on each instruction's constant fields; `tools/m2tgprecomp` emits calls to them, so the TGP program is statically recompiled. No MB86233 interpreter exists in this project. BSD-3 notice kept. | Split per ALU op, addressing mode and register into `if constexpr` templates; stall handled by returning to the caller; shift counts made explicit mod 32 and `s32(float)` made explicit (x86 result), matching MAME's x86-64 build on any host. |
 | MAME `src/mame/sega/model2.cpp` (board registers: IRQ controller, timers, video/render mode, TGP ID, model2o memory map) | same | same | BSD-3-Clause | **Register semantics transplanted** into `src/runtime/m2_board.cpp`, the native board the game runs on outside lockstep. BSD-3 notice kept. The I/O board's mailbox protocol is not from MAME (which runs the board's Z80 BIOS): it was read from the game's own traffic in our traces. | No device emulation: the I/O board, sound UART and comm board are native runtime code answering the game's protocol. |

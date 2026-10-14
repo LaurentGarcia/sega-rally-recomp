@@ -23,9 +23,13 @@ public:
         bool burst_mode = false;
         bool iswriteop = false;
     } m_stall_state;
-    int m_icount = 0; // MAME cycle estimate; unused
+    int m_icount = 0; // Independent fixed-opcode deduction metric; helpers excluded.
 
 private:
+    void consume_instruction_cycles(uint32_t cycles) {
+        m_icount -= int(cycles);
+        consume_reference_cycles(cycles);
+    }
     uint32_t get_ea(uint32_t opcode);
     uint32_t get_1_ri(uint32_t opcode);
     uint32_t get_2_ri(uint32_t opcode);

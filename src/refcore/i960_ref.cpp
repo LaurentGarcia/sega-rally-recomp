@@ -8,8 +8,9 @@
 // (BSD-3-Clause; notice above kept as the licence requires), over the
 // runtime's Cpu context. m2replay runs the game through it to check the
 // runtime and the replay against MAME independently of the recompiler.
-// Changes: device framework, cycle accounting (m_icount kept, unused) and
-// the burst-stall machinery removed. See THIRD_PARTY.md.
+// Changes: device framework and burst-stall machinery removed. Original
+// opcode cycle deductions feed both m_icount (independent table metric) and
+// Cpu::reference_cycles in their original positions. See THIRD_PARTY.md.
 
 #include "refcore/i960_ref.h"
 
@@ -405,7 +406,7 @@ void I960Ref::execute_op(uint32_t opcode)
 
 	switch(opcode >> 24) {
 		case 0x08: // b
-			m_icount--;
+			consume_instruction_cycles(1);
 			m_IP += get_disp(opcode);
 			break;
 
@@ -418,97 +419,97 @@ void I960Ref::execute_op(uint32_t opcode)
 			break;
 
 		case 0x0b: // bal
-			m_icount -= 5;
+			consume_instruction_cycles(5);
 			m_r[0x1e] = m_IP;
 			m_IP += get_disp(opcode);
 			break;
 
 		case 0x10: // bno
-			m_icount--;
+			consume_instruction_cycles(1);
 			if(!(m_AC & 7)) {
 				m_IP += get_disp(opcode);
 			}
 			break;
 
 		case 0x11: // bg
-			m_icount--;
+			consume_instruction_cycles(1);
 			bxx(opcode, 1);
 			break;
 
 		case 0x12: // be
-			m_icount--;
+			consume_instruction_cycles(1);
 			bxx(opcode, 2);
 			break;
 
 		case 0x13: // bge
-			m_icount--;
+			consume_instruction_cycles(1);
 			bxx(opcode, 3);
 			break;
 
 		case 0x14: // bl
-			m_icount--;
+			consume_instruction_cycles(1);
 			bxx(opcode, 4);
 			break;
 
 		case 0x15: // bne
-			m_icount--;
+			consume_instruction_cycles(1);
 			bxx(opcode, 5);
 			break;
 
 		case 0x16: // ble
-			m_icount--;
+			consume_instruction_cycles(1);
 			bxx(opcode, 6);
 			break;
 
 		case 0x17: // bo
-			m_icount--;
+			consume_instruction_cycles(1);
 			bxx(opcode, 7);
 			break;
 
 		case 0x18: // faultno
-			m_icount--;
+			consume_instruction_cycles(1);
 			if(!(m_AC & 7)) {
 				m_IP += get_disp(opcode);
 			}
 			break;
 
 		case 0x19: // faultg
-			m_icount--;
+			consume_instruction_cycles(1);
 			fxx(opcode, 1);
 			break;
 
 		case 0x1a: // faulte
-			m_icount--;
+			consume_instruction_cycles(1);
 			fxx(opcode, 2);
 			break;
 
 		case 0x1b: // faultge
-			m_icount--;
+			consume_instruction_cycles(1);
 			fxx(opcode, 3);
 			break;
 
 		case 0x1c: // faultl
-			m_icount--;
+			consume_instruction_cycles(1);
 			fxx(opcode, 4);
 			break;
 
 		case 0x1d: // faultne
-			m_icount--;
+			consume_instruction_cycles(1);
 			fxx(opcode, 5);
 			break;
 
 		case 0x1e: // faultle
-			m_icount--;
+			consume_instruction_cycles(1);
 			fxx(opcode, 6);
 			break;
 
 		case 0x1f: // faulto
-			m_icount--;
+			consume_instruction_cycles(1);
 			fxx(opcode, 7);
 			break;
 
 		case 0x20: // testno
-			m_icount--;
+			consume_instruction_cycles(1);
 			if(!(m_AC & 7))
 				m_r[(opcode>>19) & 0x1f] = 1;
 			else
@@ -516,42 +517,42 @@ void I960Ref::execute_op(uint32_t opcode)
 			break;
 
 		case 0x21: // testg
-			m_icount--;
+			consume_instruction_cycles(1);
 			test(opcode, 1);
 			break;
 
 		case 0x22: // teste
-			m_icount--;
+			consume_instruction_cycles(1);
 			test(opcode, 2);
 			break;
 
 		case 0x23: // testge
-			m_icount--;
+			consume_instruction_cycles(1);
 			test(opcode, 3);
 			break;
 
 		case 0x24: // testl
-			m_icount--;
+			consume_instruction_cycles(1);
 			test(opcode, 4);
 			break;
 
 		case 0x25: // testne
-			m_icount--;
+			consume_instruction_cycles(1);
 			test(opcode, 5);
 			break;
 
 		case 0x26: // testle
-			m_icount--;
+			consume_instruction_cycles(1);
 			test(opcode, 6);
 			break;
 
 		case 0x27: // testo
-			m_icount--;
+			consume_instruction_cycles(1);
 			test(opcode, 7);
 			break;
 
 		case 0x30: // bbc
-			m_icount -= 4;
+			consume_instruction_cycles(4);
 			t1 = get_1_ci(opcode) & 0x1f;
 			t2 = get_2_ci(opcode);
 			if(!(t2 & (1<<t1))) {
@@ -562,7 +563,7 @@ void I960Ref::execute_op(uint32_t opcode)
 			break;
 
 		case 0x31: // cmp0bg
-			m_icount -= 4;
+			consume_instruction_cycles(4);
 			t1 = get_1_ci(opcode);
 			t2 = get_2_ci(opcode);
 			cmp_u(t1, t2);
@@ -570,7 +571,7 @@ void I960Ref::execute_op(uint32_t opcode)
 			break;
 
 		case 0x32: // cmpobe
-			m_icount -= 4;
+			consume_instruction_cycles(4);
 			t1 = get_1_ci(opcode);
 			t2 = get_2_ci(opcode);
 			cmp_u(t1, t2);
@@ -578,7 +579,7 @@ void I960Ref::execute_op(uint32_t opcode)
 			break;
 
 		case 0x33: // cmpobge
-			m_icount -= 4;
+			consume_instruction_cycles(4);
 			t1 = get_1_ci(opcode);
 			t2 = get_2_ci(opcode);
 			cmp_u(t1, t2);
@@ -586,7 +587,7 @@ void I960Ref::execute_op(uint32_t opcode)
 			break;
 
 		case 0x34: // cmpobl
-			m_icount -= 4;
+			consume_instruction_cycles(4);
 			t1 = get_1_ci(opcode);
 			t2 = get_2_ci(opcode);
 			cmp_u(t1, t2);
@@ -594,7 +595,7 @@ void I960Ref::execute_op(uint32_t opcode)
 			break;
 
 		case 0x35: // cmpobne
-			m_icount -= 4;
+			consume_instruction_cycles(4);
 			t1 = get_1_ci(opcode);
 			t2 = get_2_ci(opcode);
 			cmp_u(t1, t2);
@@ -602,7 +603,7 @@ void I960Ref::execute_op(uint32_t opcode)
 			break;
 
 		case 0x36: // cmpoble
-			m_icount -= 4;
+			consume_instruction_cycles(4);
 			t1 = get_1_ci(opcode);
 			t2 = get_2_ci(opcode);
 			cmp_u(t1, t2);
@@ -610,7 +611,7 @@ void I960Ref::execute_op(uint32_t opcode)
 			break;
 
 		case 0x37: // bbs
-			m_icount -= 4;
+			consume_instruction_cycles(4);
 			t1 = get_1_ci(opcode) & 0x1f;
 			t2 = get_2_ci(opcode);
 			if(t2 & (1<<t1)) {
@@ -621,7 +622,7 @@ void I960Ref::execute_op(uint32_t opcode)
 			break;
 
 		case 0x39: // cmpibg
-			m_icount -= 4;
+			consume_instruction_cycles(4);
 			t1 = get_1_ci(opcode);
 			t2 = get_2_ci(opcode);
 			cmp_s(t1, t2);
@@ -629,7 +630,7 @@ void I960Ref::execute_op(uint32_t opcode)
 			break;
 
 		case 0x3a: // cmpibe
-			m_icount -= 4;
+			consume_instruction_cycles(4);
 			t1 = get_1_ci(opcode);
 			t2 = get_2_ci(opcode);
 			cmp_s(t1, t2);
@@ -637,7 +638,7 @@ void I960Ref::execute_op(uint32_t opcode)
 			break;
 
 		case 0x3b: // cmpibge
-			m_icount -= 4;
+			consume_instruction_cycles(4);
 			t1 = get_1_ci(opcode);
 			t2 = get_2_ci(opcode);
 			cmp_s(t1, t2);
@@ -645,7 +646,7 @@ void I960Ref::execute_op(uint32_t opcode)
 			break;
 
 		case 0x3c: // cmpibl
-			m_icount -= 4;
+			consume_instruction_cycles(4);
 			t1 = get_1_ci(opcode);
 			t2 = get_2_ci(opcode);
 			cmp_s(t1, t2);
@@ -653,7 +654,7 @@ void I960Ref::execute_op(uint32_t opcode)
 			break;
 
 		case 0x3d: // cmpibne
-			m_icount -= 4;
+			consume_instruction_cycles(4);
 			t1 = get_1_ci(opcode);
 			t2 = get_2_ci(opcode);
 			cmp_s(t1, t2);
@@ -661,7 +662,7 @@ void I960Ref::execute_op(uint32_t opcode)
 			break;
 
 		case 0x3e: // cmpible
-			m_icount -= 4;
+			consume_instruction_cycles(4);
 			t1 = get_1_ci(opcode);
 			t2 = get_2_ci(opcode);
 			cmp_s(t1, t2);
@@ -671,104 +672,104 @@ void I960Ref::execute_op(uint32_t opcode)
 		case 0x58:
 			switch((opcode >> 7) & 0xf) {
 			case 0x0: // notbit
-				m_icount -= 2;
+				consume_instruction_cycles(2);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				set_ri(opcode, t2 ^ (1<<(t1 & 31)));
 				break;
 
 			case 0x1: // and
-				m_icount--;
+				consume_instruction_cycles(1);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				set_ri(opcode, t2 & t1);
 				break;
 
 			case 0x2: // andnot
-				m_icount--;
+				consume_instruction_cycles(1);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				set_ri(opcode, t2 & ~t1);
 				break;
 
 			case 0x3: // setbit
-				m_icount -= 2;
+				consume_instruction_cycles(2);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				set_ri(opcode, t2 | (1<<(t1 & 31)));
 				break;
 
 			case 0x4: // notand
-				m_icount--;
+				consume_instruction_cycles(1);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				set_ri(opcode, (~t2) & t1);
 				break;
 
 			case 0x6: // xor
-				m_icount--;
+				consume_instruction_cycles(1);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				set_ri(opcode, t2 ^ t1);
 				break;
 
 			case 0x7: // or
-				m_icount--;
+				consume_instruction_cycles(1);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				set_ri(opcode, t2 | t1);
 				break;
 
 			case 0x8: // nor
-				m_icount--;
+				consume_instruction_cycles(1);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				set_ri(opcode, ((~t2) & (~t1)));
 				break;
 
 			case 0x9: // xnor
-				m_icount--;
+				consume_instruction_cycles(1);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				set_ri(opcode, ~(t2 ^ t1));
 				break;
 
 			case 0xa: // not
-				m_icount--;
+				consume_instruction_cycles(1);
 				t1 = get_1_ri(opcode);
 				set_ri(opcode, ~t1);
 				break;
 
 			case 0xb: // ornot
-				m_icount--;
+				consume_instruction_cycles(1);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				set_ri(opcode, t2 | ~t1);
 				break;
 
 			case 0xc: // clrbit
-				m_icount -= 2;
+				consume_instruction_cycles(2);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				set_ri(opcode, t2 & ~(1<<(t1 & 31)));
 				break;
 
 			case 0xd: // notor
-				m_icount--;
+				consume_instruction_cycles(1);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				set_ri(opcode, (~t2) | t1);
 				break;
 
 			case 0xe: // nand
-				m_icount -= 2;
+				consume_instruction_cycles(2);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				set_ri(opcode, ~t2 | ~t1);
 				break;
 
 			case 0xf: // alterbit
-				m_icount -= 2;
+				consume_instruction_cycles(2);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				if(m_AC & 2)
@@ -785,7 +786,7 @@ void I960Ref::execute_op(uint32_t opcode)
 		case 0x59:
 			switch((opcode >> 7) & 0xf) {
 			case 0x0: // addo
-				m_icount--;
+				consume_instruction_cycles(1);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				set_ri(opcode, t2+t1);
@@ -793,14 +794,14 @@ void I960Ref::execute_op(uint32_t opcode)
 
 			case 0x1: // addi
 				// #### overflow
-				m_icount--;
+				consume_instruction_cycles(1);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				set_ri(opcode, t2+t1);
 				break;
 
 			case 0x2: // subo
-				m_icount--;
+				consume_instruction_cycles(1);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				set_ri(opcode, t2-t1);
@@ -808,21 +809,21 @@ void I960Ref::execute_op(uint32_t opcode)
 
 			case 0x3: // subi
 				// #### overflow
-				m_icount--;
+				consume_instruction_cycles(1);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				set_ri(opcode, t2-t1);
 				break;
 
 			case 0x8: // shro
-				m_icount--;
+				consume_instruction_cycles(1);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				set_ri(opcode, t1 >= 32 ? 0 : t2>>t1);
 				break;
 
 			case 0xa: // shrdi
-				m_icount--;
+				consume_instruction_cycles(1);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				if(t1 >= 32)
@@ -837,7 +838,7 @@ void I960Ref::execute_op(uint32_t opcode)
 				break;
 
 			case 0xb: // shri
-				m_icount--;
+				consume_instruction_cycles(1);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				if(t1 >= 32)
@@ -847,14 +848,14 @@ void I960Ref::execute_op(uint32_t opcode)
 				break;
 
 			case 0xc: // shlo
-				m_icount--;
+				consume_instruction_cycles(1);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				set_ri(opcode, t1 >= 32 ? 0 : t2<<t1);
 				break;
 
 			case 0xd: // rotate
-				m_icount--;
+				consume_instruction_cycles(1);
 				t1 = get_1_ri(opcode) & 0x1f;
 				t2 = get_2_ri(opcode);
 				set_ri(opcode, std::rotl(t2, t1));
@@ -862,7 +863,7 @@ void I960Ref::execute_op(uint32_t opcode)
 
 			case 0xe: // shli
 				// missing overflow
-				m_icount--;
+				consume_instruction_cycles(1);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				// TODO: on later models, sign is always preserved even upon overflow
@@ -877,21 +878,21 @@ void I960Ref::execute_op(uint32_t opcode)
 		case 0x5a:
 			switch((opcode >> 7) & 0xf) {
 			case 0x0: // cmpo
-				m_icount--;
+				consume_instruction_cycles(1);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				cmp_u(t1, t2);
 				break;
 
 			case 0x1: // cmpi
-				m_icount--;
+				consume_instruction_cycles(1);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				cmp_s(t1, t2);
 				break;
 
 			case 0x2: // concmpo
-				m_icount--;
+				consume_instruction_cycles(1);
 				if(!(m_AC & 0x4)) {
 					t1 = get_1_ri(opcode);
 					t2 = get_2_ri(opcode);
@@ -900,7 +901,7 @@ void I960Ref::execute_op(uint32_t opcode)
 				break;
 
 			case 0x3: // concmpi
-				m_icount--;
+				consume_instruction_cycles(1);
 				if(!(m_AC & 0x4)) {
 					t1 = get_1_ri(opcode);
 					t2 = get_2_ri(opcode);
@@ -909,7 +910,7 @@ void I960Ref::execute_op(uint32_t opcode)
 				break;
 
 			case 0x4: // cmpinco
-				m_icount -= 2;
+				consume_instruction_cycles(2);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				cmp_u(t1, t2);
@@ -917,7 +918,7 @@ void I960Ref::execute_op(uint32_t opcode)
 				break;
 
 			case 0x5: // cmpinci
-				m_icount -= 2;
+				consume_instruction_cycles(2);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				cmp_s(t1, t2);
@@ -925,7 +926,7 @@ void I960Ref::execute_op(uint32_t opcode)
 				break;
 
 			case 0x6: // cmpdeco
-				m_icount -= 2;
+				consume_instruction_cycles(2);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				cmp_u(t1, t2);
@@ -933,7 +934,7 @@ void I960Ref::execute_op(uint32_t opcode)
 				break;
 
 			case 0x7: // cmpdeci
-				m_icount -= 2;
+				consume_instruction_cycles(2);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				cmp_s(t1, t2);
@@ -941,7 +942,7 @@ void I960Ref::execute_op(uint32_t opcode)
 				break;
 
 			case 0xc: // scanbyte
-				m_icount -= 2;
+				consume_instruction_cycles(2);
 				m_AC &= ~7;     // clear CC
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
@@ -955,7 +956,7 @@ void I960Ref::execute_op(uint32_t opcode)
 				break;
 
 			case 0xe: // chkbit
-				m_icount -= 2;
+				consume_instruction_cycles(2);
 				t1 = get_1_ri(opcode) & 0x1f;
 				t2 = get_2_ri(opcode);
 				if(t2 & (1<<t1))
@@ -975,7 +976,7 @@ void I960Ref::execute_op(uint32_t opcode)
 				{
 					uint64_t res;
 
-					m_icount -= 2;
+					consume_instruction_cycles(2);
 					t1 = get_1_ri(opcode);
 					t2 = get_2_ri(opcode);
 					res = t2+(t1+((m_AC>>1)&1));
@@ -993,7 +994,7 @@ void I960Ref::execute_op(uint32_t opcode)
 				{
 					uint64_t res;
 
-					m_icount -= 2;
+					consume_instruction_cycles(2);
 					t1 = get_1_ri(opcode);
 					t2 = get_2_ri(opcode);
 					// dst = src2 - src1 - 1 + C, or src2 + ~src1 + C
@@ -1016,7 +1017,7 @@ void I960Ref::execute_op(uint32_t opcode)
 		case 0x5c:
 			switch((opcode >> 7) & 0xf) {
 			case 0xc: // mov
-				m_icount -= 2;
+				consume_instruction_cycles(2);
 				t1 = get_1_ri(opcode);
 				set_ri(opcode, t1);
 				break;
@@ -1029,7 +1030,7 @@ void I960Ref::execute_op(uint32_t opcode)
 		case 0x5d:
 			switch((opcode >> 7) & 0xf) {
 			case 0xc: // movl
-				m_icount -= 2;
+				consume_instruction_cycles(2);
 				t2 = (opcode>>19) & 0x1e;
 				if(opcode & 0x00000800) { // litteral
 					t1 = opcode & 0x1f;
@@ -1046,7 +1047,7 @@ void I960Ref::execute_op(uint32_t opcode)
 		case 0x5e:
 			switch((opcode >> 7) & 0xf) {
 			case 0xc: // movt
-				m_icount -= 3;
+				consume_instruction_cycles(3);
 				t2 = (opcode>>19) & 0x1c;
 				if(opcode & 0x00000800) { // litteral
 					t1 = opcode & 0x1f;
@@ -1063,7 +1064,7 @@ void I960Ref::execute_op(uint32_t opcode)
 		case 0x5f:
 			switch((opcode >> 7) & 0xf) {
 			case 0xc: // movq
-				m_icount -= 4;
+				consume_instruction_cycles(4);
 				t2 = (opcode>>19) & 0x1c;
 				if(opcode & 0x00000800) { // litteral
 					t1 = opcode & 0x1f;
@@ -1080,7 +1081,7 @@ void I960Ref::execute_op(uint32_t opcode)
 		case 0x60:
 			switch((opcode >> 7) & 0xf) {
 			case 0x0: // synmov
-				m_icount -= 6;
+				consume_instruction_cycles(6);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				// interrupt control register
@@ -1092,7 +1093,7 @@ void I960Ref::execute_op(uint32_t opcode)
 				break;
 
 			case 0x2: // synmovq
-				m_icount -= 12;
+				consume_instruction_cycles(12);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				if(t1 == 0xff000010)
@@ -1118,7 +1119,7 @@ void I960Ref::execute_op(uint32_t opcode)
 					uint32_t res = 0xffffffff;
 					int i;
 
-					m_icount -= 10;
+					consume_instruction_cycles(10);
 
 					t1 = get_1_ri(opcode);
 					m_AC &= ~7;
@@ -1142,7 +1143,7 @@ void I960Ref::execute_op(uint32_t opcode)
 					uint32_t res = 0xffffffff;
 					int i;
 
-					m_icount -= 10;
+					consume_instruction_cycles(10);
 
 					t1 = get_1_ri(opcode);
 					m_AC &= ~7;
@@ -1170,7 +1171,7 @@ void I960Ref::execute_op(uint32_t opcode)
 				    condition code (CC) is set to 000; otherwise the condition code is set to
 				    010.
 				*/
-				m_icount -= 7;
+				consume_instruction_cycles(7);
 				t1 = get_1_ri(opcode);
 				set_ri(opcode, t1);
 				m_AC &= 0xfff8;
@@ -1179,7 +1180,7 @@ void I960Ref::execute_op(uint32_t opcode)
 				break;
 
 			case 0x5: // modac
-				m_icount -= 10;
+				consume_instruction_cycles(10);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				set_ri(opcode, m_AC);
@@ -1194,7 +1195,7 @@ void I960Ref::execute_op(uint32_t opcode)
 		case 0x65:
 			switch((opcode >> 7) & 0xf) {
 			case 0x5: // modpc
-				m_icount -= 10;
+				consume_instruction_cycles(10);
 				t1 = m_PC;
 				t2 = get_2_ri(opcode);
 				m_PC = (m_PC & ~t2) | (m_r[(opcode>>19) & 0x1f] & t2);
@@ -1246,7 +1247,7 @@ void I960Ref::execute_op(uint32_t opcode)
 		case 0x67:
 			switch((opcode >> 7) & 0xf) {
 			case 0x0: // emul
-				m_icount -= 37;
+				consume_instruction_cycles(37);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 
@@ -1254,7 +1255,7 @@ void I960Ref::execute_op(uint32_t opcode)
 				break;
 
 			case 0x1: // ediv
-				m_icount -= 37;
+				consume_instruction_cycles(37);
 				{
 					uint64_t src1, src2;
 
@@ -1266,26 +1267,26 @@ void I960Ref::execute_op(uint32_t opcode)
 				break;
 
 			case 0x4: // cvtir
-				m_icount -= 30;
+				consume_instruction_cycles(30);
 				t1 = get_1_ri(opcode);
 				set_rif(opcode, (double)(int32_t)t1);
 				break;
 
 			case 0x5: // cvtilr
-				m_icount -= 30;
+				consume_instruction_cycles(30);
 				t1 = get_1_ri(opcode);
 				set_rifl(opcode, (double)(int32_t)t1);
 				break;
 
 			case 0x6: // scalerl
-				m_icount -= 30;
+				consume_instruction_cycles(30);
 				t1 = get_1_ri(opcode);
 				t2f = get_2_rifl(opcode);
 				set_rifl(opcode, t2f * pow(2.0, (double)(int32_t)t1));
 				break;
 
 			case 0x7: // scaler
-				m_icount -= 30;
+				consume_instruction_cycles(30);
 				t1 = get_1_ri(opcode);
 				t2f = get_2_rif(opcode);
 			set_rif(opcode, t2f * pow(2.0, (double)(int32_t)t1));
@@ -1299,78 +1300,78 @@ void I960Ref::execute_op(uint32_t opcode)
 		case 0x68:
 			switch((opcode >> 7) & 0xf) {
 			case 0x0: // atanr
-				m_icount -= 267;
+				consume_instruction_cycles(267);
 				t1f = get_1_rif(opcode);
 				t2f = get_2_rif(opcode);
 				set_rif(opcode, atan2(t2f, t1f));
 				break;
 
 			case 0x1: // logepr
-				m_icount -= 400;
+				consume_instruction_cycles(400);
 				t1f = get_1_rif(opcode);
 				t2f = get_2_rif(opcode);
 				set_rif(opcode, t2f*log2(t1f+1.0));
 				break;
 
 			case 0x2: // logr
-				m_icount -= 438;
+				consume_instruction_cycles(438);
 				t1f = get_1_rif(opcode);
 				t2f = get_2_rif(opcode);
 				set_rif(opcode, t2f*log2(t1f));
 				break;
 
 			case 0x3: // remr
-				m_icount -= 67; // (67 to 75878 depending on opcodes!!!)
+				consume_instruction_cycles(67); // (67 to 75878 depending on opcodes!!!)
 				t1f = get_1_rif(opcode);
 				t2f = get_2_rif(opcode);
 				set_rif(opcode, fmod(t2f, t1f));
 				break;
 
 			case 0x5: // cmpr
-				m_icount -= 10;
+				consume_instruction_cycles(10);
 				t1f = get_1_rif(opcode);
 				t2f = get_2_rif(opcode);
 				cmp_d(t1f, t2f);
 				break;
 
 			case 0x8: // sqrtr
-				m_icount -= 104;
+				consume_instruction_cycles(104);
 				t1f = get_1_rif(opcode);
 				set_rif(opcode, sqrt(t1f));
 				break;
 
 			case 0x9: // expr
-				m_icount -= 334; // checkme
+				consume_instruction_cycles(334); // checkme
 				t1f = get_1_rif(opcode);
 				set_rif(opcode, pow(2.0, t1f) - 1.0);
 				break;
 
 			case 0xa: // logbnr
-				m_icount -= 37;
+				consume_instruction_cycles(37);
 				t1f = get_1_rif(opcode);
 				set_rif(opcode, logb(t1f));
 				break;
 
 			case 0xb: // roundr
-				m_icount -= 69;
+				consume_instruction_cycles(69);
 				t1f = get_1_rif(opcode);
 				set_rif(opcode, round_to_int(t1f));
 				break;
 
 			case 0xc: // sinr
-				m_icount -= 406;
+				consume_instruction_cycles(406);
 				t1f = get_1_rif(opcode);
 				set_rif(opcode, sin(t1f));
 				break;
 
 			case 0xd: // cosr
-				m_icount -= 406;
+				consume_instruction_cycles(406);
 				t1f = get_1_rif(opcode);
 				set_rif(opcode, cos(t1f));
 				break;
 
 			case 0xe: // tanr
-				m_icount -= 293;
+				consume_instruction_cycles(293);
 				t1f = get_1_rif(opcode);
 				set_rif(opcode, tan(t1f));
 				break;
@@ -1383,64 +1384,64 @@ void I960Ref::execute_op(uint32_t opcode)
 		case 0x69:
 			switch((opcode >> 7) & 0xf) {
 			case 0x0: // atanrl
-				m_icount -= 350;
+				consume_instruction_cycles(350);
 				t1f = get_1_rifl(opcode);
 				t2f = get_2_rifl(opcode);
 				set_rifl(opcode, atan2(t2f, t1f));
 				break;
 
 			case 0x2: // logrl
-				m_icount -= 438;
+				consume_instruction_cycles(438);
 				t1f = get_1_rifl(opcode);
 				t2f = get_2_rifl(opcode);
 				set_rifl(opcode, t2f*log2(t1f));
 				break;
 
 			case 0x5: // cmprl
-				m_icount -= 12;
+				consume_instruction_cycles(12);
 				t1f = get_1_rifl(opcode);
 				t2f = get_2_rifl(opcode);
 				cmp_d(t1f, t2f);
 				break;
 
 			case 0x8: // sqrtrl
-				m_icount -= 104;
+				consume_instruction_cycles(104);
 				t1f = get_1_rifl(opcode);
 				set_rifl(opcode, sqrt(t1f));
 				break;
 
 			case 0x9: // exprl
-				m_icount -= 334;
+				consume_instruction_cycles(334);
 				t1f = get_1_rifl(opcode);
 				set_rifl(opcode, pow(2.0, t1f)-1.0);
 				break;
 
 			case 0xa: // logbnrl
-				m_icount -= 37;
+				consume_instruction_cycles(37);
 				t1f = get_1_rifl(opcode);
 				set_rifl(opcode, logb(t1f));
 				break;
 
 			case 0xb: // roundrl
-				m_icount -= 70;
+				consume_instruction_cycles(70);
 				t1f = get_1_rifl(opcode);
 				set_rifl(opcode, round_to_int(t1f));
 				break;
 
 			case 0xc: // sinrl
-				m_icount -= 441;
+				consume_instruction_cycles(441);
 				t1f = get_1_rifl(opcode);
 				set_rifl(opcode, sin(t1f));
 				break;
 
 			case 0xd: // cosrl
-				m_icount -= 441;
+				consume_instruction_cycles(441);
 				t1f = get_1_rifl(opcode);
 				set_rifl(opcode, cos(t1f));
 				break;
 
 			case 0xe: // tanrl
-				m_icount -= 323;
+				consume_instruction_cycles(323);
 				t1f = get_1_rifl(opcode);
 				set_rifl(opcode, tan(t1f));
 				break;
@@ -1453,31 +1454,31 @@ void I960Ref::execute_op(uint32_t opcode)
 		case 0x6c:
 			switch((opcode >> 7) & 0xf) {
 			case 0x0: // cvtri
-				m_icount -= 33;
+				consume_instruction_cycles(33);
 				t1f = get_1_rif(opcode);
 				set_ri(opcode, (int32_t)round_to_int(t1f));
 				break;
 
 			case 0x1: // cvtril
-				m_icount -= 35;
+				consume_instruction_cycles(35);
 				t1f = get_1_rif(opcode);
 				set_ri64(opcode, (int64_t)round_to_int(t1f));
 				break;
 
 			case 0x2: // cvtzri
-				m_icount -= 43;
+				consume_instruction_cycles(43);
 				t1f = get_1_rif(opcode);
 				set_ri(opcode, (int32_t)t1f);
 				break;
 
 			case 0x3: // cvtzril
-				m_icount -= 44;
+				consume_instruction_cycles(44);
 				t1f = get_1_rif(opcode);
 				set_ri64(opcode, (int64_t)t1f);
 				break;
 
 			case 0x9: // movr
-				m_icount -= 5;
+				consume_instruction_cycles(5);
 				t1f = get_1_rif(opcode);
 				set_rif(opcode, t1f);
 				break;
@@ -1490,7 +1491,7 @@ void I960Ref::execute_op(uint32_t opcode)
 		case 0x6d:
 			switch((opcode >> 7) & 0xf) {
 			case 0x9: // movrl
-				m_icount -= 6;
+				consume_instruction_cycles(6);
 				t1f = get_1_rifl(opcode);
 				set_rifl(opcode, t1f);
 				break;
@@ -1507,7 +1508,7 @@ void I960Ref::execute_op(uint32_t opcode)
 				{
 					uint32_t v[3];
 
-					m_icount -= 8;
+					consume_instruction_cycles(8);
 
 					// source: three g/l registers (multiple of 4), a floating-point register or a literal
 					if(!(opcode & 0x00000800))
@@ -1541,7 +1542,7 @@ void I960Ref::execute_op(uint32_t opcode)
 				}
 				break;
 			case 0x2: // cpysre
-				m_icount -= 8;
+				consume_instruction_cycles(8);
 				t1f = get_1_rifl(opcode);
 				t2f = get_2_rifl(opcode);
 
@@ -1558,21 +1559,21 @@ void I960Ref::execute_op(uint32_t opcode)
 		case 0x70:
 			switch((opcode >> 7) & 0xf) {
 			case 0x1: // mulo
-				m_icount -= 18;
+				consume_instruction_cycles(18);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				set_ri(opcode, t2*t1);
 				break;
 
 			case 0x8: // remo
-				m_icount -= 37;
+				consume_instruction_cycles(37);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				set_ri(opcode, t2%t1);
 				break;
 
 			case 0xb: // divo
-				m_icount -= 37;
+				consume_instruction_cycles(37);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				if (t1 == 0)    // HACK!
@@ -1589,14 +1590,14 @@ void I960Ref::execute_op(uint32_t opcode)
 		case 0x74:
 			switch((opcode >> 7) & 0xf) {
 			case 0x1: // muli
-				m_icount -= 18;
+				consume_instruction_cycles(18);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				set_ri(opcode, ((int32_t)t2)*((int32_t)t1));
 				break;
 
 			case 0x8: // remi
-				m_icount -= 37;
+				consume_instruction_cycles(37);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				set_ri(opcode, ((int32_t)t2)%((int32_t)t1));
@@ -1604,7 +1605,7 @@ void I960Ref::execute_op(uint32_t opcode)
 
 			case 0x9:{// modi
 				int32_t src1, src2, dst;
-				m_icount -= 37;
+				consume_instruction_cycles(37);
 				src1 = (int32_t)get_1_ri(opcode);
 				src2 = (int32_t)get_2_ri(opcode);
 				dst = src2 - ((src2/src1)*src1);
@@ -1615,7 +1616,7 @@ void I960Ref::execute_op(uint32_t opcode)
 			}
 
 			case 0xb: // divi
-				m_icount -= 37;
+				consume_instruction_cycles(37);
 				t1 = get_1_ri(opcode);
 				t2 = get_2_ri(opcode);
 				set_ri(opcode, ((int32_t)t2)/((int32_t)t1));
@@ -1629,28 +1630,28 @@ void I960Ref::execute_op(uint32_t opcode)
 		case 0x78:
 			switch((opcode >> 7) & 0xf) {
 			case 0xb: // divr
-				m_icount -= 35;
+				consume_instruction_cycles(35);
 				t1f = get_1_rif(opcode);
 				t2f = get_2_rif(opcode);
 				set_rif(opcode, t2f/t1f);
 				break;
 
 			case 0xc: // mulr
-				m_icount -= 18;
+				consume_instruction_cycles(18);
 				t1f = get_1_rif(opcode);
 				t2f = get_2_rif(opcode);
 				set_rif(opcode, t2f*t1f);
 				break;
 
 			case 0xd: // subr
-				m_icount -= 10;
+				consume_instruction_cycles(10);
 				t1f = get_1_rif(opcode);
 				t2f = get_2_rif(opcode);
 				set_rif(opcode, t2f-t1f);
 				break;
 
 			case 0xf: // addr
-				m_icount -= 10;
+				consume_instruction_cycles(10);
 				t1f = get_1_rif(opcode);
 				t2f = get_2_rif(opcode);
 				set_rif(opcode, t2f+t1f);
@@ -1664,28 +1665,28 @@ void I960Ref::execute_op(uint32_t opcode)
 		case 0x79:
 			switch((opcode >> 7) & 0xf) {
 			case 0xb: // divrl
-				m_icount -= 77;
+				consume_instruction_cycles(77);
 				t1f = get_1_rifl(opcode);
 				t2f = get_2_rifl(opcode);
 				set_rifl(opcode, t2f/t1f);
 				break;
 
 			case 0xc: // mulrl
-				m_icount -= 36;
+				consume_instruction_cycles(36);
 				t1f = get_1_rifl(opcode);
 				t2f = get_2_rifl(opcode);
 				set_rifl(opcode, t2f*t1f);
 				break;
 
 			case 0xd: // subrl
-				m_icount -= 13;
+				consume_instruction_cycles(13);
 				t1f = get_1_rifl(opcode);
 				t2f = get_2_rifl(opcode);
 				set_rifl(opcode, t2f-t1f);
 				break;
 
 			case 0xf: // addrl
-				m_icount -= 13;
+				consume_instruction_cycles(13);
 				t1f = get_1_rifl(opcode);
 				t2f = get_2_rifl(opcode);
 				set_rifl(opcode, t2f+t1f);
@@ -1697,7 +1698,7 @@ void I960Ref::execute_op(uint32_t opcode)
 			break;
 
 		case 0x80: { // ldob
-			m_icount -= 4;
+			consume_instruction_cycles(4);
 			u8 v = bus->read_byte(get_ea(opcode));
 			if(!m_stalled)
 				m_r[(opcode>>19)&0x1f] = v;
@@ -1705,17 +1706,17 @@ void I960Ref::execute_op(uint32_t opcode)
 		}
 
 		case 0x82: // stob
-			m_icount -= 2;
+			consume_instruction_cycles(2);
 			bus->write_byte(get_ea(opcode), m_r[(opcode>>19)&0x1f]);
 			break;
 
 		case 0x84: // bx
-			m_icount -= 3;
+			consume_instruction_cycles(3);
 			m_IP = get_ea(opcode);
 			break;
 
 		case 0x85: // balx
-			m_icount -= 5;
+			consume_instruction_cycles(5);
 			t1 = get_ea(opcode);
 			m_r[(opcode>>19)&0x1f] = m_IP;
 			m_IP = t1;
@@ -1727,7 +1728,7 @@ void I960Ref::execute_op(uint32_t opcode)
 			break;
 
 		case 0x88: { // ldos
-			m_icount -= 4;
+			consume_instruction_cycles(4);
 			u16 v = i960_read_word_unaligned(get_ea(opcode));
 			if(!m_stalled)
 				m_r[(opcode>>19)&0x1f] = v;
@@ -1735,17 +1736,17 @@ void I960Ref::execute_op(uint32_t opcode)
 		}
 
 		case 0x8a: // stos
-			m_icount -= 2;
+			consume_instruction_cycles(2);
 			i960_write_word_unaligned(get_ea(opcode), m_r[(opcode>>19)&0x1f]);
 			break;
 
 		case 0x8c: // lda
-			m_icount--;
+			consume_instruction_cycles(1);
 			m_r[(opcode>>19)&0x1f] = get_ea(opcode);
 			break;
 
 		case 0x90: { // ld
-			m_icount -= 4;
+			consume_instruction_cycles(4);
 			u32 v = i960_read_dword_unaligned(get_ea(opcode));
 			if(!m_stalled)
 				m_r[(opcode>>19)&0x1f] = v;
@@ -1753,13 +1754,13 @@ void I960Ref::execute_op(uint32_t opcode)
 		}
 
 		case 0x92: // st
-			m_icount -= 2;
+			consume_instruction_cycles(2);
 			i960_write_dword_unaligned(get_ea(opcode), m_r[(opcode>>19)&0x1f]);
 			break;
 
 		case 0x98:{// ldl
 			int i;
-			m_icount -= 5;
+			consume_instruction_cycles(5);
 			t1 = get_ea(opcode);
 			t2 = (opcode>>19)&0x1e;
 			for(i=0; i<2; i++) {
@@ -1778,7 +1779,7 @@ void I960Ref::execute_op(uint32_t opcode)
 
 		case 0x9a:{// stl
 			int i;
-			m_icount -= 3;
+			consume_instruction_cycles(3);
 			t1 = get_ea(opcode);
 			t2 = (opcode>>19)&0x1e;
 			for(i=0; i<2; i++) {
@@ -1796,7 +1797,7 @@ void I960Ref::execute_op(uint32_t opcode)
 
 		case 0xa0:{// ldt
 			int i;
-			m_icount -= 6;
+			consume_instruction_cycles(6);
 			t1 = get_ea(opcode);
 			t2 = (opcode>>19)&0x1c;
 			for(i=0; i<3; i++) {
@@ -1815,7 +1816,7 @@ void I960Ref::execute_op(uint32_t opcode)
 
 		case 0xa2:{// stt
 			int i;
-			m_icount -= 4;
+			consume_instruction_cycles(4);
 			t1 = get_ea(opcode);
 			t2 = (opcode>>19)&0x1c;
 			for(i=0; i<3; i++) {
@@ -1833,7 +1834,7 @@ void I960Ref::execute_op(uint32_t opcode)
 
 		case 0xb0:{// ldq
 			int i;
-			m_icount -= 7;
+			consume_instruction_cycles(7);
 			t1 = get_ea(opcode);
 			t2 = (opcode>>19)&0x1c;
 			for(i=0; i<4; i++) {
@@ -1852,7 +1853,7 @@ void I960Ref::execute_op(uint32_t opcode)
 
 		case 0xb2:{// stq
 			int i;
-			m_icount -= 5;
+			consume_instruction_cycles(5);
 			t1 = get_ea(opcode);
 			t2 = (opcode>>19)&0x1c;
 			for(i=0; i<4; i++) {
@@ -1869,7 +1870,7 @@ void I960Ref::execute_op(uint32_t opcode)
 		}
 
 		case 0xc0: { // ldib
-			m_icount -= 4;
+			consume_instruction_cycles(4);
 			s8 v = bus->read_byte(get_ea(opcode));
 			if(!m_stalled)
 				m_r[(opcode>>19)&0x1f] = v;
@@ -1877,12 +1878,12 @@ void I960Ref::execute_op(uint32_t opcode)
 		}
 
 		case 0xc2: // stib
-			m_icount -= 2;
+			consume_instruction_cycles(2);
 			bus->write_byte(get_ea(opcode), m_r[(opcode>>19)&0x1f]);
 			break;
 
 		case 0xc8: { // ldis
-			m_icount -= 4;
+			consume_instruction_cycles(4);
 			s16 v = i960_read_word_unaligned(get_ea(opcode));
 			if(!m_stalled)
 				m_r[(opcode>>19)&0x1f] = v;
@@ -1890,7 +1891,7 @@ void I960Ref::execute_op(uint32_t opcode)
 		}
 
 		case 0xca: // stis
-			m_icount -= 2;
+			consume_instruction_cycles(2);
 			i960_write_word_unaligned(get_ea(opcode), m_r[(opcode>>19)&0x1f]);
 			break;
 

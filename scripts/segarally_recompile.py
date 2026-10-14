@@ -98,7 +98,7 @@ def build_generator(compiler: list[str], output: Path) -> Path:
     tool = output / ("m2recomp.exe" if os.name == "nt" else "m2recomp")
     run_logged(compiler + ["-std=c++20", "-O2", "-fno-fast-math", "-ffp-contract=off", "-Isrc",
                           "tools/m2recomp/main.cpp", "src/i960/isa.cpp", "src/i960/decode.cpp",
-                          "src/i960/reach.cpp", "-o", str(tool)], output / "generator-build.log")
+                          "src/i960/reach.cpp", "src/i960/timing.cpp", "-o", str(tool)], output / "generator-build.log")
     return tool
 
 

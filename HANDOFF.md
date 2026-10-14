@@ -1,5 +1,56 @@
 # Handoff
 
+## Timed native startup and communication registers (2026-10-14)
+
+The generator emits pinned-reference instruction cycle costs before opcode
+effects, after budget checks and RAM-code guards. Shared call/return services
+charge 9/7 cycles, including interrupt entry/return. The CPU's elapsed counter
+is separate from completed instructions and remains monotonic through reset
+and IAC reinitialization. The independent interpreter retains its own fixed
+deduction sites and supplies the same elapsed clock. At the reference 25 MHz,
+EEPROM timestamps now advance by 40 ns per reference cycle. Unknown costs fail
+generation; boot/parity scripts reject stale generation metadata lacking
+`reference_cycle_accounting_version=1`.
+
+All 66,523 instructions / 46 objects were regenerated in the ignored
+`build/segarally-timed` directory. Native/reference startup with independent
+TGP, I/O, EEPROM and communication instances agrees after 1,531,005 completed
+instructions, 367,943 cycle-stamped writes and 2,893,143 reference cycles.
+Both stop at PC `0x005c5698`, writing `0xffac` as 16 bits to horizontal video
+sync register `0x01040000`. The cycle total includes the attempted frontier
+instruction's cost. This is 115,725,720 ns on the diagnostic reference clock;
+it is not a measured arcade startup duration. The main CPU still has not
+uploaded the TGP at this frontier; its separate 108-instruction probe passes.
+
+Connecting time changes the EEPROM path: the frozen checkpoint reached the
+communication access after 1,334,542 instructions, whereas the timed run
+reaches it after 1,530,994 instructions with the same 367,940 writes. Both
+native and reference follow the longer path with equal cycle timestamps.
+The earlier shorthand describing this communication access as a read was
+incorrect; it is a byte write, now explicit in parity diagnostics.
+
+Compiler timing metadata passes 660 comparisons over all 164 reference
+opcodes. The generated template suite passes 14,496 state/cycle checks.
+Generated MMIO, burst accesses, call/return spills, interrupt helpers,
+reset/IAC continuity and overflow fixtures pass under ASan/UBSan. Eight import
+and mapping tests pass. CMake device/timing targets also pass. These fixed
+costs retain MAME's estimates and absent burst-stall continuation; full-machine
+scheduler and PCB timing parity remain unverified.
+
+Model2AComm reuses Daytona's unchanged CommBoard simulation with exact 16 KiB
+shared RAM, its mirror, CN/FG byte lanes and reference readback. Permanently
+closed transport endpoints preserve the reference's no-peer initialization;
+a null transport would skip it. The adapter never opens sockets or fabricates
+link-up. MAME's pinned header enables this simulation, but no Z80/HDLC firmware
+is executed. Mask/mirror/reset tests, sanitizers, the inherited communication
+tests and 819,250,000 no-peer comparisons against pinned source methods pass.
+The bus marks shared communication RAM as BURST and keeps flags non-burst.
+
+Next parallel work is the exact video memory/register adapter using the shared
+Video renderer, the IRQ/four-timer controller with delayed mask updates, and
+verified polygon/texture ROM import. These remain bounded bring-up steps;
+full startup, attract mode and racing are not yet verified in the new project.
+
 ## Native I/O and EEPROM checkpoint (2026-10-14)
 
 The 315-5649 register device, Rally cabinet wiring and 93C46 EEPROM now run as

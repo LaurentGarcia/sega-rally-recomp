@@ -57,6 +57,7 @@
 
 #include "i960/decode.h"
 #include "i960/reach.h"
+#include "i960/timing.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -208,6 +209,12 @@ struct Emitter {
             line("if (" + differs + ") { c.m_IP = " + hex(pc) +
                  "; throw rt::Fatal(\"relocated code differs at " + hex(pc) + "\"); }");
         }
+        const auto cycles = i960::reference_opcode_cycles(in);
+        if (!cycles) {
+            missing->push_back(hex(pc) + ": missing reference cycle cost for " + i960::format_mame(in));
+            return false; // never emit runnable code with invented timing
+        }
+        if (*cycles) line("c.consume_reference_cycles(" + std::to_string(*cycles) + "u);");
 
         std::string body, exit;   // body runs before ++count; exit transfers control
         bool falls = true;
@@ -737,6 +744,8 @@ int main(int argc, char **argv) {
             report << "]";
         };
         report << "{\n  \"schema\": 1,\n  \"board\": " << std::quoted(board)
+               << ",\n  \"reference_cycle_accounting\": true"
+               << ",\n  \"reference_cycle_accounting_version\": 1"
                << ",\n  \"instruction_count\": " << insns.size()
                << ",\n  \"instruction_bytes\": ";
         uint64_t instruction_bytes = 0;

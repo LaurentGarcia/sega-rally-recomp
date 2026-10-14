@@ -146,6 +146,8 @@ void Model2ABus::write_byte(uint32_t a, uint8_t v) { write(a, 1, v); }
 void Model2ABus::write_word(uint32_t a, uint16_t v) { write(a, 2, v); }
 void Model2ABus::write_dword(uint32_t a, uint32_t v) { write(a, 4, v); }
 uint16_t Model2ABus::flags(uint32_t address) {
+    const uint32_t comm_address = address & ~0x10000u;
+    if (comm_address >= 0x01a00000 && comm_address <= 0x01a03fff) return Cpu::BURST;
     // Program and function ports advance on multiword transfers. FIFO ports
     // repeat the same address and consume/produce one word per access.
     if ((address >= 0x00804000 && address <= 0x00807fff) ||

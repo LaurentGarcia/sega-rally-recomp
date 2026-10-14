@@ -2,6 +2,9 @@
 // A device not implemented in Model2ABus is an explicit frontier, not a pass.
 #include "runtime/gen_support.h"
 #include "runtime/model2a_bus.h"
+#ifdef M2_SRALLY_COMM
+#include "runtime/model2a_comm.h"
+#endif
 #ifdef M2_SRALLY_IO
 #include "runtime/model2a_io.h"
 #include "runtime/model2_eeprom.h"
@@ -54,13 +57,17 @@ int main(int argc, char **argv)
         if (used != requested.size() || !limit || limit > 100000000)
             throw std::runtime_error("instruction limit must be 1..100000000");
         rt::Model2ABus bus(load(argv[1]), load(argv[2]));
+        rt::Cpu cpu(&bus);
+#ifdef M2_SRALLY_COMM
+        rt::Model2AComm comm;
+        bus.add_model(&comm);
+#endif
 #ifdef M2_SRALLY_IO
-        // A diagnostic frozen clock permits serial reads, but cannot complete
-        // busy EEPROM writes. The board-cycle adapter is a separate frontier.
-        const uint64_t board_time_ns = 0;
+        // Pinned reference i960 costs at 25 MHz, not measured PCB timing.
+        // Individual opcode costs are charged before their device accesses.
         rt::Model2Eeprom eeprom;
         eeprom.reset();
-        rt::Model2AIO io(eeprom, [&] { return board_time_ns; });
+        rt::Model2AIO io(eeprom, [&] { return cpu.reference_cycles * 40; });
         bus.add_model(&io);
 #endif
 #ifdef M2_SRALLY_TGP
@@ -80,16 +87,19 @@ int main(int argc, char **argv)
                 " last_write=%08x pcb_verified=false\n",
                 d.reference_gap_reads, d.reference_gap_writes, d.reference_gap_last_write);
             std::printf("irq_reset writes=%" PRIu64 " asynchronous_sources=false\n", d.irq_reset_writes);
+            std::printf("reference_clock cycles=%" PRIu64 " nanoseconds=%" PRIu64 " pcb_verified=false\n",
+                cpu.reference_cycles, cpu.reference_cycles * 40);
+#ifdef M2_SRALLY_COMM
+            std::printf("native_comm linked=true peer_connected=false firmware_executed=false\n");
+#endif
 #ifdef M2_SRALLY_IO
-            std::printf("native_io linked=true clock_ns=%llu clock_connected=false\n",
-                (unsigned long long)board_time_ns);
+            std::printf("native_io linked=true clock_connected=true\n");
 #endif
 #ifdef M2_SRALLY_TGP
             if (tgp) std::printf("native_tgp linked=true booted=%s instructions=%llu\n",
                 tgp->booted() ? "true" : "false", (unsigned long long)tgp->tgp_instructions());
 #endif
         };
-        rt::Cpu cpu(&bus);
         rt::Lockstep schedule(cpu);
         schedule.end_count = limit;
         gen::Env env{cpu, schedule};
