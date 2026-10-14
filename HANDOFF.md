@@ -1,5 +1,43 @@
 # Handoff
 
+## Sound dispatch coverage through the native title checkpoint (2026-10-14)
+
+The coupled diagnostic now reaches the v2 main CPU's known `0x005caba0`
+frontier after 266,518,444 main instructions and 588,916,392 cycles. Sound
+continues to that point with 19,707,819 instructions, 265,945,223 cycles,
+21,450 IRQ entries and 1,038,849 sample frames. The shared clock reaches
+23,556,655,680 ns; 120 main UART TX pin transitions are observed. This is
+native serial-linked execution, not audible playback or a verified race.
+
+Three individually audited nibble dispatchers contribute 48 static candidates.
+The decoder verifies mask width, shift direction/count, indexed address and
+branch registers, all 16 jump slots, source/table hashes and known side entries.
+Proofs are repeated against the combined reached graph. A separate byte-index
+table has 256 possible indices but only 128 valid jump slots; it remains
+observed-only, with no inferred seven-bit bound. Twelve actual observed entries
+remain separate from the table candidates. The resulting 58 unique seeds
+compile 2,595 instructions with no missing templates or timing.
+
+Newly reachable DIVU/DIVS use pure cost helpers derived from the pinned public
+M68000 microcode's 16-step paths, including signs and overflow. Independent
+production-emitted comparisons pass 1,379,624 cases under ASan/UBSan, checking
+exact cycles, results and defined flags. Overflow N/Z are undefined and excluded;
+divide-by-zero exception delivery still stops explicitly. The broader suite
+passes 11,551 instruction comparisons, 282 reset/IRQ phases, 1,166 sanitized
+runtime checks, five table-proof tests with semantic mutations and six generation
+tests. Daytona's default generated output remains byte-identical, SHA-256
+`a0b69c9763dbd5560b58247049a41d4300d9926e19bf20a731cc76a6c61f1042`.
+
+Evidence is under ignored `build/segarally-timed-v2/evidence/
+sound-linked-main-5caba0`. Boot report SHA-256 is
+`e4fbaa697620de97f7533d23bda5b012c15dd3b22fb11aad1a0e2d5e52471628`,
+sound audit `1ac5418ce0a5f94a715bf5fe34c723a3fdcea6e4ed2496eb220186927cdc749d`,
+generated source `233d070ac1d5f1fd7d446bc761aaba7ba6a3592e32e8bddbb624370468c215b0`.
+All 26 audited source hashes match this checkpoint. MMIO retains instruction
+boundary timing; prefetch values, bus phases and interrupt capture timing are
+not proven. Next: couple this sound profile to a newer stable main generation
+without overwriting frozen first-car evidence, then follow real gameplay inputs.
+
 ## Repeatable cabinet inputs for native gameplay probes (2026-10-14)
 
 The bounded runner accepts `--input-replay FILE` with screen and I/O enabled.

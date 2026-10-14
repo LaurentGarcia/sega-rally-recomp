@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "romset": "srallycb",
+  "board": "model2a",
+  "program_sha256": "6be2a7a6c9c08b55291ceaf7891f2d8418e38291ed00376cf0f569a8a083ad6f",
+  "notes": "Static candidates proved from decoded nibble masks, shifts and PC-indexed jumps, separate from observed sound targets. This does not claim every candidate executes or that unknown indirect side entries are absent.",
+  "tables": [
+    {
+      "name": "upper_nibble_state",
+      "kind": "nibble_pc_relative_jumps",
+      "start": "0x600876",
+      "jump": "0x600880",
+      "body_size": 12,
+      "body_sha256": "301f164353f504299e05c9c26649c56fcd396ef127cd42b5704fd64a6c9777d4",
+      "table_base": "0x600884",
+      "entries": 16,
+      "stride": 4,
+      "table_sha256": "63e59b7afc0a4a0224f942aed0e8b60ecf3402c9b85fd1b06457d8fc7b651af9"
+    },
+    {
+      "name": "lower_nibble_event",
+      "kind": "nibble_pc_relative_jumps",
+      "start": "0x6022b2",
+      "jump": "0x6022bc",
+      "body_size": 12,
+      "body_sha256": "28857d63b7896cbe47794b67d3a712221b8df0189774a917185dc15c1b7c3a85",
+      "table_base": "0x6022c0",
+      "entries": 16,
+      "stride": 4,
+      "table_sha256": "3dd6972bd1cfe7e1b83d5e22e556bc782f2fee039629595cedbd8ff713311cc4"
+    },
+    {
+      "name": "upper_nibble_command",
+      "kind": "nibble_pc_relative_jumps",
+      "start": "0x60278c",
+      "jump": "0x602798",
+      "body_size": 14,
+      "body_sha256": "1acab47c58506a649e444993788cda9604976db4f3365a6c4c5f167d9f23ec38",
+      "table_base": "0x60279a",
+      "entries": 16,
+      "stride": 4,
+      "table_sha256": "d880b64d0cd30959592247066b264d08c735e89c2dfafc18ed9935679da0e967"
+    }
+  ]
+}

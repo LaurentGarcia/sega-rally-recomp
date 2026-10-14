@@ -15,7 +15,7 @@ struct Memory final:snd::AddressSpace {
     }
 };
 int main() {
-    unsigned checks=0,errors=0,frontiers=0,odd=0;
+    unsigned checks=0,errors=0,frontiers=0,odd=0,zero_divides=0;
     std::set<unsigned> failed;
     for(unsigned op:reference_opcodes)for(unsigned iteration=0;iteration<8;++iteration) {
         MicroOracle reference;
@@ -41,6 +41,7 @@ int main() {
         try {if(!native_run(op,native))continue;}
         catch(const rt::Fatal &error) {
             if(std::string(error.what()).find("timed prefetch outside")!=std::string::npos){++frontiers;continue;}
+            if((in.op==m68k::Op::Divu || in.op==m68k::Op::Divs) && std::string(error.what()).find("divide by zero")!=std::string::npos){++zero_divides;continue;}
             std::fprintf(stderr,"unexpected frontier %04x: %s\n",op,error.what());return 2;
         }
         unsigned data=0,prefetch=0,waits=0;
@@ -87,6 +88,7 @@ int main() {
         if(native.cycles!=uint64_t(100000000-reference.m_icount) || native.pc!=reference.m_pc-2 || native.a[7]!=reference.m_da[16])++errors;
     }
     std::printf("M68000 interrupt/reset reference: %u checks\n",irq_checks);
+    std::printf("M68000 explicit zero-divide exception frontiers: %u\n",zero_divides);
     std::printf("M68000 reference: %u instruction checks, %u errors, %u explicit prefetch frontiers, %u odd-address exceptions excluded\n",checks,errors,frontiers,odd);
     for(auto op:failed)std::printf("failed opcode %04x\n",op);
     return errors?1:0;

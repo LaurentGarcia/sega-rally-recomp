@@ -72,6 +72,10 @@ struct Cpu68k {
     void dummy_read(uint32_t address,unsigned size);
     static uint32_t model2a_wait(uint32_t address);
     static uint64_t model2a_time_ns(uint64_t cycles);
+    // Pinned M68000 core totals before effective-address cycles/mapped waits.
+    // Zero divisor remains an explicit unsupported exception path.
+    static uint32_t divu_cycles(uint32_t dividend, uint16_t divisor);
+    static uint32_t divs_cycles(uint32_t dividend, uint16_t divisor);
     bool timing_active() const { return timing_active_; }
 
     // Reset: SSP and PC from the vector table, supervisor, mask 7.

@@ -90,4 +90,6 @@ void rational_time(){
     fatal([&]{snd::Cpu68k::model2a_time_ns(second*11'289'600+11'289'599);});
 }
 }
-int main(){reset_and_waits();interrupt_phases();guards_and_limits();rational_time();std::printf("Sound timing: %u checks passed\n",checks);}
+int main(){reset_and_waits();interrupt_phases();guards_and_limits();rational_time();
+    fatal([]{snd::Cpu68k::divu_cycles(1,0);});fatal([]{snd::Cpu68k::divs_cycles(1,0);});
+    std::printf("Sound timing: %u checks passed\n",checks);}

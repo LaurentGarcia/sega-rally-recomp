@@ -55,6 +55,41 @@ def observed_seeds(program: bytes, config: dict) -> list[int]:
     return sorted(set(addresses))
 
 
+def table_candidates(program: bytes, config: dict, proof_tool: Path, seed_file: Path, image: Path) -> list[dict]:
+    """Validate exact source spans and decoded bounds; do not scan for pointers."""
+    if (config.get("schema") != 1 or config.get("romset") != "srallycb" or config.get("board") != "model2a"
+            or hashlib.sha256(program).hexdigest() != config.get("program_sha256")):
+        raise ValueError("sound table provenance differs from verified program")
+    result = []
+    for table in config["tables"]:
+        if table["kind"] != "nibble_pc_relative_jumps" or table["entries"] != 16 or table["stride"] != 4:
+            raise ValueError("unsupported sound table proof kind or dimensions")
+        start, jump, base = (int(table[key], 16) for key in ("start", "jump", "table_base"))
+        body_size = table["body_size"]
+        if (start & 1 or base & 1 or not 0x600000 <= start < jump < 0x680000
+                or body_size != jump + 2 - start or not jump + 2 <= base <= 0x680000 - 64):
+            raise ValueError("sound table evidence outside aligned program")
+        body = program[start-0x600000:jump+2-0x600000]
+        slots = program[base-0x600000:base+64-0x600000]
+        if hashlib.sha256(body).hexdigest() != table["body_sha256"] or hashlib.sha256(slots).hexdigest() != table["table_sha256"]:
+            raise ValueError("sound table source/table evidence hash differs")
+        checked = subprocess.run([str(proof_tool), str(image), hex(start), hex(jump), str(seed_file)],
+                                 cwd=ROOT, capture_output=True, text=True)
+        if checked.returncode:
+            raise ValueError("sound dispatch proof failed: " + checked.stderr.strip())
+        proof = json.loads(checked.stdout)
+        if any(proof[key] != value for key, value in (("start",start),("jump",jump),("body_size",body_size),
+                ("table_base",base),("entries",16),("stride",4))):
+            raise ValueError("decoded sound dispatch differs from declared evidence")
+        if [row["address"] for row in proof["candidates"]] != list(range(base,base+64,4)):
+            raise ValueError("sound proof returned an incomplete bounded candidate set")
+        for row in proof["candidates"]:
+            result.append({"address":row["address"], "direct_target":row["direct_target"], "table":table["name"],
+                "classification":"static_bounded_candidate", "observed":False,
+                "provenance":"Decoded nibble bound and stride, same-register dataflow, program jump slots, source hashes and known side-entry checks. Unknown indirect entries and actual execution are not implied."})
+    return result
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--build-dir", type=Path, default=ROOT / "build/segarally")
@@ -77,6 +112,8 @@ def main() -> int:
         generator_sources = ["tools/m2sndrecomp/main.cpp", "src/m68k/decode.cpp", "src/m68k/reach.cpp", "src/m68k/timing.cpp"]
         runtime_sources = ["tools/srally_sound_boot/main.cpp", "src/runtime/snd_cpu.cpp", "src/runtime/model2a_sound_bus.cpp"]
         generation_flags = []
+        candidates = []
+        proof_sources = []
         runtime_flags = []
         seed_config_path = "config/segarally_sound_observed_seeds.json"
         if args.timed:
@@ -85,7 +122,21 @@ def main() -> int:
             seeds = observed_seeds(images["audiocpu"].read_bytes(), config)
             seed_file = output / "observed-seeds.txt"
             seed_file.write_text("".join(f"{address:x}\n" for address in seeds))
-            generation_flags += ["--seeds", str(seed_file)]
+            proof_sources = ["tools/srally_sound_tables/main.cpp", "src/m68k/decode.cpp", "src/m68k/reach.cpp"]
+            proof_tool = output / "srally_sound_tables"
+            run_logged(compiler + flags + proof_sources + ["-o", str(proof_tool)], output / "table-proof-build.log")
+            tables = json.loads((ROOT / "config/segarally_sound_tables.json").read_text())
+            program = images["audiocpu"].read_bytes()
+            candidates = table_candidates(program, tables, proof_tool, seed_file, images["audiocpu"])
+            combined_file = output / "seeds.txt"
+            combined = sorted(set(seeds) | {row["address"] for row in candidates})
+            combined_file.write_text("".join(f"{address:x}\n" for address in combined))
+            # New static candidates may expose direct side entries into a proof body.
+            # Recheck against the complete candidate reachability before generation.
+            if table_candidates(program, tables, proof_tool, combined_file, images["audiocpu"]) != candidates:
+                raise ValueError("sound candidate proof changed under combined reachability")
+            (output / "table-proof.json").write_text(json.dumps(candidates, indent=2) + "\n")
+            generation_flags += ["--seeds", str(combined_file)]
             runtime_flags += ["-DSEGARALLY_SOUND_TIMED_PROBE"]
             runtime_sources += ["src/runtime/model2_scsp.cpp", "src/runtime/model2_scsp_dsp.cpp", "src/runtime/model2a_clock.cpp"]
         tool = output / "m2sndrecomp"
@@ -109,17 +160,18 @@ def main() -> int:
         timed_reached = (args.timed and execution.returncode in (3, 4)
                          and result.get("status") in ("missing_code", "execution_frontier", "instruction_limit")
                          and result.get("scsp_writes", 0) > 0 and result.get("cycles", 0) > 38)
-        sources = generator_sources + runtime_sources + ["src/m68k/decode.h", "src/m68k/reach.h", "src/m68k/timing.h",
+        sources = generator_sources + runtime_sources + proof_sources + ["src/m68k/decode.h", "src/m68k/reach.h", "src/m68k/timing.h",
             "src/runtime/snd_cpu.h", "src/runtime/snd_gen_support.h", "src/runtime/snd_sched.h",
             "src/runtime/model2a_sound_bus.h", "config/segarally_sound_boot.json",
             "config/segarally_sound.json", "scripts/segarally_sound_recompile.py"]
         if args.timed:
-            sources += [seed_config_path, "src/runtime/model2_scsp.h", "src/runtime/model2_scsp_dsp.h", "src/runtime/model2a_clock.h"]
+            sources += [seed_config_path, "config/segarally_sound_tables.json", "src/runtime/model2_scsp.h", "src/runtime/model2_scsp_dsp.h", "src/runtime/model2a_clock.h"]
         report = {"schema": 1, "romset": spec["romset"], "board": spec["board"],
                   "images_sha256": spec["images"], "compiler": compiler, "flags": flags, "runtime_flags": runtime_flags,
                   "sources_sha256": {path: hashlib.sha256((ROOT / path).read_bytes()).hexdigest() for path in sources},
                   "generated_sha256": hashlib.sha256(generated.read_bytes()).hexdigest(),
                   "generation": json.loads((output / "generation.json").read_text()),
+                  "static_seed_candidates": candidates,
                   "execution": result, "exit_code": execution.returncode,
                   "expected_scsp_frontier_reached": reached, "sound_chip_attached": args.timed,
                   "native_scsp_startup_reached": timed_reached,

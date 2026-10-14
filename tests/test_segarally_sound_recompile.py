@@ -144,8 +144,8 @@ int main(int argc,char**argv) {
     def test_unsupported_timing_has_explicit_frontier(self):
         image = bytearray(0x80000)
         struct.pack_into(">4I", image, 0, 0x5000, 0x600100, 0x600100, 0x600100)
-        struct.pack_into(">3H", image, 0x100, 0x80fc, 0x0001, 0x60fe)  # divu #1,d0
-        _, source, audit = self.generate("divu", image, ["--board", "model2a", "--timing", "model2a-boundary"])
+        struct.pack_into(">2H", image, 0x100, 0xd100, 0x60fe)  # addx.b d0,d0
+        _, source, audit = self.generate("addx", image, ["--board", "model2a", "--timing", "model2a-boundary"])
         self.assertEqual(audit["missing_timing"], 1)
         self.assertIn('c.fatal("unsupported sound instruction timing")', source.read_text())
 

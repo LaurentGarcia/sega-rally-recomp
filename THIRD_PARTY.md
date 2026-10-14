@@ -129,6 +129,8 @@ linked into this reset probe.
 The optional timed generator derives instruction totals, data/prefetch counts,
 mapped waits and autovector IACK costs from the pinned MAME M68000 microcode
 (BSD-3-Clause, Olivier Galibert). `src/m68k/timing.cpp` retains that notice.
+The cycle-only DIVU/DIVS helpers in `src/runtime/snd_cpu.cpp` adapt the same
+microcode's bounded subtraction/restore/sign paths and retain its attribution.
 The independent test generates public microcode handlers separately from the
 production emitter; generated reference code remains ignored. Instruction
 totals and ordered writes are compared, while bus-phase MMIO and prefetch

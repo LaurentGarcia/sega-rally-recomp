@@ -73,6 +73,41 @@ uint64_t Cpu68k::model2a_time_ns(uint64_t count) {
         throw rt::Fatal("sound nanosecond clock overflow");
     return base+fraction;
 }
+// Cycle-only adaptation of Olivier Galibert's BSD-3-Clause M68000 microcode,
+// MAME dddd73680656e355bb2b5beecab1167c9f07bf81. The fixed16-step loops
+// count actual subtraction/restore paths; no instruction is interpreted.
+uint32_t Cpu68k::divu_cycles(uint32_t dividend, uint16_t divisor) {
+    if (!divisor) throw rt::Fatal("timed sound divide-by-zero exception is unsupported");
+    if ((dividend >> 16) >= divisor) return 10;
+    uint32_t cycles = 76, remainder = dividend >> 16, low = dividend & 0xffff;
+    for (unsigned i = 0; i < 16; ++i) {
+        const bool high = remainder & 0x8000;
+        remainder = (remainder << 1) | (low >> 15);
+        low = (low << 1) & 0xffff;
+        const bool borrow = remainder < divisor;
+        if (!borrow) { remainder -= divisor; low |= 1; }
+        // Last-step exit is included in76. Earlier nonnegative remainders
+        // test carry; unsuccessful subtraction additionally restores it.
+        if (i < 15) { if (!high) cycles += 2; if (borrow) cycles += 2; }
+    }
+    return cycles;
+}
+uint32_t Cpu68k::divs_cycles(uint32_t dividend, uint16_t divisor) {
+    if (!divisor) throw rt::Fatal("timed sound divide-by-zero exception is unsupported");
+    const bool negative_dividend = dividend & 0x80000000, negative_divisor = divisor & 0x8000;
+    const uint32_t magnitude = negative_dividend ? 0u - dividend : dividend;
+    const uint32_t denominator = negative_divisor ? uint16_t(0u - divisor) : divisor;
+    if ((magnitude >> 16) >= denominator) return 16 + (negative_dividend ? 2 : 0);
+    uint32_t cycles = 120 + (negative_dividend ? 2 : 0) + (negative_divisor ? 2 : negative_dividend ? 4 : 0);
+    uint32_t remainder = magnitude >> 16, low = magnitude & 0xffff;
+    for (unsigned i = 0; i < 16; ++i) {
+        remainder = (remainder << 1) | (low >> 15);
+        low = (low << 1) & 0xffff;
+        if (remainder >= denominator) { remainder -= denominator; low |= 1; }
+        else if (i < 15) cycles += 2;
+    }
+    return cycles;
+}
 void Cpu68k::begin_instruction() {
     if(!model2a_timing)fatal("timed sound code requires explicit Model2A accounting");
     if(timing_active_ || cycle_callback_active_)fatal("reentrant sound cycle accounting");

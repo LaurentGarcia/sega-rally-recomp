@@ -77,6 +77,8 @@ std::optional<TimingPlan> timing_plan(const Insn &in) {
         else {cost(longword?8:6);result.dynamic=TimingDynamic::Shift;}break;
     case Op::Mulu:case Op::Muls:
         cost(38+ea_read(in.src,2));result.dynamic=in.op==Op::Mulu?TimingDynamic::MultiplyUnsigned:TimingDynamic::MultiplySigned;break;
+    case Op::Divu:case Op::Divs:
+        cost(ea_read(in.src,2));result.dynamic=in.op==Op::Divu?TimingDynamic::DivideUnsigned:TimingDynamic::DivideSigned;break;
     case Op::Scc:
         cost(memory?8+ea_read(in.dst,1):4);result.dummy_destination_read=memory;
         if(!memory)result.dynamic=TimingDynamic::Scc;break;

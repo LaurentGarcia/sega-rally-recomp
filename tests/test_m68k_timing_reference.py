@@ -13,6 +13,7 @@ parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--reference-dir',type=Path,default=ROOT/'build/validation/mame-reference')
 parser.add_argument('--output',type=Path,default=ROOT/'build/validation/m68000-timing-reference')
 parser.add_argument('--sanitize',action='store_true')
+parser.add_argument('--division-only',action='store_true',help='exhaustive divisor/boundary matrix using independent microcode and emitted native instructions')
 args=parser.parse_args()
 refs=args.reference_dir.resolve()
 out=args.output.resolve()
@@ -32,6 +33,7 @@ g=runpy.run_path(str(refs/'m68000gen.py'))
 mode=g['GEN'].direct|g['GEN'].full
 # Public instruction patterns only: no game ROM or generated game source.
 ops={op | (2 if mask==0xff00 else 0) for op,mask,_ in g['instructions']}
+if args.division_only: ops={0x80c1,0x81c1}
 head=(refs/'m68000.h').read_text()
 helpers=head[head.index('\t// movem step'):head.rindex('\n};')].replace('\tvoid set_ftu_const();','')
 source=(refs/'m68000.cpp').read_text()
@@ -113,7 +115,8 @@ fixture=out/'generate-native-fixture'
 run(compiler+flags+['tests/m68k_timing_fixture.cpp','src/m68k/decode.cpp','src/m68k/reach.cpp','src/m68k/timing.cpp','-o',str(fixture)])
 run([str(fixture),str(out/'m68000-native-fixture.h')])
 exe=out/'test-m68000-reference'
-run(compiler+flags+['tests/test_m68k_timing_reference.cpp','src/m68k/decode.cpp','src/m68k/timing.cpp','src/runtime/snd_cpu.cpp','-o',str(exe)])
+test_source='tests/test_m68k_division_reference.cpp' if args.division_only else 'tests/test_m68k_timing_reference.cpp'
+run(compiler+flags+[test_source,'src/m68k/decode.cpp','src/m68k/timing.cpp','src/runtime/snd_cpu.cpp','-o',str(exe)])
 run([str(exe)])
-(out/'audit.json').write_text(json.dumps({'reference_commit':'dddd73680656e355bb2b5beecab1167c9f07bf81','reference_sha256':hashes,'public_opcode_patterns':len(ops),'sanitized':args.sanitize,'scope':'Instruction total cycles, mapped waits, total bus transfer counts, ordered write address/data/masks, reset and phase-dependent autovector entry. Bus-stage timing, prefetch values and other exception timing are not claimed.'},indent=2)+'\n')
+(out/'audit.json').write_text(json.dumps({'reference_commit':'dddd73680656e355bb2b5beecab1167c9f07bf81','reference_sha256':hashes,'public_opcode_patterns':len(ops),'sanitized':args.sanitize,'division_only':args.division_only,'scope':('Production-emitted DIVU/DIVS total cycles, results and defined flags against independent microcode for all nonzero divisors and boundary/random dividends. Zero-divide exception delivery remains unsupported.' if args.division_only else 'Instruction total cycles, mapped waits, total bus transfer counts, ordered write address/data/masks, reset and phase-dependent autovector entry. Bus-stage timing, prefetch values and other exception timing are not claimed.')},indent=2)+'\n')
 print(len(ops),'microcode oracle handlers generated')

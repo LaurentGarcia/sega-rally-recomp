@@ -215,6 +215,17 @@ is disabled by default, including in the Metal frontend. Daytona's measured
 instruction-rate shortcut is specific to its different Model 1 board and is
 not reused for Rally.
 
+Three verified nibble-table dispatchers now contribute 48 static sound-code
+candidates, distinct from twelve observed entries. The combined reached graph
+is rechecked for known side entries; the separate byte-index dispatcher remains
+observed-only because its full index range is not bounded to valid jump slots.
+Dynamic division costs follow the pinned microcode, with 1,379,624 independent
+emitted-instruction comparisons. Zero-divide exception delivery remains
+unsupported and undefined overflow N/Z flags are excluded from parity claims.
+The coupled sound CPU now runs through the main v2 title checkpoint at
+266,518,444 main instructions, with 19,707,819 sound instructions and real UART
+traffic. This does not establish host playback or complete game audio parity.
+
 The older lifted-C prototype already reaches desert practice on the phone, but
 contains incomplete game paths. It is a useful source of address annotations and
 capture tooling. Its C implementation is not a substitute for verifying the new

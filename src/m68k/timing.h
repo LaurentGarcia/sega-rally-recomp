@@ -5,7 +5,7 @@
 #include <optional>
 
 namespace m68k {
-enum class TimingDynamic : uint8_t { None, Branch, Dbcc, Scc, Shift, MultiplyUnsigned, MultiplySigned, BitRegister };
+enum class TimingDynamic : uint8_t { None, Branch, Dbcc, Scc, Shift, MultiplyUnsigned, MultiplySigned, BitRegister, DivideUnsigned, DivideSigned };
 enum class TimingFetch : uint8_t { Sequential, Branch, Dbcc, Jump, Return, Status };
 struct TimingPlan {
     uint16_t cycles=0; // nominal core cycles, before mapped waits/dynamic additions

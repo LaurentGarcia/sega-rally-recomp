@@ -295,6 +295,7 @@ struct Emitter {
             const std::string r = "D[" + std::to_string(in.dst.reg) + "]", dv = b.tmp();
             b.add("const uint32_t " + dv + " = " + src.value() + ";");
             b.add("if (!" + dv + ") c.fatal(\"divide by zero\");");
+            if(timed)b.add("timing_cycles += snd::Cpu68k::"+std::string(in.op==Op::Divu?"divu_cycles":"divs_cycles")+"("+r+", uint16_t("+dv+"));");
             if (in.op == Op::Divu)
                 b.add("{ const uint32_t q = " + r + " / " + dv + ", m = " + r + " % " + dv +
                       "; c.c = 0; if (q > 0xffffu) { c.v = 1; c.n = 1; } else { " + r +
