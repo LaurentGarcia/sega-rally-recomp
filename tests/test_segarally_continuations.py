@@ -12,7 +12,8 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-from segarally_recompile import build_continuation_tool, continuation_seeds, table_seeds
+from segarally_recompile import (build_continuation_tool, continuation_seeds, table_seeds,
+                                object_update_seeds, object_update_roots)
 
 
 def reg(op, dst, first, second=0, m1=0, m2=0):
@@ -79,6 +80,9 @@ class ProofTests(unittest.TestCase):
         self.install(0x20, [0x0800002c])  # independent b into the definition's interior
         self.reach["instruction_addresses"].append("0x500020")
         self.assertEqual(self.direct(), [])
+        self.reach["instruction_addresses"].pop()
+        self.reach["seeds"].append("0x500044")  # LDA displacement word is also an interior entry
+        self.assertEqual(self.direct(), [])
 
     def test_requires_reached_entry_and_all_instructions(self):
         self.reach["instruction_addresses"].remove("0x50004c")
@@ -118,6 +122,109 @@ class ProofTests(unittest.TestCase):
         config = {"board": "model2a", "romset": "srallycb", "tables": [table]}
         self.callback_hashes(config)
         return config
+
+    def update_fixture(self):
+        words = [mem(0x8c, 20, mode=12), 0x500180, mem(0x92, 30, 16, 84),
+                 mem(0x92, 20, 16, 4), 0x0a000000]
+        self.install(0x40, words)
+        self.install(0x180, [0x0a000000])
+        # Self-authored callback dispatcher: target=object(r4)+4, null guard,
+        # pass that same object in g0, then call through the loaded g4.
+        self.install(0x200, [mem(0x90, 20, 4, 4), 0x3a << 24 | 20 << 14 | 1 << 13 | 12,
+                           reg(0x5cc, 16, 4), mem(0x86, 0, 20, mode=4)])
+        self.reach = {"seeds": ["0x500040"], "instruction_addresses":
+            [hex(0x500000+p) for p in (0x40, 0x48, 0x4c, 0x50, 0x200, 0x204, 0x208, 0x20c)]}
+        self.update_roots = [{"address": "0x00000040", "root_role": "object_constructor",
+                              "name": "synthetic_constructor", "evidence": "synthetic ISA fixture"}]
+        config = {"program_sha256": hashlib.sha256(self.program).hexdigest(),
+            "object_update_dispatcher": {"relocation": "synthetic", "program_offset": "0x200",
+                "runtime_address": "0x500200", "size": 16,
+                "sha256": hashlib.sha256(self.program[0x200:0x210]).hexdigest()}}
+        return config
+
+    def updates(self, config):
+        return object_update_seeds(self.program, self.reach, self.relocations, self.tool, config, self.update_roots)
+
+    def update_hashes(self, config):
+        config["program_sha256"] = hashlib.sha256(self.program).hexdigest()
+        config["object_update_dispatcher"]["sha256"] = hashlib.sha256(self.program[0x200:0x210]).hexdigest()
+
+    def test_scoped_object_registration_preserves_cell_and_provenance(self):
+        config = self.update_fixture()
+        rows = self.updates(config)
+        self.assertEqual([r["address"] for r in rows], ["0x00000180"])
+        self.assertEqual(rows[0]["definition_address"], "0x00000040")
+        self.assertEqual(rows[0]["store_address"], "0x0000004c")
+        self.assertEqual(rows[0]["source_sha256"], hashlib.sha256(self.program[0x40:0x50]).hexdigest())
+        self.assertEqual(rows[0]["source_seed_provenance"], self.update_roots)
+        self.update_roots[0]["root_role"] = "arbitrary_data"
+        self.assertEqual(self.updates(config), [])
+
+    def test_registered_existing_label_qualifies_further_update_chain(self):
+        config = self.update_fixture()
+        self.install(0x180, [mem(0x8c, 20, mode=12), 0x5001c0, mem(0x92, 20, 16, 4), 0x0a000000])
+        self.install(0x1c0, [0x0a000000])
+        self.reach["instruction_addresses"] += [hex(0x500000+p) for p in (0x180, 0x188, 0x18c, 0x1c0)]
+        self.reach["seeds"].append("0x500180")
+        self.update_hashes(config)
+        constructors = [dict(self.update_roots[0], table="object_callback_type")]
+        labels = [{"address": "0x00000180", "name": "existing_label", "evidence": "fixture label"}]
+        original = copy.deepcopy(labels)
+        first = object_update_seeds(self.program, self.reach, self.relocations, self.tool, config,
+                                   object_update_roots(constructors, labels, []))
+        self.assertEqual([r["address"] for r in first], ["0x00000180"])
+        roots = object_update_roots(constructors, labels, first)
+        second = object_update_seeds(self.program, self.reach, self.relocations, self.tool, config, roots)
+        self.assertIn("0x000001c0", [r["address"] for r in second])
+        self.assertEqual(labels, original)  # classification of pre-existing seeds is preserved
+
+    def test_object_definition_base_clobber_control_and_side_entries(self):
+        for word in (reg(0x5cc, 20, 0, m1=1), reg(0x5cc, 16, 0, m1=1),
+                     mem(0x90, 20, 4, 0), 0x08000004, 0x09000004, 0x42000000):
+            with self.subTest(word=word):
+                config = self.update_fixture()
+                self.install(0x48, [word])
+                self.update_hashes(config)
+                self.assertEqual(self.updates(config), [])
+        config = self.update_fixture()
+        self.reach["seeds"].append("0x50004c")
+        self.assertEqual(self.updates(config), [])
+        self.reach["seeds"][-1] = "0x500044"
+        self.assertEqual(self.updates(config), [])
+
+    def test_object_dispatcher_mutations_hash_and_alias(self):
+        for address, word in ((0x200, mem(0x90, 20, 4, 8)),
+                (0x204, 0x3a << 24 | 20 << 14 | 1 << 13 | 8),
+                (0x208, reg(0x5cc, 16, 5)), (0x20c, mem(0x86, 0, 21, mode=4))):
+            with self.subTest(address=address):
+                config = self.update_fixture()
+                self.install(address, [word])
+                self.update_hashes(config)
+                with self.assertRaises(ValueError):
+                    self.updates(config)
+        config = self.update_fixture()
+        config["object_update_dispatcher"]["runtime_address"] = "0x500204"
+        with self.assertRaises(ValueError):
+            self.updates(config)
+        config = self.update_fixture()
+        self.reach["seeds"].append("0x500208")
+        with self.assertRaises(ValueError):
+            self.updates(config)
+
+    def test_object_cell_offset_and_noncode_bounds(self):
+        for word in (mem(0x92, 20, 16, 8), mem(0x92, 20, 4, 4), mem(0x82, 20, 16, 4)):
+            config = self.update_fixture()
+            self.install(0x4c, [word])
+            self.update_hashes(config)
+            self.assertEqual(self.updates(config), [])
+        for target in (0, 0x500181, 0x500400):
+            config = self.update_fixture()
+            self.install(0x44, [target])
+            self.update_hashes(config)
+            self.assertEqual(self.updates(config), [])
+        config = self.update_fixture()
+        self.reach["instruction_addresses"].remove("0x500204")
+        self.assertEqual(self.updates(config), [])
 
     def callback_hashes(self, config):
         config["program_sha256"] = hashlib.sha256(self.program).hexdigest()

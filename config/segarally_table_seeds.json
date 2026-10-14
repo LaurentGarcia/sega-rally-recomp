@@ -497,6 +497,513 @@
         }
       ],
       "proof": "Unsigned cmpobl literal maximum rejects out-of-range index; contiguous indexed4-byte load and bx use the independently verified loaded destination. All three instruction PCs belong to the prior reachability report. Static initial copied-table candidates remain distinct from runtime observations and do not imply immutable live RAM tables."
+    },
+    {
+      "name": "scouted_dispatch_005a5b64",
+      "relocation": "reset_workram_copy",
+      "program_offset": "0x00006b64",
+      "runtime_address": "0x005a5b64",
+      "entry_count": 6,
+      "index_register": 20,
+      "maximum_index": 5,
+      "rejected_index_target": "0x005a5c54",
+      "targets": [
+        "0x005a5b7c",
+        "0x005a5b84",
+        "0x005a5b94",
+        "0x005a5c18",
+        "0x005a5c4c",
+        "0x005a5c54"
+      ],
+      "table_sha256": "9360048e873d01ec0eca8fab3bcbd250e238b1549abe901db64a31eed45e540a",
+      "code_evidence": [
+        {
+          "role": "bound",
+          "program_offset": "0x00006b54",
+          "runtime_address": "0x005a5b54",
+          "size": 4,
+          "sha256": "ee10bdd3486f63a1524ef313685fb5ddb5b91ae56fee4c3a3698024dc03ad539"
+        },
+        {
+          "role": "load",
+          "program_offset": "0x00006b58",
+          "runtime_address": "0x005a5b58",
+          "size": 8,
+          "sha256": "38541aec2b117d8b58d27ab8fc1efbfc80981b3847c607550f7f467bebf3ec40"
+        },
+        {
+          "role": "branch",
+          "program_offset": "0x00006b60",
+          "runtime_address": "0x005a5b60",
+          "size": 4,
+          "sha256": "319ca02e90e424ddd1f97474f4daf664c64518829054b778a70cc81683dbc889"
+        }
+      ],
+      "proof": "Unsigned cmpobl rejects values above 5; indexed LD uses that register at scale 4 and BX uses its loaded destination. All inspected instructions occur in the compiled reachability snapshot; targets are bounded candidates, not runtime observations.",
+      "source_baseline_commit": "0cd0d07",
+      "candidate_evidence": "build/validation/table-scout-classic.json; independently revalidated through table_seeds before import"
+    },
+    {
+      "name": "scouted_dispatch_005a6468",
+      "relocation": "reset_workram_copy",
+      "program_offset": "0x00007468",
+      "runtime_address": "0x005a6468",
+      "entry_count": 9,
+      "index_register": 20,
+      "maximum_index": 8,
+      "rejected_index_target": "0x005a65ac",
+      "targets": [
+        "0x005a648c",
+        "0x005a64b4",
+        "0x005a648c",
+        "0x005a64e0",
+        "0x005a6518",
+        "0x005a6518",
+        "0x005a6524",
+        "0x005a655c",
+        "0x005a6584"
+      ],
+      "table_sha256": "3a9820408e08ec34a2f0f8792a18e8c23cf62d12932faedfe6dcacff12161fd9",
+      "code_evidence": [
+        {
+          "role": "bound",
+          "program_offset": "0x00007458",
+          "runtime_address": "0x005a6458",
+          "size": 4,
+          "sha256": "ad85b83f3568f76f183b9074535c6925259092df52b02c9d14b19f8dd3ca6f8d"
+        },
+        {
+          "role": "load",
+          "program_offset": "0x0000745c",
+          "runtime_address": "0x005a645c",
+          "size": 8,
+          "sha256": "3283c95d1321b07969ad60fc5e8b01353235718ef64aa0d71bc3eba5e48407b4"
+        },
+        {
+          "role": "branch",
+          "program_offset": "0x00007464",
+          "runtime_address": "0x005a6464",
+          "size": 4,
+          "sha256": "319ca02e90e424ddd1f97474f4daf664c64518829054b778a70cc81683dbc889"
+        }
+      ],
+      "proof": "Unsigned cmpobl rejects values above 8; indexed LD uses that register at scale 4 and BX uses its loaded destination. All inspected instructions occur in the compiled reachability snapshot; targets are bounded candidates, not runtime observations.",
+      "source_baseline_commit": "0cd0d07",
+      "candidate_evidence": "build/validation/table-scout-classic.json; independently revalidated through table_seeds before import"
+    },
+    {
+      "name": "scouted_dispatch_005aaafc",
+      "relocation": "reset_workram_copy",
+      "program_offset": "0x0000bafc",
+      "runtime_address": "0x005aaafc",
+      "entry_count": 5,
+      "index_register": 20,
+      "maximum_index": 4,
+      "rejected_index_target": "0x005aac18",
+      "targets": [
+        "0x005aab10",
+        "0x005aab44",
+        "0x005aab8c",
+        "0x005aab8c",
+        "0x005aabd8"
+      ],
+      "table_sha256": "1c5e9d745bd2c9e544455964ce1e91189610d7264eaad42f4b35c15e838239f1",
+      "code_evidence": [
+        {
+          "role": "bound",
+          "program_offset": "0x0000baec",
+          "runtime_address": "0x005aaaec",
+          "size": 4,
+          "sha256": "3d12f876df8af1e71d62b3c1060d9e8a1bd6d5b63e6c1ec92be8a4919362bbf7"
+        },
+        {
+          "role": "load",
+          "program_offset": "0x0000baf0",
+          "runtime_address": "0x005aaaf0",
+          "size": 8,
+          "sha256": "3c1b217bf0df4029f2c06e71aa0b9b3d8d3d32ffd9fba01f01747fd85376b974"
+        },
+        {
+          "role": "branch",
+          "program_offset": "0x0000baf8",
+          "runtime_address": "0x005aaaf8",
+          "size": 4,
+          "sha256": "319ca02e90e424ddd1f97474f4daf664c64518829054b778a70cc81683dbc889"
+        }
+      ],
+      "proof": "Unsigned cmpobl rejects values above 4; indexed LD uses that register at scale 4 and BX uses its loaded destination. All inspected instructions occur in the compiled reachability snapshot; targets are bounded candidates, not runtime observations.",
+      "source_baseline_commit": "0cd0d07",
+      "candidate_evidence": "build/validation/table-scout-classic.json; independently revalidated through table_seeds before import"
+    },
+    {
+      "name": "scouted_dispatch_005ab68c",
+      "relocation": "reset_workram_copy",
+      "program_offset": "0x0000c68c",
+      "runtime_address": "0x005ab68c",
+      "entry_count": 6,
+      "index_register": 20,
+      "maximum_index": 5,
+      "rejected_index_target": "0x005ab714",
+      "targets": [
+        "0x005ab6a4",
+        "0x005ab6cc",
+        "0x005ab6e8",
+        "0x005ab6e8",
+        "0x005ab6e8",
+        "0x005ab6f8"
+      ],
+      "table_sha256": "96f19a31f6b614788c925e6288f81f982eeba463048fea41a380c1dc8e95309c",
+      "code_evidence": [
+        {
+          "role": "bound",
+          "program_offset": "0x0000c67c",
+          "runtime_address": "0x005ab67c",
+          "size": 4,
+          "sha256": "656cc8b3711afcc6e6610b9fe31c0341919759f741f8dfcfed20d2f3ad02427b"
+        },
+        {
+          "role": "load",
+          "program_offset": "0x0000c680",
+          "runtime_address": "0x005ab680",
+          "size": 8,
+          "sha256": "cbbdeea635e1e12f36d2b5473f14e592d3525c141c4e36e6ed0f821586ea5c48"
+        },
+        {
+          "role": "branch",
+          "program_offset": "0x0000c688",
+          "runtime_address": "0x005ab688",
+          "size": 4,
+          "sha256": "319ca02e90e424ddd1f97474f4daf664c64518829054b778a70cc81683dbc889"
+        }
+      ],
+      "proof": "Unsigned cmpobl rejects values above 5; indexed LD uses that register at scale 4 and BX uses its loaded destination. All inspected instructions occur in the compiled reachability snapshot; targets are bounded candidates, not runtime observations.",
+      "source_baseline_commit": "0cd0d07",
+      "candidate_evidence": "build/validation/table-scout-classic.json; independently revalidated through table_seeds before import"
+    },
+    {
+      "name": "scouted_dispatch_005aef20",
+      "relocation": "reset_workram_copy",
+      "program_offset": "0x0000ff20",
+      "runtime_address": "0x005aef20",
+      "entry_count": 6,
+      "index_register": 20,
+      "maximum_index": 5,
+      "rejected_index_target": "0x005af058",
+      "targets": [
+        "0x005af058",
+        "0x005aef38",
+        "0x005aef68",
+        "0x005aefb0",
+        "0x005af004",
+        "0x005af058"
+      ],
+      "table_sha256": "f049b8ae7ad228f946d8923c202b411bd4f0b6d8410429f8a3071dc64fba01dd",
+      "code_evidence": [
+        {
+          "role": "bound",
+          "program_offset": "0x0000ff10",
+          "runtime_address": "0x005aef10",
+          "size": 4,
+          "sha256": "5ced2ed82e04abda2bfd30dbddb4103a959b3749cbd97b8fb8f1fd64ef9da8bd"
+        },
+        {
+          "role": "load",
+          "program_offset": "0x0000ff14",
+          "runtime_address": "0x005aef14",
+          "size": 8,
+          "sha256": "9a4c5f7b907c7f9c6470365551141941ce87622160744b6b394bc906aa956a01"
+        },
+        {
+          "role": "branch",
+          "program_offset": "0x0000ff1c",
+          "runtime_address": "0x005aef1c",
+          "size": 4,
+          "sha256": "319ca02e90e424ddd1f97474f4daf664c64518829054b778a70cc81683dbc889"
+        }
+      ],
+      "proof": "Unsigned cmpobl rejects values above 5; indexed LD uses that register at scale 4 and BX uses its loaded destination. All inspected instructions occur in the compiled reachability snapshot; targets are bounded candidates, not runtime observations.",
+      "source_baseline_commit": "0cd0d07",
+      "candidate_evidence": "build/validation/table-scout-classic.json; independently revalidated through table_seeds before import"
+    },
+    {
+      "name": "scouted_dispatch_005aff5c",
+      "relocation": "reset_workram_copy",
+      "program_offset": "0x00010f5c",
+      "runtime_address": "0x005aff5c",
+      "entry_count": 7,
+      "index_register": 20,
+      "maximum_index": 6,
+      "rejected_index_target": "0x005affb0",
+      "targets": [
+        "0x005aff78",
+        "0x005aff8c",
+        "0x005aff8c",
+        "0x005affa0",
+        "0x005affa0",
+        "0x005affa0",
+        "0x005affa0"
+      ],
+      "table_sha256": "47f47b13fa8d467a80ed7883924b141bca46b206fa059bdbceb758dae384152c",
+      "code_evidence": [
+        {
+          "role": "bound",
+          "program_offset": "0x00010f4c",
+          "runtime_address": "0x005aff4c",
+          "size": 4,
+          "sha256": "b4645d5b25eeccd6a0513ff17691fb28c81d7bdec8780e6e1a1fea6f12732f8c"
+        },
+        {
+          "role": "load",
+          "program_offset": "0x00010f50",
+          "runtime_address": "0x005aff50",
+          "size": 8,
+          "sha256": "d1c026b240f023f565199bf99e8c2c4e766ca1531d7ea6f45c30bda2c3bff1f0"
+        },
+        {
+          "role": "branch",
+          "program_offset": "0x00010f58",
+          "runtime_address": "0x005aff58",
+          "size": 4,
+          "sha256": "319ca02e90e424ddd1f97474f4daf664c64518829054b778a70cc81683dbc889"
+        }
+      ],
+      "proof": "Unsigned cmpobl rejects values above 6; indexed LD uses that register at scale 4 and BX uses its loaded destination. All inspected instructions occur in the compiled reachability snapshot; targets are bounded candidates, not runtime observations.",
+      "source_baseline_commit": "0cd0d07",
+      "candidate_evidence": "build/validation/table-scout-classic.json; independently revalidated through table_seeds before import"
+    },
+    {
+      "name": "scouted_dispatch_005b04c8",
+      "relocation": "reset_workram_copy",
+      "program_offset": "0x000114c8",
+      "runtime_address": "0x005b04c8",
+      "entry_count": 7,
+      "index_register": 20,
+      "maximum_index": 6,
+      "rejected_index_target": "0x005b051c",
+      "targets": [
+        "0x005b04e4",
+        "0x005b04f8",
+        "0x005b04f8",
+        "0x005b050c",
+        "0x005b050c",
+        "0x005b050c",
+        "0x005b050c"
+      ],
+      "table_sha256": "27569cbaa8df475c0d996e55d6779f3af865814904b312cb7d48cd797b2cc5e1",
+      "code_evidence": [
+        {
+          "role": "bound",
+          "program_offset": "0x000114b8",
+          "runtime_address": "0x005b04b8",
+          "size": 4,
+          "sha256": "b4645d5b25eeccd6a0513ff17691fb28c81d7bdec8780e6e1a1fea6f12732f8c"
+        },
+        {
+          "role": "load",
+          "program_offset": "0x000114bc",
+          "runtime_address": "0x005b04bc",
+          "size": 8,
+          "sha256": "8af03cecfd8046c01b570efab0aa289d03649cd7025ba7bcc7c7a8673cf25376"
+        },
+        {
+          "role": "branch",
+          "program_offset": "0x000114c4",
+          "runtime_address": "0x005b04c4",
+          "size": 4,
+          "sha256": "319ca02e90e424ddd1f97474f4daf664c64518829054b778a70cc81683dbc889"
+        }
+      ],
+      "proof": "Unsigned cmpobl rejects values above 6; indexed LD uses that register at scale 4 and BX uses its loaded destination. All inspected instructions occur in the compiled reachability snapshot; targets are bounded candidates, not runtime observations.",
+      "source_baseline_commit": "0cd0d07",
+      "candidate_evidence": "build/validation/table-scout-classic.json; independently revalidated through table_seeds before import"
+    },
+    {
+      "name": "scouted_dispatch_005b636c",
+      "relocation": "reset_workram_copy",
+      "program_offset": "0x0001736c",
+      "runtime_address": "0x005b636c",
+      "entry_count": 5,
+      "index_register": 20,
+      "maximum_index": 4,
+      "rejected_index_target": "0x005b683c",
+      "targets": [
+        "0x005b6380",
+        "0x005b6504",
+        "0x005b663c",
+        "0x005b66f4",
+        "0x005b6794"
+      ],
+      "table_sha256": "93c15d585be63edb12d963b7b98a4543e639e520ca3bc9f2453dd2bcbe82dcdb",
+      "code_evidence": [
+        {
+          "role": "bound",
+          "program_offset": "0x0001735c",
+          "runtime_address": "0x005b635c",
+          "size": 4,
+          "sha256": "c4ae71684ba11f8bb2bf2b45ec58144abbb23e72f0edf188c34df54947d32185"
+        },
+        {
+          "role": "load",
+          "program_offset": "0x00017360",
+          "runtime_address": "0x005b6360",
+          "size": 8,
+          "sha256": "bab4e8e247a51b20f5a4521241ed304dc884681f265a8b096df9df1d03736261"
+        },
+        {
+          "role": "branch",
+          "program_offset": "0x00017368",
+          "runtime_address": "0x005b6368",
+          "size": 4,
+          "sha256": "319ca02e90e424ddd1f97474f4daf664c64518829054b778a70cc81683dbc889"
+        }
+      ],
+      "proof": "Unsigned cmpobl rejects values above 4; indexed LD uses that register at scale 4 and BX uses its loaded destination. All inspected instructions occur in the compiled reachability snapshot; targets are bounded candidates, not runtime observations.",
+      "source_baseline_commit": "0cd0d07",
+      "candidate_evidence": "build/validation/table-scout-classic.json; independently revalidated through table_seeds before import"
+    },
+    {
+      "name": "scouted_dispatch_005bbe70",
+      "relocation": "reset_workram_copy",
+      "program_offset": "0x0001ce70",
+      "runtime_address": "0x005bbe70",
+      "entry_count": 6,
+      "index_register": 20,
+      "maximum_index": 5,
+      "rejected_index_target": "0x005bc150",
+      "targets": [
+        "0x005bbe88",
+        "0x005bbeec",
+        "0x005bbfb8",
+        "0x005bc010",
+        "0x005bc058",
+        "0x005bc0a0"
+      ],
+      "table_sha256": "d895beeeccf850565e61b3509870099c7205fef3595006c51f42af6d324bfe21",
+      "code_evidence": [
+        {
+          "role": "bound",
+          "program_offset": "0x0001ce60",
+          "runtime_address": "0x005bbe60",
+          "size": 4,
+          "sha256": "99f7f68bf574f7ca313fab37f780a44cc627905dbc13555fd9984f667831530a"
+        },
+        {
+          "role": "load",
+          "program_offset": "0x0001ce64",
+          "runtime_address": "0x005bbe64",
+          "size": 8,
+          "sha256": "e6e0f063bd8b81befc41b539cf8549abf90d33a85c1fbad675dcf9c94848e993"
+        },
+        {
+          "role": "branch",
+          "program_offset": "0x0001ce6c",
+          "runtime_address": "0x005bbe6c",
+          "size": 4,
+          "sha256": "319ca02e90e424ddd1f97474f4daf664c64518829054b778a70cc81683dbc889"
+        }
+      ],
+      "proof": "Unsigned cmpobl rejects values above 5; indexed LD uses that register at scale 4 and BX uses its loaded destination. All inspected instructions occur in the compiled reachability snapshot; targets are bounded candidates, not runtime observations.",
+      "source_baseline_commit": "0cd0d07",
+      "candidate_evidence": "build/validation/table-scout-classic.json; independently revalidated through table_seeds before import"
+    },
+    {
+      "name": "scouted_dispatch_005d06ec",
+      "relocation": "reset_workram_copy",
+      "program_offset": "0x000316ec",
+      "runtime_address": "0x005d06ec",
+      "entry_count": 5,
+      "index_register": 20,
+      "maximum_index": 4,
+      "rejected_index_target": "0x005d0728",
+      "targets": [
+        "0x005d0700",
+        "0x005d0708",
+        "0x005d0710",
+        "0x005d0718",
+        "0x005d0720"
+      ],
+      "table_sha256": "9415ec49965dbca7b9c7581ad55e3601234d3513ff9fc9d60702b439b226db90",
+      "code_evidence": [
+        {
+          "role": "bound",
+          "program_offset": "0x000316dc",
+          "runtime_address": "0x005d06dc",
+          "size": 4,
+          "sha256": "17023b16a4c279228073e90cea875b812e05449d78f805dbaabc2eca701bc166"
+        },
+        {
+          "role": "load",
+          "program_offset": "0x000316e0",
+          "runtime_address": "0x005d06e0",
+          "size": 8,
+          "sha256": "6a695e3c7a680b764ab0c827ff3ee7a6ea921b673b02462bd6465f0948a1fac4"
+        },
+        {
+          "role": "branch",
+          "program_offset": "0x000316e8",
+          "runtime_address": "0x005d06e8",
+          "size": 4,
+          "sha256": "319ca02e90e424ddd1f97474f4daf664c64518829054b778a70cc81683dbc889"
+        }
+      ],
+      "proof": "Unsigned cmpobl rejects values above 4; indexed LD uses that register at scale 4 and BX uses its loaded destination. All inspected instructions occur in the compiled reachability snapshot; targets are bounded candidates, not runtime observations.",
+      "source_baseline_commit": "0cd0d07",
+      "candidate_evidence": "build/validation/table-scout-classic.json; independently revalidated through table_seeds before import"
+    },
+    {
+      "name": "scouted_dispatch_005d21bc",
+      "relocation": "reset_workram_copy",
+      "program_offset": "0x000331bc",
+      "runtime_address": "0x005d21bc",
+      "entry_count": 7,
+      "index_register": 21,
+      "maximum_index": 6,
+      "rejected_index_target": "0x005d23c8",
+      "targets": [
+        "0x005d2864",
+        "0x005d21d8",
+        "0x005d21f4",
+        "0x005d2454",
+        "0x005d25b4",
+        "0x005d2744",
+        "0x005d22d0"
+      ],
+      "table_sha256": "10a0c572f59a0ea5a0e15039ac3e6ea97462f69f6a8d630d9c9d4713f4b731b9",
+      "code_evidence": [
+        {
+          "role": "bound",
+          "program_offset": "0x000331ac",
+          "runtime_address": "0x005d21ac",
+          "size": 4,
+          "sha256": "277c16cd95c8ba60b4110e19ea0709438a9fd23e8ad757ca29eeb130a3fbb51b"
+        },
+        {
+          "role": "load",
+          "program_offset": "0x000331b0",
+          "runtime_address": "0x005d21b0",
+          "size": 8,
+          "sha256": "d23642b13a63d4e045605e9ecbd7377731c5873adc3964d3c1a8de63f02fc251"
+        },
+        {
+          "role": "branch",
+          "program_offset": "0x000331b8",
+          "runtime_address": "0x005d21b8",
+          "size": 4,
+          "sha256": "319ca02e90e424ddd1f97474f4daf664c64518829054b778a70cc81683dbc889"
+        }
+      ],
+      "proof": "Unsigned cmpobl rejects values above 6; indexed LD uses that register at scale 4 and BX uses its loaded destination. All inspected instructions occur in the compiled reachability snapshot; targets are bounded candidates, not runtime observations.",
+      "destination_register": 20,
+      "source_baseline_commit": "0cd0d07",
+      "candidate_evidence": "build/validation/table-scout-classic.json; independently revalidated through table_seeds before import"
     }
-  ]
+  ],
+  "object_update_dispatcher": {
+    "relocation": "reset_workram_copy",
+    "program_offset": "0x0003f46c",
+    "runtime_address": "0x005de46c",
+    "size": 16,
+    "sha256": "059578140871365eb29caa254fb40a52f07108401de1f18fb698bc3b1847d9fe",
+    "proof": "LD object+4 through r4 into g4, CMPIBE zero skips to after call, MOV r4 into g0 passes that same object, then CALLX through g4. Registration proof roots are only the verified constructor table and explicitly classified update entries, not arbitrary address scans."
+  }
 }

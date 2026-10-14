@@ -9,6 +9,7 @@
 #include <functional>
 #include <optional>
 #include <limits>
+#include <array>
 
 static uint32_t number(const std::string &text) {
     size_t used=0; const auto value=std::stoull(text,&used,16);
@@ -95,17 +96,18 @@ static std::set<uint32_t> addresses(const char *path) {
 }
 int main(int argc, char **argv) {
     try {
+        const bool updates=argc==10 && std::string(argv[1])=="--updates";
         const bool comparison=argc==7 && std::string(argv[1])=="--compare";
         const bool masked=argc==7 && std::string(argv[1])=="--masked";
         const bool table_mode=masked || comparison;
-        if (!table_mode && argc != 8) throw std::runtime_error("program trusted reachable entries source guest size required");
-        std::ifstream f(argv[table_mode?2:1], std::ios::binary); if (!f) throw std::runtime_error("program unavailable");
+        if (!table_mode && !updates && argc != 8) throw std::runtime_error("program trusted reachable entries source guest size required");
+        std::ifstream f(argv[table_mode||updates?2:1], std::ios::binary); if (!f) throw std::runtime_error("program unavailable");
         const std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(f), {}};
-        auto trusted = table_mode ? std::set<uint32_t>{} : addresses(argv[2]);
-        auto reached = table_mode ? std::set<uint32_t>{} : addresses(argv[3]);
-        const uint32_t source = number(argv[table_mode?4:5]);
-        const uint32_t guest = number(argv[table_mode?5:6]);
-        const uint32_t size = number(argv[table_mode?6:7]);
+        auto trusted = table_mode ? std::set<uint32_t>{} : addresses(argv[updates?3:2]);
+        auto reached = table_mode ? std::set<uint32_t>{} : addresses(argv[updates?4:3]);
+        const uint32_t source = number(argv[updates?6:table_mode?4:5]);
+        const uint32_t guest = number(argv[updates?7:table_mode?5:6]);
+        const uint32_t size = number(argv[updates?8:table_mode?6:7]);
         if ((source | guest | size) & 3 || !size || uint64_t(source)+size > bytes.size() ||
             guest < 0x500000 || uint64_t(guest)+size > 0x600000)
             throw std::runtime_error("invalid verified copy span");
@@ -135,7 +137,7 @@ int main(int argc, char **argv) {
         // Any known seed or direct transfer into the interior invalidates the
         // straight-line reaching definition. Unknown indirect entries are not
         // resolved by this pass and do not receive an exclusivity claim.
-        auto entries = addresses(argv[4]);
+        auto entries = addresses(argv[updates?5:4]);
         for (auto p : reached) {
             if(uint64_t(p)+4>bytes.size()) continue;
             // Incoming direct edges can originate outside this copied span.
@@ -146,6 +148,61 @@ int main(int argc, char **argv) {
                     target = source + target - guest;
                 entries.insert(target);
             }
+        }
+        auto interior_entry=[&](uint32_t start,uint32_t end) {
+            auto found=entries.upper_bound(start);
+            return found!=entries.end() && *found<end;
+        };
+        if(updates) {
+            using namespace i960;
+            const auto dispatcher=number(argv[9]);
+            auto load=decode(dispatcher), guard=decode(dispatcher+4);
+            auto move=decode(dispatcher+8), call=decode(dispatcher+12);
+            if(!load.valid() || load.op->code!=0x90 || load.ea!=EaMode::AbaseOffset ||
+                load.src2!=4 || load.offset!=4 || load.src1!=20 || !guard.valid() ||
+                guard.op->code!=0x3a || !guard.m1 || guard.src1!=0 || guard.src2!=20 ||
+                guard.target!=dispatcher+16 || !move.valid() || move.op->code!=0x5cc ||
+                move.m1 || move.m3 || move.src1!=4 || move.dst!=16 || !call.valid() ||
+                call.op->code!=0x86 || call.ea!=EaMode::Abase || call.src2!=20 ||
+                interior_entry(dispatcher,dispatcher+16))
+                throw std::runtime_error("object update dispatcher operand/side-entry proof failed");
+            bool comma=false;std::cout<<'[';
+            for(auto start:trusted) {
+                // A trusted constructor/update receives the object in g0.
+                // Preserve that base and every pending constant definition.
+                std::array<std::optional<std::pair<uint32_t,uint32_t>>,32> definitions{};
+                uint32_t p=start;
+                for(unsigned n=0;n<64;++n) {
+                    auto in=decode(p);
+                    if(!in.valid() || in.op->flow!=Flow::None || interior_entry(start,p+in.length)) break;
+                    if(in.fmt==Format::Mem && in.ea!=EaMode::Reserved) {
+                        if(in.op->code==0x92 || in.op->code==0x82 || in.op->code==0x9a || in.op->code==0xb2) {
+                            const unsigned width=in.op->code==0x9a?2:in.op->code==0xb2?4:1;
+                            if(in.src1+width>32) break;
+                            if(in.op->code==0x92 && in.ea==EaMode::AbaseOffset && in.src2==16 &&
+                                in.offset==4 && definitions[in.src1]) {
+                                auto [definition,target]=*definitions[in.src1];
+                                if(comma) std::cout<<',';comma=true;
+                                std::cout<<"{\"root\":"<<start<<",\"definition\":"<<definition<<
+                                    ",\"store\":"<<p<<",\"target\":"<<target<<",\"register\":"<<unsigned(in.src1)<<"}";
+                            }
+                        } else if(in.op->code==0x8c || in.op->code==0x80 || in.op->code==0x90 ||
+                                  in.op->code==0x98 || in.op->code==0xb0) {
+                            const unsigned width=in.op->code==0x98?2:in.op->code==0xb0?4:1;
+                            if(in.src1+width>32 || (in.src1<=16 && in.src1+width>16)) break;
+                            for(unsigned r=in.src1;r<in.src1+width;++r) definitions[r]={};
+                            if(in.op->code==0x8c && in.ea==EaMode::Disp && !(in.disp&3) &&
+                                in.disp>=guest && uint64_t(in.disp)<uint64_t(guest)+size)
+                                definitions[in.src1]=std::pair{p,in.disp};
+                        } else break;
+                    } else if(in.fmt==Format::Reg && !in.m3 && in.dst!=16 &&
+                        (in.op->code==0x5cc || in.op->code==0x581 || in.op->code==0x58c ||
+                         in.op->code==0x590 || in.op->code==0x592)) definitions[in.dst]={};
+                    else break;
+                    p+=in.length;
+                }
+            }
+            std::cout<<"]\n";return 0;
         }
         bool comma=false; std::cout << "[";
         for (auto start : trusted) {
@@ -171,7 +228,7 @@ int main(int argc, char **argv) {
                 p+=in.length;
             }
             // The mov itself is also an interior entry, checked separately.
-            if (!proven || entries.contains(start+8)) continue;
+            if (!proven || interior_entry(start,p)) continue;
             if (comma) std::cout << ','; comma=true;
             std::cout << "{\"start\":"<<start<<",\"target\":"<<p<<",\"size\":"<<p-start<<"}";
         }

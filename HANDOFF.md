@@ -1,5 +1,40 @@
 # Handoff
 
+## Expanded object-update coverage for the race transition (2026-10-14)
+
+The frozen v4 generation contains 73,945 instructions, 51 compiled objects
+and no missing templates. Twenty-two audited tables contribute 116 candidate
+rows, alongside ten continuation and fourteen object-registration rows. The
+new scoped proof follows constructor/update roots, preserving the object in
+g0 and an absolute callback constant through decoded straight-line operations
+to a word store at object+4. The pinned caller independently loads that cell,
+guards null, passes the same object and calls the loaded pointer. Known side
+entries, base/value clobbers and unrecognized control flow reject the proof.
+
+Accumulated registrations qualify an update root even if its address already
+has an ordinary label; the initial fixed-point implementation missed that
+case by only retaining roles on newly added seeds. A synthetic already-labeled
+update chain verifies the correction. The final reached graph reproduces every
+registration and continuation with provenance. Seventeen proof tests pass both
+normally and under ASan/UBSan, and all eight table and eight bootstrap tests
+pass before the next recorded replay result.
+
+Actual frontier entries `0x005ca5b0`, `0x005e29d0` and `0x005e4380` are compiled
+separately from inferred registrations. The earlier hypothesis that conditional
+branches explained the last two missed registrations was wrong: their known
+constructors save the object in r4 and use BAL to a returning leaf before the
+store. The straight-line proof intentionally stops at that call and does not
+track the saved object alias. Read-only evidence identifies a narrow leaf/alias
+extension for the next iteration; it is not part of this checkpoint.
+
+Source-set SHA-256 is
+`19f05087de9ba5db3ad5e7601e4e1cefed204f5e0ecf241834561f47ea806d2a`,
+coverage `098329d8657f7a65fa045b1634da022db89e93f729bf12d918336bed89469258`,
+proof helper `048d8a91e9674d9bac26bf88cb154a6653f7ae2d0918d7488a45408d3f035b03`.
+Generation success does not establish race entry. Next: run the exact versioned
+Lancia-selection replay on this frozen profile, preserve its next frontier and
+let the platform and sound lanes consume separate stable copies.
+
 ## Linked sound preserves the Lancia selection replay (2026-10-14)
 
 Adding the actually reached sound entry `0x6016ce` from the known byte dispatcher
@@ -7,7 +42,7 @@ allows all ten recorded cabinet events to complete with sound attached. The
 coupled machine reaches exactly the sound-disabled main frontier `0x005e4380`:
 376,736,993 instructions, 832,720,369 cycles, 1,915 frames and pixel hash
 `54fd87f7d2db4325`. Eighteen input/CPU/IRQ/frame/TGP/frontier transcript lines
-match the root replay. Sound runs 26,148,973 instructions, 376,043,201 cycles
+match the sound-disabled replay. Sound runs 26,148,973 instructions, 376,043,201 cycles
 and 30,949 IRQs; main UART has 214 pin transitions. The image is still the white
 transition after selecting Lancia AT, not a running race.
 

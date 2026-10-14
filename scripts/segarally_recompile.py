@@ -201,6 +201,75 @@ def continuation_seeds(program: bytes, reach: dict, relocations: dict, proof_too
     return candidates
 
 
+def object_update_seeds(program: bytes, reach: dict, relocations: dict, proof_tool: Path,
+                        config: dict, roots: list[dict]) -> list[dict]:
+    """Prove update registrations from constructor/update roots and a pinned caller.
+
+    No arbitrary address scan: roots must carry an explicit object role, all
+    inspected instructions must already be decoded, and the established
+    dispatcher must load/guard/call the same object's +4 pointer cell.
+    """
+    if hashlib.sha256(program).hexdigest() != config["program_sha256"]:
+        raise ValueError("object registration proof belongs to a different program")
+    dispatcher = config["object_update_dispatcher"]
+    copies = [row for row in relocations["relocations"] if row["name"] == dispatcher["relocation"]]
+    if len(copies) != 1:
+        raise ValueError("object dispatcher requires one named verified reset copy")
+    copy = copies[0]
+    guest, source, size = (int(copy[key], 16) for key in ("guest", "program_offset", "size"))
+    start, runtime = int(dispatcher["program_offset"], 16), int(dispatcher["runtime_address"], 16)
+    if (dispatcher["size"] != 16 or (start | runtime) & 3 or start < source or start + 16 > source + size or
+        runtime != guest + start - source or hashlib.sha256(program[start:start+16]).hexdigest() != dispatcher["sha256"]):
+        raise ValueError("object dispatcher span/hash/alias differs from pinned proof")
+    def canonical(pc: str) -> int:
+        value = int(pc, 16)
+        return source + value - guest if guest <= value < guest + size else value
+    qualified = [row for row in roots if row.get("root_role") in ("object_constructor", "object_update")]
+    reached = {canonical(pc) for pc in reach["instruction_addresses"]}
+    if any(start + offset not in reached for offset in (0, 4, 8, 12)):
+        return []  # sparse profiles cannot establish this caller yet
+    trusted = {canonical(row["address"]) for row in qualified} & reached
+    entries = {canonical(pc) for pc in reach["seeds"]}
+    with tempfile.TemporaryDirectory(prefix="srally-updates-") as directory:
+        folder = Path(directory)
+        image = folder / "program.bin"
+        image.write_bytes(program)
+        for name, values in (("trusted", trusted), ("reached", reached), ("entries", entries)):
+            (folder / name).write_text("".join(f"{pc:x}\n" for pc in sorted(values)))
+        result = subprocess.run([str(proof_tool), "--updates", str(image), str(folder / "trusted"),
+            str(folder / "reached"), str(folder / "entries"), hex(source), hex(guest), hex(size), hex(start)],
+            capture_output=True, text=True)
+    if result.returncode:
+        raise ValueError("object registration proof failed: " + result.stderr.strip())
+    candidates = []
+    for proof in json.loads(result.stdout):
+        root, definition, store, target = (proof[key] for key in ("root", "definition", "store", "target"))
+        if root not in trusted or not source <= root <= definition < store < source + size or not guest <= target < guest + size:
+            raise ValueError("object registration target/span differs from verified roots/copy")
+        candidates.append({"address": f"0x{source + target - guest:08x}",
+            "runtime_address": f"0x{target:08x}", "root_role": "object_update",
+            "name": f"verified_registered_object_update_{target:08x}",
+            "evidence": "Inherited decoder constructor/update pointer-cell proof",
+            "source_address": f"0x{root:08x}", "source_size": store + 4 - root,
+            "source_sha256": hashlib.sha256(program[root:store+4]).hexdigest(),
+            "definition_address": f"0x{definition:08x}", "store_address": f"0x{store:08x}",
+            "value_register": proof["register"], "dispatcher_provenance": dispatcher,
+            "source_seed_provenance": [row for row in qualified if canonical(row["address"]) == root],
+            "provenance": "Static object update registration candidate from a scoped constructor/update root, preserved object base and constant value, known side-entry rejection, and the pinned +4/null-guard/call dispatcher. Runtime observation, immutable pointer cells and exclusive target coverage are not implied."})
+    return candidates
+
+
+def object_update_roots(derived: list[dict], seeds: list[dict], registrations: list[dict]) -> list[dict]:
+    """Keep inferred roles separate from existing label/observed seed metadata.
+
+    Registrations qualify their targets even when those addresses already
+    belonged to the native seed profile; those update chains need analysis too.
+    """
+    return ([dict(row, root_role="object_constructor") for row in derived
+             if row.get("table") == "object_callback_type"] +
+            [row for row in seeds if row.get("root_role") == "object_update"] + registrations)
+
+
 def table_seeds(program: bytes, config: dict, relocations: dict, proof_tool: Path | None = None) -> list[dict]:
     """Verify individually audited bounded dispatch tables, not arbitrary scans.
 
@@ -392,18 +461,26 @@ def main() -> int:
                     "--board", "model2a", "--main-data", str(BUILD / "rom_cache" / "main_data.bin"),
                     "--seeds", str(seedfile), "--report", str(report)] + relocation_flags, BUILD / "recompile.log")
         reach = json.loads(report.read_text())
-        continuations = []
+        continuations, registrations = [], []
         for iteration in range(16):
-            proven = continuation_seeds(program, reach, relocations, proof_tool)
-            for row in proven:
+            continued = continuation_seeds(program, reach, relocations, proof_tool)
+            for row in continued:
                 row["source_seed_provenance"] = [{key: seed[key] for key in
                     ("address", "name", "evidence", "provenance", "table", "source_address") if key in seed}
                     for seed in combined["seeds"] if seed["address"] == row["source_address"]]
+            update_roots = object_update_roots(derived, combined["seeds"], registrations)
+            registered = object_update_seeds(program, reach, relocations, proof_tool, table_config, update_roots)
+            new_update_roots = {row["address"] for row in registered} - {row["address"] for row in update_roots}
+            proven = continued + registered
             prior = {row["address"] for row in combined["seeds"]}
             additions = [row for row in proven if row["address"] not in prior]
-            continuations.extend(row for row in proven if row["address"] not in {item["address"] for item in continuations})
-            if not additions:
+            continuations.extend(row for row in continued if row["address"] not in {item["address"] for item in continuations})
+            registrations.extend(row for row in registered if (row["address"], row["store_address"]) not in
+                {(item["address"], item["store_address"]) for item in registrations})
+            if not additions and not new_update_roots:
                 break
+            if not additions:
+                continue  # newly qualified existing labels need another proof pass, not recompilation
             combined["seeds"].extend(additions)
             relocation_flags, aliases = relocation_seeds(program, combined, relocations)
             seedfile.write_text("".join(row["address"][2:] + "\n" for row in combined["seeds"] + aliases))
@@ -421,6 +498,7 @@ def main() -> int:
                       "observed_seed_provenance": observed, "relocation_provenance": relocations,
                       "table_seed_provenance": table_config, "table_derived_candidates": derived,
                       "continuation_candidates": continuations,
+                      "object_update_candidates": registrations,
                       "indirect_seed_analysis": {"version": 1,
                           "helper": "tools/srally_continuations/main.cpp",
                           "helper_sha256": hashlib.sha256((ROOT / "tools/srally_continuations/main.cpp").read_bytes()).hexdigest(),

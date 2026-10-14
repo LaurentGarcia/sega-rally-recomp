@@ -190,6 +190,68 @@
       "observed_rip": "0x005c30ac",
       "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
       "provenance": "Actual native dispatcher frontier at bx(g4) at 0x5d0ae4 after unsigned cmpobl bounded indexed table load. Last capture is a white transition with no rendered geometry yet; native TGP has executed 67207 instructions. Canonical ROM target = runtime -0x59f000 in verified reset copy; no game state or instruction patched."
+    },
+    {
+      "address": "0x00045980",
+      "observed_runtime_address": "0x005e4980",
+      "name": "observed_attract_object_update_005e4980",
+      "evidence": "build/segarally-timed-v3/evidence/first-native-3d-005e4980/boot.json",
+      "observed_after_instructions": 321115347,
+      "observed_reference_cycles": 710610287,
+      "observed_previous_dispatch": "0x005de478",
+      "observed_rip": "0x005de47c",
+      "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+      "source_baseline_commit": "0cd0d07",
+      "provenance": "Actual native update callback frontier after278 frames with geometry and a captured Martini Lancia/forest scene. Constructor0x5e4ae0 explicitly loads0x5e4980 at0x5e4af0 and saves it to object+4 at0x5e4af8; update loop reloads/null-guards object+4 and calls at0x5de478. Canonical ROM target=runtime-0x59f000 in verified reset copy; no game state or instruction patched.",
+      "root_role": "object_update"
+    },
+    {
+      "address": "0x0002b5b0",
+      "observed_runtime_address": "0x005ca5b0",
+      "name": "observed_attract_object_update_005ca5b0",
+      "root_role": "object_update",
+      "evidence": "build/segarally-timed-v4/evidence/native-005ca5b0/boot.json",
+      "observed_after_instructions": 397600766,
+      "observed_reference_cycles": 880975115,
+      "observed_previous_dispatch": "0x005de478",
+      "observed_rip": "0x005de47c",
+      "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+      "source_baseline_commit": "0cd0d07",
+      "provenance": "Actual native object update callback frontier after670 frames with geometry. Constructor0x5ca6d0 (bounded table index6) loads0x5ca5b0 at0x5ca6e8, preserves g4 through a disjoint store and saves it to object+4 at0x5ca6f4. Established update loop reloads/null-guards object+4 and calls at0x5de478. Captured forest track; no game state or instruction patched."
+    },
+    {
+      "address": "0x00045380",
+      "observed_runtime_address": "0x005e4380",
+      "name": "observed_object_update_005e4380_hardware_input_replay",
+      "root_role": "object_update",
+      "evidence": "build/validation/input-replay/lancia-select.log",
+      "observed_after_instructions": 376736993,
+      "observed_reference_cycles": 832720369,
+      "observed_previous_dispatch": "0x005de478",
+      "observed_rip": "0x005de47c",
+      "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+      "execution_variant": "hardware_input_replay",
+      "source_baseline_commit": "0cd0d07",
+      "provenance": "Actual native object update target called at0x5de478 after reloading/null-guarding object+4. Kept separate from constructor-registration candidates; conditional or non-whitelisted definition paths are not inferred. No game state or instruction patched.",
+      "input_replay": "build/validation/input-replay/lancia-select.txt",
+      "input_replay_sha256": "797df95862beda36fd9ab54f8c440b701897bc0561b0cf8630f29e30b4f25f6e",
+      "observed_rendered_frames": 1915
+    },
+    {
+      "address": "0x000439d0",
+      "observed_runtime_address": "0x005e29d0",
+      "name": "observed_object_update_005e29d0_coupled_native_sound",
+      "root_role": "object_update",
+      "evidence": "build/segarally-coupled-v4/evidence/neutral-main-5e29d0/boot.json",
+      "observed_after_instructions": 397603063,
+      "observed_reference_cycles": 880982159,
+      "observed_previous_dispatch": "0x005de478",
+      "observed_rip": "0x005de47c",
+      "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+      "execution_variant": "coupled_native_sound",
+      "source_baseline_commit": "0cd0d07",
+      "provenance": "Actual native object update target called at0x5de478 after reloading/null-guarding object+4. Kept separate from constructor-registration candidates; conditional or non-whitelisted definition paths are not inferred. No game state or instruction patched.",
+      "observed_rendered_frames": 2027
     }
   ]
 }

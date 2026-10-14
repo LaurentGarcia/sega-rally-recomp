@@ -75,8 +75,14 @@ paths remain outside this proof. Actual callback frontiers are separately
 recorded with instruction/cycle counts and ignored execution-report paths.
 Unsigned compare/branch tables also admit intervening frame spills only when
 they preserve both the comparison flags and index. The bounded index and
-loaded branch destination are checked independently. Eleven audited tables
-now contribute 61 candidate rows. The resulting native profile reaches its
+loaded branch destination are checked independently. Twenty-two audited tables
+now contribute 116 candidate rows. Fourteen scoped object-update registrations
+add a separately recorded candidate class: constructor/update roots must
+preserve the object base and absolute callback definition through decoded
+operations to its +4 pointer cell, with the caller's load/null guard/same-object
+argument independently verified. Already-labeled targets retain inferred roles
+for subsequent update-chain analysis. Unknown calls, object aliases across calls
+and conditional paths remain outside this proof. The frozen first-car profile reaches its
 first geometry at rendered frame 1,357 and a visible textured car/course scene
 by frame 1,634; this is CPU-renderer evidence, pending Metal and race validation.
 
