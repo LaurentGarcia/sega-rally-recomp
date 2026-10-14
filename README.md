@@ -72,6 +72,11 @@ Use `--instructions 10000000` to run past the initial RAM-copy loop; the
 default one-million-instruction limit stops inside it.
 `--step-frames` exercises the same resumable machine one rendered frame at a
 time while retaining the exact instruction limit.
+`--input-replay FILE` additionally supplies complete cabinet input snapshots
+at completed rendered-frame boundaries; it requires `--with-screen --with-io`.
+See [input replay format](docs/segarally-input-replay.md). The runner saves
+the exact input file and its SHA-256 beside the boot report, and records each
+applied event's instruction/cycle count. It does not change game memory.
 
 The expanded profile has 403 annotated label candidates, seven separately
 recorded executed targets, three checked table-derived targets, and RAM aliases. It retains 402 unresolved

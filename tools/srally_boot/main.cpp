@@ -1,5 +1,6 @@
 // Bounded native startup using the same machine as the SDL3/Metal frontend.
 #include "runtime/model2a_machine.h"
+#include "input_replay.h"
 #ifdef M2_SRALLY_VIDEO
 #include "runtime/video.h"
 #endif
@@ -7,6 +8,7 @@
 #include <cstdio>
 #include <fstream>
 #include <iterator>
+#include <optional>
 #include <string>
 
 namespace {
@@ -29,8 +31,8 @@ int main(int argc, char **argv) {
 #ifdef M2_SRALLY_SOUND
     expected += 2;
 #endif
-    if (argc != expected && argc != expected + 1) {
-        std::fprintf(stderr, "usage: srally_boot PROGRAM.bin MAIN_DATA.bin INSTRUCTION_LIMIT [compiled TGP/video/sound image pairs] [FRAME.ppm]\n");
+    if (argc < expected) {
+        std::fprintf(stderr, "usage: srally_boot PROGRAM.bin MAIN_DATA.bin INSTRUCTION_LIMIT [compiled TGP/video/sound image pairs] [FRAME.ppm] [--input-replay FILE]\n");
         return 2;
     }
     try {
@@ -43,7 +45,18 @@ int main(int argc, char **argv) {
         images.program = load(argv[1]); images.main_data = load(argv[2]);
         Machine::Options options{false, false, false, false, false, false, false, false};
         [[maybe_unused]] int next_image = 4;
-        const char *capture = argc == expected + 1 ? argv[expected] : nullptr;
+        int next_option = expected;
+        const char *capture = nullptr;
+        if (next_option < argc && std::string(argv[next_option]) != "--input-replay")
+            capture = argv[next_option++];
+        std::optional<srally::InputReplay> replay;
+        if (next_option < argc) {
+            if (argc - next_option != 2 || std::string(argv[next_option]) != "--input-replay")
+                throw std::runtime_error("expected --input-replay FILE after image/capture paths");
+            std::ifstream file(argv[next_option + 1]);
+            if (!file) throw std::runtime_error("cannot open input replay");
+            replay.emplace(file);
+        }
 #ifdef M2_SRALLY_TGP
         images.tgp_tables = load(argv[next_image++]);
         images.copro_data = load(argv[next_image++]); options.tgp = true;
@@ -73,17 +86,32 @@ int main(int argc, char **argv) {
 #else
         if (capture) throw std::runtime_error("frame capture requires timed screen rendering");
 #endif
+        if (replay && (!options.io || !options.screen))
+            throw std::runtime_error("input replay requires timed screen rendering and cabinet I/O");
         Machine machine(std::move(images), options);
         const auto &cpu = machine.cpu();
         std::printf("reset IP=%08x SAT=%08x PRCB=%08x FP=%08x SP=%08x\n",
             cpu.m_IP, cpu.m_SAT, cpu.m_PRCB, cpu.m_r[rt::I960_FP], cpu.m_r[rt::I960_SP]);
         Machine::RunResult outcome;
+        bool step_frames = replay.has_value();
 #ifdef M2_SRALLY_STEP_FRAMES
-        do { outcome = machine.run_until_frame(limit - machine.stats().instructions); }
-        while (outcome.reason == Machine::Reason::Frame && outcome.instructions < limit);
-#else
-        outcome = machine.run_for(limit);
+        step_frames = true;
 #endif
+        do {
+            const auto before = machine.stats();
+            if (replay && replay->apply(before.frames_rendered, machine.inputs())) {
+                const auto &pins = machine.inputs();
+                std::printf("input_event completed_frames=%" PRIu64 " instructions=%" PRIu64
+                    " cycles=%" PRIu64 " in0=%02x in1=%02x in2=%02x switches=%02x analog=",
+                    before.frames_rendered, before.instructions, before.reference_cycles,
+                    unsigned(pins.in0), unsigned(pins.in1), unsigned(pins.in2), unsigned(pins.switches));
+                for (auto value : pins.analog) std::printf("%02x", unsigned(value));
+                std::puts("");
+            }
+            outcome = step_frames ? machine.run_until_frame(limit - before.instructions) : machine.run_for(limit);
+        } while (step_frames && outcome.reason == Machine::Reason::Frame && outcome.instructions < limit);
+        if (replay) std::printf("input_replay events=%zu applied=%zu pending=%zu frame_origin=completed_renders\n",
+            replay->size(), replay->applied(), replay->size() - replay->applied());
         const auto s = machine.stats(true);
         const auto &d = machine.diagnostics();
         std::printf("reference_unmapped reads=%" PRIu64 " writes=%" PRIu64 " last_write=%08x pcb_verified=false\n",

@@ -1,5 +1,26 @@
 # Handoff
 
+## Repeatable cabinet inputs for native gameplay probes (2026-10-14)
+
+The bounded runner accepts `--input-replay FILE` with screen and I/O enabled.
+Complete cabinet snapshots apply after explicitly numbered completed rendered
+frames, before resuming the next frame. No game memory is patched. Input bytes
+are frozen and hashed beside the execution report; each applied event records
+its exact instruction/cycle boundary, and pending events remain visible when
+execution stops. The format and coin/start example are documented in
+`docs/segarally-input-replay.md`; the example is not a verified driving replay.
+
+Thirty-eight strict and ASan/UBSan checks cover active-low press/release,
+persistent state, every cabinet input byte, initial frame zero, duplicates,
+skipped/backwards frames, malformed/range-limited numbers and bounded event
+counts. CMake's input replay test and strict runner syntax pass. A frozen v3
+neutral replay applies snapshots at frames 0, 100 and 500 and reaches exactly
+the prior 100-million-instruction checkpoint: 223,328,073 cycles, 4,585 IRQs,
+513 frames, PC `0x005a379c`, pixel hash `c2b1e0b7602037ac`. Evidence is under
+ignored `build/validation/input-replay`; the existing v3 generation and its
+saved first-car/parity evidence were not overwritten. Next: use real coin/start
+edges with expanded callback coverage, and validate the resulting gameplay path.
+
 ## Visible Mac Metal car scene and packaged launch (2026-10-14)
 
 The frozen v3 core now runs in a normal Mac application and leaves the last

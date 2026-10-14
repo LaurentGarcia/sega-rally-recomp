@@ -68,6 +68,7 @@ def main() -> int:
     parser.add_argument("--sound-build-dir", type=Path, help="Verified timed sound generation directory; defaults to --build-dir")
     parser.add_argument("--capture-frame", action="store_true", help="Save the latest rendered startup frame as boot-frame.ppm (requires --with-screen)")
     parser.add_argument("--step-frames", action="store_true", help="Resume the shared machine once per rendered frame (requires --with-screen)")
+    parser.add_argument("--input-replay", type=Path, help="Replay complete cabinet snapshots at completed-frame boundaries (requires --with-screen --with-io)")
     args = parser.parse_args()
     output = args.build_dir.resolve()
     if not output.is_relative_to(ROOT / "build"):
@@ -88,7 +89,18 @@ def main() -> int:
         parser.error("--capture-frame requires --with-screen")
     if args.step_frames and not args.with_screen:
         parser.error("--step-frames requires --with-screen")
+    if args.input_replay and not (args.with_screen and args.with_io):
+        parser.error("--input-replay requires --with-screen and --with-io")
     try:
+        input_replay = None
+        if args.input_replay:
+            replay_path = args.input_replay.resolve()
+            replay_bytes = replay_path.read_bytes()
+            if len(replay_bytes) > 1024 * 1024:
+                raise ValueError("input replay exceeds 1 MiB")
+            input_replay = {"source": str(replay_path), "path": str(output / "boot-input.txt"),
+                            "sha256": hashlib.sha256(replay_bytes).hexdigest(),
+                            "frame_origin": "completed_renders", "cabinet_pins_only": True}
         audit = json.loads((output / "coverage.json").read_text())
         if audit.get("board") != "model2a" or not audit.get("native_objects_compiled"):
             raise ValueError("a successful Model2A generation/compile audit is required")
@@ -164,7 +176,10 @@ def main() -> int:
         with (output / "boot-build.log").open("w") as log:
             subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, check=True)
         capture = [str(output / "boot-frame.ppm")] if args.capture_frame else []
-        result = subprocess.run([str(executable), *map(str, images), str(args.instructions), *map(str, tgp_images), *map(str, video_images), *map(str, sound_images), *capture],
+        if input_replay:
+            Path(input_replay["path"]).write_bytes(replay_bytes)
+        replay_args = ["--input-replay", input_replay["path"]] if input_replay else []
+        result = subprocess.run([str(executable), *map(str, images), str(args.instructions), *map(str, tgp_images), *map(str, video_images), *map(str, sound_images), *capture, *replay_args],
             cwd=ROOT, capture_output=True, text=True, timeout=180)
         transcript = result.stdout + result.stderr
         (output / "boot.txt").write_text(transcript)
@@ -180,6 +195,7 @@ def main() -> int:
                   "sound_timing_scope": "instruction_boundary_not_bus_phase" if args.with_sound else None,
                   "clock_source": "pinned_mame_i960_cycles_at_25mhz", "pcb_timing_verified": False,
                   "instruction_limit": args.instructions, "exit_code": result.returncode,
+                  "input_replay": input_replay,
                   "image_sha256": {name: audit["images"][name]["sha256"] for name in ("program", "main_data")},
                   "transcript": transcript}
         for line in result.stdout.splitlines():

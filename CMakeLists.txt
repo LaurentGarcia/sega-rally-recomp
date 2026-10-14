@@ -429,6 +429,10 @@ target_include_directories(test_model2a_machine PRIVATE src)
 target_compile_definitions(test_model2a_machine PRIVATE M2_SRALLY_IO M2_SRALLY_CONTROL)
 add_test(NAME model2a_machine COMMAND test_model2a_machine)
 
+add_executable(test_segarally_input_replay tests/test_segarally_input_replay.cpp)
+target_include_directories(test_segarally_input_replay PRIVATE src .)
+add_test(NAME segarally_input_replay COMMAND test_segarally_input_replay)
+
 add_executable(test_model2_scsp tests/test_model2_scsp.cpp
     src/runtime/model2_scsp.cpp src/runtime/model2_scsp_dsp.cpp src/runtime/model2a_clock.cpp)
 target_include_directories(test_model2_scsp PRIVATE src)
