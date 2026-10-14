@@ -28,6 +28,11 @@ public:
     };
     Model2ABus(std::vector<uint8_t> program, std::vector<uint8_t> main_data);
     const Diagnostics &diagnostics() const { return diagnostics_; }
+    std::vector<uint8_t> save_backup() const { return backup_; }
+    void load_backup(const std::vector<uint8_t> &image) {
+        if (image.size() != backup_.size()) throw Fatal("Model2A backup image must contain 16384 bytes");
+        backup_ = image;
+    }
     // Attach before CPU reset. The caller owns the shared native device model.
     void set_model(DeviceModel *model) { models_.clear(); add_model(model); }
     void add_model(DeviceModel *model) { if (model) models_.push_back(model); }

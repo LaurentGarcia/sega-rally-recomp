@@ -104,6 +104,11 @@ video event.
 
 The optional screen path follows the inherited **Frame loop** and
 **Reference & validation** sections with a more explicit diagnostic clock.
+`Model2AMachine` owns that common machine for both the bounded runner and the
+platform frontend. Relative instruction budgets and frame-boundary stepping
+resume the same CPU/device state. Unsupported code or device accesses stop
+the machine persistently; repeating a run cannot silently retry a partly
+executed instruction. EEPROM and backup images load only before execution.
 Every bus access and instruction boundary synchronizes one shared event queue;
 callbacks run at their deadline, and IRQ edges wait for a CPU boundary. Equal
 deadlines preserve insertion order across timers, delayed mask writes and

@@ -30,6 +30,7 @@ def main() -> int:
     parser.add_argument("--with-screen", action="store_true", help="Schedule screen events and render real display lists (requires --with-control --with-video)")
     parser.add_argument("--with-uart", action="store_true", help="Connect the timed main-board UART with idle RX (requires --with-control; SCSP not connected)")
     parser.add_argument("--capture-frame", action="store_true", help="Save the latest rendered startup frame as boot-frame.ppm (requires --with-screen)")
+    parser.add_argument("--step-frames", action="store_true", help="Resume the shared machine once per rendered frame (requires --with-screen)")
     args = parser.parse_args()
     output = args.build_dir.resolve()
     if not output.is_relative_to(ROOT / "build"):
@@ -44,6 +45,8 @@ def main() -> int:
         parser.error("--with-uart requires --with-control for its ready IRQ pins")
     if args.capture_frame and not args.with_screen:
         parser.error("--capture-frame requires --with-screen")
+    if args.step_frames and not args.with_screen:
+        parser.error("--step-frames requires --with-screen")
     try:
         audit = json.loads((output / "coverage.json").read_text())
         if audit.get("board") != "model2a" or not audit.get("native_objects_compiled"):
@@ -66,7 +69,7 @@ def main() -> int:
         compiler = shlex.split(args.compiler)
         executable = output / "srally_boot"
         command = compiler + ["-std=c++20", "-O1", "-fno-fast-math", "-ffp-contract=off", "-Isrc",
-            "tools/srally_boot/main.cpp", "src/runtime/model2a_bus.cpp", "src/runtime/cpu.cpp",
+            "tools/srally_boot/main.cpp", "src/runtime/model2a_machine.cpp", "src/runtime/model2a_bus.cpp", "src/runtime/cpu.cpp",
             "src/runtime/lockstep.cpp", "src/runtime/model2a_clock.cpp"] + [str(p) for p in objects] + ["-o", str(executable)]
         tgp_images = []
         video_images = []
@@ -79,6 +82,8 @@ def main() -> int:
             command += ["-DM2_SRALLY_CONTROL", "src/runtime/model2a_control.cpp"]
         if args.with_screen:
             command += ["-DM2_SRALLY_SCREEN"]
+        if args.step_frames:
+            command += ["-DM2_SRALLY_STEP_FRAMES"]
         if args.with_uart:
             command += ["-DM2_SRALLY_UART", "src/runtime/model2_uart.cpp", "src/runtime/model2a_uart.cpp"]
         if args.with_tgp:

@@ -1,5 +1,29 @@
 # Handoff
 
+## Shared resumable machine (2026-10-14)
+
+`Model2AMachine` now owns the CPU, bus, shared clock and optional devices.
+The bounded runner is a thin wrapper around it; the platform host can use the
+same implementation. It supports relative instruction budgets, run-until-frame,
+input state, pre-start EEPROM/backup loading and persistent stopped frontiers.
+No extra instruction executes when a caller resumes after missing code or
+unsupported hardware. External GPU mode selects the existing Video contract.
+
+Both the extracted runner and repeated frame stepping exactly reproduce the
+frozen 100-million checkpoint: 223,328,073 reference cycles, 4,585 IRQ entries,
+513 frames, PC `0x005a379c`, screen hash `c2b1e0b7602037ac` and 19,074 TGP
+instructions. Strict all-device compilation passes. A synthetic lifecycle
+fixture checks budget resumption, persistent stops, partial failing-instruction
+cost, saved-state size validation and load-after-start rejection; direct and
+CMake runs pass. The original independent parity harness remains separate.
+
+Cloning pinned SDL3 made the inherited top-level build discover its windowed
+launcher, which then required absent ImGui. `M2_BUILD_WINDOWED_APP` now gates
+that inherited target, defaulting on; the headless verification build sets it
+off. This keeps optional platform dependencies from blocking device checks.
+Next: finish the dedicated Metal host and signed asset packaging, then verify
+actual 3D scenes. Startup CPU/Metal tile equality is not polygon/race parity.
+
 ## Bounded table and title callback coverage (2026-10-14)
 
 The seven-entry table at runtime `0x005af85c` has three distinct targets:

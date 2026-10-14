@@ -58,6 +58,8 @@ The boot command exits 3 for an unimplemented board access or 4 for a missing
 code target; those are incomplete frontiers, not successful game boots.
 Use `--instructions 10000000` to run past the initial RAM-copy loop; the
 default one-million-instruction limit stops inside it.
+`--step-frames` exercises the same resumable machine one rendered frame at a
+time while retaining the exact instruction limit.
 
 The expanded profile has 403 annotated label candidates, seven separately
 recorded executed targets, three checked table-derived targets, and RAM aliases. It retains 402 unresolved

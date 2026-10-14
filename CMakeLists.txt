@@ -193,7 +193,8 @@ target_link_libraries(m2sndrecomp PRIVATE m68k)
 # and the app's own code. Built whenever SDL is there, ROM set or not, so CI
 # compiles all of it; the daytona executable itself also needs the generated
 # game code (below).
-if(EXISTS ${CMAKE_SOURCE_DIR}/extern/sdl3/CMakeLists.txt)
+option(M2_BUILD_WINDOWED_APP "Build the inherited Daytona SDL3 launcher and windowed app" ON)
+if(M2_BUILD_WINDOWED_APP AND EXISTS ${CMAKE_SOURCE_DIR}/extern/sdl3/CMakeLists.txt)
     if(ANDROID)
         # SDLActivity loads libSDL3.so before the game's libmain.so.
         set(M2_SDL_TARGET SDL3::SDL3-shared)
@@ -419,6 +420,14 @@ add_executable(test_model2a_uart tests/test_model2a_uart.cpp src/runtime/model2a
     src/runtime/model2_uart.cpp src/runtime/model2a_bus.cpp src/runtime/cpu.cpp)
 target_include_directories(test_model2a_uart PRIVATE src)
 add_test(NAME model2a_uart COMMAND test_model2a_uart)
+
+add_executable(test_model2a_machine tests/test_model2a_machine.cpp
+    src/runtime/model2a_machine.cpp src/runtime/model2a_bus.cpp src/runtime/model2a_clock.cpp
+    src/runtime/model2a_control.cpp src/runtime/model2_io.cpp src/runtime/model2a_io.cpp
+    src/runtime/model2_eeprom.cpp src/runtime/cpu.cpp src/runtime/lockstep.cpp)
+target_include_directories(test_model2a_machine PRIVATE src)
+target_compile_definitions(test_model2a_machine PRIVATE M2_SRALLY_IO M2_SRALLY_CONTROL)
+add_test(NAME model2a_machine COMMAND test_model2a_machine)
 
 add_executable(test_decode tests/test_decode.cpp)
 target_link_libraries(test_decode PRIVATE i960)
