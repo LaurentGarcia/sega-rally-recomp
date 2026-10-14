@@ -13,11 +13,13 @@ from the user's ROMs, not Sega's original source code.
 The repository is in bring-up. The expanded address-label profile produces
 66,523 native i960 instructions and 46 compiled objects. The core executes
 reset at `0x420`, copies and checks its RAM code, initializes the I/O chip,
-and reaches video synchronization setup after 1,531,005 instructions.
-The I/O, EEPROM and disconnected communication-board adapters have isolated
-reference tests. The runner charges pinned-reference opcode cycles before
-memory effects and supplies device time at 25 MHz; this is not measured PCB
-timing, and asynchronous IRQ/video/sound events remain to be connected.
+and reaches sound UART initialization after 14,386,245 instructions and 82
+rendered startup frames. I/O, EEPROM, communication, video, timers and screen
+events use native hardware components with isolated reference tests. A shared
+event queue preserves deadline and insertion order, with CPU IRQ delivery at
+instruction boundaries. The runner charges pinned-reference opcode cycles
+before memory effects and supplies device time at 25 MHz; this is not measured
+PCB timing. The sound UART and SCSP sound board remain bring-up work.
 The native TGP independently
 uploads its actual 1,665-word program and answers the startup command through
 Daytona's shared hardware code. These are bring-up checks, not a complete game
@@ -42,7 +44,8 @@ With Python 3 and a C++20 compiler, run:
 ```sh
 python3 scripts/segarally_recompile.py --roms /path/to/srallyc.zip --seed-profile lift-labels
 python3 scripts/segarally_tgp.py --roms /path/to/srallyc.zip
-python3 scripts/segarally_boot.py --instructions 10000000 --with-tgp --with-io --with-comm
+python3 scripts/segarally_video.py --roms /path/to/srallyc.zip
+python3 scripts/segarally_boot.py --instructions 20000000 --with-tgp --with-io --with-comm --with-control --with-video --with-screen
 ```
 
 The importer verifies the Revision B (`srallycb`) program pair present in the
@@ -67,9 +70,10 @@ and TGP inputs are:
 ```sh
 python3 tests/test_segarally_bootstrap.py
 python3 tests/test_segarally_native_templates.py
-python3 tests/test_segarally_boot_parity.py --tgp --io --comm
+python3 tests/test_segarally_boot_parity.py --tgp --io --comm --control --video --screen
 python3 tests/test_i960_runtime_timing.py
 python3 tests/test_segarally_tgp_import.py
+python3 tests/test_segarally_video_import.py
 ```
 
 See [the project design](docs/sega-rally-design.md) for scope and validation.

@@ -1,0 +1,118 @@
+{
+  "schema": 1,
+  "romset": "srallycb",
+  "board": "model2a",
+  "source": {
+    "repository": "https://github.com/mamedev/mame",
+    "commit": "dddd73680656e355bb2b5beecab1167c9f07bf81",
+    "path": "src/mame/sega/model2.cpp",
+    "sha256": "359d7fa309c0bca6c93f5c0826011a7054ae8f04068e9df995188a6256c995b6",
+    "definition": "ROM_START(srallycb), MODEL2A_VID_BOARD"
+  },
+  "regions": [
+    {
+      "name": "polygons",
+      "size": 33554432,
+      "fill": 0,
+      "consumer": "Geo",
+      "loads": [
+        {
+          "file": "mpr-17748.16",
+          "offset": 0,
+          "size": 2097152,
+          "crc32": "3148a2b2",
+          "sha1": "283cc49bfb6c6381a7ead9273fd097dca5b981b6",
+          "load": "ROM_LOAD32_WORD"
+        },
+        {
+          "file": "mpr-17750.20",
+          "offset": 2,
+          "size": 2097152,
+          "crc32": "232aec29",
+          "sha1": "4d470e71df61298282c356814e2d151fda323fb6",
+          "load": "ROM_LOAD32_WORD"
+        },
+        {
+          "file": "mpr-17749.17",
+          "offset": 4194304,
+          "size": 2097152,
+          "crc32": "0838d184",
+          "sha1": "704175c8b29e4c989afcb7be42e7e0e096740eaf",
+          "load": "ROM_LOAD32_WORD"
+        },
+        {
+          "file": "mpr-17751.21",
+          "offset": 4194306,
+          "size": 2097152,
+          "crc32": "ed87ac62",
+          "sha1": "601542149d33ca52a47536b4b0af47bf1fd87eb2",
+          "load": "ROM_LOAD32_WORD"
+        }
+      ]
+    },
+    {
+      "name": "textures",
+      "size": 16777216,
+      "fill": 0,
+      "consumer": "Geo",
+      "loads": [
+        {
+          "file": "mpr-17753.25",
+          "offset": 0,
+          "size": 2097152,
+          "crc32": "6db0eb36",
+          "sha1": "dd5fd3c9592360d3e95623ac2491e6faabe9dbcb",
+          "load": "ROM_LOAD32_WORD"
+        },
+        {
+          "file": "mpr-17752.24",
+          "offset": 2,
+          "size": 2097152,
+          "crc32": "d6aa86ce",
+          "sha1": "1d342f87d1af1e5438d1ae818b1b14268e765897",
+          "load": "ROM_LOAD32_WORD"
+        }
+      ]
+    },
+    {
+      "name": "video_unk",
+      "size": 2097152,
+      "fill": 0,
+      "consumer": null,
+      "description": "Model2A reciprocal lookup table; independently imported analysis input, unused by current Geo. Hardware function remains unimplemented.",
+      "loads": [
+        {
+          "file": "mpr-16310.15",
+          "offset": 0,
+          "size": 524288,
+          "crc32": "c078a780",
+          "sha1": "0ad5b49774172743e2708b7ca4c061acfe10957a",
+          "load": "ROM_LOAD32_BYTE"
+        },
+        {
+          "file": "mpr-16311.16",
+          "offset": 1,
+          "size": 524288,
+          "crc32": "452a492b",
+          "sha1": "88c2f6c2dbfd0c1b39a7bf15c74455fb68c7274e",
+          "load": "ROM_LOAD32_BYTE"
+        },
+        {
+          "file": "mpr-16312.14",
+          "offset": 2,
+          "size": 524288,
+          "crc32": "a25fef5b",
+          "sha1": "c6a37856b97f5bc4996cb6b66209f47af392cc38",
+          "load": "ROM_LOAD32_BYTE"
+        }
+      ]
+    }
+  ],
+  "luma": {
+    "rom_backed": false,
+    "cpu_range": "0x12800000..0x1281ffff",
+    "bytes": 131072,
+    "description": "CPU-written luma RAM; no ROM image is invented."
+  },
+  "scope": "Verified video ROM import only; Geo/rendering, full-machine reference and hardware parity remain unverified."
+}

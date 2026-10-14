@@ -83,6 +83,7 @@ Model2ABus::Mapping Model2ABus::mapping(uint32_t address)
 
 uint32_t Model2ABus::read(uint32_t address, unsigned width)
 {
+    if (before_access_) before_access_();
     for (DeviceModel *model : models_) if (model->claims(address)) {
         const unsigned lane = address & 3;
         if (lane + width > 4 || !model->claims(address + width - 1))
@@ -109,6 +110,7 @@ uint32_t Model2ABus::read(uint32_t address, unsigned width)
 
 void Model2ABus::write(uint32_t address, unsigned width, uint32_t value)
 {
+    if (before_access_) before_access_();
     for (DeviceModel *model : models_) if (model->claims(address)) {
         const unsigned lane = address & 3;
         if (lane + width > 4 || !model->claims(address + width - 1))
@@ -146,6 +148,10 @@ void Model2ABus::write_byte(uint32_t a, uint8_t v) { write(a, 1, v); }
 void Model2ABus::write_word(uint32_t a, uint16_t v) { write(a, 2, v); }
 void Model2ABus::write_dword(uint32_t a, uint32_t v) { write(a, 4, v); }
 uint16_t Model2ABus::flags(uint32_t address) {
+    if (before_access_) before_access_();
+    for (const DeviceModel *model : models_) if (model->claims(address)) {
+        if (const uint16_t device_flags = model->flags(address)) return device_flags;
+    }
     const uint32_t comm_address = address & ~0x10000u;
     if (comm_address >= 0x01a00000 && comm_address <= 0x01a03fff) return Cpu::BURST;
     // Program and function ports advance on multiword transfers. FIFO ports

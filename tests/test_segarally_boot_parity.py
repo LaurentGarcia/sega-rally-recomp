@@ -24,7 +24,14 @@ def main():
     parser.add_argument("--tgp", action="store_true", help="Attach independently instantiated native TGP boards")
     parser.add_argument("--io", action="store_true", help="Attach independent I/O+EEPROM devices using each CPU's reference cycle clock")
     parser.add_argument("--comm", action="store_true", help="Attach independent disconnected communication adapters (no firmware or vblank)")
+    parser.add_argument("--control", action="store_true", help="Attach independent IRQ/countdown timers with explicit boundary dispatch")
+    parser.add_argument("--video", action="store_true", help="Attach independent video RAM and actual Geo/TGP bindings (frame clock frozen)")
+    parser.add_argument("--screen", action="store_true", help="Connect shared queue screen phase, geometry, rendering and vblank IRQ")
     args = parser.parse_args()
+    if args.video and not args.tgp:
+        parser.error("--video requires --tgp for each independent geometry buffer")
+    if args.screen and not (args.control and args.video):
+        parser.error("--screen requires --control and --video")
     directory = args.build_dir.resolve()
     if not directory.is_relative_to(ROOT / "build") or directory == ROOT / "build":
         parser.error("--build-dir must be below ignored build/")
@@ -47,7 +54,7 @@ def main():
     executable = directory / "boot_parity"
     command = shlex.split(args.compiler) + ["-std=c++20", "-O1", "-fno-fast-math", "-ffp-contract=off", "-Isrc",
         "tests/test_segarally_boot_parity.cpp", "src/runtime/model2a_bus.cpp", "src/runtime/cpu.cpp",
-        "src/runtime/lockstep.cpp", "src/refcore/i960_ref.cpp"]
+        "src/runtime/lockstep.cpp", "src/refcore/i960_ref.cpp", "src/runtime/model2a_clock.cpp"]
     tgp_images = []
     if args.tgp:
         tgp_audit = json.loads((directory / "tgp/audit.json").read_text())
@@ -65,12 +72,33 @@ def main():
                     "src/runtime/model2_eeprom.cpp"]
     if args.comm:
         command += ["-DM2_SRALLY_COMM", "src/runtime/model2a_comm.cpp", "src/runtime/comm_board.cpp"]
+    if args.control:
+        command += ["-DM2_SRALLY_CONTROL", "src/runtime/model2a_control.cpp"]
+    video_images = []
+    if args.video:
+        video_audit = json.loads((directory / "video/audit.json").read_text())
+        assert video_audit["romset"] == "srallycb" and video_audit["board"] == "model2a"
+        assert video_audit["manifest_sha256"] == hashlib.sha256((ROOT / "config/segarally_video.json").read_bytes()).hexdigest()
+        for name in ("polygons", "textures"):
+            entry = video_audit["images"][name]
+            path = (ROOT / entry["path"]).resolve()
+            assert path.is_relative_to(directory)
+            assert hashlib.sha256(path.read_bytes()).hexdigest() == entry["sha256"]
+            video_images.append(path)
+        command += ["-DM2_SRALLY_VIDEO", "src/runtime/model2a_video.cpp", "src/runtime/geo.cpp",
+                    "src/runtime/video.cpp", "src/runtime/raster.cpp"]
     subprocess.run(command + list(map(str, objects)) + ["-o", str(executable)], cwd=ROOT, check=True)
-    arguments = [str(executable), *map(str, images), str(args.instructions), *map(str, tgp_images)]
+    arguments = [str(executable), *map(str, images), str(args.instructions), *map(str, tgp_images), *map(str, video_images)]
     if args.io:
         arguments.append("--io")
     if args.comm:
         arguments.append("--comm")
+    if args.control:
+        arguments.append("--control")
+    if args.video:
+        arguments.append("--video")
+    if args.screen:
+        arguments.append("--screen")
     result = subprocess.run(arguments,
                             cwd=ROOT, capture_output=True, text=True, timeout=60)
     transcript = result.stdout + result.stderr

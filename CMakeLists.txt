@@ -110,6 +110,9 @@ add_library(runtime STATIC
     src/runtime/model2a_io.cpp
     src/runtime/model2_eeprom.cpp
     src/runtime/model2a_comm.cpp
+    src/runtime/model2a_control.cpp
+    src/runtime/model2a_clock.cpp
+    src/runtime/model2a_video.cpp
     src/runtime/game_loop.cpp
     src/runtime/zip.cpp
     src/runtime/rom_import.cpp
@@ -383,6 +386,28 @@ add_executable(test_model2a_comm tests/test_model2a_comm.cpp
     src/runtime/model2a_bus.cpp src/runtime/cpu.cpp)
 target_include_directories(test_model2a_comm PRIVATE src)
 add_test(NAME model2a_comm COMMAND test_model2a_comm)
+
+add_executable(test_model2a_control tests/test_model2a_control.cpp
+    src/runtime/model2a_control.cpp src/runtime/model2a_clock.cpp src/runtime/model2a_bus.cpp src/runtime/cpu.cpp)
+target_include_directories(test_model2a_control PRIVATE src)
+add_test(NAME model2a_control COMMAND test_model2a_control)
+
+add_executable(test_model2a_clock tests/test_model2a_clock.cpp
+    src/runtime/model2a_clock.cpp src/runtime/model2a_control.cpp)
+target_include_directories(test_model2a_clock PRIVATE src)
+add_test(NAME model2a_clock COMMAND test_model2a_clock)
+
+add_executable(test_model2a_bus_clock tests/test_model2a_bus_clock.cpp
+    src/runtime/model2a_clock.cpp src/runtime/model2a_control.cpp
+    src/runtime/model2a_bus.cpp src/runtime/cpu.cpp)
+target_include_directories(test_model2a_bus_clock PRIVATE src)
+add_test(NAME model2a_bus_clock COMMAND test_model2a_bus_clock)
+
+add_executable(test_model2a_video tests/test_model2a_video.cpp
+    src/runtime/model2a_video.cpp src/runtime/model2a_bus.cpp src/runtime/cpu.cpp
+    src/runtime/video.cpp src/runtime/raster.cpp src/runtime/geo.cpp)
+target_include_directories(test_model2a_video PRIVATE src)
+add_test(NAME model2a_video COMMAND test_model2a_video)
 
 add_executable(test_decode tests/test_decode.cpp)
 target_link_libraries(test_decode PRIVATE i960)

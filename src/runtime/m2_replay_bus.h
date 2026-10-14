@@ -36,6 +36,9 @@ public:
     virtual void measured_mismatch(uint32_t addr, uint32_t ours, uint32_t mame) = 0;
     // A region the model holds (buffer RAM), for the sample hashes; nullptr if not.
     virtual const uint8_t *region(uint32_t base) const { (void)base; return nullptr; }
+    // Native adapters may supply BURST metadata for their owned memories.
+    // Existing replay maps and shared TGP bus mappings keep their own flags.
+    virtual uint16_t flags(uint32_t address) const { (void)address; return 0; }
     uint64_t region_samples = 0, region_mismatch = 0; // measured, as above
 };
 

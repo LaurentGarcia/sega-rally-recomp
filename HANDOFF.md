@@ -1,5 +1,66 @@
 # Handoff
 
+## Screen, timer and video startup checkpoint (2026-10-14)
+
+The native core now reaches its sound-UART initialization at PC `0x005c4ce0`,
+write16 zero to `0x01c80002`, after 14,386,245 instructions and 36,071,853
+reference cycles (1,442,874,120 ns). The shared Video renderer has completed
+82 startup frames; geometry parsing has begun 83 frames. The last screen hash
+is `528ac52fdc1e6325`. The main CPU has not yet uploaded the TGP. This is a
+bounded native startup checkpoint, not attract mode or gameplay. The UART is
+the next actual access frontier; SCSP audio execution is also still absent.
+
+The video adapter uses exact ranges, mirrors and byte lanes, with stable RAM
+shared by the inherited Video renderer. All four tile aliases invalidate the
+renderer; texture writes retain the reference's maskless halfword packing.
+CRTC offsets, palette/translation notification, render-mode frame readback,
+polygon count, Z clipping, texture/luma RAM and framebuffer storage are mapped.
+Direct framebuffer test-mode presentation remains an explicit error. Nine
+verified graphics inputs produce 32 MiB polygon, 16 MiB texture and 2 MiB
+video-table images; padding and interleaving were independently reconstructed.
+The video-table image remains unused analysis input. Import tests cover bad
+size/checksums, duplicate names, aliases, lanes, overlap, bounds and output
+confinement; all seven pass. No derived images are tracked.
+
+One event queue now orders screen, timer and delayed-mask callbacks by deadline
+and insertion. The host synchronizes it before every bus access and CPU
+boundary, guards callback reentry, and defers CPU IRQ line handling to a
+boundary. IO/EEPROM callbacks see the event cursor, not a later CPU timestamp.
+Screen phase follows pinned MAME: first begin 17.384 ms, first end 19.024 ms,
+frame period 17.384 ms, blank duration 1.640 ms. The begin latch precedes
+conditional geometry parsing, vblank IRQ and comm tick. End renders before
+incrementing the screen counter. These replace the previous frozen frame
+counter, which held the core in its frame-bit wait at `0x005a37a8`.
+
+Reference timer details are retained: full 32-bit countdowns, 40 ns ticks,
+80 ns delayed enable, last-read latch merging, active-mask replacement,
+maskless ACK, retained requests on disable and pending enable surviving soft
+reset. Treating ACK as `data | ~mask` would incorrectly preserve other lanes.
+The independent pinned-handler differential passes 1,777,563 comparisons over
+250,000 operations. Clock tests cover 12,000 randomized queue operations,
+50 exact frame phases, equal-deadline insertion/replacement, reset, lifetime,
+overflow and reentry. Strict and sanitizer tests pass. CMake device tests and
+the bus callback/deferred-IRQ integration fixture pass.
+
+Before screen events were connected, independent native/reference engines
+matched 4,000,000 instructions, 1,138,135 ordered cycle-stamped writes and
+10,593,743 reference cycles with independent control/video state. That frozen
+checkpoint does not prove asynchronous-screen parity. With screen events now
+connected, independent engines also match the actual UART frontier above:
+14,386,245 instructions, 1,164,002 ordered cycle-stamped writes, 36,071,853
+cycles, 83 geometry parses and 82 rendered frames. CPU/control state, pending
+clock tokens, queued IRQ edges and frame phases match after every step; full
+video RAM and rendered pixels match at the frontier. No IRQ has been entered
+yet in this startup segment. Full MAME/PCB/race parity remains unverified;
+absent auxiliary ROMs still prevent a complete
+reference-machine trace. The shared CPU reference renderer is used for this
+diagnostic path; Metal integration follows actual native startup.
+
+Do not re-propose a first vblank at 15.744 ms (visible-line duration), a
+startup end at 1.640 ms, per-register time advancement, a synthetic ready UART,
+or importing Daytona's game-specific sound board. All would change the
+contracts established here.
+
 ## Timed native startup and communication registers (2026-10-14)
 
 The generator emits pinned-reference instruction cycle costs before opcode

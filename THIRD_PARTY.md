@@ -70,6 +70,31 @@ The header enables `M2COMM_SIMULATION`; the adapter supplies permanently closed
 transport endpoints to preserve no-peer initialization without socket access.
 This does not execute or replace the missing communication firmware.
 
+`model2a_control` adapts the pinned `model2.cpp` IRQ, four-timer and delayed
+enable handlers, preserving maskless acknowledgments and reset behavior.
+`model2a_clock` is a native event queue whose insertion and screen-phase
+contracts were checked against the same MAME revision. These additional
+BSD-3-Clause reference files have SHA-256 hashes:
+
+| Reference file | SHA-256 |
+| --- | --- |
+| `src/emu/schedule.cpp` | `d7a54f21126144df71ba9a4b40fc3451c5bef1096fe96f89653922015b3c21f9` |
+| `src/emu/screen.cpp` | `00950a7da23d4468573dc0c1314b441821802ceccdf67a2e4b8320e6c6006ce0` |
+| `src/emu/screen.h` | `a3ee394293462d5f4319349b09d8c70209ab9dce73dc58925508d633c7f4631b` |
+| `src/emu/emumem.h` | `4285ca50a0c14b6038c7443bab45340834f0e4b741f0549a127c4ba7cc1c3e2e` |
+| `src/emu/emumem_hedp.cpp` | `27b25423ab39477d1b719b8922dc7dab16f712cac43a24d4974890ad7af1aeee` |
+
+`model2a_video` adapts the inherited M2Board mapping and pinned Model 2A
+video/register contracts to the existing Video/Geo components. MAME framework
+storage becomes owned vectors; exact mirrors and byte-lane handlers replace
+coarse page mappings. Notices are retained. Additional source SHA-256 hashes
+are `64511d032b7382df5ded6829b3f3e618c8f09fb602016dc7be35a7cd924e6892`
+for `src/mame/sega/model2_v.cpp` and
+`d6e2283b1e02e27fe4e28c78d8c86f6e3c2177e6c7db396e7b666d397a037b96`
+for `src/mame/sega/segaic24.cpp`. The video ROM manifest records public
+`srallycb` and `MODEL2A_VID_BOARD` size/checksum/loading metadata from the
+pinned `model2.cpp`; no ROM content is stored in source control.
+
 This project's own code is under the BSD-3-Clause licence (`LICENSE`). The
 code below keeps its own licence and notices; every component linked into the
 game is under a licence compatible with it (BSD, zlib, MIT, public domain).

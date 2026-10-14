@@ -5,6 +5,7 @@
 #pragma once
 
 #include "runtime/cpu.h"
+#include <functional>
 #include <vector>
 
 namespace rt {
@@ -30,6 +31,9 @@ public:
     // Attach before CPU reset. The caller owns the shared native device model.
     void set_model(DeviceModel *model) { models_.clear(); add_model(model); }
     void add_model(DeviceModel *model) { if (model) models_.push_back(model); }
+    // Host time is synchronized before each memory access and burst query.
+    // The host must guard recursive accesses from device event callbacks.
+    void set_before_access(std::function<void()> callback) { before_access_ = std::move(callback); }
     // Width accesses stay within one mapping. Cpu's unaligned instruction
     // helpers split into byte accesses, preserving mirror/boundary behavior.
     uint32_t fetch(uint32_t address) override;
@@ -47,6 +51,7 @@ private:
     uint32_t read(uint32_t address, unsigned width);
     void write(uint32_t address, unsigned width, uint32_t value);
     Diagnostics diagnostics_;
+    std::function<void()> before_access_;
     std::vector<DeviceModel *> models_;
     std::vector<uint8_t> program_, data_, ram_, work_, buffer_, cpu_control_, backup_;
 };

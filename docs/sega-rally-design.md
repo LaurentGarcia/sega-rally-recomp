@@ -67,9 +67,9 @@ TGP command and race parity are still required.
 The current bus exposes unsupported hardware accesses. Two observed unmapped
 probes (`0x00f80000` and `0x01c00202`) follow the pinned reference's zero-read,
 discarded-write contract with counters; these are not invented ready devices.
-Only timing-independent IRQ reset operations are supported. Enabling a source
-is still a frontier until the board clock, delayed mask update, timers, and
-asynchronous sources are connected. Buffer reset and fresh backup SRAM match
+Without the optional control adapter, only timing-independent IRQ reset
+operations are supported. The adapter implements delayed mask updates, four
+timers and requests from attached sources. Buffer reset and fresh backup SRAM match
 the reference's `0x07800f0f` word pattern and all-ones initialization.
 
 The 315-5649 register chip, Model 2A byte-lane/cabinet wiring, and 93C46
@@ -91,8 +91,41 @@ explicitly disconnected endpoints. Shared RAM, mirrors and CN/FG register
 semantics match the pinned reference. A null transport would skip the
 reference's no-peer initialization, so the adapter supplies closed endpoints
 without opening sockets. It never manufactures a successful link and does
-not execute the missing Z80 firmware. Frame callbacks will be driven by the
-board's video event, not by polling the registers.
+not execute the missing Z80 firmware. Frame callbacks run from the board's
+video event.
+
+The optional screen path follows the inherited **Frame loop** and
+**Reference & validation** sections with a more explicit diagnostic clock.
+Every bus access and instruction boundary synchronizes one shared event queue;
+callbacks run at their deadline, and IRQ edges wait for a CPU boundary. Equal
+deadlines preserve insertion order across timers, delayed mask writes and
+screen events. This does not reproduce MAME's complete CPU timeslice machinery.
+The pinned screen starts its first vblank at 17,384,000 ns and ends it at
+19,024,000 ns. Subsequent frames take 17,384,000 ns. The frame latch updates
+before geometry parsing; vblank IRQ and communication follow parsing. Rendering
+occurs at vblank end before the screen frame counter increments. Soft reset
+preserves screen phase. A visible-line duration of 15,744,000 ns would be the
+wrong initial vblank deadline.
+
+The video adapter owns stable memory for the shared Video renderer and exposes
+the exact Model 2A ranges, mirrors and byte lanes. Geometry uses independently
+verified polygon and texture ROM images; CPU texture/luma RAM remains distinct.
+All four tile mirrors notify the renderer. Reference maskless texture and
+CRTC writes retain their partial-write behavior. Framebuffer test-mode storage
+is mapped, but its presentation is an explicit unsupported frontier. Normal
+screen rendering uses the inherited CPU reference renderer during bring-up;
+the SDL3/Metal host remains the target once actual startup is established.
+
+Nine verified graphics ROMs produce polygon, texture and unused video-table
+analysis images under ignored build output. Only polygon and texture images
+are connected to Geo. The lookup-table image is not a claimed new hardware
+implementation. The importer validates every input before writing output.
+
+Timer/IRQ reference details matter: acknowledgment has no write mask, partial
+timer writes combine with the last read latch, delayed enable replacement uses
+the active mask, disabling a source does not clear its latched request, and
+soft reset does not cancel an already pending delayed-enable callback. These
+are preserved reference contracts, not conclusions from PCB measurements.
 
 The older lifted-C prototype already reaches desert practice on the phone, but
 contains incomplete game paths. It is a useful source of address annotations and
