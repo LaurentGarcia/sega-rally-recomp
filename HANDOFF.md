@@ -1,5 +1,25 @@
 # Handoff
 
+## Linked sound preserves the Lancia selection replay (2026-10-14)
+
+Adding the actually reached sound entry `0x6016ce` from the known byte dispatcher
+allows all ten recorded cabinet events to complete with sound attached. The
+coupled machine reaches exactly the sound-disabled main frontier `0x005e4380`:
+376,736,993 instructions, 832,720,369 cycles, 1,915 frames and pixel hash
+`54fd87f7d2db4325`. Eighteen input/CPU/IRQ/frame/TGP/frontier transcript lines
+match the root replay. Sound runs 26,148,973 instructions, 376,043,201 cycles
+and 30,949 IRQs; main UART has 214 pin transitions. The image is still the white
+transition after selecting Lancia AT, not a running race.
+
+Evidence is under ignored `build/segarally-coupled-v4/evidence/
+lancia-at-main-5e4380`. Boot report SHA-256 is
+`b58ae85eb53d5bbffca37616c7215b2a66917ba19bf1525f8e77319c57fed7a7`,
+sound audit `7d5a3b2bfb2c975789377b822d7998de70c6031471a2d70e3f1a60d4fa161592`.
+The exact replay SHA-256 is
+`797df95862beda36fd9ab54f8c440b701897bc0561b0cf8630f29e30b4f25f6e`.
+Next: continue the observed main update callback; sound and frontend playback
+limitations remain as documented.
+
 ## Real coin/start and Lancia selection with independent parity (2026-10-14)
 
 The frozen v3 core accepts real cabinet inputs and reaches Car Select. The
