@@ -22,7 +22,31 @@ Normal board-time pacing is the default. Startup can take time while the game
 executes its reset checks. The launcher activates an already running copy of
 the same app; quit it before changing startup options.
 
-The current preserved v13 playtest is in
+When `--input-replay` is supplied, the launcher copies that file into the app's
+resources before signing. Startup reads the bundled copy. Missing files,
+directories and replays larger than 1 MiB are rejected before packaging.
+
+The latest prepared sound playtest is in
+`build/worktrees/boundary-hook/build/mac-boundary-sound-v13-live/Sega Rally Native.app`.
+Launch it with its sound and execution options using:
+
+```sh
+python3 platform/segarally/macos/launch.py \
+    --build-dir build/worktrees/boundary-hook/build/mac-boundary-sound-v13-live \
+    --sound --instruction-boundary-hook \
+    --input-replay config/segarally_lancia_select.inputs
+```
+
+These flags matter: opening the executable without them retains its default
+sound-off, original execution mode. Quit a running copy before relaunching with
+different options.
+
+The latest sound app currently exits during CoreAudio startup with
+`AudioQueueStart: -66681`, before creating a game window. The successful timing
+and output checks below came from a separate direct-executable test. See
+[current evidence](segarally-status.md) for the launch investigation.
+
+The earlier sound-off v13 playtest is preserved in
 `build/worktrees/indexed-dispatch/build/mac-playtest-v13/Sega Rally Native.app`.
 It was launched windowed with normal pacing, selection replay and sound off.
 Its session uses `live-window-save` and `live-window.log` beside the app.
@@ -74,16 +98,15 @@ automatic transmission. Saved cabinet settings can change credit behavior.
 
 ## Sound, speed and saves
 
-The current v13 speed playtest has **sound off**. The optional sound build and
-`--sound` runtime switch are described in the [build guide](segarally-build-validation.md).
-Nonzero PCM capture and a short SDL/CoreAudio output check are established.
-A normal-paced sound build reaches the race but cannot yet supply samples fast
-enough for continuous playback, so sound may break up. User listening confirmation
-remains pending. Silence in the sound-off speed app is expected.
+The latest sound build uses the exact instruction boundary hook. Its normal-paced
+driving check completes 47.98 seconds of board time in 48.52 seconds including
+startup and shutdown, with no reported audio input shortfalls or sample drops.
+The [build guide](segarally-build-validation.md) explains both build options
+and the runtime switches `--sound --instruction-boundary-hook`. The older
+sound-off speed app remains silent by design. Listening confirmation is pending.
 
-The measured indexed Mac checkpoint remains below real time. Game time can
-advance more slowly than wall time; `--unthrottled` disables waiting for
-diagnostic runs and does not guarantee arcade speed. Avoid additional builds
+Other paths and machines may run more slowly. `--unthrottled` disables waiting
+for diagnostic runs and does not guarantee arcade speed. Avoid additional builds
 or captures during a live speed playtest.
 
 The launcher normally keeps EEPROM and backup RAM in `live-app-save` beside

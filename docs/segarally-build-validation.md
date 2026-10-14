@@ -173,11 +173,13 @@ therefore does not validate speakers. Source/assets/generated-code changes
 require renewed sound audits; the host checks provenance during incremental
 builds. A ten-second captured-race check through the real SDL/CoreAudio output
 submitted 441,000 stereo frames with no queue drops or reported input shortfalls.
-The separate normal-paced game check reaches 2,760 frames with unchanged main
-state and no chip or host sample drops, but records 3,222 SDL requests for extra
-input. The runtime is too slow for continuous playback; these estimated requests
-diagnose an empty queue, not exact hardware underrun samples. User listening
-confirmation and full-game sound parity remain pending.
+The older outer-loop execution reaches 2,760 frames with unchanged main state
+and no sample drops, but records 3,222 SDL requests for extra input. With the
+instruction boundary hook enabled, the same checkpoint completes in 48.519993
+seconds including startup and shutdown, with zero extra input requests and
+zero chip/host drops. These counters estimate SDL input demand, not exact
+hardware output samples. User listening confirmation and full-game sound parity
+remain pending.
 
 Full MAME reference work is separately blocked by three files absent from the
 supplied archive: `epr-17891.ic12`, `epr-16726.bin` and `epr-18022.ic2`.

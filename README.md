@@ -37,17 +37,17 @@ It uses separately instantiated shared device implementations, so it is not
 full MAME-machine or PCB proof. Extended-precision FP, exact racing-scene pixels
 and physical timing remain open requirements.
 
-Indexed instruction lookup preserves instruction bodies and timing checks.
-A quiet hidden Mac race comparison improves from 33.89 to 40.43 FPS, about 19%,
-with sound off. That checkpoint remains below real time; it is not a guarantee
-for other machines or visible-window presentation.
+Indexed lookup and the opt-in instruction boundary hook reduce execution
+overhead while preserving instruction guards and timing. With native SCSP sound
+enabled, the latest quiet Mac check completes 2,760 frames and 47.98148 seconds
+of board time in 48.519993 seconds of wall time, including startup and shutdown.
+SDL reports zero audio input shortfalls and zero chip or host sample drops.
+The older execution path exhausted its queue during the same driving checkpoint.
 
-Native SCSP produces verified stereo PCM. The optional SDL audio output has
-accepted a ten-second captured race excerpt through CoreAudio without input
-shortfalls. In a normal-paced game check, however, the output queue runs dry:
-the current runtime cannot produce audio fast enough for continuous playback.
-The preserved v13 speed playtest has sound off; the separate sound build requires
-both the build option and runtime `--sound`. Listening confirmation remains open.
+The hook matches the old Machine through 600 million driving instructions,
+every compared frame and every captured PCM sample. This hidden-window result
+does not establish every course or visible presentation; listening confirmation
+remains open. Sound requires both the build option and runtime `--sound`.
 See the [sound instructions](docs/segarally-build-validation.md#optional-sound-experiment).
 
 ## Personal inputs and repository boundaries

@@ -1,5 +1,69 @@
 # Handoff
 
+## Near-real-time Mac sound checkpoint (2026-10-14)
+
+The quiet normal-paced sound-and-hook run completes frame 2,760 with identical
+main state: 529,303,426 instructions, 1,199,537,000 cycles and PC `0x005dde44`.
+All 64 progress/input rows match the older device trial; eighteen input events
+apply, with the frame-2,760 event pending at exit as before. The external
+monotonic wrapper measures 48.519993 seconds from launch through exit for
+47.98148 seconds of board time, including initialization and final saves.
+That is 98.890% board/wall speed for the whole process, not a separately timed
+race segment or a guarantee of visible-window performance.
+
+SDL reports zero input-demand shortfalls, zero requested extra bytes, zero
+chip/host drops and 2,282 queued frames at exit. The 2,115,984-frame WAV is
+byte-identical to the prior normal-paced capture. The earlier outer-loop run
+reported 3,222 demand requests for 10,744,248 bytes; its log-timestamp timing
+was less precise than the new monotonic measurement. No game clock, sample,
+pitch or audio gain was changed to obtain the new result. Human listening is
+still unconfirmed; the counters establish supplied SDL input, not exact
+hardware-output samples or full sound-board fidelity.
+
+Evidence is `build/worktrees/boundary-hook/build/mac-boundary-sound-v13/`
+with `normal-paced-monotonic.json`, `normal-paced-results.json`, the log/WAV
+and the earlier source/binary and PCM-comparison reports. The tested executable
+remains SHA-256
+`87a6aa3ecfe0b2748b132b8a192c8d975633ca903849184a37664089a9013da6`.
+The source/test integration is committed as `7b574fa`; the isolated source
+hashes match those integrated files. The GPU prototype remains excluded.
+
+The first visible launch did not reach SDL initialization: its log contained
+only `Sega Rally native host startup`. All 1,587 startup sample stacks were
+blocked at `ifstream` / `fopen` / `__open_nocancel` while opening the external
+selection replay. That replay is a regular 429-byte file with the expected
+SHA-256 `797df95862beda36fd9ab54f8c440b701897bc0561b0cf8630f29e30b4f25f6e`.
+The sample proves the blocking file open; an operating-system privacy prompt
+is a hypothesis, not an established cause. Preserve `live-window.log` and
+`live-startup-sample.txt` under the sound build as the failed-launch record.
+
+The Mac launcher now reads a bounded regular replay before changing the bundle,
+copies its exact bytes to `Contents/Resources/input-replay.inputs` before signing,
+and passes that resource path at launch. Packaging without a replay removes a
+stale copy; activating an existing process leaves its package unchanged.
+Ten lightweight launcher tests pass with synthetic assets and mocked OS calls,
+covering copy-before-sign ordering, flags, the 1 MiB size bound, invalid inputs,
+stale replay cleanup and already-running activation. These tests establish
+packaging behavior, not whether the blocked visible launch is resolved.
+
+Closing the original frozen process required an escalated command that remained
+at approval and was canceled without a confirmed execution result. The old
+process and bundle were left untouched. A separate prepared build directory,
+`build/worktrees/boundary-hook/build/mac-boundary-sound-v13-live`, contains the
+same tested executable, eight verified assets and bundled canonical selection
+replay. All 26 executable code/data sections match before and after signing;
+strict/deep signature verification passes. Its `package-provenance.json` records
+the compiled-source integration separately from the newer launcher packaging
+source. One windowed, normally paced launch with sound and the hook enabled
+successfully loaded all ten replay events, clearing the original external
+replay open. It then exited before window creation when SDL audio returned
+`CoreAudio error (AudioQueueStart): -66681`. The local SDK identifies this as
+`kAudioQueueErr_CannotStart`, distinct from its permissions error. This does
+not invalidate the earlier successful direct-device timing test; it prevents
+a claim that the new visible sound app has run. Preserve this log while
+comparing launch context and output-device startup. Race progression and
+listening confirmation remain pending.
+
 ## Exact instruction boundary hook and driving equivalence (2026-10-14)
 
 The opt-in `M2_INSTRUCTION_BOUNDARY_HOOK` path lets exact generated chunks

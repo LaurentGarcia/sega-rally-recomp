@@ -220,11 +220,18 @@ Actual old/new Machine comparison matches 600 million driving instructions,
 19,641,024 ordered writes, 32,576 IRQ entries and all 3,142 framebuffers. The
 independent CPU transcript remains byte-identical to the prior checkpoint.
 The sound-enabled old/new comparison also matches each PCM drain, with the full
-54.6297052-second WAV byte-identical to the earlier capture. These are exact
-execution-path comparisons; continuous real-device audio still requires a
-separate pacing measurement.
+54.6297052-second WAV byte-identical to the earlier capture. A separate quiet
+normal-paced SDL/CoreAudio test reaches 2,760 frames and 47.98148 seconds of
+board time in 48.519993 seconds including process startup/exit, with zero audio
+input shortfalls or chip/host sample drops. The old sound path recorded 3,222
+estimated input-demand requests at that checkpoint. Hidden presentation and
+SDL counters do not establish user hearing, every course or physical audio
+fidelity; visible-window playback remains a separate test.
 Bundled assets are verified Xcode resource inputs so signing follows copying,
 including incremental builds; post-signing bundle mutation is not allowed.
+The Mac launcher also copies the selected cabinet replay into app resources
+before signing, so startup does not depend on opening the original workspace
+file. This packaging change preserves replay bytes and execution behavior.
 
 Nine verified graphics ROMs produce polygon, texture and unused video-table
 analysis images under ignored build output. Only polygon and texture images

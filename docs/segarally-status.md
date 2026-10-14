@@ -8,18 +8,18 @@ The [design](sega-rally-design.md) records interpretation and hardware limits.
 | Area | Established evidence | Limit |
 | --- | --- | --- |
 | Main native coverage | Frozen v13: 75,205 instructions, 52 native objects, no missing templates | Coverage is a reached graph, not a remaining-work percentage |
-| Interactive Mac | Stable SDL3/Metal host, actual driving after selection replay handoff | Current speed playtest has sound off |
+| Interactive Mac | Stable SDL3/Metal host, actual driving after selection replay handoff; separate sound-and-hook build validated | Latest sound app exits during CoreAudio startup; visible listening confirmation pending |
 | Driving parity | 600 million instructions, 19,641,024 ordered writes, 1,365,742,448 cycles, 32,576 IRQs and 3,142 renders; nineteen replay events match | Independent CPU with shared board implementations; no full MAME race |
 | Later game paths | Held-gas v13 runs two billion instructions and 10,701 renders without a code/device frontier; returns to attract | Game Over overlay and a new credit/start sequence not separately validated |
 | Course progress | Desert clear/results show 1:12.15; forested second course enters, times out, then attract returns | Centered steering does not complete second-course bends; remaining courses unvalidated |
 | Metal fidelity | Startup warning matches CPU renderer pixel for pixel; stable fan path is used | Exact racing-scene raster parity remains open |
 | Sound generation | Native linked board captures 2,409,170 stereo frames: 54.6297052 seconds including nonzero 44.1 kHz PCM; shared-core drains agree | Whole-game audio parity unvalidated |
-| Audio output | Ten-second recorded excerpt plays through the SDL/CoreAudio API without input shortfalls; a normal-paced game reaches 2,760 frames with unchanged main state | Game output queue runs dry: 3,222 estimated input-demand requests; user listening confirmation pending |
+| Audio output | Sound-and-hook build reaches 2,760 frames with unchanged main state, zero SDL input shortfalls and zero chip/host drops | One quiet hidden-window checkpoint; user listening confirmation pending |
 | Hardware fidelity | Isolated device/reference tests and instruction-timed diagnostics | PCB timing, extF80 precision and full-machine behavior remain open |
 
 ## Measured Mac speed
 
-A quiet hidden-window Metal race comparison used the same 480 rendered frames,
+The earlier quiet hidden-window Metal race comparison used the same 480 rendered frames,
 87,173,426 main instructions and 8.344320 seconds of board time, with sound off:
 
 | Routing | Wall time | Frames per wall second | Board time / wall time |
@@ -27,12 +27,31 @@ A quiet hidden-window Metal race comparison used the same 480 rendered frames,
 | Original | 14.163164 seconds | 33.8907 | 58.9156% |
 | Indexed | 11.871813 seconds | 40.4319 | 70.2868% |
 
-This is about a 19% wall-speed gain, still below real time. All 66 progress,
+Indexed lookup alone gives about a 19% wall-speed gain, still below real time. All 66 progress,
 input and exit rows match. It is one measured Mac checkpoint, not a performance
 guarantee. Hidden acquisition does not measure visible VSync blocking; GPU
 encoding time is CPU work, not GPU completion time. The game clock was unchanged.
 The indexed v6 independent parity transcript also matches the original report
 byte for byte.
+
+The newer sound-enabled instruction boundary hook reaches the 2,760-frame
+driving checkpoint in **48.519993 seconds**, including process startup and exit,
+for **47.98148 seconds of board time**. SDL reports zero input shortfall requests
+and zero chip/host sample drops; 2,282 audio frames remain queued at exit. The
+previous outer-loop sound test reported 3,222 input-demand requests. These are
+whole-process sound checks, separate from the sound-off race segment above.
+
+The hook preserves the prior game and sound data: actual Machine comparison
+matches all 3,142 frames through 600 million instructions, and the entire
+54.6297052-second WAV matches the old output byte for byte. SDL stayed supplied
+through this quiet hidden-window check; visible presentation, user hearing and
+longer game paths remain separate checks.
+
+The latest LaunchServices sound attempt loads its bundled selection replay and
+initializes the machine, then exits at `AudioQueueStart` with CoreAudio error
+`-66681` (`kAudioQueueErr_CannotStart`). The earlier direct-device check passed.
+Launch context and current output-device startup are under investigation; this
+error alone does not establish a permission or sound-generation fault.
 
 ## Graphics evidence
 
@@ -45,9 +64,9 @@ picture and correct polygon ordering remain distinct from pixel fidelity.
 
 ## Next validation work
 
-Improve runtime speed enough to supply continuous audio and confirm the Mac
-listening result before treating live sound as working. Continue speed work with
-exact instruction guards, timing and IRQ boundaries preserved. Validate fresh
+Confirm visible-window playback and the Mac listening result, then measure
+longer game paths with sound enabled. Preserve exact instruction guards, timing
+and IRQ boundaries in further speed work. Validate fresh
 credit/restart and the remaining courses, then extend independent replay
 comparison beyond the current 600-million driving checkpoint. Real-race graphics
 comparison, full MAME-machine parity and PCB/precision validation remain required.

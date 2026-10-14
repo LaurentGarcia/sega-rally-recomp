@@ -38,16 +38,28 @@ try:
         if entry["file"]!=name+".bin" or hashlib.sha256((assets/entry["file"]).read_bytes()).hexdigest()!=entry["sha256"]:
             raise ValueError(f"{name} differs from the verified host package")
     app=build/"Sega Rally Native.app"
-    binary=app/"Contents/MacOS";binary.mkdir(parents=True,exist_ok=True)
+    binary=app/"Contents/MacOS"
     active=subprocess.run(["pgrep","-f",re.escape(str(binary/"segarally_native"))],capture_output=True,text=True)
     if active.returncode==0:
         subprocess.run(["open",str(app)],check=True)
         print(f"Activated existing native app, PID(s) {active.stdout.strip()}")
         raise SystemExit(0)
+    replay_bytes=None
+    if args.input_replay:
+        replay_path=args.input_replay.resolve()
+        if not replay_path.is_file():raise ValueError("input replay must be a regular file")
+        with replay_path.open("rb") as file:replay_bytes=file.read(1024*1024+1)
+        if len(replay_bytes)>1024*1024:raise ValueError("input replay exceeds 1 MiB")
+    binary.mkdir(parents=True,exist_ok=True)
     shutil.copy2(executable,binary/"segarally_native")
     # SDL_GetBasePath points at Contents/Resources for a macOS app bundle.
     resources=app/"Contents/Resources";resources.mkdir(parents=True,exist_ok=True)
     shutil.copytree(assets,resources/"assets",dirs_exist_ok=True)
+    # LaunchServices apps read their own signed resources at startup. Do not
+    # depend on a separate workspace file being accessible before SDL starts.
+    bundled_replay=resources/"input-replay.inputs"
+    bundled_replay.unlink(missing_ok=True)
+    if replay_bytes is not None:bundled_replay.write_bytes(replay_bytes)
     with (app/"Contents/Info.plist").open("wb") as file:
         plistlib.dump({"CFBundleIdentifier":"com.lgarciacarro.segarally.macnative",
             "CFBundleName":"Sega Rally Native","CFBundleDisplayName":"Sega Rally Native",
@@ -60,7 +72,7 @@ try:
     if args.fullscreen:startup.append("--fullscreen")
     if args.sound:startup.append("--sound")
     if args.instruction_boundary_hook:startup.append("--instruction-boundary-hook")
-    if args.input_replay:startup += ["--input-replay",str(args.input_replay.resolve())]
+    if replay_bytes is not None:startup += ["--input-replay",str(bundled_replay)]
     subprocess.run(["open","-n",str(app),"--args",*startup],check=True)
     print(f"Opened {app}; startup log {build/'live-app.log'}")
 except (OSError,ValueError,KeyError,subprocess.SubprocessError) as error:
