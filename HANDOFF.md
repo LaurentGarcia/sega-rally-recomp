@@ -1,5 +1,33 @@
 # Handoff
 
+## Exact host resume transcript core (2026-10-14)
+
+The new bounded `segarally-host-resume-v1` core records every actual
+`run_until_frame` call, including its budget, twelve input bytes, before/after
+instruction/cycle/time/frame/PC witnesses and return reason. It preserves
+equal instruction counts across IRQ/frame preparation, requires a completion
+marker and rejects malformed, discontinuous, oversized or partial streams.
+It is separate from the unchanged frame-based selection/driving replay.
+No player flag or runtime behavior changes in this commit.
+
+Both registered CMake tests pass: 98 stream/contract checks and 84 synthetic
+Machine checks across the old outer loop and exact instruction hook. The
+Machine fixture establishes an actual timer IRQ/frame boundary at equal
+instruction counts, then verifies the next opcode reads the correct pins.
+Recorded, unrecorded and replayed state, frame output and saves match. The
+integrated tests were built in `build/host-make`; its existing CMake cache
+needed reconfiguration before the new target names were available. The build
+reports only the existing unused `gpu_front_hud_` field warning.
+
+Provenance approval is a caller contract, not a parser guarantee. Next work
+is to bind actual loaded images, generated code/options and initial save
+snapshots, wire capture/playback around unchanged resume/drain calls, and
+compare PCM and terminal fault details. The independent CPU harness lacks
+startup-seed/resume-phase support and coupled sound; unsupported captures must
+be rejected. No full-course or independent parity claim follows from these
+ROM-free tests. The four main-tree GPU prototype files remain untouched and
+outside this commit; their corrected candidate is being tested separately.
+
 ## Windowed sound session exits cleanly (2026-10-14)
 
 The signed window-first app completed 9,347 frames, 1,726,555,073 instructions

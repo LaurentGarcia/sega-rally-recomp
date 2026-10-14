@@ -96,3 +96,55 @@ compiled in v6. The full nineteen-event v6 driving replay now also passes:
 32,576 IRQs and 3,142 rendered frames, hash `f6c10714158f5366`. All nineteen
 event boundaries match the shared machine, with no missing-code frontier.
 Longer course and race-end comparisons remain outstanding.
+
+## Exact host resume transcripts
+
+`tools/srally_boot/host_input_transcript.h` provides a separate diagnostic
+format, `segarally-host-resume-v1`. It is a tested core API; the player has no
+capture or playback flag for it yet. The existing frame replay above is
+unchanged.
+
+The interactive host samples controls before each call to
+`run_until_frame`, with a budget of at most 100,000 instructions. Several
+calls can occur within one rendered frame. Also, IRQ entry can finish a frame
+between calls without executing another opcode: the instruction count stays
+equal while reference cycles, board time, frame count and PC advance. A manual
+recording keyed only by frame or instruction count would lose these boundaries.
+
+The transcript therefore records every actual resume call: its sequential
+index, requested budget, all twelve cabinet input bytes, return reason, and
+before/after instruction count, reference cycles, board nanoseconds, rendered
+frame count and PC. Playback must repeat those exact calls and, with sound,
+drain PCM after each call. Paused or quit-only host polls do not execute the
+machine and need no row. Repeated input bytes and equal instruction counts
+must not be merged.
+
+Streams are limited to 250,000 resumes, 64 MiB and 1,024 bytes per line. An
+explicit terminal marker binds the final count and witness; truncation, trailing
+data, discontinuities and failed writes are rejected. A complete transcript
+can end at a missing-code or device frontier. Completion establishes a complete
+record, not successful gameplay, matching fault details or validated replay.
+
+The context binds a SHA-256 provenance digest and sound/hook flags. The caller
+must validate the manifest against the actual loaded images, generated build,
+runtime options and initial EEPROM/backup bytes before approving that binding.
+Fresh default save bytes matter too. The parser checks syntax and equality;
+a supplied digest or callback does not verify those external facts. Host
+integration, manifest hashing, PCM evidence and detailed terminal faults remain
+work to implement. The independent CPU harness must reject unsupported startup
+seeds, resume phases or configurations, and currently rejects coupled sound.
+
+The ROM-free tests cover 98 stream/contract checks and 84 Machine checks in
+both execution modes. A real timer IRQ in the synthetic fixture completes a
+frame at the same instruction count, then the next opcode reads the newly
+recorded input. Captured, untouched and replayed Machines agree on CPU state,
+frame output and saves. This follows the inherited design's **Inputs** and
+**Reference & validation** contracts; it is not a MAME or full-course result.
+
+```sh
+cmake -S . -B build/host-tests-resume -DM2_BUILD_WINDOWED_APP=OFF
+cmake --build build/host-tests-resume --target \
+    test_segarally_host_input_transcript test_segarally_host_input_machine -j 2
+ctest --test-dir build/host-tests-resume --output-on-failure \
+    -R '^segarally_host_input_(transcript|machine)$'
+```

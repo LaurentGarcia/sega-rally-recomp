@@ -464,6 +464,21 @@ add_executable(test_segarally_input_replay tests/test_segarally_input_replay.cpp
 target_include_directories(test_segarally_input_replay PRIVATE src .)
 add_test(NAME segarally_input_replay COMMAND test_segarally_input_replay)
 
+add_executable(test_segarally_host_input_transcript tests/test_segarally_host_input_transcript.cpp)
+target_include_directories(test_segarally_host_input_transcript PRIVATE src .)
+add_test(NAME segarally_host_input_transcript COMMAND test_segarally_host_input_transcript)
+
+add_executable(test_segarally_host_input_machine tests/test_segarally_host_input_machine.cpp
+    src/runtime/model2a_machine.cpp src/runtime/model2a_bus.cpp src/runtime/model2a_clock.cpp
+    src/runtime/model2a_control.cpp src/runtime/cpu.cpp src/runtime/lockstep.cpp
+    src/runtime/model2_io.cpp src/runtime/model2a_io.cpp src/runtime/model2_eeprom.cpp
+    src/runtime/tgp.cpp src/runtime/m2_tgp_board.cpp src/runtime/model2a_video.cpp
+    src/runtime/video.cpp src/runtime/raster.cpp src/runtime/geo.cpp)
+target_include_directories(test_segarally_host_input_machine PRIVATE src .)
+target_compile_definitions(test_segarally_host_input_machine PRIVATE M2_INSTRUCTION_BOUNDARY_HOOK
+    M2_SRALLY_CONTROL M2_SRALLY_SCREEN M2_SRALLY_VIDEO M2_SRALLY_TGP M2_SRALLY_IO)
+add_test(NAME segarally_host_input_machine COMMAND test_segarally_host_input_machine)
+
 add_executable(test_model2_scsp tests/test_model2_scsp.cpp
     src/runtime/model2_scsp.cpp src/runtime/model2_scsp_dsp.cpp src/runtime/model2a_clock.cpp)
 target_include_directories(test_model2_scsp PRIVATE src)

@@ -181,6 +181,13 @@ The host also accepts the bounded cabinet replay and holds its final snapshot
 through one complete frame before handing control to keyboard/touch. Both
 rendering instances receive identical inputs. Normal board-time pacing is the
 Mac launch default; unthrottled runs are explicit diagnostics.
+Manual capture needs a separate host-resume transcript because controls are
+sampled between bounded execution calls, including mid-frame. An IRQ can also
+complete a frame at an unchanged instruction count. The tested transcript core
+preserves each requested budget, all cabinet pins, before/after witnesses and
+return reason; it does not yet add player capture controls. Actual startup
+save bytes, image/build/configuration provenance and sound drain boundaries
+remain required integration work. See [the input reference](segarally-input-replay.md#exact-host-resume-transcripts).
 The frozen v6 generation now executes the actual Lancia race with recorded
 cabinet throttle, steering, view and brake events. A bounded 600-million main
 instruction run renders 3,142 frames without an unsupported frontier; matched
