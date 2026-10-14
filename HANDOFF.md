@@ -1,5 +1,38 @@
 # Handoff
 
+## Metal frontend and first native iPhone installation (2026-10-14)
+
+The standalone `platform/segarally` host uses shared Model2AMachine and the
+unchanged Daytona GpuRenderer with pinned SDL3 3.4.16. macOS and signed arm64
+iOS Release builds succeed. It requires Metal, provides touch/keyboard input,
+stores EEPROM/backup images, clears touch on pause, restores the pacing origin
+on foreground, and supports exact instruction/frame limits and GPU captures.
+Controller handling remains future work. The earliest iOS log is available
+as `Documents/segarally-native.log` through file sharing.
+
+Two independent machine instances render frame 513 through GPU and CPU paths
+at 99,846,823 instructions / 222,990,800 reference cycles, PC `0x005a37a8`.
+All 496 by 384 RGB pixels match, with zero differing components. RGB SHA-256
+is `1c05e1c4b0aa6db64ed1f4fbee89a57471d6706282b5f69f3e0a8004a1e264d3`.
+This is the original startup warning, not a polygon/car scene. A separate
+88-instruction budget test exits at exactly 88 instructions / 229 cycles,
+PC `0x450`. Strict host compilation and seven asset-packaging tests pass.
+
+Asset staging validates main/TGP/video audits, hashes, paths and current video
+manifest before packaging. The first Xcode POST_BUILD path accidentally kept
+a literal platform placeholder; fixing that path exposed an incremental-build
+signature issue because copying after CodeSign changes the sealed bundle.
+The final implementation stages verified assets as tracked Xcode resources
+with a build dependency, preserving unchanged files. Final
+`codesign --verify --deep --strict` passes. The app installs successfully on
+the paired iPhone as `com.lgarciacarro.segarally.native` (Sega Rally Native),
+separate from the prior prototype. Launch/capture verification is still pending.
+Its frozen v2 generation contains 66,557 instructions; ongoing v3 discovery
+does not modify those sources during platform compilation.
+
+Next: verify phone startup, capture the first native 3D scene and compare its
+Metal pixels with the CPU renderer. The new port is not yet verified playable.
+
 ## Native SCSP, DSP and physical audio link (2026-10-14)
 
 The native SCSP implements 32 voices, sample looping/envelopes/LFOs, DSP,

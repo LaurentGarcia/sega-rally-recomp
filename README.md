@@ -30,6 +30,12 @@ boot. The existing lifted-C iPhone prototype lives
 separately in `../segarally95-recomp`; its rendering captures provide regression
 evidence, not proof that this new runtime already runs a race.
 
+The dedicated SDL3/Metal frontend builds on macOS and iPhone. Its first native
+iPhone package is installed as **Sega Rally Native**, separately from the
+earlier prototype; launch and gameplay validation remain pending. On macOS,
+the startup warning frame matches the CPU renderer pixel for pixel. Polygon
+and racing-scene parity still require actual 3D captures.
+
 Daytona's instruction decoder, C++ generator, CPU services, geometry, rasterizer,
 SDL3 host, Metal shaders, and tests form the starting codebase. Game-specific
 ROM layouts, entry points, hardware mappings, and sound behavior must be checked
@@ -94,6 +100,18 @@ python3 scripts/segarally_sound_recompile.py
 Its successful audit means the expected SCSP access frontier was reached;
 it does not mean audio played. The sound runner currently counts completed
 instructions without a board clock or asynchronous interrupts.
+
+After importing/generating the main, TGP and video inputs above, build the
+dedicated frontend with the pinned SDL3 checkout described in
+[the host instructions](platform/segarally/README.md):
+
+```sh
+SEGARALLY_NATIVE_BUILD="$PWD/build/segarally" bash platform/segarally/build.sh mac
+SEGARALLY_NATIVE_BUILD="$PWD/build/segarally" bash platform/segarally/build.sh ios
+```
+
+The current controls are touch and keyboard. EEPROM/backup RAM persist across
+launches; code or hardware frontiers leave a diagnostic instead of being skipped.
 
 See [the project design](docs/sega-rally-design.md) for scope and validation.
 Full MAME tracing currently needs three files absent from the supplied archive:

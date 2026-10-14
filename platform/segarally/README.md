@@ -1,0 +1,17 @@
+This dedicated host runs the generated Sega Rally i960 core and native Model 2A devices through `rt::Model2AMachine`. It reuses Daytona's existing SDL_GPU polygon and System 24 tile renderer directly, with Metal required on macOS and iOS. There is no lifted game logic in this target. The current machine remains a bring-up build: native coverage is partial, the SCSP sound board is not connected, and an unsupported access or missing code target stops execution with a diagnostic.
+
+SDL3 is pinned to Daytona's revision `fa2c02bb6e21974a89ea9824bc53c9932abe5f9c` (3.4.16). Clone that revision into ignored `extern/sdl3`. Generate the main CPU, TGP, and verified video imports into `build/segarally-timed` using the project pipeline first. The standalone frontend project does not require ImGui or the Daytona launcher.
+
+```sh
+bash platform/segarally/build.sh mac
+build/segarally-mac/segarally_native --frames 180 --unthrottled \
+    --capture build/segarally-mac/metal.ppm \
+    --reference-capture build/segarally-mac/reference.ppm
+bash platform/segarally/build.sh ios
+```
+
+`--reference-capture` runs a second instance of the same generated core with the existing CPU renderer, checks matching instruction counts, PCs, cycle counts, and actual screen events, then saves the corresponding software frame. The Metal capture reads the hardware target back through a GPU transfer buffer. These captures compare rendering; they do not prove complete game coverage or physical board timing.
+
+`SEGARALLY_NATIVE_BUILD` overrides the generation directory. `SEGARALLY_DEVICE` selects the connected iPhone for signing; the default is the previously authorized device. Packaging verifies every bundled image against its import audit. Personal ROM-derived images, generated code, SDL source, and build products remain in ignored directories.
+
+The iOS bundle is `com.lgarciacarro.segarally.native`, separate from the earlier driving prototype. Its SDL3 scene startup follows the working Daytona lifecycle. EEPROM and backup RAM persist in Application Support; the earliest startup log is available through file sharing as `Documents/segarally-native.log`. Current input support is keyboard and touch; gamepads are not connected yet. Touch controls use the actual coin, start, view, steering, pedal, gearbox, and handbrake inputs. Arrow triangles steer, the lower right triangle accelerates, the adjacent square brakes, the top left yellow mark inserts a coin, and the top left triangle presses start. Keyboard controls appear in `--help`.

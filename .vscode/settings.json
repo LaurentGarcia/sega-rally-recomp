@@ -4,6 +4,7 @@
         "extern/kos-dc",
         "extern/softfloat",
         "extern/ymfm",
-        "extern/lzma"
+        "extern/lzma",
+        "extern/sdl3"
     ]
 }

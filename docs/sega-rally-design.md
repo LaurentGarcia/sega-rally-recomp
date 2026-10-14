@@ -126,8 +126,15 @@ verified polygon and texture ROM images; CPU texture/luma RAM remains distinct.
 All four tile mirrors notify the renderer. Reference maskless texture and
 CRTC writes retain their partial-write behavior. Framebuffer test-mode storage
 is mapped, but its presentation is an explicit unsupported frontier. Normal
-screen rendering uses the inherited CPU reference renderer during bring-up;
-the SDL3/Metal host remains the target once actual startup is established.
+screen rendering uses either the inherited CPU reference renderer or the same
+Daytona SDL_GPU renderer through the dedicated SDL3 host. Metal is required on
+macOS and iOS. Separate machine instances check execution counts and frame
+boundaries during render comparison. The startup warning at frame 513 matches
+all RGB pixels; no polygon or racing-scene parity is inferred from this tile
+screen. The host provides touch/keyboard inputs, persistence, pause/resume,
+and board-time pacing. A separate iOS bundle preserves the earlier prototype.
+Bundled assets are verified Xcode resource inputs so signing follows copying,
+including incremental builds; post-signing bundle mutation is not allowed.
 
 Nine verified graphics ROMs produce polygon, texture and unused video-table
 analysis images under ignored build output. Only polygon and texture images

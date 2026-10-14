@@ -6,6 +6,10 @@ This tree starts from `alphanu1/daytona-arcade-recomp` at
 `b33baeb28a1e1c94d90a4a80811f0b2c7f61106b` (BSD-3-Clause, original Git history
 and notices retained). The shared `src/runtime/model2_priority.h` extracts its
 existing geometry/raster/GPU priority functions without changing their rules.
+The dedicated Sega Rally frontend links the inherited `GpuRenderer` and
+generated Metal shaders directly. Its SDL3 checkout uses the exact pin listed
+below without the Daytona launcher's Vulkan application-name patch; only the
+Metal backend is selected. No ImGui code is used by this standalone host.
 
 The Model 2A memory adapter is implemented from the public address-map contracts
 in MAME `src/mame/sega/model2.cpp` at the same pinned MAME revision listed below,

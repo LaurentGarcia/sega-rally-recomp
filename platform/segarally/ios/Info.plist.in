@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+    <key>CFBundleExecutable</key><string>${MACOSX_BUNDLE_EXECUTABLE_NAME}</string>
+    <key>CFBundlePackageType</key><string>APPL</string>
+    <key>CFBundleIdentifier</key><string>com.lgarciacarro.segarally.native</string>
+    <key>CFBundleName</key><string>Sega Rally Native</string>
+    <key>CFBundleDisplayName</key><string>Sega Rally Native</string>
+    <key>CFBundleShortVersionString</key><string>0.1</string>
+    <key>CFBundleVersion</key><string>1</string>
+    <key>LSRequiresIPhoneOS</key><true/>
+    <key>UISupportedInterfaceOrientations</key><array>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    <key>UIRequiresFullScreen</key><true/>
+    <key>UILaunchScreen</key><dict/>
+    <key>UIApplicationSupportsIndirectInputEvents</key><true/>
+    <key>UIFileSharingEnabled</key><true/>
+    <key>LSSupportsOpeningDocumentsInPlace</key><true/>
+</dict></plist>

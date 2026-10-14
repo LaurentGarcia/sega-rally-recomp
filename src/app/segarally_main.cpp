@@ -1,0 +1,218 @@
+// The native frontend reuses Daytona's SDL_GPU renderer and shared Model2A machine.
+#include "runtime/model2a_machine.h"
+#include "app/gpu/gpu_renderer.h"
+#include "app/gpu_device.h"
+#include "app/segarally_touch.h"
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h>
+#include <algorithm>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+namespace {
+using Machine=rt::Model2AMachine;
+std::vector<uint8_t> read_file(const std::filesystem::path &path, bool optional=false) {
+    std::ifstream file(path,std::ios::binary);
+    if(!file) {if(optional) return {};throw std::runtime_error("Cannot read "+path.string());}
+    return {std::istreambuf_iterator<char>(file),std::istreambuf_iterator<char>()};
+}
+void write_file(const std::filesystem::path &path,const std::vector<uint8_t> &bytes) {
+    const auto temporary=path.string()+".tmp";
+    {std::ofstream file(temporary,std::ios::binary|std::ios::trunc);file.write(reinterpret_cast<const char *>(bytes.data()),std::streamsize(bytes.size()));
+     if(!file) throw std::runtime_error("Cannot save "+path.string());}
+    std::filesystem::rename(temporary,path);
+}
+void save(Machine &machine,const std::filesystem::path &directory) {
+    write_file(directory/"eeprom.bin",machine.save_eeprom());write_file(directory/"backup.bin",machine.save_backup());
+}
+void capture(SDL_GPUDevice *device,SDL_GPUTexture *texture,const std::filesystem::path &path) {
+    constexpr Uint32 w=496,h=384;
+    SDL_GPUTransferBufferCreateInfo ci{SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD,w*h*4,0};
+    auto *buffer=SDL_CreateGPUTransferBuffer(device,&ci);
+    if(!buffer) throw std::runtime_error(SDL_GetError());
+    auto *cmd=SDL_AcquireGPUCommandBuffer(device);
+    if(!cmd) {SDL_ReleaseGPUTransferBuffer(device,buffer);throw std::runtime_error(SDL_GetError());}
+    auto *pass=SDL_BeginGPUCopyPass(cmd);
+    if(!pass) {SDL_CancelGPUCommandBuffer(cmd);SDL_ReleaseGPUTransferBuffer(device,buffer);throw std::runtime_error(SDL_GetError());}
+    SDL_GPUTextureRegion src{};src.texture=texture;src.w=w;src.h=h;src.d=1;
+    SDL_GPUTextureTransferInfo dst{};dst.transfer_buffer=buffer;dst.pixels_per_row=w;dst.rows_per_layer=h;
+    SDL_DownloadFromGPUTexture(pass,&src,&dst);SDL_EndGPUCopyPass(pass);
+    auto *fence=SDL_SubmitGPUCommandBufferAndAcquireFence(cmd);
+    if(!fence || !SDL_WaitForGPUFences(device,true,&fence,1)) {SDL_ReleaseGPUTransferBuffer(device,buffer);throw std::runtime_error(SDL_GetError());}
+    auto *pixels=static_cast<const uint8_t *>(SDL_MapGPUTransferBuffer(device,buffer,false));
+    if(!pixels) {SDL_ReleaseGPUFence(device,fence);SDL_ReleaseGPUTransferBuffer(device,buffer);throw std::runtime_error(SDL_GetError());}
+    std::ofstream file(path,std::ios::binary|std::ios::trunc);file<<"P6\n"<<w<<" "<<h<<"\n255\n";
+    uint64_t hash=0xcbf29ce484222325ULL;
+    for(size_t i=0;i<w*h*4;++i) {hash^=pixels[i];hash*=0x100000001b3ULL;}
+    for(size_t i=0;i<w*h;++i) {const char rgb[]={char(pixels[4*i+2]),char(pixels[4*i+1]),char(pixels[4*i])};file.write(rgb,3);}
+    SDL_UnmapGPUTransferBuffer(device,buffer);SDL_ReleaseGPUFence(device,fence);SDL_ReleaseGPUTransferBuffer(device,buffer);
+    if(!file) throw std::runtime_error("Cannot write GPU capture");
+    fprintf(stderr,"Metal frame capture: %s BGRA hash=%016llx\n",path.string().c_str(),static_cast<unsigned long long>(hash));
+}
+void capture_reference(const rt::Video &video,const std::filesystem::path &path) {
+    std::ofstream file(path,std::ios::binary|std::ios::trunc);file<<"P6\n496 384\n255\n";
+    for(const auto pixel:video.screen()) {
+        const char rgb[]={char(pixel>>16),char(pixel>>8),char(pixel)};file.write(rgb,3);
+    }
+    if(!file) throw std::runtime_error("Cannot write native software reference capture");
+    fprintf(stderr,"Native software reference capture: %s BGRA hash=%016llx\n",path.string().c_str(),
+        static_cast<unsigned long long>(video.screen_hash()));
+}
+} // namespace
+
+int segarally_host_main(int argc,char **argv) {
+    std::filesystem::path data,saves,capture_path,reference_path;
+    uint64_t frame_limit=0,instruction_limit=0;
+    bool touch_visible=false,unthrottled=false;
+    if(const char *env=std::getenv("SEGARALLY_DATA_DIR")) data=env;
+    if(const char *env=std::getenv("SEGARALLY_SAVE_DIR")) saves=env;
+    for(int i=1;i<argc;++i) {
+        const std::string arg=argv[i];
+        auto value=[&](){if(++i>=argc) throw std::runtime_error("Missing argument for "+arg);return std::string(argv[i]);};
+        if(arg=="--data") data=value();else if(arg=="--save-dir") saves=value();
+        else if(arg=="--frames") frame_limit=std::stoull(value());else if(arg=="--instructions") instruction_limit=std::stoull(value());
+        else if(arg=="--capture") capture_path=value();else if(arg=="--touch") touch_visible=true;
+        else if(arg=="--reference-capture") reference_path=value();
+        else if(arg=="--unthrottled") unthrottled=true;
+        else if(arg=="--help") {puts("Sega Rally native: --data DIR --save-dir DIR --frames N --instructions N --capture FILE.ppm --reference-capture FILE.ppm --touch --unthrottled\nKeys: arrows steer, Z gas, X brake, C coin, Return start, V view, A/S gear down/up, Space handbrake, F2 service, F3 test, Escape quit.");return 0;}
+        else throw std::runtime_error("Unknown argument "+arg);
+    }
+    SDL_SetMainReady();SDL_SetHint(SDL_HINT_GPU_DRIVER,"metal");
+    if(!SDL_Init(SDL_INIT_VIDEO)) {fprintf(stderr,"SDL_Init: %s\n",SDL_GetError());return 1;}
+    if(data.empty()) data=std::filesystem::path(SDL_GetBasePath())/"assets";
+    if(saves.empty()) {char *path=SDL_GetPrefPath("sega-rally-recomp","SegaRallyNative");if(path) {saves=path;SDL_free(path);}else saves="saves";}
+    SDL_Window *window=nullptr;SDL_GPUDevice *device=nullptr;SDL_GPUTexture *screen=nullptr;
+    app::GpuRenderer gpu;rally::TouchControls touch;std::unique_ptr<Machine> machine,reference;
+    int result=0;
+    try {
+        std::filesystem::create_directories(saves);
+        Machine::Images images{read_file(data/"program.bin"),read_file(data/"main_data.bin"),read_file(data/"tgp_tables.bin"),
+            read_file(data/"copro_data.bin"),read_file(data/"polygons.bin"),read_file(data/"textures.bin")};
+        Machine::Options options;options.external_video=true;
+        if(!reference_path.empty()) {Machine::Options ref_options;reference=std::make_unique<Machine>(images,ref_options);}
+        machine=std::make_unique<Machine>(std::move(images),options);
+        const auto eeprom=read_file(saves/"eeprom.bin",true),backup=read_file(saves/"backup.bin",true);
+        if(!eeprom.empty()) machine->load_eeprom(eeprom);if(!backup.empty()) machine->load_backup(backup);
+        if(reference) {if(!eeprom.empty()) reference->load_eeprom(eeprom);if(!backup.empty()) reference->load_backup(backup);}
+        SDL_WindowFlags flags=SDL_WINDOW_RESIZABLE|SDL_WINDOW_HIGH_PIXEL_DENSITY;
+#ifdef SEGARALLY_IOS
+        flags|=SDL_WINDOW_FULLSCREEN;touch_visible=true;
+#endif
+        window=SDL_CreateWindow("Sega Rally Native",992,768,flags);
+        device=app::create_gpu_device();
+        if(!window || !device || strcmp(SDL_GetGPUDeviceDriver(device),"metal") || !SDL_ClaimWindowForGPUDevice(device,window))
+            throw std::runtime_error(std::string("Metal initialization: ")+SDL_GetError());
+        SDL_SetGPUSwapchainParameters(device,window,SDL_GPU_SWAPCHAINCOMPOSITION_SDR,SDL_GPU_PRESENTMODE_VSYNC);
+        fprintf(stderr,"GPU driver=%s device=%s native Model2A core, SCSP audio remains unconnected\n",SDL_GetGPUDeviceDriver(device),
+            SDL_GetStringProperty(SDL_GetGPUDeviceProperties(device),SDL_PROP_GPU_DEVICE_NAME_STRING,"unknown"));
+        SDL_GPUTextureCreateInfo ti{};ti.type=SDL_GPU_TEXTURETYPE_2D;ti.format=SDL_GPU_TEXTUREFORMAT_B8G8R8A8_UNORM;
+        ti.usage=SDL_GPU_TEXTUREUSAGE_SAMPLER|SDL_GPU_TEXTUREUSAGE_COLOR_TARGET;ti.width=496;ti.height=384;ti.layer_count_or_depth=1;ti.num_levels=1;
+        screen=SDL_CreateGPUTexture(device,&ti);
+        if(!screen || !gpu.init(device,ti.format) || !touch.init(device,SDL_GetGPUSwapchainTextureFormat(device,window)))
+            throw std::runtime_error(std::string("Metal pipelines: ")+gpu.error()+" "+SDL_GetError());
+        touch.visible=touch_visible;touch.layout(window);
+        bool quit=false,background=false,stopped=false;int gear=0;
+        Uint64 start=SDL_GetTicksNS();uint64_t displayed=0,last_frames=0;
+        while(!quit) {
+            SDL_Event event;
+            while(SDL_PollEvent(&event)) {
+                if(event.type==SDL_EVENT_QUIT || event.type==SDL_EVENT_TERMINATING) quit=true;
+                if(event.type==SDL_EVENT_WILL_ENTER_BACKGROUND) {background=true;touch.clear();save(*machine,saves);}
+                if(event.type==SDL_EVENT_DID_ENTER_FOREGROUND) {background=false;start=SDL_GetTicksNS()-machine->stats().board_time_ns;}
+                if(event.type==SDL_EVENT_WINDOW_FOCUS_LOST) touch.clear();
+                if(event.type==SDL_EVENT_WINDOW_RESIZED || event.type==SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED || event.type==SDL_EVENT_WINDOW_SAFE_AREA_CHANGED) touch.layout(window);
+                touch.event(event);
+            }
+            if(background) {SDL_Delay(20);continue;}
+            const bool *keys=SDL_GetKeyboardState(nullptr);
+            if(keys[SDL_SCANCODE_ESCAPE]) quit=true;
+            auto &in=machine->inputs();
+            in.in0=0xff;
+            auto low=[&](unsigned bit,bool held){if(held) in.in0&=uint8_t(~(1u<<bit));};
+            low(0,keys[SDL_SCANCODE_C]||touch.held[rally::Coin]);low(6,keys[SDL_SCANCODE_RETURN]||touch.held[rally::Start]);
+            low(5,keys[SDL_SCANCODE_V]||touch.held[rally::View]);low(2,keys[SDL_SCANCODE_F2]);low(3,keys[SDL_SCANCODE_F3]);
+            static bool last_up=false,last_down=false;
+            const bool up=keys[SDL_SCANCODE_S]||touch.held[rally::GearUp],down=keys[SDL_SCANCODE_A]||touch.held[rally::GearDown];
+            if(up&&!last_up) gear=std::min(4,gear+1);if(down&&!last_down) gear=std::max(0,gear-1);last_up=up;last_down=down;
+            constexpr uint8_t gears[]={0,0x20,0x10,0x60,0x50};in.in1=uint8_t(0x8f|gears[gear]);
+            in.in2=(keys[SDL_SCANCODE_SPACE]||touch.held[rally::Handbrake])?0xff:0;
+            const int steering=int(keys[SDL_SCANCODE_RIGHT]||touch.held[rally::Right])-int(keys[SDL_SCANCODE_LEFT]||touch.held[rally::Left]);
+            in.analog[0]=steering<0?0:steering>0?255:128;
+            in.analog[1]=(keys[SDL_SCANCODE_Z]||touch.held[rally::Gas])?255:0;
+            in.analog[2]=(keys[SDL_SCANCODE_X]||touch.held[rally::Brake])?255:0;
+            bool new_frame=false;
+            if(!stopped && !quit) {
+                const uint64_t completed=machine->stats().instructions;
+                if(instruction_limit && completed>=instruction_limit) break;
+                const uint64_t budget=instruction_limit?std::min(uint64_t(100000),instruction_limit-completed):100000;
+                const auto outcome=machine->run_until_frame(budget);
+                if(reference) {
+                    reference->inputs()=in;
+                    const auto expected=reference->run_until_frame(budget);
+                    const auto a=machine->stats(),b=reference->stats();
+                    if(outcome.reason!=expected.reason || a.instructions!=b.instructions || a.pc!=b.pc ||
+                       a.reference_cycles!=b.reference_cycles || a.frames_rendered!=b.frames_rendered)
+                        throw std::runtime_error("Native software/Metal machines diverged before presentation");
+                }
+                if(outcome.reason==Machine::Reason::Frame) new_frame=true;
+                else if(outcome.reason!=Machine::Reason::Budget) {
+                    stopped=true;result=3;
+                    fprintf(stderr,"Native frontier: pc=%08x instructions=%llu %s\n",outcome.pc,
+                            static_cast<unsigned long long>(outcome.instructions),outcome.message.c_str());
+                    SDL_SetWindowTitle(window,("Sega Rally Native - frontier: "+outcome.message).c_str());
+                    if(frame_limit||instruction_limit) quit=true;
+                }
+            }
+            if(instruction_limit && machine->stats().instructions>=instruction_limit) quit=true;
+            if(quit && !new_frame) break;
+            if(!new_frame && !stopped) continue;
+            auto *cmd=SDL_AcquireGPUCommandBuffer(device);if(!cmd) throw std::runtime_error(SDL_GetError());
+            SDL_GPUTexture *swapchain=nullptr;Uint32 sw=0,sh=0;
+            if(!SDL_WaitAndAcquireGPUSwapchainTexture(cmd,window,&swapchain,&sw,&sh)) throw std::runtime_error(SDL_GetError());
+            if(new_frame) {gpu.render(cmd,screen,496,384,machine->video());++displayed;}
+            if(swapchain && displayed) {
+                const float scale=std::min(sw/496.f,sh/384.f);const Uint32 dw=Uint32(496*scale),dh=Uint32(384*scale);
+                SDL_GPUBlitInfo blit{};blit.source.texture=screen;blit.source.w=496;blit.source.h=384;
+                blit.destination.texture=swapchain;blit.destination.x=(sw-dw)/2;blit.destination.y=(sh-dh)/2;blit.destination.w=dw;blit.destination.h=dh;
+                blit.load_op=SDL_GPU_LOADOP_CLEAR;blit.clear_color={0,0,0,1};blit.filter=SDL_GPU_FILTER_LINEAR;
+                SDL_BlitGPUTexture(cmd,&blit);touch.draw(cmd,swapchain);
+            }
+            if(!SDL_SubmitGPUCommandBuffer(cmd)) throw std::runtime_error(SDL_GetError());
+            const auto stats=machine->stats();
+            if(displayed/60!=last_frames/60) fprintf(stderr,"frames=%llu instructions=%llu cycles=%llu pc=%08x\n",
+                static_cast<unsigned long long>(displayed),static_cast<unsigned long long>(stats.instructions),
+                static_cast<unsigned long long>(stats.reference_cycles),stats.pc);
+            last_frames=displayed;
+            if((frame_limit&&displayed>=frame_limit)||(instruction_limit&&stats.instructions>=instruction_limit)) quit=true;
+            if(!unthrottled && new_frame) {
+                // Pace the host to the machine's exact board time, without changing device clocks.
+                const Uint64 deadline=start+stats.board_time_ns,now=SDL_GetTicksNS();
+                if(deadline>now) SDL_DelayNS(deadline-now);
+            }
+            if(stopped) SDL_Delay(20);
+        }
+        if(!capture_path.empty() && displayed) capture(device,screen,capture_path);
+        if(reference && displayed) capture_reference(reference->video(),reference_path);
+        save(*machine,saves);
+        const auto stats=machine->stats();
+        fprintf(stderr,"Native host exit: frames=%llu instructions=%llu cycles=%llu pc=%08x result=%d\n",
+            static_cast<unsigned long long>(displayed),static_cast<unsigned long long>(stats.instructions),
+            static_cast<unsigned long long>(stats.reference_cycles),stats.pc,result);
+    } catch(const std::exception &error) {fprintf(stderr,"Sega Rally native: %s\n",error.what());result=1;}
+    if(device) {SDL_WaitForGPUIdle(device);touch.shutdown();gpu.shutdown();if(screen) SDL_ReleaseGPUTexture(device,screen);
+        if(window) SDL_ReleaseWindowFromGPUDevice(device,window);SDL_DestroyGPUDevice(device);}
+    if(window) SDL_DestroyWindow(window);SDL_Quit();return result;
+}
+
+#ifndef SEGARALLY_IOS
+int main(int argc,char **argv) {
+    try {return segarally_host_main(argc,argv);}catch(const std::exception &error) {fprintf(stderr,"Sega Rally native: %s\n",error.what());return 1;}
+}
+#endif
