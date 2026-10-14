@@ -1,5 +1,57 @@
 # Handoff
 
+## Desert results, second course and measured Mac speed (2026-10-14)
+
+Mac remains the only active platform. The design now records that current
+scope explicitly; iPhone configuration is preserved without further device work.
+Six actual execution frontiers extend coverage through the finish cinematic,
+Desert results, next-stage loader and second-course time-up:
+`0x005bf790`, `0x005bf880`, `0x005bf7c0`, `0x005bae40`, `0x005bc8d0`,
+and `0x005bfff0`. Every observed row retains its input replay hash, original
+execution profile, instruction/cycle counts and dispatch site. Static proofs
+are unchanged: 116 table rows, ten continuations and sixteen registrations.
+
+The held-gas replay displays DESERT STAGE CLEAR, rank 15th and clear/total time
+1:12.15, with the Lancia close-up. The v9 result frontier occurs at
+1,268,125,837 instructions / 2,947,096,677 reference cycles / 6,781 renders.
+Its ignored evidence is
+`build/segarally-timed-v9/evidence/lancia-centered-gas-005bf7c0`; boot report
+SHA-256 is `6bc3f0a783df786a94836b92483eb39136a508e0a3a3a7b13f025730e03dc2fa`.
+The v11 run enters the forested second course, then runs out of time at
+1,659,787,795 instructions / 3,881,862,423 cycles / 8,931 renders. Its capture
+shows the Lancia off the road at 19 km/h, total time 1:37.57 and lap time 25.42.
+The replay does not steer through the second course's bends; this is observed
+course entry and time-up behavior, not second-course completion.
+V12 displays the large TIME IS UP lettering before its next actual callback.
+Game Over and restart remain under test.
+
+The frozen v13 profile contains 75,205 instructions / 52 native objects with
+zero missing templates. Source-set SHA-256 is
+`ddc5a290001d54544e0afa7004ce9aa82b08cdb8d26545abfb7f494b343fe88f`,
+coverage `0eebd441903e486e82e8cbab925c758499dd021e128c7230bc68c41399a194bf`.
+Earlier profiles, including the user-tested v6 app, remain preserved.
+
+Quiet hidden-window Metal profiling measures 480 race frames (2280..2760) in
+14.163164 seconds of wall time for 8.344320 seconds of board time: 33.8907 FPS,
+58.9156% normal speed. Core execution is 14.082547 seconds, or 99.4308% of wall
+time and 29.3386 ms/frame. Geometry takes 0.1525 ms/frame, TGP 0.0521 ms/frame,
+and GPU CPU encoding 0.1222 ms/frame. Those nested core timings are not additive
+to core cost; encoding is not GPU completion time. The run uses the stable fan
+renderer, sound disabled, and normal board-time pacing. Hidden acquisition
+does not measure visible VSync blocking. Evidence and instrumented source hashes
+are in `build/validation/mac-profile/profile.json`.
+
+An isolated exact instruction-index candidate replaces binary address search
+and linear chunk selection while retaining every instruction body and timing
+boundary. Its synthetic tests pass and all fifty v6 instruction chunks are
+byte-identical, but actual performance and independent replay parity are still
+pending; it is not integrated or in the playable app. A requested native stack
+sample could not attach because approval arrived after its bounded process
+exited; no stack result exists and no conclusion is based on one. Next: finish
+Game Over/restart coverage, measure and validate exact dispatch, then native
+audio presentation and real-race Metal comparisons. Complete MAME-machine race
+parity, hardware FP precision and remaining-course completion are still open.
+
 ## Mac-first validation and finish-line coverage (2026-10-14)
 
 Current user direction is to defer the iPhone build and concentrate on making

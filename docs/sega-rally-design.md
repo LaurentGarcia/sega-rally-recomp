@@ -6,14 +6,20 @@ The sections **i960 static recompiler**, **Reference & validation**, and
 **Platform layer & build** govern that reuse. Daytona-specific addresses and
 hardware mappings are evidence to inspect, not defaults for Sega Rally.
 
+Current development scope is Mac only, following the 2026-10-14 direction.
+Complete and validate the native game before resuming iPhone work. The shared
+SDL3/Metal architecture remains; device builds, installs and testing are deferred
+until requested again.
+
 ## Required end state
 
 - Generate Sega Rally's native game code reproducibly from verified user ROMs.
 - Execute the actual game control flow, including menus, races, and results.
 - Preserve geometry command, polygon-priority, texture, audio, timing, and input
   behavior using tested shared components from Daytona where the hardware agrees.
-- Run through SDL3 and hardware Metal on the connected iPhone, with functioning
-  touch/controller inputs and lifecycle handling.
+- Run through SDL3 and hardware Metal on Mac, with functioning keyboard/controller
+  inputs and lifecycle handling. Resume the iPhone target after the native game
+  is ready and device work is requested again.
 - Validate actual game scenes and replayed inputs, including buildings, car
   decals, shadows, water, and foreground occlusion.
 
@@ -33,7 +39,7 @@ hardware mappings are evidence to inspect, not defaults for Sega Rally.
 5. Connect the verified game to the shared SDL3/Metal host. Bring up the correct
    sound-board behavior, inputs, saves, pause/resume, and frame pacing.
 6. Run attract, course selection, driving, finish/results, and restart checks on
-   the phone. Record what passed and what remains incomplete.
+   Mac. Record what passed and what remains incomplete; phone checks are deferred.
 
 ## Current evidence and unresolved work
 
@@ -183,6 +189,24 @@ The linked native sound board completes the same run with identical main state
 transcripts and final pixels. The Mac Metal host has visibly passed GO with
 selection-replay handoff to manual controls. These observations do not close
 the full-race, hardware-precision, exact raster or on-phone validation gaps.
+The separate held-gas replay now completes Desert and its result screen
+(1:12.15), enters the forested second course, and reaches TIME IS UP. It supplies
+centered steering rather than following the second course's bends. Six additional
+actually executed callbacks extend the frozen v13 graph to 75,205 instructions;
+the existing static table and registration proofs are unchanged. Game Over,
+restart and completion of the remaining courses still require validation.
+Independent v6 driving comparison matches 600 million instructions, all nineteen
+input events, 19,641,024 ordered writes and 3,142 renders against the reference
+CPU with shared board implementations. It is not complete MAME-machine parity.
+
+The slow sensation of speed is measured in a hidden, normally paced Mac Metal
+run with sound disabled: 480 race frames take 14.163 seconds of wall time for
+8.344 seconds of board time, or 33.89 FPS and 58.92% normal speed. Core execution
+accounts for 99.43% of wall time; the CPU cost of GPU encoding is 0.122 ms/frame
+and is not a GPU completion measurement. Hidden-window acquisition does not
+measure visible VSync blocking. Optimization must preserve per-instruction
+timing, live instruction guards and exact event/IRQ boundaries; changing the
+game clock is not a speed fix.
 Bundled assets are verified Xcode resource inputs so signing follows copying,
 including incremental builds; post-signing bundle mutation is not allowed.
 
