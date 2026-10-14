@@ -14,7 +14,7 @@ The repository is in bring-up. The expanded address-label profile produces
 66,597 native i960 instructions and 46 compiled objects. The core executes
 reset at `0x420`, copies and checks its RAM code, initializes the I/O chip,
 and displays the original startup warning and Sega Rally 1995 logo. Independent
-CPU execution agrees through 100 million instructions and 513 startup frames.
+CPU execution agrees through 266,518,444 instructions and 1,354 startup frames.
 The longer logo run still stops at an unresolved indirect target; attract mode
 and racing are not established. I/O, EEPROM, communication, UART, video, timers and screen
 events use native hardware components with isolated reference tests. A shared
@@ -32,7 +32,8 @@ evidence, not proof that this new runtime already runs a race.
 
 The dedicated SDL3/Metal frontend builds on macOS and iPhone. Its first native
 iPhone package is installed as **Sega Rally Native**, separately from the
-earlier prototype; launch and gameplay validation remain pending. On macOS,
+earlier prototype. It launches and initializes the A15 Metal device; phone frame
+capture and gameplay validation remain pending. On macOS,
 the startup warning frame matches the CPU renderer pixel for pixel. Polygon
 and racing-scene parity still require actual 3D captures.
 

@@ -52,6 +52,7 @@ struct Model2AMachine::Impl {
     std::optional<RunResult> stopped;
     uint32_t previous_dispatch = 0;
     uint64_t frames_rendered = 0, frames_parsed = 0;
+    uint64_t frames_with_geometry = 0, first_geometry_frame = 0;
 #ifdef M2_SRALLY_CONTROL
     std::unique_ptr<Model2AControl> control;
 #endif
@@ -187,6 +188,10 @@ struct Model2AMachine::Impl {
             screen->on_end = [this](uint64_t, uint64_t) {
                 video->screen_update(geo->polys, geo->windows());
                 ++frames_rendered;
+                if (!geo->polys.empty()) {
+                    if (!frames_with_geometry) first_geometry_frame = frames_rendered;
+                    ++frames_with_geometry;
+                }
             };
         }
 #endif
@@ -258,6 +263,7 @@ Model2AMachine::Stats Model2AMachine::stats(bool hash_screen) const {
     s.instructions = m.schedule.count; s.reference_cycles = m.cpu.reference_cycles;
     s.board_time_ns = m.clock.now_ns(); s.pc = m.cpu.m_IP; s.previous_dispatch = m.previous_dispatch;
     s.frames_rendered = m.frames_rendered; s.frames_parsed = m.frames_parsed;
+    s.frames_with_geometry = m.frames_with_geometry; s.first_geometry_frame = m.first_geometry_frame;
     s.irq_entries = unsigned(m.schedule.interrupts());
 #ifdef M2_SRALLY_SCREEN
     if (m.screen) { s.screen_frame = m.screen->screen_frame(); s.latched_frame = m.screen->latched_frame(); }
@@ -269,6 +275,7 @@ Model2AMachine::Stats Model2AMachine::stats(bool hash_screen) const {
     if (m.uart_chip) { s.uart_mode = m.uart_chip->mode(); s.uart_command = m.uart_chip->command(); s.tx_pin_changes = m.tx_pin_changes; }
 #endif
 #ifdef M2_SRALLY_VIDEO
+    if (m.geo) s.polygons = m.geo->polys.size();
     if (hash_screen && m.video) s.screen_hash = m.video->video().screen_hash();
 #else
     (void)hash_screen;

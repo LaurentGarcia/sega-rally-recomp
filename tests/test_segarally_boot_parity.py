@@ -20,6 +20,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--build-dir", type=Path, default=ROOT / "build/segarally")
     parser.add_argument("--instructions", type=int, default=2_000_000)
+    parser.add_argument("--timeout", type=int, default=180, help="Execution timeout in seconds for longer checkpoints")
     parser.add_argument("--compiler", default=os.environ.get("CXX", "c++"))
     parser.add_argument("--tgp", action="store_true", help="Attach independently instantiated native TGP boards")
     parser.add_argument("--io", action="store_true", help="Attach independent I/O+EEPROM devices using each CPU's reference cycle clock")
@@ -38,8 +39,10 @@ def main():
     directory = args.build_dir.resolve()
     if not directory.is_relative_to(ROOT / "build") or directory == ROOT / "build":
         parser.error("--build-dir must be below ignored build/")
-    if not 1 <= args.instructions <= 100_000_000:
-        parser.error("--instructions must be 1..100000000")
+    if not 1 <= args.instructions <= 1_000_000_000:
+        parser.error("--instructions must be 1..1000000000")
+    if not 1 <= args.timeout <= 3600:
+        parser.error("--timeout must be 1..3600 seconds")
     audit = json.loads((directory / "coverage.json").read_text())
     assert audit["board"] == "model2a" and audit["native_objects_compiled"]
     reachability = json.loads((directory / "reachability.json").read_text())
@@ -107,7 +110,7 @@ def main():
     if args.uart:
         arguments.append("--uart")
     result = subprocess.run(arguments,
-                            cwd=ROOT, capture_output=True, text=True, timeout=180)
+                            cwd=ROOT, capture_output=True, text=True, timeout=args.timeout)
     transcript = result.stdout + result.stderr
     (directory / "boot-parity.txt").write_text(transcript)
     print(transcript, end="")

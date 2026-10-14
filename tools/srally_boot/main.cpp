@@ -86,6 +86,9 @@ int main(int argc, char **argv) {
         if (options.video) std::printf("native_video linked=true frame_clock_connected=%s frames_rendered=%" PRIu64
             " frames_parsed=%" PRIu64 " latched_frame=%" PRIu64 " screen_frame=%" PRIu64 " screen_hash=%016" PRIx64 "\n",
             options.screen ? "true" : "false", s.frames_rendered, s.frames_parsed, s.latched_frame, s.screen_frame, s.screen_hash);
+        if (options.video) std::printf("native_geometry polygons=%" PRIu64 " frames_with_geometry=%" PRIu64
+            " first_geometry_frame=%" PRIu64 " frame_numbering=one_based_zero_means_none\n",
+            s.polygons, s.frames_with_geometry, s.first_geometry_frame);
 #ifdef M2_SRALLY_VIDEO
         if (argc == 9 && s.frames_rendered) {
             std::ofstream frame(argv[8], std::ios::binary);

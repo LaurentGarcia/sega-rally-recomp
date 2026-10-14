@@ -1,5 +1,32 @@
 # Handoff
 
+## Independent title checkpoint and phone launch (2026-10-14)
+
+Independent CPU/device instances now agree through 266,518,444 instructions,
+3,573,076 ordered cycle-stamped writes, 588,916,392 reference cycles and
+13,559 IRQ entries. The frozen v2 profile stops at the same missing-code
+target `0x005caba0`; 1,354 rendered frames / 1,355 geometry parses and final
+pixel hash `2e007e4918e0a776` match. All 23,556,655 physical UART edges match.
+This extends the earlier 100-million parity checkpoint through the title
+screen, with RX still idle and the sound CPU/chip unconnected. Shared device
+implementations remain outside independent full-MAME/PCB validation.
+
+Reproduce using `tests/test_segarally_boot_parity.py --build-dir
+build/segarally-timed-v2 --instructions 300000000 --timeout 600 --tgp --io
+--comm --control --video --screen --uart`. The runner now accepts an explicit
+bounded timeout and up to one billion instructions for later checkpoints.
+Machine/boot diagnostics also record current polygon count, frames containing
+geometry and the first such rendered frame (one-based, zero if absent),
+without changing execution or rendering. All-device strict compilation passes.
+Nonempty geometry is not proof that the car is visible.
+
+The installed native app launches and its retrieved log confirms scene startup
+and `GPU driver=metal device=Apple A15 GPU`. A separate bounded GPU-capture
+launch was denied because the phone had locked. No phone frame or gameplay
+claim follows from initialization; there are no further retry loops. Local
+device logs remain ignored. Continue native coverage and capture work on Mac
+while the phone is unavailable.
+
 ## Metal frontend and first native iPhone installation (2026-10-14)
 
 The standalone `platform/segarally` host uses shared Model2AMachine and the

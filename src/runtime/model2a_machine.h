@@ -32,6 +32,8 @@ public:
         uint64_t instructions = 0, reference_cycles = 0, board_time_ns = 0;
         uint64_t frames_rendered = 0, frames_parsed = 0, screen_frame = 0, latched_frame = 0;
         uint64_t tgp_instructions = 0, tx_pin_changes = 0, screen_hash = 0;
+        uint64_t polygons = 0, frames_with_geometry = 0;
+        uint64_t first_geometry_frame = 0; // one-based rendered frame; zero means none
         uint32_t pc = 0, previous_dispatch = 0;
         unsigned irq_entries = 0;
         bool tgp_booted = false;
