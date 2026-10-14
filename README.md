@@ -1,166 +1,78 @@
 # Sega Rally Championship native recompilation
 
 A dedicated reverse-engineering project for Sega Rally Championship (1995,
-Model 2A), based on the Daytona USA static recompilation tools and native
-hardware implementation.
+Model 2A), based on Daytona USA's static recompilation tools and shared native
+hardware code. It reconstructs behavior from verified personal ROMs; it is not
+Sega's original source code.
 
-The target is the original game running as generated native C++ with shared
-Model 2 hardware code, SDL3, and Metal on iPhone. This is reconstructed behavior
-from the user's ROMs, not Sega's original source code.
+**macOS is the active target.** The game runs through SDL3 and Metal. iPhone
+work is deferred while native game coverage, speed, sound and fidelity improve.
 
-## Current state
+## Documentation
 
-The repository is in bring-up. The expanded profile produces
-73,945 native i960 instructions and 51 compiled objects. The core executes
-reset at `0x420`, copies and checks its RAM code, initializes the I/O chip,
-and displays the original startup warning and Sega Rally 1995 logo. Independent
-CPU execution agrees through 321,115,347 instructions and 1,634 rendered frames,
-including the first car/course scene.
-An exact two-coin/start/steering/gas replay reaches Car Select and selects the
-automatic Lancia. Independent CPU/device parity follows that path through
-376,736,993 instructions and 1,915 rendered frames, stopping at a missing
-callback during the transition after selection. The versioned replay is
-`config/segarally_lancia_select.inputs`; playable racing remains unverified.
-The longer native run renders the Martini Lancia, another rally car and a
-forest/gravel course before an unresolved callback. This establishes a first
-3D scene; completed attract mode and racing are not established. I/O, EEPROM, communication, UART, video, timers and screen
-events use native hardware components with isolated reference tests. A shared
-event queue preserves deadline and insertion order, with CPU IRQ delivery at
-instruction boundaries. The runner charges pinned-reference opcode cycles
-before memory effects and supplies device time at 25 MHz; this is not measured
-PCB timing. An optional diagnostic connects the generated sound 68000, native
-SCSP and physical serial link. Instruction totals, waits and ordered writes
-pass independent public-microcode comparisons; exact bus phases remain
-unverified. The linked machine reaches real sound IRQs and another native-code
-frontier. Whole-game audio and playback are not established. The SCSP chip
-passes isolated sample, DSP, timer and serial comparisons. The actual game uploads and runs its 1,665-word TGP
-program through Daytona's shared hardware code. These are bring-up checks, not a complete game
-boot. The existing lifted-C iPhone prototype lives
-separately in `../segarally95-recomp`; its rendering captures provide regression
-evidence, not proof that this new runtime already runs a race.
+Start with the [project wiki](docs/README.md):
 
-The dedicated SDL3/Metal frontend builds on macOS and iPhone. Its first native
-iPhone package is installed as **Sega Rally Native**, separately from the
-earlier prototype. It launches and initializes the A15 Metal device; phone frame
-capture and gameplay validation remain pending. On macOS,
-the startup warning frame matches the CPU renderer pixel for pixel. A paired
-3D car capture has 8.31% differing pixels; a frozen-scene diagnostic attributes
-most average error to whole-polygon versus triangle-fan interpolation. Exact
-graphics fidelity and racing-scene parity remain unresolved.
+- [Mac player manual](docs/mac-player-manual.md): launch, controls, coins and saves.
+- [Build and validation guide](docs/segarally-build-validation.md): reproducible
+  import, generation, Mac builds and bounded checks.
+- [Technical architecture](docs/segarally-architecture.md): CPU, devices, timing,
+  graphics and audio.
+- [Evidence and status](docs/segarally-status.md): measured progress and remaining
+  validation.
 
-Daytona's instruction decoder, C++ generator, CPU services, geometry, rasterizer,
-SDL3 host, Metal shaders, and tests form the starting codebase. Game-specific
-ROM layouts, entry points, hardware mappings, and sound behavior must be checked
-before reuse. The existing Daytona build targets remain as reference targets.
+The [design](docs/sega-rally-design.md), [project rules](rules.md) and
+[handoff](HANDOFF.md) retain the detailed contracts and engineering record.
 
-## Reproducible inputs
+## Current checkpoint
 
-Supply your own Sega Rally ROM archive. ROMs, extracted images, generated game
-C++, display-list captures, and compiled apps belong in ignored local folders.
-They are never committed. Verified manifests, address lists, source tools, and
-tests are versioned.
+The frozen v13 graph contains 75,205 native i960 instructions in 52 compiled
+objects. It runs the actual Lancia race, Desert finish/results and entry into
+the forested second course. A two-billion-instruction held-gas replay reaches
+time-over and returns to attract mode without a missing-code or device error.
+Other courses, alternate paths and a fresh second-credit start still need tests.
 
-With Python 3 and a C++20 compiler, run:
+Independent CPU comparison passes 600 million driving instructions, all nineteen
+recorded input events, 19,641,024 ordered writes and 3,142 rendered frames.
+It uses separately instantiated shared device implementations, so it is not
+full MAME-machine or PCB proof. Extended-precision FP, exact racing-scene pixels
+and physical timing remain open requirements.
 
-```sh
-python3 scripts/segarally_recompile.py --roms /path/to/srallyc.zip --seed-profile lift-labels
-python3 scripts/segarally_tgp.py --roms /path/to/srallyc.zip
-python3 scripts/segarally_video.py --roms /path/to/srallyc.zip
-python3 scripts/segarally_boot.py --instructions 100000000 --with-tgp --with-io --with-comm --with-control --with-video --with-screen --with-uart --capture-frame
-```
+Indexed instruction lookup preserves instruction bodies and timing checks.
+A quiet hidden Mac race comparison improves from 33.89 to 40.43 FPS, about 19%,
+with sound off. That checkpoint remains below real time; it is not a guarantee
+for other machines or visible-window presentation.
 
-The importer verifies the Revision B (`srallycb`) program pair present in the
-supplied archive by published size, CRC32, and SHA1. It rejects mismatches.
-Output goes to `build/segarally/`: imported images, generated C++, native
-objects, `coverage.json`, and the bounded execution report `boot.json`.
-The boot command exits 3 for an unimplemented board access or 4 for a missing
-code target; those are incomplete frontiers, not successful game boots.
-Use `--instructions 10000000` to run past the initial RAM-copy loop; the
-default one-million-instruction limit stops inside it.
-`--step-frames` exercises the same resumable machine one rendered frame at a
-time while retaining the exact instruction limit.
-`--input-replay FILE` additionally supplies complete cabinet input snapshots
-at completed rendered-frame boundaries; it requires `--with-screen --with-io`.
-See [input replay format](docs/segarally-input-replay.md). The runner saves
-the exact input file and its SHA-256 beside the boot report, and records each
-applied event's instruction/cycle count. It does not change game memory.
+Native SCSP produces verified stereo PCM. The optional SDL audio output has
+accepted a ten-second captured race excerpt through CoreAudio without input
+shortfalls. In a normal-paced game check, however, the output queue runs dry:
+the current runtime cannot produce audio fast enough for continuous playback.
+The preserved v13 speed playtest has sound off; the separate sound build requires
+both the build option and runtime `--sound`. Listening confirmation remains open.
+See the [sound instructions](docs/segarally-build-validation.md#optional-sound-experiment).
 
-The expanded profile has 403 annotated label candidates, seven separately
-recorded executed targets, three checked table-derived targets, and RAM aliases. It retains 402 unresolved
-indirect sites and 13 invalid decode stops for analysis. The default
-`--seed-profile bootstrap` uses a smaller label set. Every generated RAM
-instruction checks its live word(s) before execution. Generation success does
-not prove that every game path has been found.
+## Personal inputs and repository boundaries
 
-Tests for the bootstrap, instruction templates, native/reference execution,
-and TGP inputs are:
+Supply an archive matching the committed Revision B (`srallycb`) manifests.
+The importer checks sizes, CRC32 and SHA1; filenames alone do not establish the
+revision. ROMs, extracted images, generated game C++, captures and apps stay in
+ignored local directories. Source tools, native hardware code, manifests,
+address annotations, tests and analysis are versioned.
 
-```sh
-python3 tests/test_segarally_bootstrap.py
-python3 tests/test_segarally_table_seeds.py
-python3 tests/test_segarally_continuations.py
-python3 tests/test_segarally_native_templates.py
-python3 tests/test_segarally_boot_parity.py --tgp --io --comm --control --video --screen --uart
-python3 tests/test_i960_runtime_timing.py
-python3 tests/test_segarally_tgp_import.py
-python3 tests/test_segarally_video_import.py
-python3 tests/test_segarally_sound_import.py
-python3 tests/test_segarally_sound_recompile.py
-python3 tests/test_segarally_sound_link.py
-```
+Unsupported hardware and missing native targets stop with diagnostics. They
+are not skipped or replaced with invented game behavior. The earlier lifted-C
+phone prototype lives separately in `../segarally95-recomp`; its captures and
+Daytona's results do not establish this runtime's fidelity.
 
-The separate sound reset probe uses the same verified archive:
-
-```sh
-python3 scripts/segarally_sound.py --roms /path/to/srallyc.zip
-python3 scripts/segarally_sound_recompile.py
-```
-
-Its successful audit means the expected SCSP access frontier was reached;
-it does not mean audio played. This default reset probe counts completed
-instructions without a board clock or asynchronous interrupts.
-
-For the optional instruction-timed sound diagnostic, generate and audit the
-sound core before linking it to the main board:
-
-```sh
-python3 scripts/segarally_sound_recompile.py --timed
-python3 scripts/segarally_boot.py --instructions 100000000 --with-tgp --with-io --with-comm --with-control --with-video --with-screen --with-uart --with-sound
-```
-
-Use matching `--build-dir` arguments for a nondefault import. An explicit
-`--sound-build-dir` can select a separately audited sound build. Changed source,
-assets or generated code require a new audit. This mode connects serial pins,
-SCSP samples and IRQs; it reports native-code frontiers and does not yet play
-audio through the host. MMIO remains at instruction boundaries.
-
-After importing/generating the main, TGP and video inputs above, build the
-dedicated frontend with the pinned SDL3 checkout described in
-[the host instructions](platform/segarally/README.md):
-
-```sh
-SEGARALLY_NATIVE_BUILD="$PWD/build/segarally" bash platform/segarally/build.sh mac
-SEGARALLY_NATIVE_BUILD="$PWD/build/segarally" bash platform/segarally/build.sh ios
-```
-
-The current controls are touch and keyboard. EEPROM/backup RAM persist across
-launches; code or hardware frontiers leave a diagnostic instead of being skipped.
-
-See [the project design](docs/sega-rally-design.md) for scope and validation.
 Full MAME tracing currently needs three files absent from the supplied archive:
-`epr-17891.ic12` (drive), `epr-16726.bin` (communication), and `epr-18022.ic2`
-(billboard). This does not prevent native CPU/TGP bring-up; a full reference
-race has not been captured.
-The [inherited Daytona documentation](docs/daytona-upstream-readme.md) describes
-the upstream reference build; its claims do not establish Sega Rally support.
+`epr-17891.ic12` (drive), `epr-16726.bin` (communication) and `epr-18022.ic2`
+(billboard). Native bring-up does not claim to execute those missing firmwares.
 
 ## Source base
 
 Started from [`alphanu1/daytona-arcade-recomp`](https://github.com/alphanu1/daytona-arcade-recomp)
 at `b33baeb28a1e1c94d90a4a80811f0b2c7f61106b`. The upstream Git history and
-BSD-3-Clause license are retained. `daytona-upstream` is a read/reference remote;
-this project currently has no publication remote.
-
-The shared polygon-priority component is used by the native CPU and GPU
-renderers. It keeps Model 2 window, sort-bucket, submission-order, and face rules
-consistent; camera-space depth does not substitute for arcade polygon priority.
+BSD-3-Clause license are retained. Third-party pins and licenses are recorded in
+[THIRD_PARTY.md](THIRD_PARTY.md). `daytona-upstream` is a read/reference remote;
+this project currently has no publication remote. The
+[inherited Daytona documentation](docs/daytona-upstream-readme.md) describes the
+upstream reference build, whose targets remain available separately.

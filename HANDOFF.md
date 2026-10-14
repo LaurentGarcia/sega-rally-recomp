@@ -1,5 +1,61 @@
 # Handoff
 
+## Mac documentation and real audio output checks (2026-10-14)
+
+The repository now has a wiki index, Mac player manual, build/validation guide,
+technical architecture guide and evidence/status reference under `docs/`.
+The root and dedicated-host READMEs point to them and state the active Mac-only
+scope. Phone work is deferred. Commands cover verified import, exact indexed
+generation, pinned SDL3 setup, isolated Mac builds, optional sound and bounded
+parity. The 600-million-instruction example explicitly allows 1,200 seconds;
+the harness's 180-second default is too short for the previously measured run.
+All 47 local documentation links/anchors resolve, command paths and switches
+were checked against the source, and whitespace checks pass. No external wiki
+was published; no publication remote is configured.
+
+The sound-off indexed v13 user window closed normally at 9,730 frames,
+1,796,003,836 instructions, 4,228,699,002 cycles and PC `0x005a37a4`, result 0.
+All ten selection events applied; manual takeover was frame 1,851. This log
+does not establish which course the player reached.
+
+A separate ten-second native race-audio excerpt was paced through the current
+`AudioOutput` and the actual SDL/CoreAudio default output. It submitted 441,000
+stereo frames with no host drops, no reported extra input demand and a maximum
+queue of 4,017 frames. The sample used unity gain, peak 0.0672225952 and RMS
+0.0104243613. Evidence and source/binary hashes are in
+`build/validation/audio-output/results.json`. Counters were read before final
+tail drain. The API accepted audio; physical listening remains unconfirmed.
+
+The isolated signed sound package is
+`build/worktrees/mac-audio-v13/build/mac-sound-v13/Sega Rally Native.app`, built
+from `a4b8094` with stable fan graphics, frozen v13 indexed main code, 2,663
+native sound instructions and eight verified assets. Strict bundle signing,
+the audio fixture and help check pass. It has not been visibly launched.
+Its hidden normal-paced real-device replay completes 2,760 frames with
+529,303,426 instructions, 1,199,537,000 cycles and PC `0x005dde44`, matching
+the prior main-state checkpoint. Eighteen replay events applied; the final
+event at frame 2,760 remains pending because the bounded host exits there.
+
+The live check produces 2,115,984 stereo frames, including 2,794,333 nonzero
+channel samples, peak 0.0676727295 and RMS 0.00714519913. Chip and host sample
+drops are zero, but SDL records 3,222 demand requests for 10,744,248 additional
+input bytes; the queue ends at 774 frames. This establishes live presentation
+starvation, despite the successful pre-recorded output check. The counters are
+estimated input demand including resampler padding, not exact hardware missing
+samples. A larger fixed buffer does not correct sustained execution below real
+time. Evidence is `device-check.log` and `device-check.wav` beside the package;
+precise wall-duration timestamps were not captured. Continuous live playback
+and user hearing are not established.
+
+Next: reduce exact main dispatch overhead, verify old/new Machine execution on
+the actual driving replay, then repeat sound-enabled PCM and device checks.
+An opt-in instruction-boundary hook is isolated in
+`build/worktrees/boundary-hook`; strict/sanitizer synthetic tests and build-audit
+tests pass, but real-game equivalence and performance remain pending. Its
+generation must retain `--seed-profile lift-labels` to match frozen v13; an
+initial proposed command omitted that flag and was corrected before generation.
+The prototype is not included in this commit or either preserved playtest.
+
 ## Exact indexed dispatch and the next Mac playtest (2026-10-14)
 
 `m2recomp --indexed-dispatch` now emits a sparse page/word index for exact
