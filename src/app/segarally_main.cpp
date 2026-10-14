@@ -71,7 +71,7 @@ void capture_reference(const rt::Video &video,const std::filesystem::path &path)
 int segarally_host_main(int argc,char **argv) {
     std::filesystem::path data,saves,capture_path,reference_path,log_path,replay_path;
     uint64_t frame_limit=0,instruction_limit=0;
-    bool touch_visible=false,unthrottled=false,hidden=false;
+    bool touch_visible=false,unthrottled=false,hidden=false,fullscreen=false;
     if(const char *env=std::getenv("SEGARALLY_DATA_DIR")) data=env;
     if(const char *env=std::getenv("SEGARALLY_SAVE_DIR")) saves=env;
     for(int i=1;i<argc;++i) {
@@ -83,9 +83,10 @@ int segarally_host_main(int argc,char **argv) {
         else if(arg=="--reference-capture") reference_path=value();
         else if(arg=="--unthrottled") unthrottled=true;
         else if(arg=="--hidden") hidden=true;
+        else if(arg=="--fullscreen") fullscreen=true;
         else if(arg=="--log") log_path=value();
         else if(arg=="--input-replay") replay_path=value();
-        else if(arg=="--help") {puts("Sega Rally native: --data DIR --save-dir DIR --frames N --instructions N --capture FILE.ppm --reference-capture FILE.ppm --touch --unthrottled --hidden --log FILE --input-replay FILE\nKeys: arrows steer, Z gas, X brake, C coin, Return start, V view, A/S gear down/up, Space handbrake, F2 service, F3 test, Escape quit.");return 0;}
+        else if(arg=="--help") {puts("Sega Rally native: --data DIR --save-dir DIR --frames N --instructions N --capture FILE.ppm --reference-capture FILE.ppm --touch --unthrottled --hidden --fullscreen --log FILE --input-replay FILE\nKeys: arrows steer, Z gas, X brake, C coin, Return start, V view, A/S gear down/up, Space handbrake, F2 service, F3 test, Escape quit.");return 0;}
         else throw std::runtime_error("Unknown argument "+arg);
     }
     if(!log_path.empty()) {
@@ -122,6 +123,7 @@ int segarally_host_main(int argc,char **argv) {
         if(reference) {if(!eeprom.empty()) reference->load_eeprom(eeprom);if(!backup.empty()) reference->load_backup(backup);}
         SDL_WindowFlags flags=SDL_WINDOW_RESIZABLE|SDL_WINDOW_HIGH_PIXEL_DENSITY;
         if(hidden) flags|=SDL_WINDOW_HIDDEN;
+        if(fullscreen) flags|=SDL_WINDOW_FULLSCREEN;
 #ifdef SEGARALLY_IOS
         flags|=SDL_WINDOW_FULLSCREEN;touch_visible=true;
 #endif

@@ -1,5 +1,67 @@
 # Handoff
 
+## Native Lancia driving and full-screen Metal launch (2026-10-14)
+
+The frozen v6 generation reaches actual driving: 74,181 native instructions,
+51 compiled objects, zero missing templates. Two actual entries extend v4:
+`0x005e2828`, the reached return continuation after Lancia selection, and
+`0x005c0d60`, the race callback reached after GO. These are recorded execution
+frontiers, not broader inferred code-pointer rules. Source-set SHA-256 is
+`4aa8f1552e2f56d7477d858cead503bf708c8b2b448d5200142a58829a065d06`,
+coverage `74da94b686fd6fa703f2dd04ead968174f50f22a53ea6447be918313d86bedf6`.
+
+The nineteen-event cabinet replay is versioned as
+`config/segarally_lancia_drive.inputs`, SHA-256
+`d7055e6747358f61509abbd49c449eea9437f8c11012aec5be52117190f5869c`.
+All events complete at 600,000,000 main instructions / 1,365,742,448 reference
+cycles / 32,576 IRQs / 3,142 renders, with no code or device frontier. The
+capture shows the chase-view Lancia farther down the gravel course, elapsed
+13.53 seconds and 8 km/h after brake release/coasting. A 500-million capture
+during gas shows 160 km/h in third gear after left steering; the matched
+centered-steering capture shows 222 km/h in fourth gear at the same 4.48-second
+race time. Automatic gear changes and a steering-dependent trajectory are
+observed. Evidence remains ignored under `build/segarally-timed-v6/evidence/`.
+No game-state or generated-instruction patches are involved.
+Matched 530-million-instruction captures isolate the brake ADC: gas is released
+in both, while brake `ff` produces 113 km/h in second gear and brake `00`
+produces 185 km/h in fourth at the same displayed race time of 7.22 seconds.
+
+The linked sound profile adds only actually reached dispatcher target
+`0x601852`, bringing it to 2,663 instructions / 61 combined seeds with no
+template or timing gaps. It completes the same 600-million driving run with
+39,901,316 sound instructions, 616,747,443 modeled sound cycles, 53,848 sound
+IRQs and 11,750 main UART pin transitions. All 26 compared main/input/IRQ/frame/
+TGP/status transcript lines and final PPM bytes match the sound-disabled run.
+This does not enable frontend audio playback or establish full audio parity.
+Evidence is `build/segarally-coupled-v7/evidence/lancia-drive-600m`; boot report
+SHA-256 `4810eab3cd9f8727c479ec441c7a7b0f17e2c94b8d9f8786eb638551eb641f5b`,
+sound audit `b7d1f0dcb030a08e2c474fb674f79fc729ce047e90a697ff86fa3a2dc08fb032`.
+
+Independent v5 selection parity passes through GO and its then-missing callback:
+451,072,711 instructions, 11,880,004 ordered writes, 1,012,631,901 cycles,
+23,911 IRQs and 2,329 renders, hash `efb9df857cb6e7c8`. Every cabinet event
+matches the shared machine's instruction/cycle boundary. This comparison uses
+independent CPU instances with shared board implementations, not a complete
+MAME-machine or PCB race. Next: extend this comparison through v6 driving and
+exercise longer course, finish/results and restart paths.
+
+The host and Mac launcher now accept `--fullscreen`. Strict host compilation,
+Python compile and diff checks pass. A fresh signed Mac app at
+`build/segarally-mac-v5/Sega Rally Native.app` was rebuilt against frozen **v6**
+(the build-directory name is older), launched through LaunchServices with
+Metal on Apple M5, desktop fullscreen and normal pacing. The selection-only
+replay completed all ten events and handed control back at frame 1851; the
+live log continued beyond GO to frame 2460 without a frontier. Z accelerates,
+X brakes, arrows steer, V changes view, and Escape exits. The stable committed
+GPU shaders remain in this visible app; the interpolation prototype is separate.
+The app subsequently exited normally at frame 2618 / 503,836,827 instructions
+with result 0; no missing-code or device failure was logged.
+At the user's request the same packaged stable v6 executable was then opened
+in a normal window, with fresh `live-window-save`, `live-window.log` and the
+selection-only replay. Startup confirms Apple M5 Metal and progressing frames.
+The new driving build has not yet been installed on the locked phone. Full-race
+completion, physical timing and exact graphics fidelity remain unverified.
+
 ## Interactive replay and measured Metal interpolation difference (2026-10-14)
 
 The SDL3 host and Mac launcher accept the same `--input-replay FILE` format.

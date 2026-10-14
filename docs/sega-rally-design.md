@@ -170,6 +170,14 @@ The host also accepts the bounded cabinet replay and holds its final snapshot
 through one complete frame before handing control to keyboard/touch. Both
 rendering instances receive identical inputs. Normal board-time pacing is the
 Mac launch default; unthrottled runs are explicit diagnostics.
+The frozen v6 generation now executes the actual Lancia race with recorded
+cabinet throttle, steering, view and brake events. A bounded 600-million main
+instruction run renders 3,142 frames without an unsupported frontier; matched
+captures show acceleration, automatic shifting, steering and braking responses.
+The linked native sound board completes the same run with identical main state
+transcripts and final pixels. The Mac Metal host has visibly passed GO with
+selection-replay handoff to manual controls. These observations do not close
+the full-race, hardware-precision, exact raster or on-phone validation gaps.
 Bundled assets are verified Xcode resource inputs so signing follows copying,
 including incremental builds; post-signing bundle mutation is not allowed.
 

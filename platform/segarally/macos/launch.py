@@ -14,6 +14,7 @@ parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--build-dir",type=Path,default=ROOT/"build/segarally-mac")
 parser.add_argument("--unthrottled",action="store_true",help="Disable board-time pacing for diagnostics")
 parser.add_argument("--input-replay",type=Path,help="Optional cabinet input replay, then manual control")
+parser.add_argument("--fullscreen",action="store_true",help="Launch in desktop fullscreen")
 args=parser.parse_args()
 build=args.build_dir.resolve()
 if not build.is_relative_to(ROOT/"build"):
@@ -48,6 +49,7 @@ try:
     subprocess.run(["codesign","--force","--sign","-",str(app)],check=True)
     startup=["--save-dir",str(build/"live-app-save"),"--log",str(build/"live-app.log")]
     if args.unthrottled:startup.append("--unthrottled")
+    if args.fullscreen:startup.append("--fullscreen")
     if args.input_replay:startup += ["--input-replay",str(args.input_replay.resolve())]
     subprocess.run(["open","-n",str(app),"--args",*startup],check=True)
     print(f"Opened {app}; startup log {build/'live-app.log'}")

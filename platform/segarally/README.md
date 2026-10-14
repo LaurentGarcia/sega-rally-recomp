@@ -15,6 +15,8 @@ bash platform/segarally/build.sh ios
 
 Add `--hidden` to run a bounded Mac capture without activating a visible window. The same Metal target and pipelines render the captured frame; the live frontend can remain open in a separate process.
 
+Pass `--fullscreen` to the host or Mac launcher to use desktop fullscreen. Escape closes the app; steering uses the arrows, acceleration uses Z, and braking uses X.
+
 The Mac launcher builds an ignored `.app` from the verified executable/assets and uses LaunchServices to leave the window open independently of a shell session. Its diagnostic output is `live-app.log` in the build directory. Pass `--build-dir build/segarally-mac-v3` to launch a different prepared generation.
 
 Interactive launches use normal board-time pacing; `--unthrottled` is an explicit diagnostic option. The host and launcher accept `--input-replay FILE`, reusing the boot tool's `segarally-input-v1` parser and completed-render boundary semantics. Replayed cabinet snapshots remain unchanged between events. The final snapshot is held for one completed frame, then keyboard/touch take over with neutral inputs where no control is held. This interactive handoff intentionally differs from the headless boot tool, which retains its final snapshot indefinitely. Parsing failures stop before native execution. A paired software capture receives the identical inputs at every resumed step, including handoff.

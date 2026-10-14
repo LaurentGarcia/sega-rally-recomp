@@ -36,12 +36,25 @@ produces CREDIT 1/2 and does not buy a game. The complete versioned replay
 `config/segarally_lancia_select.inputs` additionally steers right at frame 1800,
 centers at 1820, presses gas at 1840 and releases at 1850. A captured menu
 confirms the Lancia with automatic transmission is selected. On v3 it then
-stops at callback `0x005e4380`, during a white transition at frame 1915; race
-entry remains unverified. Coin is active
+stops at callback `0x005e4380`, during a white transition at frame 1915. The
+frozen v6 generation proceeds through GO and actual driving. Coin is active
 low bit 0 of `in0`; start is active low bit 6. The first three analog bytes
 control steering (center `80`), gas and brake. Other pins use the same raw
 cabinet wiring as the SDL frontend; no game variables or saved memory are
 modified. The run begins from the runner's fresh board state.
+
+`config/segarally_lancia_drive.inputs` extends that selection sequence to
+nineteen events: gas at frame 2300, a chase-view button pulse at 2400, left
+and right steering pulses at 2500/2600, gas release plus brake at 2700, and
+brake release at 2760. On v6 all events complete through 600 million native
+instructions without a missing-code or device frontier. A capture during
+acceleration at 500 million instructions shows 160 km/h in third gear after
+the left steering pulse. A matched centered-steering replay shows 222 km/h
+in fourth gear at the same displayed race time, 4.48 seconds. The original
+replay reaches 13.53 seconds at 600 million instructions, showing 8 km/h
+after braking and coasting. These are bounded driving observations, not a
+complete race or hardware-fidelity claim. Use the selection-only replay for
+interactive play so scripted steering and pedals do not override the player.
 
 The runner preserves the submitted bytes as `boot-input.txt`, hashes them in
 `boot.json`, and logs the exact frame/instruction/cycle boundary of each input.
@@ -61,3 +74,8 @@ with shared board implementations; it is not a full emulator or PCB replay.
 The complete Lancia-selection replay also passes 376,736,993 instructions,
 6,518,236 ordered writes and 832,720,369 cycles through that same callback.
 Every input event's instruction/cycle boundary matches the native machine.
+The v5 selection replay also passes independent CPU/device comparison through
+GO: 451,072,711 instructions, 11,880,004 ordered writes, 1,012,631,901 cycles,
+23,911 IRQs and 2,329 rendered frames. Its missing callback `0x005c0d60` is
+compiled in v6; independent comparison through the later driving sequence is
+the next validation step.

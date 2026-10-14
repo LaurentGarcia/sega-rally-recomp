@@ -252,6 +252,40 @@
       "source_baseline_commit": "0cd0d07",
       "provenance": "Actual native object update target called at0x5de478 after reloading/null-guarding object+4. Kept separate from constructor-registration candidates; conditional or non-whitelisted definition paths are not inferred. No game state or instruction patched.",
       "observed_rendered_frames": 2027
+    },
+    {
+      "address": "0x00043828",
+      "observed_runtime_address": "0x005e2828",
+      "name": "observed_lancia_race_transition_continuation_005e2828",
+      "evidence": "build/segarally-timed-v4/evidence/lancia-select-005e2828/boot.json",
+      "observed_after_instructions": 376753126,
+      "observed_reference_cycles": 832780596,
+      "observed_previous_dispatch": "0x005e2824",
+      "observed_rip": "0x005c9bac",
+      "observed_rendered_frames": 1916,
+      "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+      "source_baseline_commit": "71012fc",
+      "execution_variant": "hardware_input_replay",
+      "input_replay": "config/segarally_lancia_select.inputs",
+      "input_replay_sha256": "797df95862beda36fd9ab54f8c440b701897bc0561b0cf8630f29e30b4f25f6e",
+      "provenance": "Actual native BX(g1) target at0x5e2824 during the transition after cabinet coin/start/Lancia selection inputs. Generated decoded instructions show LDA0x5e2828 into g14 at0x5e2790 and MOVg14 into g1 at0x5e2798. The existing conservative continuation whitelist stops on floating-point instructions in this span, so this target is retained as actual execution evidence rather than widening static inference. Canonical ROM target=runtime-0x59f000 in verified reset copy; no game state or instruction patched."
+    },
+    {
+      "address": "0x00021d60",
+      "observed_runtime_address": "0x005c0d60",
+      "name": "observed_lancia_race_function_005c0d60",
+      "evidence": "build/segarally-timed-v5/evidence/lancia-select-005c0d60/boot.json",
+      "observed_after_instructions": 451072711,
+      "observed_reference_cycles": 1012631901,
+      "observed_previous_dispatch": "0x005c17e0",
+      "observed_rip": "0x005c17e4",
+      "observed_rendered_frames": 2329,
+      "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+      "source_baseline_commit": "71012fc",
+      "execution_variant": "hardware_input_replay",
+      "input_replay": "config/segarally_lancia_select.inputs",
+      "input_replay_sha256": "797df95862beda36fd9ab54f8c440b701897bc0561b0cf8630f29e30b4f25f6e",
+      "provenance": "Actual native CALLX(g4) target0x5c0d60 at0x5c17e0 after LD0x20afa0,g4. Generated decoded instructions show earlier LDA0x5c0d60,g5 at0x5c1784 and STg5 to0x20afa0 at0x5c178c. Captured race START/GO HUD with course geometry1504polygons, gear1 and0km/h. Canonical ROM target=runtime-0x59f000 in verified reset copy; no game state or instruction patched."
     }
   ]
 }
