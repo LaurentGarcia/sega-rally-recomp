@@ -429,6 +429,17 @@ target_include_directories(test_model2a_machine PRIVATE src)
 target_compile_definitions(test_model2a_machine PRIVATE M2_SRALLY_IO M2_SRALLY_CONTROL)
 add_test(NAME model2a_machine COMMAND test_model2a_machine)
 
+add_executable(test_model2_scsp tests/test_model2_scsp.cpp
+    src/runtime/model2_scsp.cpp src/runtime/model2_scsp_dsp.cpp src/runtime/model2a_clock.cpp)
+target_include_directories(test_model2_scsp PRIVATE src)
+add_test(NAME model2_scsp COMMAND test_model2_scsp)
+
+add_executable(test_model2a_audio_link tests/test_model2a_audio_link.cpp
+    src/runtime/model2_scsp.cpp src/runtime/model2_scsp_dsp.cpp src/runtime/model2a_clock.cpp
+    src/runtime/model2_uart.cpp src/runtime/model2a_uart.cpp)
+target_include_directories(test_model2a_audio_link PRIVATE src)
+add_test(NAME model2a_audio_link COMMAND test_model2a_audio_link)
+
 add_executable(test_decode tests/test_decode.cpp)
 target_link_libraries(test_decode PRIVATE i960)
 add_test(NAME decode COMMAND test_decode)

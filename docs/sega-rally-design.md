@@ -155,8 +155,24 @@ install its vectors. Every generated instruction checks its live words.
 The actual reset path executes 278,301 instructions before its first SCSP
 access, a high-byte write at `0x100400` from PC `0x600184`. This establishes
 static sound-code execution and the memory map, not chip or audio parity.
-SCSP, sound CPU cycle accounting and asynchronous IRQ scheduling remain
-required. Daytona's measured instruction-rate shortcut is specific to its
+The native SCSP component now uses shared big-endian sound RAM, the common
+event queue, explicit MIDI pins and interrupt callbacks that retain distinct
+clear/assert/hold states. All 32 voices and the DSP follow the pinned public
+source; buffers are bounded and drainable at 44.1 kHz. An explicit reference
+random provider makes the source's noise sequence reproducible without
+claiming physical RNG fidelity. Independent unmodified source comparisons
+cover samples, DSP, registers, DMA, timers and serial behavior. A real
+UART-to-SCSP pin test also transfers every byte in both directions concurrently.
+
+Sample deadlines follow the reference stream's `floor(time * 44100) + 1`
+sample count for positive time: the first sample is observable at 1 ns,
+later samples at the ceiling of their rational index. No work occurs at zero.
+Timers round reference attosecond deadlines upward to nanoseconds. The native
+queue produces samples proactively; MAME's lazy stream updates and speaker
+resampling remain outside this comparison. Reference envelope/LFO/noise/DSP
+limitations, immediate DMA and the missing 1Fs interrupt are retained.
+Sound CPU cycle accounting and asynchronous IRQ scheduling remain required
+before whole-game audio is connected. Daytona's measured instruction-rate shortcut is specific to its
 different Model 1 board and is not reused for Rally.
 
 The older lifted-C prototype already reaches desert practice on the phone, but

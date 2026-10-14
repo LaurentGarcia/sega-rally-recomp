@@ -122,7 +122,15 @@ The unchanged 68000 instruction templates come from the Daytona base above;
 the added address-space interface, map-aware reachability and live instruction
 guards keep the existing Daytona mapping as the default. No SCSP device is
 linked into this reset probe.
-The SCSP source was read for the sound-board inventory, not yet linked:
+`model2_scsp` and `model2_scsp_dsp` adapt the pinned SCSP sources below
+(BSD-3-Clause; ElSemi, R. Belmont, Carl, Miodrag Milanovic; notices retained).
+Framework memory becomes shared big-endian RAM; timer/serial callbacks use
+the common native event queue; sample output is a bounded stereo buffer.
+An explicit random provider preserves the reference noise sequence. Chip and
+DSP algorithms retain the reference's documented limitations. The component
+is linked into isolated tests; whole-game sound CPU scheduling is separate.
+The independent oracle compiles the following source unchanged behind test
+host services:
 `src/devices/sound/scsp.cpp/.h`, hashes
 `11750fa03db0324cedc8a56ac481537df1991e58d3ef522e6ca737694dc1a259` and
 `82636b35d049e2e07f0df5b778d1fd87cc3152e5a7d53fe0da64e3bd1206b1d5`;
@@ -130,6 +138,17 @@ The SCSP source was read for the sound-board inventory, not yet linked:
 `9d4b1de166e5d7d5128b591c612eff3fd5cec78af79c1acabb9d5e93341917fd` and
 `db522ecaa04665063e46f7f6c699eb7781c672fd7624ac58a60b0b180652d3cc`.
 All are BSD-3-Clause at the same pinned MAME revision.
+Additional SCSP scheduling/memory references at that revision have SHA-256:
+
+| Reference file | SHA-256 |
+| --- | --- |
+| `src/emu/machine.cpp` | `a537d3033b37a795781e076ff55c76c11a7b17cc3f03617bf82d81809a875dbc` |
+| `src/emu/disound.cpp` | `d65485c3597fbd93f6c8e16ce1c51204974fe58c8af4a846423eb2fd805df87c` |
+| `src/emu/disound.h` | `fb1e938113a21aa8fa228dea42f2c9e3e1c4c9f42d6c247426759a4962a7fa4c` |
+| `src/emu/emumem_aspace.cpp` | `2b7411f12eb6305070070f16ff781b5b80a14e52160a59eefc09c018c4bda03c` |
+| `src/emu/dirom.h` | `3c2390ecb74fba46b4807813001fcbc76948dbb523e3c39f902562e0593f5da9` |
+| `src/emu/attotime.cpp` | `bb397e1b1cf1908ad01471d40904cf8cfd362de74a1aa0a2e9e04e9a2dc52ec5` |
+| `src/emu/attotime.h` | `a712bcf59c83af0ef38d64f15aa982427380377e3703443e5d7dad543efe15dd` |
 
 This project's own code is under the BSD-3-Clause licence (`LICENSE`). The
 code below keeps its own licence and notices; every component linked into the

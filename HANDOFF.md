@@ -1,5 +1,46 @@
 # Handoff
 
+## Native SCSP, DSP and physical audio link (2026-10-14)
+
+The native SCSP implements 32 voices, sample looping/envelopes/LFOs, DSP,
+masked registers, DMA, timers and MIDI against shared 512 KiB sound RAM.
+It uses the common clock and an explicit pinned-reference random provider.
+Stereo samples are drainable and bounded; overflow discards oldest frames
+and counts them. IRQ callbacks retain clear/assert/hold rather than folding
+all states into a boolean. The separate sound CPU probe still stops at its
+original SCSP frontier; the new chip is not yet connected to the game.
+
+Strict and ASan/UBSan unit runs pass 1,484 checks. Independent comparisons
+against unmodified pinned `scsp.cpp`, `scspdsp.cpp` and `diserial.cpp` pass
+44,160 checks, including 256 randomized DSP programs over 16 frames each,
+32-voice PCM8/PCM16/noise, active full-chip DSP, all LFOs, sample buffers,
+registers, timers and 256 physical MIDI frames. The oracle has its own
+attosecond scheduler and does not call the native chip algorithms. Preparing
+the six pinned source/header files in an ignored include directory plus empty
+`emu.h`, `dirom.h`, `logmacro.h` allows `test_model2_scsp_reference.cpp` to
+compile separately; exact source hashes are in `THIRD_PARTY.md` and the local
+`build/validation/scsp-reference-audit.json`.
+
+A separate integration fixture wires the actual native UART and SCSP serial
+pins through one queue. It passes all 256 simultaneous bytes in each direction,
+checks receive IRQs and rejects early completion; strict and ASan/UBSan runs
+pass. No game response or sound CPU is mocked. Normal CMake targets cover the
+chip and physical-link fixtures.
+
+The first sample-period proposal (starting at 22,676 ns) was wrong: pinned
+`disound.cpp` generates sample zero for any positive time. A subsequent
+strictly-after-every-edge proposal also failed exact integral boundaries.
+The implementation now starts at 1 ns and uses ceiling rational deadlines
+thereafter, with zero-time update doing nothing. This proactive queue is not
+the complete lazy MAME stream/timeslice/speaker pipeline. MVOL is applied to
+each produced sample; downstream resampling and lazy gain routing are outside
+comparison. Reference imperfect envelopes/noise/DSP, immediate DMA and missing
+1Fs IRQ remain explicit. Cold monitor/DMA latches are zeroed in both fixtures
+where the source constructor does not explicitly initialize them.
+
+Next: establish sound 68000 cycle costs, bus wait/prefetch and interrupt timing,
+then connect the generated sound program and audio output to the machine.
+
 ## Shared resumable machine (2026-10-14)
 
 `Model2AMachine` now owns the CPU, bus, shared clock and optional devices.

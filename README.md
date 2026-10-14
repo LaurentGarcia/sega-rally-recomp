@@ -23,7 +23,8 @@ instruction boundaries. The runner charges pinned-reference opcode cycles
 before memory effects and supplies device time at 25 MHz; this is not measured
 PCB timing. The sound 68000 now executes its generated reset code through
 278,301 instructions and clears its own RAM, stopping at its first SCSP write.
-Sound-chip execution and synchronized audio remain bring-up work. The actual game uploads and runs its 1,665-word TGP
+The native SCSP chip passes isolated sample, DSP, timer and serial comparisons;
+sound CPU timing and whole-game audio remain unconnected. The actual game uploads and runs its 1,665-word TGP
 program through Daytona's shared hardware code. These are bring-up checks, not a complete game
 boot. The existing lifted-C iPhone prototype lives
 separately in `../segarally95-recomp`; its rendering captures provide regression
