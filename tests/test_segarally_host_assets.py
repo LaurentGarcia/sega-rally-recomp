@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT=Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location("stage_data",ROOT/"platform/segarally/stage_data.py")
@@ -56,6 +57,42 @@ class HostAssets(unittest.TestCase):
         self.audits[1]["native_code_compiled"]=False;self.rejects()
     def test_external_destination(self):
         with self.assertRaises(ValueError):stage_data.stage(self.source,ROOT/"assets")
+
+    def sound_fixture(self):
+        source=self.base/"sound-build"
+        native=source/"sound/native-timed";native.mkdir(parents=True)
+        generated=native/"snd_gen.cpp";generated.write_text("// synthetic native fixture\n")
+        (native/"audit.json").write_text('{"synthetic":true}\n')
+        images=[source/"audiocpu.bin",source/"samples.bin"]
+        for i,path in enumerate(images):path.write_bytes(bytes([i,2,3,4]))
+        return source,images,generated
+
+    def test_sound_staging_records_verified_generation_and_both_images(self):
+        source,images,generated=self.sound_fixture()
+        # Detailed source/import/guard rejection is exercised independently by
+        # test_segarally_sound_link.py; this checks the platform's audit handoff.
+        with patch.object(stage_data,"sound_inputs",return_value=(images,generated)) as verify:
+            stage_data.stage(self.source,self.target,source)
+        verify.assert_called_once_with(source.resolve(),"srallycb")
+        report=json.loads((self.target/"assets.json").read_text())
+        self.assertEqual(len(report["images"]),8)
+        self.assertEqual((self.target/"sound_program.bin").read_bytes(),images[0].read_bytes())
+        self.assertEqual((self.target/"sound_samples.bin").read_bytes(),images[1].read_bytes())
+        self.assertEqual(report["sound"]["generated_sha256"],hashlib.sha256(generated.read_bytes()).hexdigest())
+        self.assertEqual(report["sound"]["timing"],"instruction_boundary")
+        self.assertFalse(report["sound"]["bus_phase_verified"])
+
+    def test_rejected_sound_audit_prevents_any_asset_copy(self):
+        with patch.object(stage_data,"sound_inputs",side_effect=ValueError("stale native generation")):
+            with self.assertRaises(ValueError):stage_data.stage(self.source,self.target,self.base/"sound-build")
+        self.assertFalse(self.target.exists())
+
+    def test_sound_image_must_remain_inside_its_audited_build(self):
+        source,images,generated=self.sound_fixture()
+        images[0]=self.source/"program.bin"
+        with patch.object(stage_data,"sound_inputs",return_value=(images,generated)):
+            with self.assertRaises(ValueError):stage_data.stage(self.source,self.target,source)
+        self.assertFalse(self.target.exists())
 
 
 if __name__=="__main__":unittest.main()

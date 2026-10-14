@@ -429,6 +429,19 @@ target_include_directories(test_model2a_machine PRIVATE src)
 target_compile_definitions(test_model2a_machine PRIVATE M2_SRALLY_IO M2_SRALLY_CONTROL)
 add_test(NAME model2a_machine COMMAND test_model2a_machine)
 
+add_executable(test_model2a_machine_audio tests/test_model2a_machine_audio.cpp
+    src/runtime/model2a_machine.cpp src/runtime/model2a_bus.cpp src/runtime/model2a_clock.cpp
+    src/runtime/model2a_control.cpp src/runtime/model2_io.cpp src/runtime/model2a_io.cpp
+    src/runtime/model2_eeprom.cpp src/runtime/cpu.cpp src/runtime/lockstep.cpp
+    src/runtime/model2_uart.cpp src/runtime/model2a_uart.cpp src/runtime/model2a_sound.cpp
+    src/runtime/model2a_sound_bus.cpp src/runtime/snd_cpu.cpp
+    src/runtime/model2_scsp.cpp src/runtime/model2_scsp_dsp.cpp)
+target_include_directories(test_model2a_machine_audio PRIVATE src)
+target_compile_definitions(test_model2a_machine_audio PRIVATE
+    M2_SRALLY_IO M2_SRALLY_CONTROL M2_SRALLY_UART M2_SRALLY_SOUND)
+target_compile_options(test_model2a_machine_audio PRIVATE $<IF:$<CXX_COMPILER_ID:MSVC>,/UNDEBUG,-UNDEBUG>)
+add_test(NAME model2a_machine_audio COMMAND test_model2a_machine_audio)
+
 add_executable(test_segarally_input_replay tests/test_segarally_input_replay.cpp)
 target_include_directories(test_segarally_input_replay PRIVATE src .)
 add_test(NAME segarally_input_replay COMMAND test_segarally_input_replay)
@@ -495,6 +508,11 @@ add_test(NAME comm_board COMMAND test_comm_board)
 
 # Wheel and pedal bindings against SDL virtual joysticks.
 if(TARGET SDL3::SDL3-static)
+    add_executable(test_segarally_audio tests/test_segarally_audio.cpp)
+    target_include_directories(test_segarally_audio PRIVATE src)
+    target_link_libraries(test_segarally_audio PRIVATE SDL3::SDL3-static)
+    target_compile_options(test_segarally_audio PRIVATE $<IF:$<CXX_COMPILER_ID:MSVC>,/UNDEBUG,-UNDEBUG>)
+    add_test(NAME segarally_audio COMMAND test_segarally_audio "${CMAKE_CURRENT_BINARY_DIR}/audio-fixture.wav")
     add_executable(test_app_config tests/test_app_config.cpp src/app/config.cpp src/app/controls.cpp)
     target_include_directories(test_app_config PRIVATE src)
     target_link_libraries(test_app_config PRIVATE runtime SDL3::SDL3-static)

@@ -1,5 +1,41 @@
 # Handoff
 
+## Optional native SCSP audio capture and SDL output (2026-10-14)
+
+The Mac host can now build with `SEGARALLY_SOUND=ON` and opt in at runtime
+with `--sound`. Sound assets and generated CPU inputs are hash-audited before
+linking, including incremental builds. The shared machine drains bounded
+44.1 kHz stereo samples without advancing any CPU or device clock. SDL output
+primes 60 ms, caps its queue at 240 ms, clears on lifecycle/frontier stops and
+limits presentation-rate trim to +/-0.5%. Sound remains off by default.
+`--audio-capture` writes exact float WAV; unthrottled diagnostics drain and
+capture without opening an audio playback device.
+
+The actual nineteen-event drive completes 600,000,000 main instructions,
+1,365,742,448 cycles and 3,142 renders at PC `0x005a379c`. It captures 2,409,170
+stereo frames (54.6297052 seconds), with 3,380,462 nonzero channel samples,
+peak 0.08428192138671875, RMS 0.007353817195170514 and no chip sample drops.
+Both machine instances agree on PCM at every drain; they share the generated
+CPU and are not an independent CPU oracle. The software image is byte-identical
+to the previous coupled driving capture, SHA-256
+`7f3007acd63730959cab164e8833109fbb8217b183c0c62f588974a1b572c686`.
+
+Ignored evidence is `build/segarally-mac-audio/capture-results.json`, SHA-256
+`59e8782c2eb50d4994bed94f2be92b8abbbe153e91d1c122d471dba3fefef825`;
+WAV `7353902ba5af44d8af2a25b8f0b6fab033c3bd9544e1d18e35eba74ba2df8fc7`,
+capture executable `ac433056f5da6464d74b70fa2af3024157b42a6c28c1ea240ad1ab09b52f6d86`.
+That executable predates the separately tested atomic SDL demand counters.
+The counters observe estimated extra input bytes requested by SDL; resampler
+padding means they are not exact missing hardware output sample counts.
+
+Machine sample-drain and SDL/WAV fixtures pass strict and ASan/UBSan checks;
+host assets pass ten tests and sound-link provenance passes six. Registered
+root machine/machine-audio CTests and the dedicated Mac Release SDL CTest pass,
+with assertions explicitly enabled for the new fixtures. Physical listening,
+device pacing and whole-game audio parity are still untested. The sound CPU's
+documented instruction-boundary MMIO limitation is unchanged. No audio probe
+is active; keep sound off in the imminent speed-focused Mac playtest.
+
 ## Desert results, second course and measured Mac speed (2026-10-14)
 
 Mac remains the only active platform. The design now records that current

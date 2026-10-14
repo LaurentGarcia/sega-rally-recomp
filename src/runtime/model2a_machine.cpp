@@ -320,6 +320,22 @@ Video &Model2AMachine::video() {
 #endif
     throw Fatal("native video is not enabled");
 }
+std::vector<float> Model2AMachine::take_audio() {
+#ifdef M2_SRALLY_SOUND
+    static_assert(kAudioRate == snd::Model2Scsp::SAMPLE_HZ);
+    if (impl_->sound) {
+        const auto samples = impl_->sound->take_samples();
+        std::vector<float> output;
+        output.reserve(samples.size() * 2);
+        for (const auto &sample : samples) {
+            output.push_back(sample.left);
+            output.push_back(sample.right);
+        }
+        return output;
+    }
+#endif
+    return {};
+}
 Model2AIO::Inputs &Model2AMachine::inputs() {
 #ifdef M2_SRALLY_IO
     if (impl_->io) return impl_->io->inputs;

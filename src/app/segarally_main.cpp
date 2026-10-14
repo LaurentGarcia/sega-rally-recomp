@@ -3,6 +3,8 @@
 #include "app/gpu/gpu_renderer.h"
 #include "app/gpu_device.h"
 #include "app/segarally_touch.h"
+#include "app/segarally_audio.h"
+#include "app/segarally_audio_capture.h"
 #include "../../tools/srally_boot/input_replay.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
@@ -10,6 +12,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -69,9 +72,9 @@ void capture_reference(const rt::Video &video,const std::filesystem::path &path)
 } // namespace
 
 int segarally_host_main(int argc,char **argv) {
-    std::filesystem::path data,saves,capture_path,reference_path,log_path,replay_path;
+    std::filesystem::path data,saves,capture_path,reference_path,log_path,replay_path,audio_path;
     uint64_t frame_limit=0,instruction_limit=0;
-    bool touch_visible=false,unthrottled=false,hidden=false,fullscreen=false;
+    bool touch_visible=false,unthrottled=false,hidden=false,fullscreen=false,sound=false;
     if(const char *env=std::getenv("SEGARALLY_DATA_DIR")) data=env;
     if(const char *env=std::getenv("SEGARALLY_SAVE_DIR")) saves=env;
     for(int i=1;i<argc;++i) {
@@ -86,9 +89,15 @@ int segarally_host_main(int argc,char **argv) {
         else if(arg=="--fullscreen") fullscreen=true;
         else if(arg=="--log") log_path=value();
         else if(arg=="--input-replay") replay_path=value();
-        else if(arg=="--help") {puts("Sega Rally native: --data DIR --save-dir DIR --frames N --instructions N --capture FILE.ppm --reference-capture FILE.ppm --touch --unthrottled --hidden --fullscreen --log FILE --input-replay FILE\nKeys: arrows steer, Z gas, X brake, C coin, Return start, V view, A/S gear down/up, Space handbrake, F2 service, F3 test, Escape quit.");return 0;}
+        else if(arg=="--sound") sound=true;
+        else if(arg=="--audio-capture") audio_path=value();
+        else if(arg=="--help") {puts("Sega Rally native: --data DIR --save-dir DIR --frames N --instructions N --capture FILE.ppm --reference-capture FILE.ppm --touch --unthrottled --hidden --fullscreen --log FILE --input-replay FILE --sound --audio-capture FILE.wav\nSound is opt-in and uses diagnostic instruction-boundary timing. Unthrottled runs capture/drain audio without device playback.\nKeys: arrows steer, Z gas, X brake, C coin, Return start, V view, A/S gear down/up, Space handbrake, F2 service, F3 test, Escape quit.");return 0;}
         else throw std::runtime_error("Unknown argument "+arg);
     }
+    if(!audio_path.empty() && !sound) throw std::runtime_error("--audio-capture requires --sound");
+#ifndef M2_SRALLY_SOUND
+    if(sound) throw std::runtime_error("Build with SEGARALLY_SOUND=ON before using --sound");
+#endif
     if(!log_path.empty()) {
         if(!freopen(log_path.string().c_str(),"w",stderr)) throw std::runtime_error("Cannot open native host log");
         setvbuf(stderr,nullptr,_IONBF,0);
@@ -108,6 +117,10 @@ int segarally_host_main(int argc,char **argv) {
     if(saves.empty()) {char *path=SDL_GetPrefPath("sega-rally-recomp","SegaRallyNative");if(path) {saves=path;SDL_free(path);}else saves="saves";}
     SDL_Window *window=nullptr;SDL_GPUDevice *device=nullptr;SDL_GPUTexture *screen=nullptr;
     app::GpuRenderer gpu;rally::TouchControls touch;std::unique_ptr<Machine> machine,reference;
+    rally::AudioOutput audio;
+    std::unique_ptr<rally::AudioCapture> audio_capture;
+    uint64_t audio_frames=0,audio_nonzero=0;
+    double audio_energy=0;float audio_peak=0;
     int result=0;
     try {
         std::filesystem::create_directories(saves);
@@ -115,9 +128,13 @@ int segarally_host_main(int argc,char **argv) {
         images.program=read_file(data/"program.bin");images.main_data=read_file(data/"main_data.bin");
         images.tgp_tables=read_file(data/"tgp_tables.bin");images.copro_data=read_file(data/"copro_data.bin");
         images.polygons=read_file(data/"polygons.bin");images.textures=read_file(data/"textures.bin");
-        Machine::Options options;options.external_video=true;
-        if(!reference_path.empty()) {Machine::Options ref_options;reference=std::make_unique<Machine>(images,ref_options);}
+        if(sound) {images.sound_program=read_file(data/"sound_program.bin");images.sound_samples=read_file(data/"sound_samples.bin");}
+        Machine::Options options;options.external_video=true;options.sound=sound;
+        if(!reference_path.empty()) {Machine::Options ref_options;ref_options.sound=sound;reference=std::make_unique<Machine>(images,ref_options);}
         machine=std::make_unique<Machine>(std::move(images),options);
+        static_assert(Machine::kAudioRate==rally::AudioOutput::kRate);
+        if(sound && !unthrottled) audio.open();
+        if(!audio_path.empty()) audio_capture=std::make_unique<rally::AudioCapture>(audio_path);
         const auto eeprom=read_file(saves/"eeprom.bin",true),backup=read_file(saves/"backup.bin",true);
         if(!eeprom.empty()) machine->load_eeprom(eeprom);if(!backup.empty()) machine->load_backup(backup);
         if(reference) {if(!eeprom.empty()) reference->load_eeprom(eeprom);if(!backup.empty()) reference->load_backup(backup);}
@@ -132,8 +149,9 @@ int segarally_host_main(int argc,char **argv) {
         if(!window || !device || strcmp(SDL_GetGPUDeviceDriver(device),"metal") || !SDL_ClaimWindowForGPUDevice(device,window))
             throw std::runtime_error(std::string("Metal initialization: ")+SDL_GetError());
         SDL_SetGPUSwapchainParameters(device,window,SDL_GPU_SWAPCHAINCOMPOSITION_SDR,SDL_GPU_PRESENTMODE_VSYNC);
-        fprintf(stderr,"GPU driver=%s device=%s native Model2A core, SCSP audio remains unconnected\n",SDL_GetGPUDeviceDriver(device),
-            SDL_GetStringProperty(SDL_GetGPUDeviceProperties(device),SDL_PROP_GPU_DEVICE_NAME_STRING,"unknown"));
+        fprintf(stderr,"GPU driver=%s device=%s native Model2A core, SCSP=%s playback=%d\n",SDL_GetGPUDeviceDriver(device),
+            SDL_GetStringProperty(SDL_GetGPUDeviceProperties(device),SDL_PROP_GPU_DEVICE_NAME_STRING,"unknown"),
+            sound?"instruction_boundary":"disabled",int(sound&&!unthrottled));
         SDL_GPUTextureCreateInfo ti{};ti.type=SDL_GPU_TEXTURETYPE_2D;ti.format=SDL_GPU_TEXTUREFORMAT_B8G8R8A8_UNORM;
         ti.usage=SDL_GPU_TEXTUREUSAGE_SAMPLER|SDL_GPU_TEXTUREUSAGE_COLOR_TARGET;ti.width=496;ti.height=384;ti.layer_count_or_depth=1;ti.num_levels=1;
         screen=SDL_CreateGPUTexture(device,&ti);
@@ -147,8 +165,8 @@ int segarally_host_main(int argc,char **argv) {
             SDL_Event event;
             while(SDL_PollEvent(&event)) {
                 if(event.type==SDL_EVENT_QUIT || event.type==SDL_EVENT_TERMINATING) quit=true;
-                if(event.type==SDL_EVENT_WILL_ENTER_BACKGROUND) {background=true;touch.clear();save(*machine,saves);}
-                if(event.type==SDL_EVENT_DID_ENTER_FOREGROUND) {background=false;start=SDL_GetTicksNS()-machine->stats().board_time_ns;}
+                if(event.type==SDL_EVENT_WILL_ENTER_BACKGROUND) {background=true;touch.clear();audio.clear();save(*machine,saves);}
+                if(event.type==SDL_EVENT_DID_ENTER_FOREGROUND) {background=false;audio.clear();start=SDL_GetTicksNS()-machine->stats().board_time_ns;}
                 if(event.type==SDL_EVENT_WINDOW_FOCUS_LOST) touch.clear();
                 if(event.type==SDL_EVENT_WINDOW_RESIZED || event.type==SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED || event.type==SDL_EVENT_WINDOW_SAFE_AREA_CHANGED) touch.layout(window);
                 touch.event(event);
@@ -200,12 +218,25 @@ int segarally_host_main(int argc,char **argv) {
                 }
                 if(outcome.reason==Machine::Reason::Frame) new_frame=true;
                 else if(outcome.reason!=Machine::Reason::Budget) {
-                    stopped=true;result=3;
+                    stopped=true;result=3;audio.clear();
                     fprintf(stderr,"Native frontier: pc=%08x instructions=%llu %s\n",outcome.pc,
                             static_cast<unsigned long long>(outcome.instructions),outcome.message.c_str());
                     SDL_SetWindowTitle(window,("Sega Rally Native - frontier: "+outcome.message).c_str());
                     if(frame_limit||instruction_limit) quit=true;
                 }
+            }
+            if(sound) {
+                const auto samples=machine->take_audio();
+                if(reference && reference->take_audio()!=samples)
+                    throw std::runtime_error("Native software/Metal machines produced different SCSP samples");
+                audio_frames+=samples.size()/2;
+                for(const float sample:samples) {
+                    if(!std::isfinite(sample)) throw std::runtime_error("Non-finite SCSP output sample");
+                    audio_nonzero+=sample!=0;audio_peak=std::max(audio_peak,std::abs(sample));
+                    audio_energy+=double(sample)*sample;
+                }
+                if(audio_capture) audio_capture->push(samples);
+                if(!unthrottled && !stopped) audio.push(samples);
             }
             if(instruction_limit && machine->stats().instructions>=instruction_limit) quit=true;
             if(quit && !new_frame) break;
@@ -238,13 +269,21 @@ int segarally_host_main(int argc,char **argv) {
         if(!capture_path.empty() && displayed) capture(device,screen,capture_path);
         if(reference && displayed) capture_reference(reference->video(),reference_path);
         save(*machine,saves);
+        if(audio_capture) audio_capture->finish();
         if(replay) fprintf(stderr,"Input replay exit: events=%zu applied=%zu pending=%zu manual_takeover=%d\n",
             replay->size(),replay->applied(),replay->size()-replay->applied(),int(replay_manual_takeover));
         const auto stats=machine->stats();
+        if(sound) fprintf(stderr,"Native audio: rate=%u frames=%llu nonzero_samples=%llu peak=%.9g rms=%.9g chip_dropped=%llu host_dropped=%llu queued=%u device_shortfall_requests=%llu requested_extra_input_bytes=%llu capture=%s\n",
+            Machine::kAudioRate,static_cast<unsigned long long>(audio_frames),static_cast<unsigned long long>(audio_nonzero),audio_peak,
+            audio_frames?std::sqrt(audio_energy/(2*audio_frames)):0,
+            static_cast<unsigned long long>(stats.sound_dropped_samples),static_cast<unsigned long long>(audio.dropped_frames()),
+            audio.queued_frames(),static_cast<unsigned long long>(audio.shortfall_requests()),
+            static_cast<unsigned long long>(audio.requested_extra_bytes()),audio_path.empty()?"none":audio_path.string().c_str());
         fprintf(stderr,"Native host exit: frames=%llu instructions=%llu cycles=%llu pc=%08x result=%d\n",
             static_cast<unsigned long long>(displayed),static_cast<unsigned long long>(stats.instructions),
             static_cast<unsigned long long>(stats.reference_cycles),stats.pc,result);
     } catch(const std::exception &error) {fprintf(stderr,"Sega Rally native: %s\n",error.what());result=1;}
+    audio.close();
     if(device) {SDL_WaitForGPUIdle(device);touch.shutdown();gpu.shutdown();if(screen) SDL_ReleaseGPUTexture(device,screen);
         if(window) SDL_ReleaseWindowFromGPUDevice(device,window);SDL_DestroyGPUDevice(device);}
     if(window) SDL_DestroyWindow(window);SDL_Quit();return result;

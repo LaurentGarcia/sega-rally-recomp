@@ -30,6 +30,7 @@ Machine::Options options() { return {false, true, false, true, false, false, fal
 int main() {
     Machine machine(images(), options());
     assert(machine.cpu().m_IP == 0x420);
+    assert(machine.take_audio().empty());
     auto eeprom = machine.save_eeprom();
     auto backup = machine.save_backup();
     assert(eeprom.size() == 128 && eeprom.front() == 255);

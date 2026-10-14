@@ -51,6 +51,11 @@ public:
     RunResult run_for(uint64_t instruction_budget);
     RunResult run_until_frame(uint64_t instruction_budget);
     Stats stats(bool hash_screen = false) const;
+    // Interleaved normalized float stereo, left then right, at 44,100 Hz.
+    // Drains the bounded chip buffer (at most one second); never runs CPUs,
+    // advances board time or changes IRQ state. Empty when sound is disabled.
+    static constexpr unsigned kAudioRate = 44100;
+    std::vector<float> take_audio();
     const Cpu &cpu() const;
     const Model2ABus::Diagnostics &diagnostics() const;
     Video &video();

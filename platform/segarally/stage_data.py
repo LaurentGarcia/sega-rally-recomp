@@ -6,11 +6,14 @@ import hashlib
 import json
 from pathlib import Path
 import shutil
+import sys
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts"))
+from segarally_boot import sound_inputs
 
 
-def stage(source: Path, destination: Path) -> None:
+def stage(source: Path, destination: Path, sound_source: Path | None = None) -> None:
     source, destination = source.resolve(), destination.resolve()
     if not source.is_relative_to(ROOT / "build") or not destination.is_relative_to(ROOT / "build"):
         raise ValueError("source and destination must be inside the ignored project build directory")
@@ -37,8 +40,22 @@ def stage(source: Path, destination: Path) -> None:
         if not path.is_relative_to(source) or hashlib.sha256(path.read_bytes()).hexdigest() != entry["sha256"]:
             raise ValueError(f"{image} differs from the audited import")
         verified.append((path, output, entry["sha256"]))
+    sound_audit = None
+    if sound_source is not None:
+        sound_source = sound_source.resolve()
+        images, generated = sound_inputs(sound_source, coverage["romset"])
+        for path, name in zip(images, ("sound_program", "sound_samples")):
+            path = path.resolve()
+            if not path.is_relative_to(sound_source):
+                raise ValueError("sound image is outside its verified build")
+            verified.append((path, name, hashlib.sha256(path.read_bytes()).hexdigest()))
+        sound_audit = {"timing": "instruction_boundary", "bus_phase_verified": False,
+            "generated_sha256": hashlib.sha256(generated.read_bytes()).hexdigest(),
+            "audit_sha256": hashlib.sha256((sound_source / "sound/native-timed/audit.json").read_bytes()).hexdigest()}
     destination.mkdir(parents=True, exist_ok=True)
     report = {"romset": "srallycb", "images": {}, "native_coverage_is_partial": True}
+    if sound_audit is not None:
+        report["sound"] = sound_audit
     for path, output, digest in verified:
         target = destination / f"{output}.bin"
         if not target.exists() or hashlib.sha256(target.read_bytes()).hexdigest() != digest:
@@ -55,8 +72,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--native-build", type=Path, default=ROOT / "build/segarally-timed")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--sound-build", type=Path, help="Optional audited native sound generation")
     args = parser.parse_args()
     try:
-        stage(args.native_build, args.output)
+        stage(args.native_build, args.output, args.sound_build)
     except (OSError, ValueError, KeyError) as error:
         parser.exit(2, f"stage_data: {error}\n")
