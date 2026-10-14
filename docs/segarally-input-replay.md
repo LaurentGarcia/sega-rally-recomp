@@ -129,8 +129,10 @@ The context binds a SHA-256 provenance digest and sound/hook flags. The caller
 must validate the manifest against the actual loaded images, generated build,
 runtime options and initial EEPROM/backup bytes before approving that binding.
 Fresh default save bytes matter too. The parser checks syntax and equality;
-a supplied digest or callback does not verify those external facts. Host
-integration, manifest hashing, PCM evidence and detailed terminal faults remain
+a supplied digest or callback does not verify those external facts. The bounded
+`rt::Sha256` helper now hashes loaded byte snapshots, streams and files through
+the pinned public-domain SDK, with 179 known-answer and I/O checks. Host
+integration, manifest validation, PCM evidence and detailed terminal faults remain
 work to implement. The independent CPU harness must reject unsupported startup
 seeds, resume phases or configurations, and currently rejects coupled sound.
 

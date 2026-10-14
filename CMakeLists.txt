@@ -148,6 +148,13 @@ if(EXISTS ${LZMA_DIR}/7zArcIn.c)
     endif()
     target_link_libraries(runtime PUBLIC lzma7z)
     target_compile_definitions(runtime PRIVATE M2_HAVE_7Z)
+    # Reuse the pinned public-domain SDK for capture identities. The wrapper
+    # selects its software implementation through the public per-context API.
+    add_library(sha256_digest STATIC src/runtime/sha256_digest.cpp
+        ${LZMA_DIR}/Sha256.c ${LZMA_DIR}/Sha256Opt.c ${LZMA_DIR}/CpuArch.c)
+    target_include_directories(sha256_digest PUBLIC src)
+    target_include_directories(sha256_digest SYSTEM PUBLIC ${LZMA_DIR})
+    set_target_properties(sha256_digest PROPERTIES C_STANDARD 11)
 else()
     message(STATUS "extern/lzma not found: 7z ROM sets unsupported (run scripts/setup.py)")
 endif()
@@ -470,6 +477,12 @@ add_test(NAME segarally_input_replay COMMAND test_segarally_input_replay)
 add_executable(test_segarally_host_input_transcript tests/test_segarally_host_input_transcript.cpp)
 target_include_directories(test_segarally_host_input_transcript PRIVATE src .)
 add_test(NAME segarally_host_input_transcript COMMAND test_segarally_host_input_transcript)
+
+if(TARGET sha256_digest)
+    add_executable(test_sha256 tests/test_sha256.cpp)
+    target_link_libraries(test_sha256 PRIVATE sha256_digest)
+    add_test(NAME sha256 COMMAND test_sha256)
+endif()
 
 add_executable(test_segarally_host_input_machine tests/test_segarally_host_input_machine.cpp
     src/runtime/model2a_machine.cpp src/runtime/model2a_bus.cpp src/runtime/model2a_clock.cpp

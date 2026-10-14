@@ -1,5 +1,28 @@
 # Handoff
 
+## Bounded capture-identity hashing (2026-10-14)
+
+`rt::Sha256` and its byte-span/stream/file helpers reuse the pinned public-domain
+7-Zip SDK instead of adding a cryptographic implementation. The unchanged
+`Sha256.c`, `Sha256Opt.c` and `CpuArch.c` are linked by a separate CMake library;
+the public per-context API selects software hashing without global preparation.
+`THIRD_PARTY.md` records this use. The player is not linked to it yet.
+
+All 179 known-answer, binary/chunking, bounded-I/O and startup-snapshot checks
+pass, including the integrated CMake/CTest target `sha256`. Strict standalone
+C11/C++20 warnings-as-errors also pass. A transient fixture failure was a
+53-byte typo in the canonical 56-byte vector; correcting the fixture, not the
+backend, resolved it. Helpers use a fixed 64-KiB buffer, reject oversized or
+failed reads, and hash the actual supplied bytes rather than reopening a saved
+path when a caller passes a loaded snapshot.
+
+Exact standalone commands and dependency identities are preserved in
+`build/input-replay-capture-sha256-tests.sh` and
+`build/input-replay-capture-sha256-identities.txt`. Capture integration still
+needs a validated manifest, actual initial EEPROM/backup snapshots, unchanged
+resume/drain calls and replay checks. A digest identifies bytes; it does not
+establish complete game coverage or independent parity.
+
 ## Optional Metal polygon scanlines integrated (2026-10-14)
 
 The corrected four-file GPU candidate and ROM-free fixture are integrated from
