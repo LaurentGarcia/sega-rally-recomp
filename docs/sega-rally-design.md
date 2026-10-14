@@ -63,8 +63,16 @@ targets across seven entries. The importer verifies the unsigned index bound,
 scaled load, indirect branch register, contiguous control flow, code/data
 hashes and exact reset-copy aliases before adding candidates. Table candidates
 remain distinct from executed targets; neither is evidence of complete game
-coverage. Later callback frontiers are added only after actual native dispatch
-and retain their instruction/cycle counts and ignored execution-report paths.
+coverage. A second table at `0x005ddfc0` has 32 masked entries and 17 nonzero
+callbacks. The inherited decoder checks the index mask, saved object pointer,
+disjoint intervening stores including longword width, reload and null guard.
+A narrow continuation pass follows explicit absolute loads and moves through
+a decoded straight-line whitelist to adjacent indirect branches. Known seed
+and direct-transfer side entries invalidate its reaching definition. Each
+candidate retains its source span hash and original seed provenance; unknown
+indirect side entries and exclusive coverage are not established. Conditional
+paths remain outside this proof. Actual callback frontiers are separately
+recorded with instruction/cycle counts and ignored execution-report paths.
 
 Daytona's unchanged TGP generator and TgpBoard compile Rally's own 1,665-word
 upload, not Daytona's microcode. A bus-level upload/startup probe returns `8`

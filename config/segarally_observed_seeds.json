@@ -82,6 +82,78 @@
       "observed_rip": "0x005de2a8",
       "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
       "provenance": "Actual native callx(g5) dispatcher frontier at runtime 0x5de2a4 after executing earlier game callbacks; captured title screen remains unchanged. No bounded table proof claimed. Canonical ROM target = runtime - 0x59f000 in verified reset copy; no game state, instruction, or return value patched."
+    },
+    {
+      "address": "0x00045960",
+      "observed_runtime_address": "0x005e4960",
+      "name": "observed_title_continuation_005e4960",
+      "evidence": "build/segarally-timed-v3/evidence/native-005e4960/boot.json",
+      "observed_after_instructions": 266519141,
+      "observed_reference_cycles": 588918464,
+      "observed_previous_dispatch": "0x005e495c",
+      "observed_rip": "0x005de2a8",
+      "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+      "provenance": "Actual native dispatcher frontier from lda005e4960,g14 at005e4920, mov to g1 and bx(g1) at005e495c. Captured title screen remains unchanged. Canonical ROM target = runtime -0x59f000 in verified reset copy; no game state, instruction, or return value patched."
+    },
+    {
+      "address": "0x00045350",
+      "observed_runtime_address": "0x005e4350",
+      "name": "observed_title_callback_target_005e4350",
+      "evidence": "build/segarally-timed-v3/evidence/native-005e4350/boot.json",
+      "observed_after_instructions": 266519193,
+      "observed_reference_cycles": 588918617,
+      "observed_previous_dispatch": "0x005de2a4",
+      "observed_rip": "0x005de2a8",
+      "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+      "provenance": "Actual native callx(g5) dispatcher frontier at runtime0x5de2a4 after earlier game callbacks executed; title capture remains unchanged. No bounded table proof claimed. Canonical ROM target =runtime-0x59f000 in verified reset copy; no game state, instruction, or return value patched."
+    },
+    {
+      "address": "0x00045370",
+      "observed_runtime_address": "0x005e4370",
+      "name": "observed_title_continuation_005e4370",
+      "evidence": "build/segarally-timed-v3/evidence/native-005e4370/boot.json",
+      "observed_after_instructions": 266519199,
+      "observed_reference_cycles": 588918628,
+      "observed_previous_dispatch": "0x005e436c",
+      "observed_rip": "0x005de2a8",
+      "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+      "provenance": "Actual native dispatcher frontier from an explicit address load and bx(g1) at0x5e436c. Captured title screen remains unchanged. Canonical ROM target = runtime -0x59f000 in verified reset copy; no game state, instruction, or return value patched."
+    },
+    {
+      "address": "0x0002b5a0",
+      "observed_runtime_address": "0x005ca5a0",
+      "name": "observed_title_continuation_005ca5a0",
+      "evidence": "build/segarally-timed-v3/evidence/native-005ca5a0/boot.json",
+      "observed_after_instructions": 266519315,
+      "observed_reference_cycles": 588918956,
+      "observed_previous_dispatch": "0x005ca59c",
+      "observed_rip": "0x005de2a8",
+      "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+      "provenance": "Actual native dispatcher frontier from an explicit address load and bx(g1) at 0x5ca59c. Captured title screen remains unchanged. Canonical ROM target = runtime -0x59f000 in verified reset copy; no game state, instruction, or return value patched."
+    },
+    {
+      "address": "0x0004521c",
+      "observed_runtime_address": "0x005e421c",
+      "name": "observed_title_continuation_005e421c",
+      "evidence": "build/segarally-timed-v3/evidence/native-005e421c/boot.json",
+      "observed_after_instructions": 266519378,
+      "observed_reference_cycles": 588919130,
+      "observed_previous_dispatch": "0x005e4218",
+      "observed_rip": "0x005de2a8",
+      "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+      "provenance": "Actual native dispatcher frontier after bounded callback candidates executed, from explicit address load and bx(g1) at 0x5e4218. Static pass conservatively stopped at an integer AND, now separately tested for destination clobbers. Captured title screen remains unchanged; no rendered geometry yet. Canonical ROM target = runtime -0x59f000 in verified reset copy; no game state or instruction patched."
+    },
+    {
+      "address": "0x0004458c",
+      "observed_runtime_address": "0x005e358c",
+      "name": "observed_transition_continuation_005e358c",
+      "evidence": "build/segarally-timed-v3/evidence/native-005e358c/boot.json",
+      "observed_after_instructions": 266539341,
+      "observed_reference_cycles": 588976402,
+      "observed_previous_dispatch": "0x005e3588",
+      "observed_rip": "0x005de2a8",
+      "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+      "provenance": "Actual native dispatcher frontier from explicit address load and bx(g1) at 0x5e3588 after a conditional bit-test path. Strict continuation analysis rejects that control flow.1355 rendered frames; latest capture is a white transition with no geometry yet. Canonical ROM target = runtime -0x59f000 in verified reset copy; no game state or instruction patched."
     }
   ]
 }

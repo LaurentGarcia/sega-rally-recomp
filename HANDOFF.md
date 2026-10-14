@@ -1,5 +1,38 @@
 # Handoff
 
+## Verified callback and continuation candidates (2026-10-14)
+
+The guarded native profile now contains 67,031 instructions and 46 compiled
+objects, with no missing templates. The object callback table at `0x005ddfc0`
+contributes 17 nonzero targets from 32 masked entries. An inherited-decoder
+helper checks the mask, scaled load, saved object pointer, full widths of
+intervening disjoint stores, reload and null guard. Null entries are excluded.
+The previous seven-entry startup table still contributes three distinct targets.
+
+The same helper derives ten adjacent continuations from explicit address loads
+and register moves. It accepts a small decoded whitelist, rejects clobbers,
+control transfers and known interior entries, and iterates only from the selected
+seed profile. Every candidate retains a source hash and nonempty per-root seed
+provenance. Unknown indirect side entries and exclusive target coverage are not
+claimed. Live RAM instruction guards remain active. Six actual execution
+frontiers are separately recorded; conditional paths use observed evidence,
+without expanding the straight-line proof to unverified control flow.
+
+Ten synthetic proof tests, seven existing table tests and eight bootstrap tests
+pass. The proof suite also passes ASan/UBSan. Semantic mutation tests recompute
+hashes, demonstrating rejection from operands/dataflow rather than hash alone.
+Generation source-set SHA-256 is
+`4eff7066f1a4fa54b2cb5a9cb8eafa51b91208728388a7a42fed678415ffe2c9`;
+coverage report SHA-256 is
+`e04965c6781f84931f58350b6ac69baf8314bfeb887254bd988be9e952de702b`.
+
+The latest native run reaches 266,700,692 instructions / 589,330,734 reference
+cycles and 1,355 rendered frames before missing `0x005af6f8`. The last capture
+is a white transition after the title, with zero geometry frames. Evidence is
+under ignored `build/segarally-timed-v3/evidence/native-005af6f8`. This is native
+coverage progress, not a first-car or playable-game result. Next: audit the
+new bounded dispatch table, continue toward 3D and compare its CPU/Metal frames.
+
 ## Independent title checkpoint and phone launch (2026-10-14)
 
 Independent CPU/device instances now agree through 266,518,444 instructions,

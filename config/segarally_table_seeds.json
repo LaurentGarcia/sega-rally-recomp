@@ -48,6 +48,59 @@
         "0x005af8a0"
       ],
       "proof": "Unsigned cmpobl6,g4 rejects indices above6; ld table[g4*4] replacesg4, then bx(g4). Code, data and targets are inside the verified reset work-RAM copy. These are bounded table-derived candidates, separate from execution-observed targets."
+    },
+    {
+      "name": "object_callback_type",
+      "kind": "masked_callback",
+      "relocation": "reset_workram_copy",
+      "program_offset": "0x0003efc0",
+      "runtime_address": "0x005ddfc0",
+      "entry_count": 32,
+      "table_sha256": "9e20d7f86a9f67adb10caed2ee80aecd3a5a2c50efb523e614ae7e8176c1fd66",
+      "targets": [
+        "0x00000000",
+        "0x005e2b20",
+        "0x005e2bf0",
+        "0x005e3240",
+        "0x005ca580",
+        "0x005e3540",
+        "0x005ca6d0",
+        "0x005caae0",
+        "0x005ca710",
+        "0x005e37d0",
+        "0x005e3b10",
+        "0x00000000",
+        "0x00000000",
+        "0x00000000",
+        "0x00000000",
+        "0x00000000",
+        "0x005e41e0",
+        "0x005e4350",
+        "0x005e4550",
+        "0x005e4920",
+        "0x005e4ae0",
+        "0x005cab80",
+        "0x005e4fd0",
+        "0x00000000",
+        "0x00000000",
+        "0x00000000",
+        "0x00000000",
+        "0x00000000",
+        "0x00000000",
+        "0x00000000",
+        "0x00000000",
+        "0x00000000"
+      ],
+      "code_evidence": [
+        {
+          "role": "body",
+          "program_offset": "0x0003f248",
+          "runtime_address": "0x005de248",
+          "size": 96,
+          "sha256": "30a0971f85df6b740f85d5a93a1d73f02e670322e165d529e94821e97bc44d14"
+        }
+      ],
+      "proof": "AND literal31 bounds g4 to32 entries; indexed4-byte table load feeds a pointer saved at newly allocated object+4. Object base/pointer registers remain unchanged until reload; intervening stores use disjoint object offsets and complete stl width. Reloaded target is compared to zero and conditional branch skips callx(g5) for null entries. Inherited decoder validates exact operand/dataflow idiom; candidates are not runtime observations."
     }
   ]
 }

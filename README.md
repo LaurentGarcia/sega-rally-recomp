@@ -11,7 +11,7 @@ from the user's ROMs, not Sega's original source code.
 ## Current state
 
 The repository is in bring-up. The expanded address-label profile produces
-66,597 native i960 instructions and 46 compiled objects. The core executes
+67,031 native i960 instructions and 46 compiled objects. The core executes
 reset at `0x420`, copies and checks its RAM code, initializes the I/O chip,
 and displays the original startup warning and Sega Rally 1995 logo. Independent
 CPU execution agrees through 266,518,444 instructions and 1,354 startup frames.

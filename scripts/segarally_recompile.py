@@ -17,6 +17,7 @@ import shlex
 import struct
 import subprocess
 import sys
+import tempfile
 import zipfile
 import zlib
 
@@ -149,7 +150,58 @@ def compile_generated(compiler: list[str], generated: Path, output: Path, jobs: 
     return len(sources)
 
 
-def table_seeds(program: bytes, config: dict, relocations: dict) -> list[dict]:
+def build_continuation_tool(compiler: list[str], output: Path) -> Path:
+    output.mkdir(parents=True, exist_ok=True)
+    tool = output / "srally_continuations"
+    run_logged(compiler + ["-std=c++20", "-O2", "-Isrc", "tools/srally_continuations/main.cpp",
+                          "src/i960/decode.cpp", "src/i960/isa.cpp", "-o", str(tool)],
+               output / "continuations-build.log")
+    return tool
+
+
+def continuation_seeds(program: bytes, reach: dict, relocations: dict, proof_tool: Path) -> list[dict]:
+    """Prove adjacent continuations from explicit seed entries, never scan data.
+
+    These are static candidates from the selected seed profile. Known direct
+    transfers and seeds into the interior reject the reaching definition;
+    unknown indirect transfers and exclusive target coverage are not claimed.
+    """
+    candidates = []
+    with tempfile.TemporaryDirectory(prefix="srally-continuation-") as directory:
+        folder = Path(directory)
+        image = folder / "program.bin"
+        image.write_bytes(program)
+        for relocation in relocations["relocations"]:
+            guest, source, size = (int(relocation[key], 16) for key in ("guest", "program_offset", "size"))
+            def canonical(pc: str) -> int:
+                value = int(pc, 16)
+                return source + value - guest if guest <= value < guest + size else value
+            reached = {canonical(pc) for pc in reach["instruction_addresses"]}
+            entries = {canonical(pc) for pc in reach["seeds"]}
+            trusted = entries & reached
+            for name, addresses in (("trusted", trusted), ("reached", reached), ("entries", entries)):
+                (folder / name).write_text("".join(f"{pc:x}\n" for pc in sorted(addresses)))
+            result = subprocess.run([str(proof_tool), str(image), str(folder / "trusted"),
+                str(folder / "reached"), str(folder / "entries"), hex(source), hex(guest), hex(size)],
+                capture_output=True, text=True)
+            if result.returncode:
+                raise ValueError("continuation proof failed: " + result.stderr.strip())
+            for proof in json.loads(result.stdout):
+                start, target, length = proof["start"], proof["target"], proof["size"]
+                if not source <= start < target < source + size or target != start + length:
+                    raise ValueError("continuation target differs from verified adjacent reset-copy alias")
+                candidates.append({"address": f"0x{target:08x}",
+                    "runtime_address": f"0x{guest + target - source:08x}",
+                    "name": f"verified_continuation_{guest + target - source:08x}",
+                    "evidence": "Inherited i960 decoder straight-line continuation proof",
+                    "source_address": f"0x{start:08x}", "source_size": length,
+                    "source_sha256": hashlib.sha256(program[start:target]).hexdigest(),
+                    "relocation": relocation["name"],
+                    "provenance": "Static seed-profile continuation candidate; explicit absolute lda/mov reaching definition, decoded whitelist and known side-entry rejection. Runtime observation, exclusive indirect targets and full coverage are not implied."})
+    return candidates
+
+
+def table_seeds(program: bytes, config: dict, relocations: dict, proof_tool: Path | None = None) -> list[dict]:
     """Verify individually audited bounded dispatch tables, not arbitrary scans.
 
     The hashes identify exact code/data in the supplied revision. Independent
@@ -179,6 +231,42 @@ def table_seeds(program: bytes, config: dict, relocations: dict) -> list[dict]:
             if hashlib.sha256(data).hexdigest() != digest:
                 raise ValueError("table code/data evidence hash differs from supplied program")
             return data
+
+        if table.get("kind") == "masked_callback":
+            if proof_tool is None or len(table["code_evidence"]) != 1:
+                raise ValueError("masked callback requires the inherited-decoder proof tool and one body span")
+            body = table["code_evidence"][0]
+            if body["role"] != "body":
+                raise ValueError("masked callback body evidence role differs")
+            start = number(body["program_offset"])
+            verified_span(start, number(body["runtime_address"]), body["size"], body["sha256"])
+            with tempfile.TemporaryDirectory(prefix="srally-table-") as directory:
+                image = Path(directory) / "program.bin"
+                image.write_bytes(program)
+                result = subprocess.run([str(proof_tool), "--masked", str(image), hex(start),
+                    hex(source), hex(guest), hex(size)], capture_output=True, text=True)
+            if result.returncode:
+                raise ValueError("masked callback operand/dataflow proof failed: " + result.stderr.strip())
+            proof = json.loads(result.stdout)
+            count, address, offset = table["entry_count"], number(table["runtime_address"]), number(table["program_offset"])
+            if proof != {"table": address, "count": count, "size": body["size"]}:
+                raise ValueError("masked callback decoded proof differs from declared table/body")
+            data = verified_span(offset, address, count * 4, table["table_sha256"])
+            targets = list(struct.unpack("<" + "I" * count, data))
+            if targets != [number(target) for target in table["targets"]]:
+                raise ValueError("masked callback entries differ from audited metadata")
+            for target in dict.fromkeys(targets):
+                if target == 0:
+                    continue  # decoded cmpi/be skips null callbacks
+                if target & 3 or not guest <= target < guest + size:
+                    raise ValueError("masked callback target lies outside aligned verified reset copy")
+                candidates.append({"address": f"0x{source + target - guest:08x}",
+                    "runtime_address": f"0x{target:08x}", "table": table["name"],
+                    "table_indices": [i for i, value in enumerate(targets) if value == target],
+                    "name": f"verified_table_{table['name']}_target_{target:08x}",
+                    "evidence": "config/segarally_table_seeds.json",
+                    "provenance": "Verified masked callback table candidate with null guard and saved-pointer dataflow; runtime observation and full coverage are not implied."})
+            continue
 
         evidence = {}
         for row in table["code_evidence"]:
@@ -285,7 +373,8 @@ def main() -> int:
                 raise ValueError("Observed target provenance belongs to a different program image")
         relocations = json.loads((ROOT / "config" / "segarally_relocations.json").read_text())
         table_config = json.loads((ROOT / "config/segarally_table_seeds.json").read_text())
-        derived = table_seeds(program, table_config, relocations)
+        proof_tool = build_continuation_tool(compiler, BUILD / "tools")
+        derived = table_seeds(program, table_config, relocations, proof_tool)
         combined = {"seeds": seeds["seeds"] + observed["seeds"] + derived}
         relocation_flags, aliases = relocation_seeds(program, combined, relocations)
         seedfile = BUILD / "seeds.txt"
@@ -295,10 +384,42 @@ def main() -> int:
                     "--board", "model2a", "--main-data", str(BUILD / "rom_cache" / "main_data.bin"),
                     "--seeds", str(seedfile), "--report", str(report)] + relocation_flags, BUILD / "recompile.log")
         reach = json.loads(report.read_text())
+        continuations = []
+        for iteration in range(16):
+            proven = continuation_seeds(program, reach, relocations, proof_tool)
+            for row in proven:
+                row["source_seed_provenance"] = [{key: seed[key] for key in
+                    ("address", "name", "evidence", "provenance", "table", "source_address") if key in seed}
+                    for seed in combined["seeds"] if seed["address"] == row["source_address"]]
+            prior = {row["address"] for row in combined["seeds"]}
+            additions = [row for row in proven if row["address"] not in prior]
+            continuations.extend(row for row in proven if row["address"] not in {item["address"] for item in continuations})
+            if not additions:
+                break
+            combined["seeds"].extend(additions)
+            relocation_flags, aliases = relocation_seeds(program, combined, relocations)
+            seedfile.write_text("".join(row["address"][2:] + "\n" for row in combined["seeds"] + aliases))
+            for stale in generated.glob("*.cpp"):
+                stale.unlink()
+            run_logged([str(tool), str(BUILD / "rom_cache/program.bin"), str(generated),
+                "--board", "model2a", "--main-data", str(BUILD / "rom_cache/main_data.bin"),
+                "--seeds", str(seedfile), "--report", str(report)] + relocation_flags,
+                BUILD / f"continuations-{iteration}.log")
+            reach = json.loads(report.read_text())
+        else:
+            raise ValueError("continuation proof did not reach a fixed point within 16 passes")
         compiled = compile_generated(compiler, generated, objects, args.jobs)
         audit.update({"seed_profile": args.seed_profile, "seed_provenance": seeds,
                       "observed_seed_provenance": observed, "relocation_provenance": relocations,
                       "table_seed_provenance": table_config, "table_derived_candidates": derived,
+                      "continuation_candidates": continuations,
+                      "indirect_seed_analysis": {"version": 1,
+                          "helper": "tools/srally_continuations/main.cpp",
+                          "helper_sha256": hashlib.sha256((ROOT / "tools/srally_continuations/main.cpp").read_bytes()).hexdigest(),
+                          "decoder_sha256": hashlib.sha256((ROOT / "src/i960/decode.cpp").read_bytes()).hexdigest(),
+                          "seed_file_sha256": hashlib.sha256(seedfile.read_bytes()).hexdigest(),
+                          "runtime_ram_word_guards_preserved": True,
+                          "limits": "Static candidates only; unknown indirect side entries and exclusive target coverage are not established."},
                       "relocated_seed_provenance": aliases, "reachability": reach,
                       "native_objects_compiled": True, "native_object_count": compiled,
                       "compiler_command": compiler})
