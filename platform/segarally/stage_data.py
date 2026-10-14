@@ -6,12 +6,97 @@ import hashlib
 import json
 from pathlib import Path
 import shutil
+import struct
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 from segarally_boot import sound_inputs
-from segarally_recompile import verify_boundary_contract
+from segarally_recompile import boundary_artifact_hashes, verify_boundary_contract
+
+TGP_MANIFEST = ROOT / "config/segarally_tgp.json"
+
+
+def confined_file(path: Path, build: Path) -> Path:
+    path = path.resolve()
+    if not path.is_relative_to(build) or not path.is_file():
+        raise ValueError("staging provenance artifact is outside its build or missing")
+    return path
+
+
+def digest(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def reference_identity(audit: dict) -> dict:
+    # These are declared public reference IDs, not hashes of local source files.
+    return {key: audit["source"][key] for key in ("repository", "commit")
+            if key in audit.get("source", {})}
+
+
+def staging_provenance(source: Path, audits: list[dict], boundary: dict | None) -> dict:
+    """Bind actual staging inputs without inventing generation authentication.
+
+    Legacy audits need not contain every optional artifact. Present artifacts
+    are confined and checked against existing audit assertions. Ordinary main
+    and TGP audits do not seal generated source bytes: their hashes identify
+    the files being consumed, and do not prove how those files were produced.
+    """
+    coverage, tgp, video = audits
+    main = {"coverage_sha256": digest(confined_file(source / "coverage.json", source)),
+            "generation_source_verification": "boundary_contract" if boundary else "identity_only"}
+    tgp_info = {"audit_sha256": digest(confined_file(source / "tgp/audit.json", source)),
+                "generation_source_verification": "identity_only"}
+    video_info = {"audit_sha256": digest(confined_file(source / "video/audit.json", source)),
+                  "manifest_sha256": video["manifest_sha256"]}
+    for record, audit in ((main, coverage), (tgp_info, tgp), (video_info, video)):
+        reference = reference_identity(audit)
+        if reference:
+            record["reference"] = reference
+    reach_path = source / "reachability.json"
+    if reach_path.exists() or reach_path.is_symlink():
+        reach_path = confined_file(reach_path, source)
+        if json.loads(reach_path.read_text()) != coverage["reachability"]:
+            raise ValueError("main reachability report differs from coverage audit")
+        main["reachability_sha256"] = digest(reach_path)
+    generated = source / "gen"
+    if generated.exists() or generated.is_symlink():
+        count = coverage["reachability"].get("chunk_count")
+        if count is not None:
+            if type(count) is not int or count <= 0:
+                raise ValueError("invalid main generated chunk count")
+            names = {f"chunk_{i:03d}.cpp" for i in range(count)} | {"gen_table.cpp"}
+        else:
+            names = {path.name for path in generated.glob("*.cpp")}
+        main["generated_sha256"] = boundary_artifact_hashes(source, "gen", names)
+    if boundary and "sources_sha256" in boundary:
+        # Already independently checked by verify_boundary_contract above.
+        main["sources_sha256"] = boundary["sources_sha256"]
+    tgp_generated = source / "tgp/program.cpp"
+    if tgp_generated.exists() or tgp_generated.is_symlink():
+        tgp_info["generated_sha256"] = digest(confined_file(tgp_generated, source / "tgp"))
+    if "program" in tgp:
+        manifest = json.loads(TGP_MANIFEST.read_text())
+        spec = manifest["program"]
+        if manifest["romset"] != coverage["romset"] or tgp["program"] != spec:
+            raise ValueError("TGP firmware specification differs from current manifest")
+        program_entry = coverage["images"]["program"]
+        program = confined_file(ROOT / program_entry["path"], source).read_bytes()
+        count_offset, offset = int(spec["count_offset"], 16), int(spec["offset"], 16)
+        count = spec["word_count"]
+        if (count_offset < 0 or count_offset + 4 > len(program) or offset < 0 or
+            type(count) is not int or count <= 0 or offset + count * 4 > len(program) or
+            struct.unpack_from("<I", program, count_offset)[0] != count):
+            raise ValueError("TGP firmware upload bounds or length differs")
+        firmware = program[offset:offset + count * 4]
+        if hashlib.sha256(firmware).hexdigest() != spec["sha256"]:
+            raise ValueError("TGP firmware differs from verified main program upload")
+        firmware_path = source / "tgp/program.bin"
+        if firmware_path.exists() or firmware_path.is_symlink():
+            if confined_file(firmware_path, source / "tgp").read_bytes() != firmware:
+                raise ValueError("TGP firmware artifact differs from verified main program upload")
+        tgp_info.update(firmware_sha256=spec["sha256"], manifest_sha256=digest(TGP_MANIFEST))
+    return {"schema": 1, "main": main, "tgp": tgp_info, "video": video_info}
 
 
 def stage(source: Path, destination: Path, sound_source: Path | None = None,
@@ -19,7 +104,7 @@ def stage(source: Path, destination: Path, sound_source: Path | None = None,
     source, destination = source.resolve(), destination.resolve()
     if not source.is_relative_to(ROOT / "build") or not destination.is_relative_to(ROOT / "build"):
         raise ValueError("source and destination must be inside the ignored project build directory")
-    audits = [json.loads((source / name).read_text()) for name in
+    audits = [json.loads(confined_file(source / name, source).read_text()) for name in
               ("coverage.json", "tgp/audit.json", "video/audit.json")]
     coverage, tgp, video = audits
     timing = coverage.get("reachability", {})
@@ -59,8 +144,10 @@ def stage(source: Path, destination: Path, sound_source: Path | None = None,
         sound_audit = {"timing": "instruction_boundary", "bus_phase_verified": False,
             "generated_sha256": hashlib.sha256(generated.read_bytes()).hexdigest(),
             "audit_sha256": hashlib.sha256((sound_source / "sound/native-timed/audit.json").read_bytes()).hexdigest()}
+    provenance = staging_provenance(source, audits, boundary)
     destination.mkdir(parents=True, exist_ok=True)
     report = {"romset": "srallycb", "images": {}, "native_coverage_is_partial": True}
+    report["provenance"] = provenance
     if sound_audit is not None:
         report["sound"] = sound_audit
     if boundary is not None:

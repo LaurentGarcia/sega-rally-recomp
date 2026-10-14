@@ -685,6 +685,8 @@ add_test(NAME trace COMMAND test_trace ${CMAKE_CURRENT_BINARY_DIR})
 # The MAME plugin's Lua core against the C++ trace library (needs lupa).
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_FOUND)
+    add_test(NAME segarally_staging_provenance
+        COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tests/test_segarally_staging_provenance.py)
     add_test(NAME segarally_boundary_contract
         COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tests/test_segarally_boundary_contract.py)
     add_test(NAME segarally_boundary_audit

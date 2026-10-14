@@ -52,6 +52,15 @@ the original routing. Record the checkout revision and resulting import,
 coverage and source hashes: fresh generation from a newer checkout is not
 automatically the frozen v13 checkpoint.
 
+Staging now records those actual artifact identities under `assets.json`'s
+versioned `provenance` object. Hook generation retains its boundary-contract
+verification. Ordinary main/TGP generated sources are labeled `identity_only`:
+their hashes identify consumed files without claiming that older audits
+authenticate how they were generated. Available inventories, reachability and
+the declared TGP upload bytes are checked before changing the package. Audits
+use paths relative to their originating checkout; stage worktree builds in
+that checkout's context rather than weakening path checks.
+
 ROM-derived images, generated C++ and objects remain under ignored `build/`.
 Import success proves input identity; coverage success proves the generated
 graph, not every course or hardware behavior. Fix the generator or seed evidence

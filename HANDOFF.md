@@ -1,5 +1,41 @@
 # Handoff
 
+## Staged build identities for future recordings (2026-10-14)
+
+`stage_data.py` adds a versioned provenance object to `assets.json`: coverage
+and available reachability/generated-source identities, TGP audit/generated
+source/verified firmware identities, video audit identity and public reference
+revision IDs. Hook sources remain checked by the existing boundary contract.
+Ordinary main/TGP generated hashes are explicitly `identity_only`; their
+existing audits do not authenticate the complete generation source. Optional
+legacy artifacts that are absent do not acquire invented hashes.
+
+Present inventories, paths, reachability and declared TGP firmware are checked
+before destination mutation. The firmware must match the verified program's
+declared upload slice/count. Seventeen synthetic provenance tests and the
+thirteen existing asset tests pass; the new registered CTest passes too.
+Invalid incremental staging preserves the existing package bytes and mtimes.
+The SDK attribution now explicitly describes the separate SHA-256 library use.
+
+Actual ordinary v6 staging succeeds with six images at
+`build/validation/staging-provenance/ordinary-v6`. The v13 sound/hook build
+uses paths relative to its original `boundary-hook` worktree. Calling MAIN's
+CLI directly on it rejects the program path; rebinding only the staging module
+also leaves sound helpers in the wrong context and rejects their paths. With
+the new module and existing helper modules using the original worktree context,
+all eight images stage successfully and 52 generated source identities are
+recorded. No confinement rule was relaxed. Evidence is
+`build/validation/staging-provenance/sound-hook-v13-results.json`; staged
+`assets.json` SHA-256 is
+`7134f44e0c162f6ba1069ddee1c6d8f6deaa90aa8cdce2f9f81c070a3e814e5d`.
+The preserved playable app/assets were not changed or relaunched.
+
+Next is actual host capture/replay wiring with initial save snapshots and
+per-resume PCM comparison. Staging identities and transcript parsing alone do
+not establish a playable recording, independent CPU parity or a full course.
+The graphics lane is separately using the frozen first-car scene to resolve
+pixel (147,20); no full-game run is needed for that attribution.
+
 ## Bounded capture-identity hashing (2026-10-14)
 
 `rt::Sha256` and its byte-span/stream/file helpers reuse the pinned public-domain
