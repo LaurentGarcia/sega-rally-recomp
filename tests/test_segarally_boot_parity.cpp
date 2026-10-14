@@ -4,12 +4,14 @@
 #include "runtime/gen_support.h"
 #include "runtime/model2a_bus.h"
 #include "runtime/model2a_clock.h"
+#include "tools/srally_boot/input_replay.h"
 #include <cstdio>
 #include <deque>
 #include <cstring>
 #include <fstream>
 #include <iterator>
 #include <memory>
+#include <optional>
 #include <tuple>
 #include <vector>
 #ifdef M2_SRALLY_IO
@@ -100,8 +102,12 @@ static bool same(const rt::Cpu& a,const rt::Cpu& b) {
 }
 int main(int argc,char** argv) {
     bool enable_io=false,enable_comm=false,enable_control=false,enable_video=false,enable_screen=false,enable_uart=false;
+    const char *replay_path=nullptr;
     int positional_argc=argc;
     while(positional_argc>1) {
+        if(positional_argc>2 && std::strcmp(argv[positional_argc-2],"--input-replay")==0 && !replay_path) {
+            replay_path=argv[positional_argc-1];positional_argc-=2;continue;
+        }
         const char* option=argv[positional_argc-1];
         if(std::strcmp(option,"--io")==0 && !enable_io) enable_io=true;
         else if(std::strcmp(option,"--comm")==0 && !enable_comm) enable_comm=true;
@@ -116,7 +122,15 @@ int main(int argc,char** argv) {
     if(enable_video!=(positional_argc==8)) return 2;
     if(enable_screen && (!enable_control || !enable_video)) return 2;
     if(enable_uart && !enable_control) return 2;
+    if(replay_path && (!enable_screen || !enable_io)) return 2;
     try {
+        std::optional<srally::InputReplay> native_replay,reference_replay;
+        if(replay_path) {
+            std::ifstream stream(replay_path);
+            if(!stream) throw rt::Fatal("cannot read input replay");
+            native_replay.emplace(stream);
+            reference_replay=native_replay;
+        }
         auto p=load(argv[1]),d=load(argv[2]);
         ObservedBus nb(p,d),rb(p,d);
         rt::Cpu native(&nb);rt::I960Ref ref(&rb);
@@ -283,10 +297,25 @@ int main(int argc,char** argv) {
             nb.board.add_model(&native_io);rb.board.add_model(&reference_io);
             std::puts("I/O parity reference_cycle_clock=true ns_per_cycle=40 independent_devices=true pcb_timing_verified=false");
         }
+        const auto replay_inputs=[&] {
+            if(!native_replay) return;
+            const bool applied=native_replay->apply(native_renders,native_io.inputs);
+            if(applied!=reference_replay->apply(reference_renders,reference_io.inputs))
+                throw rt::Fatal("input replay boundary mismatch");
+            if(applied) std::printf("input_event completed_frames=%llu instructions=%llu cycles=%llu in0=%02x\n",
+                (unsigned long long)native_renders,(unsigned long long)ls.count,
+                (unsigned long long)native.reference_cycles,unsigned(native_io.inputs.in0));
+        };
+        const auto report_inputs=[&] {
+            if(native_replay) std::printf("input_replay events=%zu applied=%zu pending=%zu frame_origin=completed_renders independent_cursors=true\n",
+                native_replay->size(),native_replay->applied(),native_replay->size()-native_replay->applied());
+        };
         const auto same_io=[&] {
             if(!enable_io) return true;
             const auto& a=native_io.chip().state();const auto& b=reference_io.chip().state();
-            return a.port_value==b.port_value && a.port_config==b.port_config &&
+            const auto& ni=native_io.inputs;const auto& ri=reference_io.inputs;
+            return ni.in0==ri.in0 && ni.in1==ri.in1 && ni.in2==ri.in2 && ni.switches==ri.switches && ni.analog==ri.analog &&
+                a.port_value==b.port_value && a.port_config==b.port_config &&
                 a.mode==b.mode && a.analog_channel==b.analog_channel &&
                 native_io.drive_command()==reference_io.drive_command() &&
                 native_io.lamp_output()==reference_io.lamp_output() &&
@@ -297,6 +326,8 @@ int main(int argc,char** argv) {
 #else
         if(enable_io) throw rt::Fatal("I/O support not linked into test");
         const auto same_io=[] { return true; };
+        const auto replay_inputs=[] {};
+        const auto report_inputs=[] {};
 #endif
 #ifdef M2_SRALLY_TGP
         std::unique_ptr<rt::TgpBoard> nt,rtgp;
@@ -403,6 +434,10 @@ int main(int argc,char** argv) {
         const uint64_t limit=std::stoull(argv[3]);
         uint64_t writes=0;
         while(ls.count<limit) {
+            // A frame can finish during an opcode or while synchronizing its
+            // following boundary/IRQ. Apply before the next opcode in either
+            // case; independent cursors reject skipped or mismatched events.
+            replay_inputs();
             // Include pending-table writes and IRQ entry before the opcode in
             // this step. Neither IRQ entry nor its 9 helper cycles is an opcode.
             nb.writes.clear();rb.writes.clear();
@@ -413,6 +448,7 @@ int main(int argc,char** argv) {
             ls.end_count=ls.count+1;
             sync_native();sync_reference();
             advance_control();
+            replay_inputs();
             if(ls.count!=before_count || !same(native,ref) || nb.writes!=rb.writes ||
                native_irqs.events!=reference_irqs.events || !same_control() || !same_clock() || !same_uart())
                 throw rt::Fatal("instruction boundary/IRQ parity mismatch");
@@ -421,6 +457,7 @@ int main(int argc,char** argv) {
                 if(!same_video(true)) throw rt::Fatal("video RAM mismatch at code frontier");
                 report_screen();
                 report_uart();
+                report_inputs();
                 std::printf("PASS native/reference parity instructions=%llu writes=%llu cycles=%llu irq_entries=%llu frontier=missing_code pc=%08x\n",
                     (unsigned long long)ls.count,(unsigned long long)writes,(unsigned long long)native.reference_cycles,
                     (unsigned long long)native_irqs.total,pc);
@@ -444,6 +481,7 @@ int main(int argc,char** argv) {
                        native_frames==reference_frames && native_parses==reference_parses && native_renders==reference_renders && same_uart()) {
                         report_screen();
                         report_uart();
+                        report_inputs();
                         std::printf("PASS native/reference parity instructions=%llu writes=%llu cycles=%llu irq_entries=%llu frontier=device pc=%08x access=%s%u address=%08x value=%08x\n",
                             (unsigned long long)ls.count,(unsigned long long)writes,(unsigned long long)native.reference_cycles,
                             (unsigned long long)native_irqs.total,pc,
@@ -480,6 +518,7 @@ int main(int argc,char** argv) {
         if(!same_video(true)) throw rt::Fatal("video RAM mismatch at instruction limit");
         report_screen();
         report_uart();
+        report_inputs();
         std::printf("PASS native/reference parity instructions=%llu writes=%llu cycles=%llu irq_entries=%llu frontier=instruction_limit pc=%08x\n",
             (unsigned long long)ls.count,(unsigned long long)writes,(unsigned long long)native.reference_cycles,
             (unsigned long long)native_irqs.total,native.m_IP);

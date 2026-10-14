@@ -39,3 +39,13 @@ The runner preserves the submitted bytes as `boot-input.txt`, hashes them in
 The final event counts distinguish applied and pending inputs. Missing, duplicate,
 backwards or skipped frame events fail explicitly. This diagnostic replay does
 not establish full MAME or PCB input-timing parity.
+
+The independent CPU/device harness accepts the same file with
+`tests/test_segarally_boot_parity.py --input-replay FILE --screen --io` and its
+usual TGP/video/control options. Separate replay cursors drive each board;
+CPU registers, cycle-stamped writes, IRQs, device states and framebuffer are
+still compared. It freezes the file as `parity-input.txt` with a SHA-256 in
+`parity-input.json`. The v3 neutral check at frames 0, 100 and 500 matches the
+native machine's input instruction/cycle boundaries exactly and passes through
+100 million instructions. This test uses the inherited independent CPU engine
+with shared board implementations; it is not a full emulator or PCB replay.

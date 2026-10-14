@@ -1,5 +1,19 @@
 # Handoff
 
+## Cabinet replay in independent CPU/device parity (2026-10-14)
+
+The independent harness now accepts the same bounded cabinet replay, with
+separate cursors for native and reference boards. It verifies the input pins
+alongside CPU registers, ordered cycle-stamped writes, IRQs and device state,
+and preserves exact replay bytes and a SHA-256. Strict harness compilation
+passes. The v3 neutral frame 0/100/500 run agrees through 100,000,000 instructions,
+1,719,294 ordered writes, 223,328,073 cycles, 4,585 IRQs and 513 rendered frames,
+with final hash `c2b1e0b7602037ac`. Its applied events also match the shared
+machine's exact instruction/cycle boundaries: frame 100 at 17,787,072 /
+43,501,001 and frame 500 at 97,263,830 / 217,341,000. Ignored evidence is
+`build/validation/input-replay/neutral-parity.log`. This is a neutral replay
+check; coin/start behavior and driving parity still need the expanded profile.
+
 ## Sound dispatch coverage through the native title checkpoint (2026-10-14)
 
 The coupled diagnostic now reaches the v2 main CPU's known `0x005caba0`

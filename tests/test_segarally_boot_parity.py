@@ -29,6 +29,7 @@ def main():
     parser.add_argument("--video", action="store_true", help="Attach independent video RAM and actual Geo/TGP bindings (frame clock frozen)")
     parser.add_argument("--screen", action="store_true", help="Connect shared queue screen phase, geometry, rendering and vblank IRQ")
     parser.add_argument("--uart", action="store_true", help="Connect independent main-board UARTs on physical clock edges, idle RX, no SCSP")
+    parser.add_argument("--input-replay", type=Path, help="Apply identical cabinet snapshots using independent replay cursors (requires --screen --io)")
     args = parser.parse_args()
     if args.video and not args.tgp:
         parser.error("--video requires --tgp for each independent geometry buffer")
@@ -36,6 +37,8 @@ def main():
         parser.error("--screen requires --control and --video")
     if args.uart and not args.control:
         parser.error("--uart requires --control for ready IRQ pins")
+    if args.input_replay and not (args.screen and args.io):
+        parser.error("--input-replay requires --screen and --io")
     directory = args.build_dir.resolve()
     if not directory.is_relative_to(ROOT / "build") or directory == ROOT / "build":
         parser.error("--build-dir must be below ignored build/")
@@ -58,7 +61,7 @@ def main():
         assert hashlib.sha256(path.read_bytes()).hexdigest() == entry["sha256"]
         images.append(path)
     executable = directory / "boot_parity"
-    command = shlex.split(args.compiler) + ["-std=c++20", "-O1", "-fno-fast-math", "-ffp-contract=off", "-Isrc",
+    command = shlex.split(args.compiler) + ["-std=c++20", "-O1", "-fno-fast-math", "-ffp-contract=off", "-Isrc", "-I.",
         "tests/test_segarally_boot_parity.cpp", "src/runtime/model2a_bus.cpp", "src/runtime/cpu.cpp",
         "src/runtime/lockstep.cpp", "src/refcore/i960_ref.cpp", "src/runtime/model2a_clock.cpp"]
     tgp_images = []
@@ -109,6 +112,16 @@ def main():
         arguments.append("--screen")
     if args.uart:
         arguments.append("--uart")
+    if args.input_replay:
+        contents = args.input_replay.read_bytes()
+        if len(contents) > 1024 * 1024:
+            parser.error("input replay exceeds 1 MiB")
+        replay = directory / "parity-input.txt"
+        replay.write_bytes(contents)
+        metadata = {"source": str(args.input_replay.resolve()), "path": str(replay),
+                    "sha256": hashlib.sha256(contents).hexdigest(), "frame_origin": "completed_renders"}
+        (directory / "parity-input.json").write_text(json.dumps(metadata, indent=2) + "\n")
+        arguments += ["--input-replay", str(replay)]
     result = subprocess.run(arguments,
                             cwd=ROOT, capture_output=True, text=True, timeout=args.timeout)
     transcript = result.stdout + result.stderr
