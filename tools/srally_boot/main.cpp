@@ -19,8 +19,18 @@ std::vector<uint8_t> load(const char *path) {
 
 int main(int argc, char **argv) {
     using Machine = rt::Model2AMachine;
-    if (argc != 4 && argc != 6 && argc != 8 && argc != 9) {
-        std::fprintf(stderr, "usage: srally_boot PROGRAM.bin MAIN_DATA.bin INSTRUCTION_LIMIT [TGP_TABLES.bin COPRO_DATA.bin [POLYGONS.bin TEXTURES.bin [FRAME.ppm]]]\n");
+    int expected = 4;
+#ifdef M2_SRALLY_TGP
+    expected += 2;
+#endif
+#ifdef M2_SRALLY_VIDEO
+    expected += 2;
+#endif
+#ifdef M2_SRALLY_SOUND
+    expected += 2;
+#endif
+    if (argc != expected && argc != expected + 1) {
+        std::fprintf(stderr, "usage: srally_boot PROGRAM.bin MAIN_DATA.bin INSTRUCTION_LIMIT [compiled TGP/video/sound image pairs] [FRAME.ppm]\n");
         return 2;
     }
     try {
@@ -32,15 +42,19 @@ int main(int argc, char **argv) {
         Machine::Images images;
         images.program = load(argv[1]); images.main_data = load(argv[2]);
         Machine::Options options{false, false, false, false, false, false, false, false};
+        [[maybe_unused]] int next_image = 4;
+        const char *capture = argc == expected + 1 ? argv[expected] : nullptr;
 #ifdef M2_SRALLY_TGP
-        if (argc >= 6) { images.tgp_tables = load(argv[4]); images.copro_data = load(argv[5]); options.tgp = true; }
-#else
-        if (argc >= 6) throw std::runtime_error("this runner was built without a native TGP program");
+        images.tgp_tables = load(argv[next_image++]);
+        images.copro_data = load(argv[next_image++]); options.tgp = true;
 #endif
 #ifdef M2_SRALLY_VIDEO
-        if (argc >= 8) { images.polygons = load(argv[6]); images.textures = load(argv[7]); options.video = true; }
-#else
-        if (argc >= 8) throw std::runtime_error("this runner was built without native video");
+        images.polygons = load(argv[next_image++]);
+        images.textures = load(argv[next_image++]); options.video = true;
+#endif
+#ifdef M2_SRALLY_SOUND
+        images.sound_program = load(argv[next_image++]);
+        images.sound_samples = load(argv[next_image++]); options.sound = true;
 #endif
 #ifdef M2_SRALLY_CONTROL
         options.control = true;
@@ -57,7 +71,7 @@ int main(int argc, char **argv) {
 #ifdef M2_SRALLY_SCREEN
         options.screen = true;
 #else
-        if (argc == 9) throw std::runtime_error("frame capture requires timed screen rendering");
+        if (capture) throw std::runtime_error("frame capture requires timed screen rendering");
 #endif
         Machine machine(std::move(images), options);
         const auto &cpu = machine.cpu();
@@ -81,8 +95,13 @@ int main(int argc, char **argv) {
         std::printf("native_cpu irq_entries=%u previous_dispatch=%08x\n", s.irq_entries, s.previous_dispatch);
         if (options.comm) std::printf("native_comm linked=true peer_connected=false firmware_executed=false\n");
         if (options.io) std::printf("native_io linked=true clock_connected=true\n");
-        if (options.uart) std::printf("native_uart linked=true clock_connected=true sound_board_connected=false mode=%02x command=%02x tx_pin_changes=%" PRIu64 "\n",
-            unsigned(s.uart_mode), unsigned(s.uart_command), s.tx_pin_changes);
+        if (options.uart) std::printf("native_uart linked=true clock_connected=true sound_board_connected=%s mode=%02x command=%02x tx_pin_changes=%" PRIu64 "\n",
+            options.sound ? "true" : "false", unsigned(s.uart_mode), unsigned(s.uart_command), s.tx_pin_changes);
+        if (options.sound) std::printf("native_sound linked=true timing=instruction_boundary bus_phase_verified=false instructions=%" PRIu64
+            " cycles=%" PRIu64 " irq_entries=%" PRIu64 " pc=%06x previous_dispatch=%06x last_event_ns=%" PRIu64
+            " samples=%" PRIu64 " dropped_samples=%" PRIu64 "\n",
+            s.sound_instructions, s.sound_cycles, s.sound_irqs, s.sound_pc, s.sound_previous_dispatch,
+            s.board_time_ns, s.sound_samples, s.sound_dropped_samples);
         if (options.video) std::printf("native_video linked=true frame_clock_connected=%s frames_rendered=%" PRIu64
             " frames_parsed=%" PRIu64 " latched_frame=%" PRIu64 " screen_frame=%" PRIu64 " screen_hash=%016" PRIx64 "\n",
             options.screen ? "true" : "false", s.frames_rendered, s.frames_parsed, s.latched_frame, s.screen_frame, s.screen_hash);
@@ -90,8 +109,8 @@ int main(int argc, char **argv) {
             " first_geometry_frame=%" PRIu64 " frame_numbering=one_based_zero_means_none\n",
             s.polygons, s.frames_with_geometry, s.first_geometry_frame);
 #ifdef M2_SRALLY_VIDEO
-        if (argc == 9 && s.frames_rendered) {
-            std::ofstream frame(argv[8], std::ios::binary);
+        if (capture && s.frames_rendered) {
+            std::ofstream frame(capture, std::ios::binary);
             frame << "P6\n" << machine.video().width() << ' ' << rt::Video::H << "\n255\n";
             for (uint32_t pixel : machine.video().screen()) {
                 const char rgb[] = {char(pixel >> 16), char(pixel >> 8), char(pixel)};

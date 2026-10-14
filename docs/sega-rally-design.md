@@ -160,8 +160,8 @@ with a rising edge at 1 us. Its ready outputs feed the IRQ controller while
 CPU line delivery stays at instruction boundaries. The real recovery sequence
 briefly programs idle synchronous mode before resetting into asynchronous 8N1
 at x16; rejecting that programming sequence would stop valid startup. Actual
-synchronous transfer remains unsupported. SCSP RX is unconnected and idle,
-with no fake responses. The shared 68000 generator now has an explicit Model
+synchronous transfer remains unsupported. Without the optional sound diagnostic,
+SCSP RX remains unconnected and idle, with no fake responses. The shared 68000 generator now has an explicit Model
 2A map: 512 KiB RAM, SCSP at `0x100000`, 512 KiB program at `0x600000`, and
 8 MiB sample ROM at `0x800000`. The address-space adapter preserves big-endian
 byte lanes and ordered longword accesses. Board reset copies only the first
@@ -186,9 +186,22 @@ Timers round reference attosecond deadlines upward to nanoseconds. The native
 queue produces samples proactively; MAME's lazy stream updates and speaker
 resampling remain outside this comparison. Reference envelope/LFO/noise/DSP
 limitations, immediate DMA and the missing 1Fs interrupt are retained.
-Sound CPU cycle accounting and asynchronous IRQ scheduling remain required
-before whole-game audio is connected. Daytona's measured instruction-rate shortcut is specific to its
-different Model 1 board and is not reused for Rally.
+An opt-in diagnostic now accounts 68000 instruction totals at 11.2896 MHz,
+including RAM/SCSP waits, modeled prefetch transfers, dynamic instruction costs
+and phase-dependent autovector IACK. Unsupported exception/timing paths stop.
+The common queue executes exactly one sound instruction or IRQ entry per
+callback. Reset consumes its modeled cycles before the first instruction,
+without advancing the caller's clock during construction. SCSP and the main
+UART exchange real serial pin edges; no command reply is substituted.
+
+This follows the inherited **Audio** section's static-program approach with a
+Rally-specific scheduling contract. MMIO still occurs at each instruction's
+start boundary, with no value-bearing prefetch or individual bus-phase model.
+Independent public microcode tests validate totals, waits and ordered writes;
+whole-game audio parity and physical timing remain unverified. The diagnostic
+is disabled by default, including in the Metal frontend. Daytona's measured
+instruction-rate shortcut is specific to its different Model 1 board and is
+not reused for Rally.
 
 The older lifted-C prototype already reaches desert practice on the phone, but
 contains incomplete game paths. It is a useful source of address annotations and

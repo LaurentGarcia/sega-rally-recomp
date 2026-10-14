@@ -13,10 +13,12 @@ class Model2AMachine {
 public:
     struct Images {
         std::vector<uint8_t> program, main_data, tgp_tables, copro_data, polygons, textures;
+        std::vector<uint8_t> sound_program, sound_samples;
     };
     struct Options {
         bool tgp = true, io = true, comm = true, control = true;
         bool video = true, screen = true, uart = true, external_video = false;
+        bool sound = false; // Diagnostic 68000 instruction-boundary timing.
     };
     enum class Reason { Frame, Budget, MissingCode, DeviceAccess, RuntimeError };
     struct RunResult {
@@ -34,6 +36,9 @@ public:
         uint64_t tgp_instructions = 0, tx_pin_changes = 0, screen_hash = 0;
         uint64_t polygons = 0, frames_with_geometry = 0;
         uint64_t first_geometry_frame = 0; // one-based rendered frame; zero means none
+        uint64_t sound_instructions = 0, sound_cycles = 0, sound_irqs = 0;
+        uint64_t sound_samples = 0, sound_dropped_samples = 0;
+        uint32_t sound_pc = 0, sound_previous_dispatch = 0;
         uint32_t pc = 0, previous_dispatch = 0;
         unsigned irq_entries = 0;
         bool tgp_booted = false;

@@ -13,6 +13,7 @@
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -46,11 +47,32 @@ struct Cpu68k {
     uint32_t x = 0, n = 0, z = 0, v = 0, c = 0; // flags, each 0 or 1
     uint16_t sys = 0x2700;          // SR system byte: T, S, interrupt mask (flags in the variables above)
     int irq_line = 0;               // level asserted on IPL (autovectored)
+    bool nmi_pending = false;       // host records a transition to level7
 
     std::vector<uint8_t> ram = std::vector<uint8_t>(0x10000, 0); // 0xf00000-0xf0ffff
     const uint8_t *rom = nullptr;   // 0x000000-0x03ffff, big-endian bytes; 0x080000-0x09ffff mirrors 0x020000
     Devices *dev = nullptr;
     AddressSpace *bus = nullptr;   // caller-owned; must outlive this CPU
+
+    // Optional Model2A instruction-boundary accounting. Data accesses occur
+    // at the previous completed boundary; this is not production bus-phase
+    // scheduling or a value-bearing prefetch pipeline. Live code checks run
+    // outside begin/finish and incur no modeled cycles or bus waits.
+    bool model2a_timing = false;
+    uint64_t cycles = 0;
+    struct CycleStats {
+        uint64_t data_transfers=0, prefetch_transfers=0, dummy_reads=0;
+        uint64_t mapped_waits=0, iack_transfers=0, iack_waits=0;
+    } cycle_stats;
+    std::function<void(uint64_t total_cycles)> on_cycles;
+    std::function<void(int level)> on_irq_ack;
+    void begin_instruction();
+    void finish_instruction(uint32_t nominal_cycles);
+    void account_prefetch(uint32_t address);
+    void dummy_read(uint32_t address,unsigned size);
+    static uint32_t model2a_wait(uint32_t address);
+    static uint64_t model2a_time_ns(uint64_t cycles);
+    bool timing_active() const { return timing_active_; }
 
     // Reset: SSP and PC from the vector table, supervisor, mask 7.
     void reset();
@@ -66,6 +88,7 @@ struct Cpu68k {
     // Memory: 24-bit bus.
     uint8_t r8(uint32_t addr) {
         addr &= 0xffffff;
+        if (timing_active_) account_data(addr);
         if (bus) {
             const uint16_t value = bus->read16(addr & ~1u, addr & 1 ? 0x00ff : 0xff00);
             return uint8_t(addr & 1 ? value : value >> 8);
@@ -78,6 +101,7 @@ struct Cpu68k {
     uint16_t r16(uint32_t addr) {
         addr &= 0xffffff;
         if (addr & 1) odd(addr);
+        if (timing_active_) account_data(addr);
         if (bus) return bus->read16(addr, 0xffff);
         if (addr >= 0xf00000 && addr < 0xf10000) return uint16_t(ram[addr - 0xf00000] << 8 | ram[addr - 0xf00000 + 1]);
         if (addr < 0x40000) return uint16_t(rom[addr] << 8 | rom[addr + 1]);
@@ -90,6 +114,7 @@ struct Cpu68k {
     }
     void w8(uint32_t addr, uint32_t val) {
         addr &= 0xffffff;
+        if (timing_active_) account_data(addr);
         if (bus) {
             bus->write16(addr & ~1u, uint16_t(addr & 1 ? val & 0xff : (val & 0xff) << 8),
                          addr & 1 ? 0x00ff : 0xff00);
@@ -101,6 +126,7 @@ struct Cpu68k {
     void w16(uint32_t addr, uint32_t val) {
         addr &= 0xffffff;
         if (addr & 1) odd(addr);
+        if (timing_active_) account_data(addr);
         if (bus) { bus->write16(addr, uint16_t(val), 0xffff); return; }
         if (addr >= 0xf00000 && addr < 0xf10000) {
             ram[addr - 0xf00000] = uint8_t(val >> 8);
@@ -108,6 +134,9 @@ struct Cpu68k {
         } else dev_w(addr, uint16_t(val), 0xffff);
     }
     void w32(uint32_t addr, uint32_t val) { w16(addr, val >> 16); w16(addr + 2, val); }
+    // M68000 long RMW and predecrement stores complete the low word first.
+    // Optional timed emission selects this without changing Daytona templates.
+    void w32_low_first(uint32_t addr, uint32_t val) { w16(addr + 2, val); w16(addr, val >> 16); }
 
     void push16(uint32_t v16) { a[7] -= 2; w16(a[7], v16); }
     void push32(uint32_t v32) { a[7] -= 4; w32(a[7], v32); }
@@ -117,6 +146,10 @@ struct Cpu68k {
     [[noreturn]] void fatal(const std::string &what) const;
 
 private:
+    CycleStats pending_cycles_;
+    bool timing_active_=false, cycle_callback_active_=false;
+    uint64_t last_vpa_cycle_=0;
+    void account_data(uint32_t address);
     uint8_t dev_r8(uint32_t addr);
     uint16_t dev_r16(uint32_t addr);
     void dev_w(uint32_t addr, uint16_t data, uint16_t mem_mask);

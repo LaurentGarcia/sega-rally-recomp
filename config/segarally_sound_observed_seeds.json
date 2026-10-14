@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "romset": "srallycb",
+  "program_sha256": "6be2a7a6c9c08b55291ceaf7891f2d8418e38291ed00376cf0f569a8a083ad6f",
+  "notes": "Observed native sound dispatcher targets. This supplies recompilation coverage only; the real ROM still installs vectors into RAM. Boundary-timed execution is not exact bus-phase timing.",
+  "seeds": [
+    {
+      "address": "0x6026f6",
+      "name": "observed_scsp_level2_handler",
+      "observed_status": "missing_code",
+      "observed_after_instructions": 639524,
+      "observed_modeled_cycles": 8662199,
+      "evidence": "build/validation/sound-vector-frontier.json",
+      "vector_address": "0x000068",
+      "vector_installed_by_pc": "0x60020e",
+      "vector_stores_evidence": "build/validation/sound-vector-stores.txt",
+      "vector_stores_sha256": "53d1934d425c655736c464e5fedaedaf0f09e77ff411ee3533db7ad2eab39d13",
+      "provenance": "Actual SCSP IRQ entry reached this program-ROM target after 1406 SCSP writes. A traced ROM instruction at 0x60020e wrote vector words 0x0060 and 0x26f6 into RAM 0x68/0x6a. No RAM vector image, game instruction or return value is substituted."
+    },
+    {
+      "address": "0x60068e",
+      "name": "observed_scsp_level1_handler",
+      "observed_status": "missing_code",
+      "observed_after_instructions": 639575,
+      "observed_modeled_cycles": 8663289,
+      "evidence": "build/validation/sound-level1-frontier.json",
+      "evidence_sha256": "5a5da71e161b1661372a71a56bfd89c42a05f581f888b040b2ffa0f4a45e9e62",
+      "vector_address": "0x000064",
+      "vector_installed_by_pc": "0x60020e",
+      "provenance": "Actual second SCSP IRQ entry reached this program-ROM target. The same real ROM copy instruction installed vector words 0x0060/0x068e into RAM 0x64/0x66; vector-store evidence is shared with the level-2 seed. This entry adds coverage without replacing the vector copy or game state."
+    }
+  ]
+}

@@ -1,5 +1,68 @@
 # Handoff
 
+## Timed sound core and optional shared-board diagnostic (2026-10-14)
+
+The 68000 generator now supports explicit `--timing model2a-boundary` for
+Model 2A. It accounts instruction totals, dynamic costs, mapped RAM/SCSP waits,
+prefetch transfer counts, reset and phase-dependent autovector IACK against
+the pinned public M68000 microcode. Unsupported timing and exception paths
+stop before proceeding. MMIO remains at the instruction's start boundary;
+prefetch values, individual bus phases and interrupt capture timing are not
+modeled. These are diagnostic timing contracts, not PCB or whole-game parity.
+
+Independent microcode comparisons pass 11,409 synthetic instruction cases
+across 1,528 public decode patterns, checking total cycles, waits, bus counts
+and ordered write address/data/masks. Another 282 comparisons cover two resets
+and 20 starting phases across seven IRQ levels with RAM/ROM handlers, including
+final PC/SSP and ordered stack writes. Strict and ASan/UBSan runs pass. Sixteen
+prefetch-map frontiers and 151 odd-address exception cases are explicitly
+excluded. The wider comparison caught upper-word bit-operation costs and
+longword write order: timed read-modify-write and predecrement stores write
+the low word first. Runtime guards and rational clocks pass 1,164 checks;
+six generator tests pass. Default Daytona generation remains byte-identical,
+SHA-256 `a0b69c9763dbd5560b58247049a41d4300d9926e19bf20a731cc76a6c61f1042`.
+
+Actual timed Rally sound startup compiles 886 instructions and completes a
+one-million-instruction bound at 13,096,293 modeled cycles, 383 IRQ entries,
+35,955 SCSP writes and 51,158 sample frames. Sanitized execution produces the
+same JSON as the normal run. Generated source SHA-256 is
+`d1293a200f6d9039f2c903b1cd213edefaee4d546fb567e82c62a46c62f56d95`.
+Observed IRQ seeds retain real vector-store evidence; no vector RAM image or
+game reply is substituted. The original untimed reset probe still reaches
+its first SCSP write after 278,301 instructions.
+
+`Model2ASound` owns images, the bus, chip and native CPU. A shared-clock callback
+executes exactly one instruction or one IRQ entry, then schedules its next
+absolute rational deadline. Construction accounts reset without advancing the
+caller's clock. Missing code and errors remain stopped; destruction cancels
+all callbacks. Thirty-five scheduler checks pass strict, CMake and ASan/UBSan,
+including real physical MIDI reception, DMA hold acknowledgment, equal-time
+insertion order and DMA Hold followed by MIDI Assert on the same level. The
+initial held-bit implementation was wrong for that last transition: Assert
+must replace Hold, as pinned diexec does. A mutant retaining Hold fails with
+`acknowledgment cleared ASSERT_LINE`. External peripheral callback exceptions
+propagate through the shared clock; CPU-step failures also retain sound status.
+
+The runner's opt-in `--with-sound` connects both serial directions to the main
+UART and checks source, generated-code and asset audits before linking. Six
+rejection tests cover untimed/unguarded/partial/stale code and path escape.
+The Metal frontend and default runner leave this diagnostic disabled. A shared
+machine completes ten million main instructions with 807,783 sound instructions
+and 179 sound IRQs. The longer coupled run reaches main instruction 14,391,262
+and sound instruction 1,259,939 before missing sound PC `0x600582`, dispatched
+from `0x600778`. Sound cycles are 16,293,469 with 660 IRQ entries; shared clock
+stops at 1,443,228,193 ns. Main UART is in mode `4e`, command `37`, with actual
+TX edges. Evidence is under ignored `build/segarally-timed-v2/evidence/
+sound-linked-600582`. Samples are bounded and drainable, but host playback is
+not connected; undrained output drops and counts old frames.
+
+The default-off 100-million run still exactly matches its prior checkpoint:
+223,328,073 reference cycles, 4,585 IRQs, 513 frames and pixel hash
+`c2b1e0b7602037ac`. CMake builds the shared generator and passes inherited
+68000, timing, machine and sound scheduler tests. Next: compile the newly
+observed sound entry, retain explicit timing limitations, and validate the
+independent graphics lane's first native car capture through Metal.
+
 ## Verified callback and continuation candidates (2026-10-14)
 
 The guarded native profile now contains 67,031 instructions and 46 compiled

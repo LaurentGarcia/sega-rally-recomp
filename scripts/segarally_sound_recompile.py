@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Compile Rally's actual sound reset path with the shared Daytona generator.
 
-Requires segarally_sound.py's verified import. Stops at the first unsupported
-SCSP access; reaching that frontier does not establish sound-chip execution.
+Requires segarally_sound.py's verified import. Default mode preserves the reset
+probe's absent-chip frontier. --timed attaches the native SCSP and accounts
+instruction totals; MMIO remains at the previous instruction boundary, so this
+is a bounded diagnostic, not bus-phase or full sound-board timing parity.
 """
 from __future__ import annotations
 import argparse
@@ -38,11 +40,27 @@ def verified_images(build: Path, specification: dict) -> dict[str, Path]:
     return result
 
 
+def observed_seeds(program: bytes, config: dict) -> list[int]:
+    digest = hashlib.sha256(program).hexdigest()
+    if config.get("schema") != 1 or config.get("romset") != "srallycb" or config.get("program_sha256") != digest:
+        raise ValueError("sound seed provenance differs from verified program")
+    addresses = []
+    for row in config["seeds"]:
+        address = int(row["address"], 16)
+        if address & 1 or not 0x600000 <= address < 0x680000:
+            raise ValueError("observed sound seed must be aligned program ROM")
+        if row.get("observed_status") != "missing_code":
+            raise ValueError("sound seed requires an actual native dispatcher frontier")
+        addresses.append(address)
+    return sorted(set(addresses))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--build-dir", type=Path, default=ROOT / "build/segarally")
     parser.add_argument("--compiler", default=os.environ.get("CXX", "c++"))
     parser.add_argument("--max-instructions", type=int, default=1_000_000)
+    parser.add_argument("--timed", action="store_true", help="bounded instruction timing with native SCSP; MMIO at prior boundary")
     args = parser.parse_args()
     try:
         if args.max_instructions <= 0:
@@ -50,23 +68,35 @@ def main() -> int:
         build = build_path(args.build_dir)
         spec = json.loads((ROOT / "config/segarally_sound_boot.json").read_text())
         images = verified_images(build, spec)
-        output = build_path(build / "sound/native")
+        output = build_path(build / ("sound/native-timed" if args.timed else "sound/native"))
         if not output.is_relative_to(build):
             raise ValueError("native sound output is outside the audited build directory")
         output.mkdir(parents=True, exist_ok=True)
         compiler = shlex.split(args.compiler)
         flags = ["-std=c++20", "-O1", "-fno-fast-math", "-ffp-contract=off", "-Isrc"]
-        generator_sources = ["tools/m2sndrecomp/main.cpp", "src/m68k/decode.cpp", "src/m68k/reach.cpp"]
+        generator_sources = ["tools/m2sndrecomp/main.cpp", "src/m68k/decode.cpp", "src/m68k/reach.cpp", "src/m68k/timing.cpp"]
         runtime_sources = ["tools/srally_sound_boot/main.cpp", "src/runtime/snd_cpu.cpp", "src/runtime/model2a_sound_bus.cpp"]
+        generation_flags = []
+        runtime_flags = []
+        seed_config_path = "config/segarally_sound_observed_seeds.json"
+        if args.timed:
+            generation_flags += ["--timing", "model2a-boundary"]
+            config = json.loads((ROOT / seed_config_path).read_text())
+            seeds = observed_seeds(images["audiocpu"].read_bytes(), config)
+            seed_file = output / "observed-seeds.txt"
+            seed_file.write_text("".join(f"{address:x}\n" for address in seeds))
+            generation_flags += ["--seeds", str(seed_file)]
+            runtime_flags += ["-DSEGARALLY_SOUND_TIMED_PROBE"]
+            runtime_sources += ["src/runtime/model2_scsp.cpp", "src/runtime/model2_scsp_dsp.cpp", "src/runtime/model2a_clock.cpp"]
         tool = output / "m2sndrecomp"
         generated = output / "snd_gen.cpp"
         run_logged(compiler + flags + generator_sources + ["-o", str(tool)], output / "generator-build.log")
         run_logged([str(tool), str(images["audiocpu"]), str(generated), "--board", "model2a",
-                    "--audit", str(output / "generation.json")], output / "generation.log")
+                    "--audit", str(output / "generation.json"), *generation_flags], output / "generation.log")
         executable = output / "srally_sound_boot"
-        run_logged(compiler + flags + runtime_sources + [str(generated), "-o", str(executable)], output / "build.log")
+        run_logged(compiler + flags + runtime_flags + runtime_sources + [str(generated), "-o", str(executable)], output / "build.log")
         execution = subprocess.run([str(executable), str(images["audiocpu"]), str(images["samples"]),
-                                    str(args.max_instructions)], cwd=ROOT, capture_output=True, text=True, timeout=30)
+                                    str(args.max_instructions), *(["--timed"] if args.timed else [])], cwd=ROOT, capture_output=True, text=True, timeout=30)
         (output / "boot.txt").write_text(execution.stdout + execution.stderr)
         result = json.loads(execution.stdout) if execution.stdout.strip() else {"status": "error"}
         expected = spec["expected_frontier"]
@@ -76,23 +106,31 @@ def main() -> int:
                    and result.get("reset_pc") == int(spec["expected_reset"]["pc"], 16)
                    and result.get("reset_ssp") == int(spec["expected_reset"]["ssp"], 16)
                    and result.get("ram_nonzero_bytes") == 0)
-        sources = generator_sources + runtime_sources + ["src/m68k/decode.h", "src/m68k/reach.h",
+        timed_reached = (args.timed and execution.returncode in (3, 4)
+                         and result.get("status") in ("missing_code", "execution_frontier", "instruction_limit")
+                         and result.get("scsp_writes", 0) > 0 and result.get("cycles", 0) > 38)
+        sources = generator_sources + runtime_sources + ["src/m68k/decode.h", "src/m68k/reach.h", "src/m68k/timing.h",
             "src/runtime/snd_cpu.h", "src/runtime/snd_gen_support.h", "src/runtime/snd_sched.h",
             "src/runtime/model2a_sound_bus.h", "config/segarally_sound_boot.json",
             "config/segarally_sound.json", "scripts/segarally_sound_recompile.py"]
+        if args.timed:
+            sources += [seed_config_path, "src/runtime/model2_scsp.h", "src/runtime/model2_scsp_dsp.h", "src/runtime/model2a_clock.h"]
         report = {"schema": 1, "romset": spec["romset"], "board": spec["board"],
-                  "images_sha256": spec["images"], "compiler": compiler, "flags": flags,
+                  "images_sha256": spec["images"], "compiler": compiler, "flags": flags, "runtime_flags": runtime_flags,
                   "sources_sha256": {path: hashlib.sha256((ROOT / path).read_bytes()).hexdigest() for path in sources},
                   "generated_sha256": hashlib.sha256(generated.read_bytes()).hexdigest(),
                   "generation": json.loads((output / "generation.json").read_text()),
                   "execution": result, "exit_code": execution.returncode,
-                  "expected_scsp_frontier_reached": reached, "sound_chip_implemented": False,
-                  "timing_scope": spec["timing_scope"], "full_sound_parity_verified": False}
+                  "expected_scsp_frontier_reached": reached, "sound_chip_attached": args.timed,
+                  "native_scsp_startup_reached": timed_reached,
+                  "timing_reference_commit": "dddd73680656e355bb2b5beecab1167c9f07bf81" if args.timed else None,
+                  "timing_scope": ("Pinned M68000 instruction totals, mapped RAM/SCSP waits and phase-dependent autovector IACK; actual MMIO at previous instruction boundary. Modeled prefetch transfers do not read values. Live code guards excluded from bus counts. Exceptions other than autovector/reset are explicit frontiers. No bus-phase or interrupt-capture parity."
+                                   if args.timed else spec["timing_scope"]), "full_sound_parity_verified": False}
         (output / "audit.json").write_text(json.dumps(report, indent=2) + "\n")
         print((output / "generation.log").read_text(), end="")
         print(execution.stdout + execution.stderr, end="")
         print(f"Native sound audit: {output / 'audit.json'}")
-        return 0 if reached else 1
+        return 0 if (timed_reached if args.timed else reached) else 1
     except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError) as failure:
         print(f"segarally_sound_recompile: {failure}", file=sys.stderr)
         return 2

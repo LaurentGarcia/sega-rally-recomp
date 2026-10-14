@@ -17,6 +17,41 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def sound_inputs(build: Path, romset: str) -> tuple[list[Path], Path]:
+    """Require a verified timed generation before connecting the sound CPU."""
+    from segarally_sound_recompile import verified_images
+    if not build.is_relative_to(ROOT / "build"):
+        raise ValueError("sound build must be inside this project's ignored build directory")
+    specification = json.loads((ROOT / "config/segarally_sound_boot.json").read_text())
+    if specification["romset"] != romset:
+        raise ValueError("sound revision differs from main program")
+    images = verified_images(build, specification)
+    native = build / "sound/native-timed"
+    audit = json.loads((native / "audit.json").read_text())
+    generation = audit.get("generation", {})
+    if (audit.get("romset") != romset or audit.get("board") != "model2a" or
+        not audit.get("sound_chip_attached") or not audit.get("native_scsp_startup_reached") or
+        audit.get("images_sha256") != specification["images"] or
+        generation.get("board") != "model2a" or generation.get("timing_mode") != "model2a-boundary" or
+        not generation.get("live_code_guard") or generation.get("missing_timing") != 0 or
+        generation.get("missing_templates") != 0):
+        raise ValueError("successful guarded instruction-timed SCSP generation is required")
+    sources = audit.get("sources_sha256", {})
+    required = {"tools/m2sndrecomp/main.cpp", "src/m68k/timing.cpp", "src/runtime/snd_cpu.cpp",
+                "src/runtime/snd_cpu.h", "src/runtime/snd_sched.h"}
+    if not required <= sources.keys():
+        raise ValueError("sound generation lacks source provenance")
+    for name, digest in sources.items():
+        path = (ROOT / name).resolve()
+        if not path.is_relative_to(ROOT) or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+            raise ValueError(f"sound generation source changed: {name}")
+    generated = (native / "snd_gen.cpp").resolve()
+    if (not generated.is_relative_to(build) or
+        hashlib.sha256(generated.read_bytes()).hexdigest() != audit["generated_sha256"]):
+        raise ValueError("generated sound code differs from audited source")
+    return [images[name] for name in ("audiocpu", "samples")], generated
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--build-dir", type=Path, default=ROOT / "build/segarally")
@@ -28,7 +63,9 @@ def main() -> int:
     parser.add_argument("--with-control", action="store_true", help="Connect the IRQ controller and countdown timers at instruction boundaries")
     parser.add_argument("--with-video", action="store_true", help="Connect shared video hardware and verified graphics ROMs (requires --with-tgp)")
     parser.add_argument("--with-screen", action="store_true", help="Schedule screen events and render real display lists (requires --with-control --with-video)")
-    parser.add_argument("--with-uart", action="store_true", help="Connect the timed main-board UART with idle RX (requires --with-control; SCSP not connected)")
+    parser.add_argument("--with-uart", action="store_true", help="Connect the timed main-board UART (requires --with-control)")
+    parser.add_argument("--with-sound", action="store_true", help="Connect native SCSP and diagnostic instruction-timed 68000 (requires --with-uart; bus phases unverified)")
+    parser.add_argument("--sound-build-dir", type=Path, help="Verified timed sound generation directory; defaults to --build-dir")
     parser.add_argument("--capture-frame", action="store_true", help="Save the latest rendered startup frame as boot-frame.ppm (requires --with-screen)")
     parser.add_argument("--step-frames", action="store_true", help="Resume the shared machine once per rendered frame (requires --with-screen)")
     args = parser.parse_args()
@@ -43,6 +80,10 @@ def main() -> int:
         parser.error("--with-screen requires --with-control and --with-video")
     if args.with_uart and not args.with_control:
         parser.error("--with-uart requires --with-control for its ready IRQ pins")
+    if args.with_sound and not args.with_uart:
+        parser.error("--with-sound requires --with-uart for the physical serial link")
+    if args.sound_build_dir and not args.with_sound:
+        parser.error("--sound-build-dir requires --with-sound")
     if args.capture_frame and not args.with_screen:
         parser.error("--capture-frame requires --with-screen")
     if args.step_frames and not args.with_screen:
@@ -73,6 +114,7 @@ def main() -> int:
             "src/runtime/lockstep.cpp", "src/runtime/model2a_clock.cpp"] + [str(p) for p in objects] + ["-o", str(executable)]
         tgp_images = []
         video_images = []
+        sound_images = []
         if args.with_io:
             command += ["-DM2_SRALLY_IO", "src/runtime/model2_io.cpp", "src/runtime/model2_eeprom.cpp",
                         "src/runtime/model2a_io.cpp"]
@@ -86,6 +128,11 @@ def main() -> int:
             command += ["-DM2_SRALLY_STEP_FRAMES"]
         if args.with_uart:
             command += ["-DM2_SRALLY_UART", "src/runtime/model2_uart.cpp", "src/runtime/model2a_uart.cpp"]
+        if args.with_sound:
+            sound_images, sound_generated = sound_inputs((args.sound_build_dir or output).resolve(), audit["romset"])
+            command += ["-DM2_SRALLY_SOUND", "src/runtime/model2a_sound.cpp", "src/runtime/model2a_sound_bus.cpp",
+                        "src/runtime/snd_cpu.cpp", "src/runtime/model2_scsp.cpp", "src/runtime/model2_scsp_dsp.cpp",
+                        str(sound_generated)]
         if args.with_tgp:
             tgp_dir = output / "tgp"
             tgp_audit = json.loads((tgp_dir / "audit.json").read_text())
@@ -117,7 +164,7 @@ def main() -> int:
         with (output / "boot-build.log").open("w") as log:
             subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, check=True)
         capture = [str(output / "boot-frame.ppm")] if args.capture_frame else []
-        result = subprocess.run([str(executable), *map(str, images), str(args.instructions), *map(str, tgp_images), *map(str, video_images), *capture],
+        result = subprocess.run([str(executable), *map(str, images), str(args.instructions), *map(str, tgp_images), *map(str, video_images), *map(str, sound_images), *capture],
             cwd=ROOT, capture_output=True, text=True, timeout=180)
         transcript = result.stdout + result.stderr
         (output / "boot.txt").write_text(transcript)
@@ -129,7 +176,8 @@ def main() -> int:
                   "native_control_linked": args.with_control,
                   "native_video_linked": args.with_video,
                   "video_clock_connected": args.with_screen, "uart_connected": args.with_uart,
-                  "scsp_sound_board_connected": False,
+                  "scsp_sound_board_connected": args.with_sound,
+                  "sound_timing_scope": "instruction_boundary_not_bus_phase" if args.with_sound else None,
                   "clock_source": "pinned_mame_i960_cycles_at_25mhz", "pcb_timing_verified": False,
                   "instruction_limit": args.instructions, "exit_code": result.returncode,
                   "image_sha256": {name: audit["images"][name]["sha256"] for name in ("program", "main_data")},

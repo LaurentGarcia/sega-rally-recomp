@@ -21,10 +21,12 @@ events use native hardware components with isolated reference tests. A shared
 event queue preserves deadline and insertion order, with CPU IRQ delivery at
 instruction boundaries. The runner charges pinned-reference opcode cycles
 before memory effects and supplies device time at 25 MHz; this is not measured
-PCB timing. The sound 68000 now executes its generated reset code through
-278,301 instructions and clears its own RAM, stopping at its first SCSP write.
-The native SCSP chip passes isolated sample, DSP, timer and serial comparisons;
-sound CPU timing and whole-game audio remain unconnected. The actual game uploads and runs its 1,665-word TGP
+PCB timing. An optional diagnostic connects the generated sound 68000, native
+SCSP and physical serial link. Instruction totals, waits and ordered writes
+pass independent public-microcode comparisons; exact bus phases remain
+unverified. The linked machine reaches real sound IRQs and another native-code
+frontier. Whole-game audio and playback are not established. The SCSP chip
+passes isolated sample, DSP, timer and serial comparisons. The actual game uploads and runs its 1,665-word TGP
 program through Daytona's shared hardware code. These are bring-up checks, not a complete game
 boot. The existing lifted-C iPhone prototype lives
 separately in `../segarally95-recomp`; its rendering captures provide regression
@@ -82,6 +84,7 @@ and TGP inputs are:
 ```sh
 python3 tests/test_segarally_bootstrap.py
 python3 tests/test_segarally_table_seeds.py
+python3 tests/test_segarally_continuations.py
 python3 tests/test_segarally_native_templates.py
 python3 tests/test_segarally_boot_parity.py --tgp --io --comm --control --video --screen --uart
 python3 tests/test_i960_runtime_timing.py
@@ -89,6 +92,7 @@ python3 tests/test_segarally_tgp_import.py
 python3 tests/test_segarally_video_import.py
 python3 tests/test_segarally_sound_import.py
 python3 tests/test_segarally_sound_recompile.py
+python3 tests/test_segarally_sound_link.py
 ```
 
 The separate sound reset probe uses the same verified archive:
@@ -99,8 +103,22 @@ python3 scripts/segarally_sound_recompile.py
 ```
 
 Its successful audit means the expected SCSP access frontier was reached;
-it does not mean audio played. The sound runner currently counts completed
+it does not mean audio played. This default reset probe counts completed
 instructions without a board clock or asynchronous interrupts.
+
+For the optional instruction-timed sound diagnostic, generate and audit the
+sound core before linking it to the main board:
+
+```sh
+python3 scripts/segarally_sound_recompile.py --timed
+python3 scripts/segarally_boot.py --instructions 100000000 --with-tgp --with-io --with-comm --with-control --with-video --with-screen --with-uart --with-sound
+```
+
+Use matching `--build-dir` arguments for a nondefault import. An explicit
+`--sound-build-dir` can select a separately audited sound build. Changed source,
+assets or generated code require a new audit. This mode connects serial pins,
+SCSP samples and IRQs; it reports native-code frontiers and does not yet play
+audio through the host. MMIO remains at instruction boundaries.
 
 After importing/generating the main, TGP and video inputs above, build the
 dedicated frontend with the pinned SDL3 checkout described in

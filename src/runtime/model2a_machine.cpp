@@ -13,6 +13,9 @@
 #ifdef M2_SRALLY_UART
 #include "runtime/model2a_uart.h"
 #endif
+#ifdef M2_SRALLY_SOUND
+#include "runtime/model2a_sound.h"
+#endif
 #ifdef M2_SRALLY_TGP
 #include "runtime/m2_tgp_board.h"
 #endif
@@ -69,6 +72,10 @@ struct Model2AMachine::Impl {
 #ifdef M2_SRALLY_COMM
     std::unique_ptr<Model2AComm> comm;
 #endif
+#ifdef M2_SRALLY_SOUND
+    snd::Model2Scsp::ReferenceRandom sound_random;
+    std::unique_ptr<snd::Model2ASound> sound;
+#endif
 #ifdef M2_SRALLY_IO
     std::unique_ptr<Model2Eeprom> eeprom;
     std::unique_ptr<Model2AIO> io;
@@ -89,6 +96,7 @@ struct Model2AMachine::Impl {
         if (options.video && !options.tgp) throw Fatal("Model2A video requires TGP");
         if (options.screen && !(options.video && options.control)) throw Fatal("Model2A screen requires video and control");
         if (options.uart && !options.control) throw Fatal("Model2A UART requires control");
+        if (options.sound && !options.uart) throw Fatal("Model2A sound requires the physical UART link");
         if (options.external_video && !options.video) throw Fatal("external renderer requires video");
         bus.set_before_access([this] { synchronize(); });
 #ifdef M2_SRALLY_CONTROL
@@ -116,6 +124,9 @@ struct Model2AMachine::Impl {
             callbacks.txd = [this](bool level) {
                 if (level != tx_pin_level) ++tx_pin_changes;
                 tx_pin_level = level;
+#ifdef M2_SRALLY_SOUND
+                if (sound) sound->midi_in(level);
+#endif
             };
             uart_chip->set_callbacks(std::move(callbacks));
             uart->reset();
@@ -129,6 +140,18 @@ struct Model2AMachine::Impl {
         }
 #else
         if (options.uart) throw Fatal("UART support is not compiled");
+#endif
+#ifdef M2_SRALLY_SOUND
+        if (options.sound) {
+            sound = std::make_unique<snd::Model2ASound>(clock,
+                snd::Model2ASound::Images{std::move(images.sound_program), std::move(images.sound_samples)},
+                [this] { return sound_random(); });
+            sound->on_midi_tx = [this](bool level) { uart_chip->write_rxd(level); };
+            sound->midi_in(uart_chip->txd_level());
+            uart_chip->write_rxd(true);
+        }
+#else
+        if (options.sound) throw Fatal("sound support is not compiled");
 #endif
 #ifdef M2_SRALLY_COMM
         if (options.comm) { comm = std::make_unique<Model2AComm>(); bus.add_model(comm.get()); }
@@ -279,6 +302,15 @@ Model2AMachine::Stats Model2AMachine::stats(bool hash_screen) const {
     if (hash_screen && m.video) s.screen_hash = m.video->video().screen_hash();
 #else
     (void)hash_screen;
+#endif
+#ifdef M2_SRALLY_SOUND
+    if (m.sound) {
+        const auto sound = m.sound->stats();
+        s.sound_instructions = sound.instructions; s.sound_cycles = sound.cycles;
+        s.sound_irqs = sound.irq_entries; s.sound_pc = sound.pc;
+        s.sound_previous_dispatch = sound.previous_dispatch;
+        s.sound_samples = sound.sample_frames; s.sound_dropped_samples = sound.dropped_samples;
+    }
 #endif
     return s;
 }

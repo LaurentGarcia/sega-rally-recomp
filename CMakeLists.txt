@@ -183,7 +183,7 @@ add_executable(m2recomp tools/m2recomp/main.cpp)
 target_link_libraries(m2recomp PRIVATE i960)
 
 # The sound CPU (68000) decoder and static recompiler.
-add_library(m68k STATIC src/m68k/decode.cpp src/m68k/reach.cpp)
+add_library(m68k STATIC src/m68k/decode.cpp src/m68k/reach.cpp src/m68k/timing.cpp)
 target_include_directories(m68k PUBLIC src)
 add_executable(m2sndrecomp tools/m2sndrecomp/main.cpp)
 target_link_libraries(m2sndrecomp PRIVATE m68k)
@@ -439,6 +439,16 @@ add_executable(test_model2a_audio_link tests/test_model2a_audio_link.cpp
     src/runtime/model2_uart.cpp src/runtime/model2a_uart.cpp)
 target_include_directories(test_model2a_audio_link PRIVATE src)
 add_test(NAME model2a_audio_link COMMAND test_model2a_audio_link)
+
+add_executable(test_model2a_sound tests/test_model2a_sound.cpp
+    src/runtime/model2a_sound.cpp src/runtime/model2a_sound_bus.cpp src/runtime/snd_cpu.cpp
+    src/runtime/model2_scsp.cpp src/runtime/model2_scsp_dsp.cpp src/runtime/model2a_clock.cpp)
+target_include_directories(test_model2a_sound PRIVATE src)
+add_test(NAME model2a_sound COMMAND test_model2a_sound)
+
+add_executable(test_snd_timing tests/test_snd_timing.cpp src/runtime/snd_cpu.cpp)
+target_include_directories(test_snd_timing PRIVATE src)
+add_test(NAME snd_timing COMMAND test_snd_timing)
 
 add_executable(test_decode tests/test_decode.cpp)
 target_link_libraries(test_decode PRIVATE i960)

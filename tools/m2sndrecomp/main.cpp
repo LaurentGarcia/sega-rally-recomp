@@ -18,6 +18,7 @@
 // never commit it (rules.md rule 6).
 
 #include "m68k/reach.h"
+#include "m68k/timing.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -83,7 +84,8 @@ std::string addr(Body &b, const Ea &e, unsigned size) {
 std::string rd(const std::string &a, unsigned size) {
     return size == 1 ? "c.r8(" + a + ")" : size == 2 ? "c.r16(" + a + ")" : "c.r32(" + a + ")";
 }
-std::string wr(const std::string &a, unsigned size, const std::string &v) {
+std::string wr(const std::string &a, unsigned size, const std::string &v, bool low_first=false) {
+    if(size==4 && low_first)return "c.w32_low_first(" + a + ", " + v + ");";
     return (size == 1 ? "c.w8(" : size == 2 ? "c.w16(" : "c.w32(") + a + ", " + v + ");";
 }
 std::string mask(unsigned size) { return size == 1 ? "0xffu" : size == 2 ? "0xffffu" : "0xffffffffu"; }
@@ -102,14 +104,14 @@ struct Operand {
         default: return rd(a, size);
         }
     }
-    std::string write(const std::string &v) const {
+    std::string write(const std::string &v, bool low_first=false) const {
         const std::string r = std::to_string(e.reg);
         switch (e.mode) {
         case Mode::Dn:
             if (size == 4) return "D[" + r + "] = " + v + ";";
             return "D[" + r + "] = (D[" + r + "] & ~" + mask(size) + ") | ((" + v + ") & " + mask(size) + ");";
         case Mode::An: return "A[" + r + "] = " + v + ";";
-        default: return wr(a, size, v);
+        default: return wr(a, size, v, low_first);
         }
     }
 };
@@ -126,6 +128,8 @@ struct Emitter {
     uint64_t native = 0;
     std::vector<std::string> missing;
     m68k::ReadWord code_read = {}; // Model2A: guard every live instruction word
+    bool timed = false;
+    uint64_t missing_timing = 0;
 
     std::string jump(uint32_t t) const {
         if (addrs->count(t)) return "goto " + lbl(t) + ";";
@@ -156,7 +160,31 @@ struct Emitter {
         }
 
         Body b;
+        const auto timing = timed ? m68k::timing_plan(in) : std::optional<m68k::TimingPlan>{};
+        if(timed) {
+            if(!timing) {
+                ++missing_timing;
+                line("c.fatal(\"unsupported sound instruction timing\");");
+                return false;
+            }
+            if(in.op==Op::MoveToSr || in.op==Op::OriSr || in.op==Op::AndiSr || in.op==Op::EoriSr || in.op==Op::MoveUsp || in.op==Op::Rte)
+                b.add("if (!(c.sys & 0x2000)) c.fatal(\"timed sound privilege exception is unsupported\");");
+            b.add("c.begin_instruction(); uint32_t timing_cycles = " + std::to_string(timing->cycles) + ";");
+            using Dynamic=m68k::TimingDynamic;
+            if(timing->dynamic==Dynamic::Branch || timing->dynamic==Dynamic::Dbcc || timing->dynamic==Dynamic::Scc)
+                b.add("const bool timing_condition = snd::cond(c, " + std::to_string(in.cond) + ");");
+            if(timing->dynamic==Dynamic::Branch)
+                b.add("if (!timing_condition) timing_cycles = " + std::to_string(in.length==2?8:12) + ";");
+            if(timing->dynamic==Dynamic::Dbcc)
+                b.add("timing_cycles = timing_condition ? 12 : (D["+std::to_string(in.dst.reg)+"] & 0xffffu) == 0 ? 14 : 10;");
+            if(timing->dynamic==Dynamic::Scc)b.add("if (timing_condition) timing_cycles += 2;");
+            if(timing->dynamic==Dynamic::BitRegister)
+                b.add("if (("+(in.src.mode==Mode::Imm?std::to_string(in.src.imm):"D["+std::to_string(in.src.reg)+"]")+" & 31u) >= 16) timing_cycles += 2;");
+            if(timing->dynamic==Dynamic::Shift)
+                b.add("timing_cycles += 2 * " + (in.src.mode==Mode::Imm?std::to_string(in.src.imm):"(D["+std::to_string(in.src.reg)+"] & 63u)") + ";");
+        }
         std::string exit;
+        std::string timing_target;
         bool falls = true;
         const std::string Z = S(sz);
 
@@ -165,14 +193,14 @@ struct Emitter {
             const std::string sv = b.tmp();
             b.add("const uint32_t " + sv + " = " + src.value() + ";");
             Operand dst = operand(b, in.dst, sz);
-            b.add(dst.write("snd::" + fn + "<" + Z + ">(c, " + sv + ", " + dst.value() + ")"));
+            b.add(dst.write("snd::" + fn + "<" + Z + ">(c, " + sv + ", " + dst.value() + ")", timed));
         };
         auto logic = [&](const std::string &opch) {
             Operand src = operand(b, in.src, sz);
             const std::string sv = b.tmp();
             b.add("const uint32_t " + sv + " = " + src.value() + ";");
             Operand dst = operand(b, in.dst, sz);
-            b.add(dst.write("snd::logic<" + Z + ">(c, " + sv + " " + opch + " " + dst.value() + ")"));
+            b.add(dst.write("snd::logic<" + Z + ">(c, " + sv + " " + opch + " " + dst.value() + ")", timed));
         };
         auto unary = [&](const std::string &expr_of_v) { // dst = f(dst)
             Operand dst = operand(b, in.dst, sz);
@@ -180,7 +208,7 @@ struct Emitter {
             b.add("const uint32_t " + v + " = " + dst.value() + ";");
             std::string e = expr_of_v;
             for (size_t p; (p = e.find('$')) != std::string::npos;) e.replace(p, 1, v);
-            b.add(dst.write(e));
+            b.add(dst.write(e, timed));
         };
 
         switch (in.op) {
@@ -189,7 +217,7 @@ struct Emitter {
             const std::string v = b.tmp();
             b.add("const uint32_t " + v + " = snd::logic<" + Z + ">(c, " + src.value() + ");");
             Operand dst = operand(b, in.dst, sz);
-            b.add(dst.write(v));
+            b.add(dst.write(v, timed && in.dst.mode==Mode::PreDec));
             break;
         }
         case Op::Movea: {
@@ -200,7 +228,11 @@ struct Emitter {
         case Op::Moveq: b.add("D[" + std::to_string(in.dst.reg) + "] = snd::logic<4>(c, " + hex(in.src.imm) + ");"); break;
         case Op::Lea: b.add("A[" + std::to_string(in.dst.reg) + "] = " + addr(b, in.src, 4) + ";"); break;
         case Op::Pea: { const std::string a = addr(b, in.src, 4); b.add("c.push32(" + a + ");"); break; }
-        case Op::Clr: { Operand dst = operand(b, in.dst, sz); b.add(dst.write("snd::logic<" + Z + ">(c, 0)")); break; }
+        case Op::Clr: {
+            Operand dst = operand(b, in.dst, sz);
+            if(timed && timing->dummy_destination_read)b.add("c.dummy_read("+dst.a+", "+Z+");");
+            b.add(dst.write("snd::logic<" + Z + ">(c, 0)", timed)); break;
+        }
         case Op::Tst: { Operand src = operand(b, in.src, sz); b.add("snd::logic<" + Z + ">(c, " + src.value() + ");"); break; }
         case Op::Not: unary("snd::logic<" + Z + ">(c, ~$)"); break;
         case Op::Neg: unary("snd::neg<" + Z + ">(c, $)"); break;
@@ -249,8 +281,13 @@ struct Emitter {
         case Op::Mulu: case Op::Muls: {
             Operand src = operand(b, in.src, 2);
             const std::string r = "D[" + std::to_string(in.dst.reg) + "]";
-            if (in.op == Op::Mulu) b.add(r + " = snd::logic<4>(c, (" + r + " & 0xffffu) * " + src.value() + ");");
-            else b.add(r + " = snd::logic<4>(c, uint32_t(int32_t(int16_t(" + r + ")) * int32_t(int16_t(" + src.value() + "))));");
+            std::string source=src.value();
+            if(timed) {
+                source=b.tmp();b.add("const uint32_t "+source+" = "+src.value()+";");
+                b.add("timing_cycles += 2 * std::popcount("+(in.op==Op::Mulu?source:"(("+source+" ^ ("+source+" << 1)) & 0xffffu)")+");");
+            }
+            if (in.op == Op::Mulu) b.add(r + " = snd::logic<4>(c, (" + r + " & 0xffffu) * " + source + ");");
+            else b.add(r + " = snd::logic<4>(c, uint32_t(int32_t(int16_t(" + r + ")) * int32_t(int16_t(" + source + "))));");
             break;
         }
         case Op::Divu: case Op::Divs: {
@@ -302,6 +339,7 @@ struct Emitter {
         }
         case Op::Scc: {
             Operand dst = operand(b, in.dst, 1);
+            if(timed && timing->dummy_destination_read)b.add("c.dummy_read("+dst.a+", 1);");
             b.add(dst.write("snd::cond(c, " + std::to_string(in.cond) + ") ? 0xffu : 0u"));
             break;
         }
@@ -318,6 +356,7 @@ struct Emitter {
         case Op::Jmp: case Op::Jsr: {
             const bool direct = !m68k::is_indirect(in);
             const std::string a = direct ? hex(in.src.addr) : addr(b, in.src, 4);
+            timing_target=a;
             if (in.op == Op::Jsr) b.add("c.push32(" + hex(next) + ");");
             if (direct) exit = jump(in.src.addr);
             else { b.add("c.pc = " + a + ";"); exit = "goto dispatch;"; }
@@ -338,7 +377,11 @@ struct Emitter {
             b.add("c.set_sr(" + src.value() + "); s.poke();");
             break;
         }
-        case Op::MoveFromSr: { Operand dst = operand(b, in.dst, 2); b.add(dst.write("c.sr()")); break; }
+        case Op::MoveFromSr: {
+            Operand dst = operand(b, in.dst, 2);
+            if(timed && timing->dummy_destination_read)b.add("c.dummy_read("+dst.a+", 2);");
+            b.add(dst.write("c.sr()")); break;
+        }
         case Op::MoveToCcr: { Operand src = operand(b, in.src, 2); b.add("c.set_ccr(" + src.value() + " & 0xffu);"); break; }
         case Op::AndiSr: case Op::OriSr: case Op::EoriSr: {
             b.add("if (!(c.sys & 0x2000)) c.fatal(\"privilege violation\");");
@@ -359,7 +402,7 @@ struct Emitter {
                     const std::string A = "A[" + std::to_string(in.dst.reg) + "]";
                     b.add("uint32_t a = " + A + ";");
                     for (int bit = 0; bit < 16; ++bit)
-                        if (in.mask & (1u << bit)) b.add("a -= " + std::to_string(n) + "; " + wr("a", n, reg(15 - bit)));
+                        if (in.mask & (1u << bit)) b.add("a -= " + std::to_string(n) + "; " + wr("a", n, reg(15 - bit), timed));
                     b.add(A + " = a;");
                 } else {
                     b.add("uint32_t a = " + addr(b, in.dst, n) + ";");
@@ -374,6 +417,7 @@ struct Emitter {
                 for (int i = 0; i < 16; ++i)
                     if (in.mask & (1u << i))
                         b.add(reg(i) + " = " + (n == 2 ? "snd::sext<2>(" + rd("a", 2) + ")" : rd("a", 4)) + "; a += " + std::to_string(n) + ";");
+                if(timed)b.add("c.dummy_read(a, 2);");
                 if (post) b.add(A + " = a;");
             }
             break;
@@ -393,6 +437,28 @@ struct Emitter {
         }
 
         ++native;
+        if(timed) {
+            const auto prefetch=[&](const std::string &address){b.add("c.account_prefetch("+address+");");};
+            const auto sequential=[&]{for(uint32_t offset=4;offset<in.length+4;offset+=2)prefetch(hex(pc+offset));};
+            const auto target=[&](const std::string &address){prefetch(address);prefetch("("+address+") + 2");};
+            switch(timing->fetch) {
+            case m68k::TimingFetch::Sequential:sequential();break;
+            case m68k::TimingFetch::Status:sequential();prefetch(hex(next));break;
+            case m68k::TimingFetch::Branch:
+                if(in.op==Op::Bcc)b.add("if (timing_condition) {");
+                target(hex(in.target));
+                if(in.op==Op::Bcc){b.add("} else {");sequential();b.add("}");}break;
+            case m68k::TimingFetch::Dbcc:
+                b.add("if (!timing_condition) {");prefetch(hex(in.target));
+                b.add("if (br) {");prefetch(hex(in.target+2));b.add("} else {");sequential();b.add("}");
+                b.add("} else {");sequential();b.add("}");break;
+            case m68k::TimingFetch::Jump:
+                for(uint32_t offset=4;offset<in.length;offset+=2)prefetch(hex(pc+offset));
+                target(timing_target);break;
+            case m68k::TimingFetch::Return:target("c.pc");break;
+            }
+            b.add("c.finish_instruction(timing_cycles);");
+        }
         // the exit (a branch) runs after the count, inside the block so it
         // sees the body's locals
         line("{ " + b.code + "++s.count; " + exit + (exit.empty() ? "" : " ") + "}");
@@ -414,12 +480,12 @@ std::vector<uint8_t> load(const std::string &path) {
 int main(int argc, char **argv) {
     if (argc < 3) {
         std::fprintf(stderr, "usage: m2sndrecomp SOUND_PROGRAM.bin OUT.cpp [--seeds FILE] "
-                             "[--board daytona|model2a] [--audit FILE]\n");
+                             "[--board daytona|model2a] [--timing model2a-boundary] [--audit FILE]\n");
         return 2;
     }
     const std::vector<uint8_t> img = load(argv[1]);
     std::vector<uint32_t> seeds;
-    std::string board = "daytona", audit_path;
+    std::string board = "daytona", audit_path, timing_mode;
     for (int i = 3; i < argc; ++i) {
         if (!std::strcmp(argv[i], "--seeds") && i + 1 < argc) {
             std::ifstream f(argv[++i]);
@@ -431,6 +497,8 @@ int main(int argc, char **argv) {
             board = argv[++i];
         } else if (!std::strcmp(argv[i], "--audit") && i + 1 < argc) {
             audit_path = argv[++i];
+        } else if (!std::strcmp(argv[i], "--timing") && i + 1 < argc) {
+            timing_mode = argv[++i];
         } else {
             std::fprintf(stderr, "m2sndrecomp: unknown or incomplete option %s\n", argv[i]);
             return 2;
@@ -441,6 +509,9 @@ int main(int argc, char **argv) {
         return 2;
     }
     const bool model2a = board == "model2a";
+    if(!timing_mode.empty() && (!model2a || timing_mode!="model2a-boundary")) {
+        std::fprintf(stderr,"m2sndrecomp: timing must be model2a-boundary with --board model2a\n");return 2;
+    }
     if (model2a && img.size() != 0x80000) {
         std::fprintf(stderr, "m2sndrecomp: Model2A program region must be 512 KiB\n");
         return 2;
@@ -468,9 +539,12 @@ int main(int argc, char **argv) {
     std::set<uint32_t> addrs;
     for (const auto &[a, in] : r.insns) addrs.insert(a);
     Emitter em{&addrs, {}, 0, {}};
+    em.timed=!timing_mode.empty();
     if (model2a) em.code_read = read;
     em.o << "// Generated by m2sndrecomp. Derived from the game: never commit.\n"
-         << "#include \"runtime/snd_gen_support.h\"\n\n#include <algorithm>\n#include <iterator>\n\nnamespace sndgen {\n\n"
+         << "#include \"runtime/snd_gen_support.h\"\n\n#include <algorithm>\n#include <iterator>\n";
+    if(em.timed)em.o << "#include <bit>\n";
+    em.o << "\nnamespace sndgen {\n\n"
          << "void run(Env &e) {\n    snd::Cpu68k &c = e.c;\n    snd::Sched &s = e.s;\n"
          << "    uint32_t *const D = c.d;\n    uint32_t *const A = c.a;\n"
          << "dispatch:\n    if (s.finished()) return;\n    switch (c.pc) {\n";
@@ -505,6 +579,8 @@ int main(int argc, char **argv) {
         audit << "  \"instructions\": " << r.insns.size() << ",\n"
               << "  \"missing_templates\": " << em.missing.size() << ",\n"
               << "  \"live_code_guard\": " << (model2a ? "true" : "false") << ",\n"
+              << "  \"timing_mode\": \"" << (em.timed?"model2a-boundary":"none") << "\",\n"
+              << "  \"missing_timing\": " << em.missing_timing << ",\n"
               << "  \"complete_game_coverage\": false\n}\n";
     }
 

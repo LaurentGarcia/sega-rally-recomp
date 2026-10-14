@@ -126,6 +126,27 @@ The unchanged 68000 instruction templates come from the Daytona base above;
 the added address-space interface, map-aware reachability and live instruction
 guards keep the existing Daytona mapping as the default. No SCSP device is
 linked into this reset probe.
+The optional timed generator derives instruction totals, data/prefetch counts,
+mapped waits and autovector IACK costs from the pinned MAME M68000 microcode
+(BSD-3-Clause, Olivier Galibert). `src/m68k/timing.cpp` retains that notice.
+The independent test generates public microcode handlers separately from the
+production emitter; generated reference code remains ignored. Instruction
+totals and ordered writes are compared, while bus-phase MMIO and prefetch
+values remain outside this diagnostic. Source hashes at the same revision:
+
+| Reference file | SHA-256 |
+| --- | --- |
+| `src/devices/cpu/m68000/m68000.cpp` | `a1d4daea1f61cdc4779822c7e59d561ff48c7337aaa7f920854fe2c624d70883` |
+| `src/devices/cpu/m68000/m68000.h` | `cdfb07d21b62dbf042cdebccd0d57d1be61cf84b8be257b3173408ab307425fb` |
+| `src/devices/cpu/m68000/m68000.lst` | `9b4605ef5e0bd2bb2e17a03146c37c6cf4757cf926ab1b06352d95ab09695631` |
+| `src/devices/cpu/m68000/m68000gen.py` | `87bcba366263ae97daa88fce3a082e85563bc903df89f0692f589d668aced05b` |
+
+Sound-board IRQ line replacement and hold acknowledgment were checked against
+`src/emu/diexec.cpp/.h` (BSD-3-Clause, Aaron Giles), unchanged reference inputs.
+Their SHA-256 hashes are
+`4205a1f2cc15ca8fa358646faea259c14dcbeaa83137ed996fe1ede8beb03fe7` and
+`9c7dad8cbc1a1d52d166623a9ea349488c8b21748a923aeba95acb98cf3b5273`.
+
 `model2_scsp` and `model2_scsp_dsp` adapt the pinned SCSP sources below
 (BSD-3-Clause; ElSemi, R. Belmont, Carl, Miodrag Milanovic; notices retained).
 Framework memory becomes shared big-endian RAM; timer/serial callbacks use

@@ -21,14 +21,15 @@ public:
 
     uint64_t count = 0;              // completed instructions
     uint64_t end_count = UINT64_MAX; // recompiled code returns once this is reached
+    uint64_t end_cycles = UINT64_MAX; // optional timed probe boundary limit
     uint64_t next_count = UINT64_MAX;
     bool auto_irq = true;            // free run: take c.irq_line when the mask allows
 
     bool boundary() {
-        if (count < next_count && count < end_count) return false;
+        if (count < next_count && count < end_count && c_.cycles < end_cycles) return false;
         return apply();
     }
-    bool finished() const { return count >= end_count; }
+    bool finished() const { return count >= end_count || c_.cycles >= end_cycles; }
 
     // Run fn once `at` instructions have completed (at >= count).
     void at(uint64_t when, std::function<void()> fn) {
@@ -36,7 +37,7 @@ public:
         next_count = std::min(next_count, events_.begin()->first);
     }
     // The interrupt line or mask changed: re-check at the next boundary.
-    void poke() { next_count = std::min(next_count, count + 1); }
+    void poke() { next_count = std::min(next_count, count == UINT64_MAX ? count : count + 1); }
 
 private:
     bool apply() {
@@ -46,7 +47,7 @@ private:
             events_.erase(events_.begin());
             fn();
         }
-        if (auto_irq && c_.irq_line > c_.mask()) c_.take_irq(c_.irq_line);
+        if (auto_irq && (c_.nmi_pending || c_.irq_line > c_.mask())) c_.take_irq(c_.nmi_pending?7:c_.irq_line);
         next_count = events_.empty() ? UINT64_MAX : events_.begin()->first;
         return c_.pc != pc || finished();
     }

@@ -20,7 +20,7 @@ class SoundGenerationTests(unittest.TestCase):
         cls.path = Path(cls.temp.name)
         cls.compiler = shlex.split(os.environ.get("CXX", "c++"))
         cls.tool = cls.path / "m2sndrecomp"
-        cls.compile(["tools/m2sndrecomp/main.cpp", "src/m68k/decode.cpp", "src/m68k/reach.cpp"], cls.tool)
+        cls.compile(["tools/m2sndrecomp/main.cpp", "src/m68k/decode.cpp", "src/m68k/reach.cpp", "src/m68k/timing.cpp"], cls.tool)
         cls.samples = cls.path / "samples.bin"
         cls.samples.write_bytes(bytes(0x800000))
 
@@ -29,9 +29,9 @@ class SoundGenerationTests(unittest.TestCase):
         cls.temp.cleanup()
 
     @classmethod
-    def compile(cls, sources, output):
+    def compile(cls, sources, output, extra=()):
         result = subprocess.run(cls.compiler + ["-std=c++20", "-O1", "-Isrc"]
-                                + [str(source) for source in sources] + ["-o", str(output)],
+                                + list(extra) + [str(source) for source in sources] + ["-o", str(output)],
                                 cwd=ROOT, capture_output=True, text=True)
         if result.returncode:
             raise AssertionError(result.stdout + result.stderr)
@@ -115,6 +115,39 @@ int main(int argc,char**argv) {
         self.assertEqual(default.read_bytes(), explicit.read_bytes())
         self.assertEqual(audit["instructions"], 3)
         self.assertFalse(audit["live_code_guard"])
+
+    def test_timed_scsp_write_has_reference_cycles_and_excludes_code_guard(self):
+        image = bytearray(0x80000)
+        struct.pack_into(">4I", image, 0, 0x5000, 0x600100, 0x600100, 0x600100)
+        # Synthetic move.w #$000f,$100400.l; bra.s self.
+        struct.pack_into(">5H", image, 0x100, 0x33fc, 0x000f, 0x0010, 0x0400, 0x60fe)
+        path, source, audit = self.generate("timed", image, ["--board", "model2a", "--timing", "model2a-boundary"])
+        self.assertEqual(audit["missing_timing"], 0)
+        runner = self.path / "timed-boot"
+        self.compile(["tools/srally_sound_boot/main.cpp", "src/runtime/snd_cpu.cpp",
+                      "src/runtime/model2a_sound_bus.cpp", "src/runtime/model2_scsp.cpp",
+                      "src/runtime/model2_scsp_dsp.cpp", "src/runtime/model2a_clock.cpp", source], runner,
+                      ["-DSEGARALLY_SOUND_TIMED_PROBE"])
+        run = subprocess.run([str(runner), str(path), str(self.samples), "1", "--timed"],
+                             cwd=ROOT, capture_output=True, text=True)
+        self.assertEqual(run.returncode, 4, run.stdout + run.stderr)
+        result = json.loads(run.stdout)
+        self.assertEqual(result["instructions"], 1)
+        self.assertEqual(result["cycles"], 59)  # reset38 + move20 + oneSCSPwait
+        self.assertEqual(result["data_bus_transfers"], 5)
+        self.assertEqual(result["modeled_prefetch_transfers"], 6)
+        self.assertEqual(result["mapped_wait_cycles"], 5)
+        self.assertEqual(result["scsp_writes"], 1)
+        self.assertTrue(result["mmio_at_previous_boundary"])
+        self.assertFalse(result["bus_phase_verified"])
+
+    def test_unsupported_timing_has_explicit_frontier(self):
+        image = bytearray(0x80000)
+        struct.pack_into(">4I", image, 0, 0x5000, 0x600100, 0x600100, 0x600100)
+        struct.pack_into(">3H", image, 0x100, 0x80fc, 0x0001, 0x60fe)  # divu #1,d0
+        _, source, audit = self.generate("divu", image, ["--board", "model2a", "--timing", "model2a-boundary"])
+        self.assertEqual(audit["missing_timing"], 1)
+        self.assertIn('c.fatal("unsupported sound instruction timing")', source.read_text())
 
     def test_wrong_model2a_image_size_rejected(self):
         image = self.path / "short.bin"
