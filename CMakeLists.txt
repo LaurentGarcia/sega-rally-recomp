@@ -350,6 +350,10 @@ add_executable(test_model2_priority tests/test_model2_priority.c)
 target_include_directories(test_model2_priority PRIVATE src)
 add_test(NAME model2_priority COMMAND test_model2_priority)
 
+add_executable(test_model2a_bus tests/test_model2a_bus.cpp src/runtime/model2a_bus.cpp src/runtime/cpu.cpp)
+target_include_directories(test_model2a_bus PRIVATE src)
+add_test(NAME model2a_bus COMMAND test_model2a_bus)
+
 add_executable(test_decode tests/test_decode.cpp)
 target_link_libraries(test_decode PRIVATE i960)
 add_test(NAME decode COMMAND test_decode)

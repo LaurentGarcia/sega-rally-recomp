@@ -37,6 +37,15 @@ hardware mappings are evidence to inspect, not defaults for Sega Rally.
 
 ## Current evidence and unresolved work
 
+The initial native bootstrap uses the inherited MAME-compatible host-double
+FP state and operand semantics for differential analysis. New single/long
+arithmetic, conversion, FP register/literal, and flushreg templates have
+10,344 generated-code/reference comparisons. This diagnostic mode deliberately
+does not satisfy the inherited design's hardware extF80 requirement. There is
+no claim that finite host-double parity proves the i960KB's extended precision,
+exception handling, or all rounding modes. Resolve that gap with SoftFloat
+state and tests before treating FP-dependent game behavior as hardware exact.
+
 The older lifted-C prototype already reaches desert practice on the phone, but
 contains incomplete game paths. It is a useful source of address annotations and
 capture tooling. Its C implementation is not a substitute for verifying the new

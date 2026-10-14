@@ -1,5 +1,20 @@
 # Third-party components
 
+## Sega Rally project base and board reference
+
+This tree starts from `alphanu1/daytona-arcade-recomp` at
+`b33baeb28a1e1c94d90a4a80811f0b2c7f61106b` (BSD-3-Clause, original Git history
+and notices retained). The shared `src/runtime/model2_priority.h` extracts its
+existing geometry/raster/GPU priority functions without changing their rules.
+
+The Model 2A memory adapter is implemented from the public address-map contracts
+in MAME `src/mame/sega/model2.cpp` at the same pinned MAME revision listed below,
+`dddd73680656e355bb2b5beecab1167c9f07bf81` (BSD-3-Clause). The inspected file's
+SHA-256 is `359d7fa309c0bca6c93f5c0826011a7054ae8f04068e9df995188a6256c995b6`.
+`model2_base_mem`, `model2_tgp_mem`, and `model2a_crx_mem` supply the region,
+mirror, and burst contracts. Unsupported device callbacks are explicit runtime
+frontiers during bring-up; the board is not claimed complete.
+
 This project's own code is under the BSD-3-Clause licence (`LICENSE`). The
 code below keeps its own licence and notices; every component linked into the
 game is under a licence compatible with it (BSD, zlib, MIT, public domain).

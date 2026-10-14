@@ -1,0 +1,98 @@
+{
+  "schema": 1,
+  "romset": "srallycb",
+  "notes": "Sparse bootstrap labels verified from prior lift metadata; these seeds do not establish full-game reachability.",
+  "seeds": [
+    {
+      "address": "0x00000310",
+      "name": "boot_entry",
+      "declared_size": 32,
+      "evidence": "segarally95-recomp/src/boot/boot_entry.c",
+      "provenance": "existing uplift @rom/source metadata; addresses only, no generated C copied"
+    },
+    {
+      "address": "0x00000420",
+      "name": "maincpu_reset_entry",
+      "declared_size": 324,
+      "evidence": "segarally95-recomp/src/boot/maincpu_reset_entry.c",
+      "provenance": "existing uplift @rom/source metadata; addresses only, no generated C copied"
+    },
+    {
+      "address": "0x00000570",
+      "name": "post_reset_dispatch",
+      "declared_size": 128,
+      "evidence": "segarally95-recomp/src/boot/post_reset_dispatch.c",
+      "provenance": "existing uplift @rom/source metadata; addresses only, no generated C copied"
+    },
+    {
+      "address": "0x00001490",
+      "name": "irq_init_major",
+      "declared_size": 96,
+      "evidence": "segarally95-recomp/src/irq/irq_init_major.c",
+      "provenance": "existing uplift @rom/source metadata; addresses only, no generated C copied"
+    },
+    {
+      "address": "0x00001560",
+      "name": "irq_mask_helper",
+      "declared_size": 240,
+      "evidence": "segarally95-recomp/src/irq/irq_mask_helper.c",
+      "provenance": "existing uplift @rom/source metadata; addresses only, no generated C copied"
+    },
+    {
+      "address": "0x00001650",
+      "name": "irq_timer_arm",
+      "declared_size": 256,
+      "evidence": "segarally95-recomp/src/irq/irq_timer_arm.c",
+      "provenance": "existing uplift @rom/source metadata; addresses only, no generated C copied"
+    },
+    {
+      "address": "0x00001758",
+      "name": "game_irq_wr_stub",
+      "declared_size": 40,
+      "evidence": "segarally95-recomp/src/irq/game_irq_wr_stub.c",
+      "provenance": "existing uplift @rom/source metadata; addresses only, no generated C copied"
+    },
+    {
+      "address": "0x00001780",
+      "name": "irq_enable_dispatch",
+      "declared_size": 128,
+      "evidence": "segarally95-recomp/src/irq/irq_enable_dispatch.c",
+      "provenance": "existing uplift @rom/source metadata; addresses only, no generated C copied"
+    },
+    {
+      "address": "0x000018d8",
+      "name": "irq_dispatcher",
+      "declared_size": 216,
+      "evidence": "segarally95-recomp/src/irq/irq_dispatcher.c",
+      "provenance": "existing uplift @rom/source metadata; addresses only, no generated C copied"
+    },
+    {
+      "address": "0x00003150",
+      "name": "game_dispatch_main",
+      "declared_size": 272,
+      "evidence": "segarally95-recomp/src/game/game_dispatch_main.c",
+      "provenance": "existing uplift @rom/source metadata; addresses only, no generated C copied"
+    },
+    {
+      "address": "0x000032a0",
+      "name": "game_cold_boot_init",
+      "declared_size": 60,
+      "evidence": "segarally95-recomp/src/game/game_cold_boot_init.c",
+      "provenance": "existing uplift @rom/source metadata; addresses only, no generated C copied"
+    },
+    {
+      "address": "0x00003650",
+      "name": "game_mode_apply",
+      "declared_size": 84,
+      "evidence": "segarally95-recomp/src/game/game_mode_apply.c",
+      "provenance": "existing uplift @rom/source metadata; addresses only, no generated C copied"
+    },
+    {
+      "address": "0x00029eb0",
+      "name": "catalog_draw_setup",
+      "declared_size": 400,
+      "evidence": "segarally95-recomp/src/game/catalog_draw_setup.c",
+      "provenance": "existing uplift @rom/source metadata; addresses only, no generated C copied"
+    }
+  ]
+}

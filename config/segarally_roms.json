@@ -1,0 +1,94 @@
+{
+  "schema": 1,
+  "title": "Sega Rally Championship Revision B",
+  "romset": "srallycb",
+  "board": "model2a",
+  "source": {
+    "repository": "https://github.com/mamedev/mame",
+    "commit": "dddd73680656e355bb2b5beecab1167c9f07bf81",
+    "path": "src/mame/sega/model2.cpp",
+    "definition": "ROM_START(srallycb)"
+  },
+  "regions": [
+    {
+      "name": "program",
+      "size": 2097152,
+      "fill": 0,
+      "loads": [
+        {
+          "file": "epr-17888b.12",
+          "offset": 0,
+          "size": 524288,
+          "crc32": "95bce0b9",
+          "sha1": "9b293b430db14cfab35466d2f9a1e3f7e2df3143",
+          "load": "ROM_LOAD32_WORD"
+        },
+        {
+          "file": "epr-17889b.13",
+          "offset": 2,
+          "size": 524288,
+          "crc32": "395c425e",
+          "sha1": "9868d2b79255120abfdb7f9c0930a607aeef5363",
+          "load": "ROM_LOAD32_WORD"
+        }
+      ]
+    },
+    {
+      "name": "main_data",
+      "size": 37748736,
+      "fill": 0,
+      "loads": [
+        {
+          "file": "mpr-17746.10",
+          "offset": 0,
+          "size": 2097152,
+          "crc32": "8fe311f4",
+          "sha1": "f4ada8e5c906fc384bed1b96f09cdf313f89e825",
+          "load": "ROM_LOAD32_WORD"
+        },
+        {
+          "file": "mpr-17747.11",
+          "offset": 2,
+          "size": 2097152,
+          "crc32": "543593fd",
+          "sha1": "5ba63a77e9fc70569af21d50b3171bc8ff4522b8",
+          "load": "ROM_LOAD32_WORD"
+        },
+        {
+          "file": "mpr-17744.8",
+          "offset": 4194304,
+          "size": 2097152,
+          "crc32": "71fed098",
+          "sha1": "1d187cad375121a45348d640edd3cc7dce658d28",
+          "load": "ROM_LOAD32_WORD"
+        },
+        {
+          "file": "mpr-17745.9",
+          "offset": 4194306,
+          "size": 2097152,
+          "crc32": "8ecca705",
+          "sha1": "ed2b3298aad6f4e52dc672a0168183e457564b43",
+          "load": "ROM_LOAD32_WORD"
+        },
+        {
+          "file": "mpr-17884.6",
+          "offset": 8388608,
+          "size": 2097152,
+          "crc32": "4cfc95e1",
+          "sha1": "81d927b8c4f9d0c4c5e29d676b30f30f83751fdc",
+          "load": "ROM_LOAD32_WORD"
+        },
+        {
+          "file": "mpr-17885.7",
+          "offset": 8388610,
+          "size": 2097152,
+          "crc32": "a08d2467",
+          "sha1": "9449ac8f8f9ce8d8e536b05a91e46841fed7f2d0",
+          "load": "ROM_LOAD32_WORD"
+        }
+      ]
+    }
+  ],
+  "expected_reset_ip": "0x00000420",
+  "scope": "i960 ROM import and native generation only; runtime, SCSP and TGP adaptation remain incomplete"
+}

@@ -10,9 +10,11 @@ from the user's ROMs, not Sega's original source code.
 
 ## Current state
 
-The repository is in bring-up. The i960 generation pipeline and Model 2A memory
-mapping are being validated. A complete Sega Rally game executable from this
-repository is not yet verified. The existing lifted-C iPhone prototype lives
+The repository is in bring-up. The initial annotated seed set produces 4,081
+native i960 instructions and four compiled objects. The bounded native core
+executes reset at `0x420` and currently stops after 88 instructions at an
+unimplemented read of `0x00f80000`. This is a reported bring-up frontier, not
+a complete game boot. The existing lifted-C iPhone prototype lives
 separately in `../segarally95-recomp`; its rendering captures provide regression
 evidence, not proof that this new runtime already runs a race.
 
@@ -27,6 +29,29 @@ Supply your own Sega Rally ROM archive. ROMs, extracted images, generated game
 C++, display-list captures, and compiled apps belong in ignored local folders.
 They are never committed. Verified manifests, address lists, source tools, and
 tests are versioned.
+
+With Python 3 and a C++20 compiler, run:
+
+```sh
+python3 scripts/segarally_recompile.py --roms /path/to/srallyc.zip
+python3 scripts/segarally_boot.py
+```
+
+The importer verifies the Revision B (`srallycb`) program pair present in the
+supplied archive by published size, CRC32, and SHA1. It rejects mismatches.
+Output goes to `build/segarally/`: imported images, generated C++, native
+objects, `coverage.json`, and the bounded execution report `boot.json`.
+The boot command exits 3 for an unimplemented board access or 4 for a missing
+code target; those are incomplete frontiers, not successful game boots.
+
+The initial coverage report has 71 indirect sites and 10 invalid decode stops
+requiring analysis. Generation success does not prove that every game path has
+been found. Tests for the bootstrap and added instruction templates are:
+
+```sh
+python3 tests/test_segarally_bootstrap.py
+python3 tests/test_segarally_native_templates.py
+```
 
 See [the project design](docs/sega-rally-design.md) for scope and validation.
 The [inherited Daytona documentation](docs/daytona-upstream-readme.md) describes

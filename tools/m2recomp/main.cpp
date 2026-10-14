@@ -63,6 +63,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <iomanip>
 #include <iterator>
 #include <map>
 #include <optional>
@@ -93,6 +94,16 @@ std::string s1(const Insn &in) { return in.m1 ? lit(in.src1) : R(in.src1); }
 std::string s2(const Insn &in) { return in.m2 ? lit(in.src2) : R(in.src2); }
 std::string c1(const Insn &in) { return in.m1 ? lit(in.src1) : R(in.src1); }
 std::string c2(const Insn &in) { return R(in.src2); }
+
+// Resolve MAME get_1/2_rif and get_1/2_rifl operand modes at compile time.
+// See src/refcore/i960_ref.cpp: the architectural FP registers retain double
+// values; a general-register single destination rounds through float.
+std::string real_source(unsigned reg, bool fp_mode, bool wide) {
+    if (fp_mode) return reg < 4 ? "c.m_fp[" + std::to_string(reg) + "]" : reg == 0x16 ? "1.0" : "0.0";
+    if (!wide) return "double(gen::u2f(" + R(reg) + "))";
+    reg &= 0x1e;
+    return "rt::u2d(uint64_t(" + R(reg) + ") | (uint64_t(" + R(reg + 1) + ") << 32))";
+}
 
 // MAME get_ea, with the displacement word and IP-relative base known now.
 std::string ea(const Insn &in) {
@@ -261,9 +272,21 @@ struct Emitter {
         }
 
         case i960::Format::Reg: {
-            // An FP operand with its mode bit set names fp0-fp3 or an FP literal,
-            // which needs extended-precision state; only the operands each op
-            // actually uses count (unused fields may carry mode bits).
+            // An FP mode bit selects fp0-fp3 or a literal. Follow the reference
+            // operand helpers; unused fields may also carry mode bits.
+            auto fr1 = [&](bool wide = false) { return real_source(in.src1, in.m1, wide); };
+            auto fr2 = [&](bool wide = false) { return real_source(in.src2, in.m2, wide); };
+            auto real_dest = [&](const std::string &value, bool wide = false) {
+                if (in.m3) {
+                    if (in.dst >= 4) return false; // set_rif/literal is a MAME fatal error
+                    body = "c.m_fp[" + std::to_string(in.dst) + "] = " + value + ";";
+                } else if (wide) {
+                    const unsigned dest = in.dst & 0x1e;
+                    body = "{ const uint64_t v = rt::d2u(" + value + "); " + R(dest) + " = uint32_t(v); "
+                           + R(dest + 1) + " = uint32_t(v >> 32); }";
+                } else body = d + " = gen::f2u(float(" + value + "));";
+                return true;
+            };
             switch (code) {
             case 0x580: two("t2 ^ (1u << (t1 & 31))"); break;             // notbit
             case 0x581: two("t2 & t1"); break;                             // and
@@ -327,6 +350,13 @@ struct Emitter {
             case 0x655: body = "{ const uint32_t t1 = c.m_PC, t2 = " + s2(in) + "; c.m_PC = (c.m_PC & ~t2) | (" + d + " & t2); " + d +
                                " = t1; c.m_IP = " + hex(next) + "; if ((t1 >> 16 & 0x1f) > (c.m_PC >> 16 & 0x1f)) c.check_pending_irqs(); }";
                         exit = "if (c.m_IP != " + hex(next) + ") goto dispatch;"; break; // modpc
+            case 0x66d: // flushreg, exact cache writes from I960Ref::execute_op
+                body = "if (c.m_rcache_pos > 4) c.m_rcache_pos = 4; "
+                       "for (uint32_t f = 0; f < uint32_t(c.m_rcache_pos); ++f) "
+                       "for (unsigned i = 0; i < 16; ++i) "
+                       "c.bus->write_dword(c.m_rcache_frame_addr[f] + i * sizeof(uint32_t), c.m_rcache[f][i]); "
+                       "c.m_rcache_pos = 0;";
+                break;
             case 0x670: body = "{ const uint64_t p = uint64_t(" + s1(in) + ") * uint64_t(" + s2(in) + "); " + d + " = uint32_t(p); " +
                                R(in.dst + 1) + " = uint32_t(p >> 32); }"; break; // emul
             case 0x671: {                                                  // ediv
@@ -336,16 +366,29 @@ struct Emitter {
                        d + " = rem; " + R(in.dst + 1) + " = quo; }";
                 break;
             }
-            case 0x674: if (in.m3) return unsupported(in);                  // cvtir: integer src1, real dst
-                        set("gen::f2u(float(double(int32_t(" + s1(in) + "))))"); break;
-            case 0x677: if (in.m2 || in.m3) return unsupported(in);         // scaler: integer src1, real src2/dst
-                        set("gen::f2u(float(double(gen::u2f(" + R(in.src2) + ")) * std::pow(2.0, double(int32_t(" + s1(in) + ")))))"); break;
-            case 0x685: if (in.m1 || in.m2) return unsupported(in);         // cmpr
-                        body = "AC = (AC & ~7u) | gen::cc_d(double(gen::u2f(" + R(in.src1) + ")), double(gen::u2f(" + R(in.src2) + ")));"; break; // cmpr
-            case 0x6c0: if (in.m1) return unsupported(in);                  // cvtri: real src1, integer dst
-                        set("uint32_t(int32_t(gen::round_to_int(double(gen::u2f(" + R(in.src1) + ")), AC)))"); break; // cvtri
-            case 0x6c2: if (in.m1) return unsupported(in);                  // cvtzri
-                        set("uint32_t(int32_t(double(gen::u2f(" + R(in.src1) + "))))"); break; // cvtzri
+            case 0x674: case 0x675: // cvtir/cvtilr: integer src1, real destination
+                if (!real_dest("double(int32_t(" + s1(in) + "))", code == 0x675)) return unsupported(in);
+                break;
+            case 0x676: case 0x677: { // scalerl/scaler
+                const bool wide = code == 0x676;
+                if (!real_dest(fr2(wide) + " * std::pow(2.0, double(int32_t(" + s1(in) + ")))", wide)) return unsupported(in);
+                break;
+            }
+            case 0x685: body = "AC = (AC & ~7u) | gen::cc_d(" + fr1() + ", " + fr2() + ");"; break;
+            case 0x688: if (!real_dest("std::sqrt(" + fr1() + ")")) return unsupported(in); break;
+            case 0x68a: if (!real_dest("std::logb(" + fr1() + ")")) return unsupported(in); break;
+            case 0x6c0: set("uint32_t(int32_t(gen::round_to_int(" + fr1() + ", AC)))"); break;
+            case 0x6c2: set("uint32_t(int32_t(" + fr1() + "))"); break;
+            case 0x6c3: // cvtzril: MAME reads a single real and writes two adjacent integer registers
+                if (in.m3 || in.dst == 31) return unsupported(in);
+                body = "{ const uint64_t v = uint64_t(int64_t(" + fr1() + ")); " + d + " = uint32_t(v); "
+                       + R(in.dst + 1) + " = uint32_t(v >> 32); }";
+                break;
+            case 0x6c9: case 0x6d9: {
+                const bool wide = code == 0x6d9;
+                if (!real_dest(fr1(wide), wide)) return unsupported(in);
+                break;
+            }
             case 0x701: two("t2 * t1"); break;                             // mulo
             case 0x708: two("t2 % t1"); break;                             // remo (MAME: undefined on 0)
             case 0x70b: two("t1 == 0 ? 0u : t2 / t1"); break;              // divo (MAME: 0 on divide by zero)
@@ -354,10 +397,13 @@ struct Emitter {
             case 0x749: two("uint32_t([](int32_t a, int32_t b) { int32_t r = a - (a / b) * b; "
                             "if ((b ^ a) < 0 && r != 0) r += b; return r; }(int32_t(t2), int32_t(t1)))"); break; // modi (sign of src1)
             case 0x74b: two("uint32_t(int32_t(t2) / int32_t(t1))"); break; // divi
-            case 0x78d: if (in.m1 || in.m2 || in.m3) return unsupported(in); // subr: reals in registers (MAME: double, then float)
-                        set("gen::f2u(float(double(gen::u2f(" + R(in.src2) + ")) - double(gen::u2f(" + R(in.src1) + "))))"); break;
-            case 0x78f: if (in.m1 || in.m2 || in.m3) return unsupported(in); // addr
-                        set("gen::f2u(float(double(gen::u2f(" + R(in.src2) + ")) + double(gen::u2f(" + R(in.src1) + "))))"); break;
+            case 0x78b: case 0x78c: case 0x78d: case 0x78f:
+            case 0x79b: case 0x79c: case 0x79d: case 0x79f: {
+                const bool wide = code >= 0x790;
+                const char *op = (code & 15) == 0xb ? " / " : (code & 15) == 0xc ? " * " : (code & 15) == 0xd ? " - " : " + ";
+                if (!real_dest("(" + fr2(wide) + op + fr1(wide) + ")", wide)) return unsupported(in);
+                break;
+            }
             default: return unsupported(in);
             }
             break;
@@ -435,16 +481,24 @@ std::vector<uint32_t> load_seeds(const std::string &path) {
 
 int main(int argc, char **argv) {
     if (argc < 3) {
-        std::fprintf(stderr, "usage: m2recomp PROGRAM.bin OUTDIR [--seeds FILE]... [--hooks FILE] [--chunk N] [--fast_inaccuracy]\n");
+        std::fprintf(stderr, "usage: m2recomp PROGRAM.bin OUTDIR [--seeds FILE]... [--hooks FILE] [--chunk N] [--fast_inaccuracy]\n"
+                             "  [--board model2o|model2a] [--main-data FILE] [--report FILE]\n");
         return 2;
     }
     const std::vector<uint8_t> img = load(argv[1]);
     const std::string out = argv[2];
+    std::string board = "model2o", main_data_path, report_path;
     std::vector<uint32_t> seeds;
     size_t chunk = 1500;
     bool blocks = false, chain = false;
     for (int i = 3; i < argc; ++i) {
-        if (!std::strcmp(argv[i], "--seeds") && i + 1 < argc) {
+        if (!std::strcmp(argv[i], "--board") && i + 1 < argc) {
+            board = argv[++i];
+        } else if (!std::strcmp(argv[i], "--main-data") && i + 1 < argc) {
+            main_data_path = argv[++i];
+        } else if (!std::strcmp(argv[i], "--report") && i + 1 < argc) {
+            report_path = argv[++i];
+        } else if (!std::strcmp(argv[i], "--seeds") && i + 1 < argc) {
             auto s = load_seeds(argv[++i]);
             seeds.insert(seeds.end(), s.begin(), s.end());
         } else if (!std::strcmp(argv[i], "--hooks") && i + 1 < argc) {
@@ -459,16 +513,25 @@ int main(int argc, char **argv) {
             return 2;
         }
     }
+    if (board != "model2o" && board != "model2a") {
+        std::fprintf(stderr, "m2recomp: --board must be model2o or model2a\n");
+        return 2;
+    }
+    const std::vector<uint8_t> main_data = main_data_path.empty() ? std::vector<uint8_t>{} : load(main_data_path);
 
-    // model2o: program ROM at 0, its upper 128 KiB mirrored at 0x00220000.
+    // Model2A has RAM, not Daytona's program-ROM alias, at 0x00220000.
+    // Main-data ROM follows model2_base_mem; only mapped bytes can seed code.
     auto read = [&](uint32_t a) -> std::optional<uint32_t> {
         uint64_t off;
-        if (a < img.size()) off = a;
-        else if (a >= 0x220000 && a < 0x240000) off = a - 0x200000;
+        const std::vector<uint8_t> *region = &img;
+        if (a < 0x00200000 && a < img.size()) off = a;
+        else if (board == "model2o" && a >= 0x220000 && a < 0x240000) off = a - 0x200000;
+        else if (a >= 0x02000000 && a < 0x04000000) { off = a - 0x02000000; region = &main_data; }
+        else if (a >= 0x06000000 && a < 0x07000000) { off = a - 0x06000000 + 0x01000000; region = &main_data; }
         else return std::nullopt;
-        if (off + 4 > img.size()) return std::nullopt;
+        if (off + 4 > region->size()) return std::nullopt;
         uint32_t v;
-        std::memcpy(&v, &img[off], 4);
+        std::memcpy(&v, &(*region)[off], 4);
         return v;
     };
     std::vector<uint32_t> all = i960::boot_seeds(read).all();
@@ -601,6 +664,36 @@ int main(int argc, char **argv) {
     }
     t
       << "uint64_t native_instructions() { return " << native << "ull; }\n\n} // namespace gen\n";
+    if (!report_path.empty()) {
+        std::ofstream report(report_path);
+        auto addresses = [&](const char *name, const auto &values) {
+            report << ",\n  " << std::quoted(name) << ": [";
+            bool first = true;
+            for (uint32_t a : values) {
+                char label[16]; std::snprintf(label, sizeof label, "0x%08x", a);
+                if (!first) report << ", ";
+                report << std::quoted(label); first = false;
+            }
+            report << "]";
+        };
+        report << "{\n  \"schema\": 1,\n  \"board\": " << std::quoted(board)
+               << ",\n  \"instruction_count\": " << insns.size()
+               << ",\n  \"instruction_bytes\": ";
+        uint64_t instruction_bytes = 0;
+        std::vector<uint32_t> instruction_addresses;
+        for (const Insn *in : insns) { instruction_bytes += in->length; instruction_addresses.push_back(in->addr); }
+        report << instruction_bytes << ",\n  \"native_template_count\": " << native
+               << ",\n  \"missing_template_count\": " << missing.size()
+               << ",\n  \"chunk_count\": " << ranges.size()
+               << ",\n  \"complete_game_coverage\": false";
+        addresses("seeds", all);
+        addresses("instruction_addresses", instruction_addresses);
+        addresses("indirect_sites", r.indirect_sites);
+        addresses("invalid_stops", r.stops);
+        addresses("unmapped_targets", r.unmapped_targets);
+        report << "\n}\n";
+        if (!report) { std::fprintf(stderr, "m2recomp: could not write report %s\n", report_path.c_str()); return 1; }
+    }
     if (!missing.empty()) {
         std::fprintf(stderr, "m2recomp: FAILED: %zu reachable instructions have no native template:\n", missing.size());
         for (const std::string &m : missing) std::fprintf(stderr, "  %s\n", m.c_str());

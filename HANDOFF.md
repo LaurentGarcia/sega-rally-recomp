@@ -1,5 +1,52 @@
 # Handoff
 
+## Sega Rally native bring-up (2026-10-14)
+
+The `sega-rally` branch preserves Daytona upstream history at `b33baeb28`.
+The dedicated project is a research bring-up, not the older lifted-C phone
+prototype in the sibling `segarally95-recomp` checkout. No publication remote
+is configured. The first project checkpoint extracted the shared polygon
+priority functions, documented the separate project, and excluded local ROMs,
+captures, generated code, and apps from Git.
+
+The verified Revision B (`srallycb`) manifest imports eight files from the
+user's mixed `srallyc.zip`: 1 MiB of program in a 2 MiB zero-filled region and
+12 MiB of data in a 36 MiB zero-filled region. The initial thirteen annotated
+seeds produce 4,081 native i960 instructions in four compiled objects. There
+are 71 unresolved indirect sites and ten invalid decode stops; boot-table
+heuristics can seed data, so these figures do not establish complete coverage.
+
+The generated core links with Daytona's Cpu/Lockstep services and the new
+Model2ABus. It executes reset at `0x420` and stops after 88 instructions at
+PC `0x450`, a byte read of `0x00f80000`. The bus currently implements only
+verified memory regions and reports unsupported devices explicitly. The
+bounded runner records this frontier and keeps `full_game_boot_verified=false`.
+Generation and boot commands are in README.md.
+
+Validation: bootstrap tests 5/5; generated floating-point and flushreg
+templates versus the reference core, 10,344 checks; Model 2A bus tests,
+including real Cpu unaligned accesses across a buffer mirror boundary. A
+second import independently matched both ROM_LOAD32_WORD lanes and region
+padding. The FP tests establish MAME host-double behavior only, not full
+i960 extended-precision correctness. This diagnostic limitation is recorded
+in the Sega Rally design and must be resolved before fidelity is claimed.
+
+Next: establish the first boot-gap reference contract, expand code seeds from
+verified addresses, and bring up actual Model 2A devices and the game's TGP
+program. Attract/RAM parity, full-race replay, SCSP audio, and the new project's
+SDL3/Metal phone integration remain incomplete.
+
+What not to re-propose: Daytona's upper program-ROM alias is writable RAM on
+Model 2A; the old lifted helper `0x310` is not the reset IP; the CGM asset at
+`0x02879db0` is not the setup function at `0x00029eb0`; successful generation
+is not a game boot. In the older renderer, splitting solids and textures by
+camera depth caused flicker. An initial priority-only replacement stabilized
+windows but hid a roof decal and introduced a tan ground patch. Full window,
+Z-adjust, face, and material contracts need verification before installation.
+
+The sections below are retained upstream Daytona history, not Sega Rally
+completion claims.
+
 ## Scenery selection and polygon budget PR branch (2026-10-08)
 
 Branch `scenery-budget` starts from upstream/main `82201ed`, separate from
