@@ -1,5 +1,23 @@
 # Handoff
 
+## Native PCM heard on Mac speakers (2026-10-14)
+
+The user confirmed hearing the standalone ten-second native Sega Rally audio
+sample. The current CoreAudio check submitted all 441,000 stereo frames with
+zero reported input-demand shortfalls or drops; its log is
+`build/validation/audio-output/current-speaker-check.log`. This establishes
+audible output for that captured sample, not continuous game playback or
+hardware sound fidelity.
+
+Both direct windowed and direct hidden startup probes also returned
+`AudioQueueStart: -66681`, each run explicitly outside the tool sandbox. The
+current hidden failure prevents attributing the error to foreground mode.
+The standalone player's success makes a game startup comparison useful.
+The default output reported outside the sandbox is MacBook Pro Speakers,
+two channels at 48 kHz; no device or OS permission setting was changed.
+Next: test Daytona's window/GPU-before-device startup order, then confirm
+visible gameplay sound. Preserve each failed probe rather than overwriting it.
+
 ## Near-real-time Mac sound checkpoint (2026-10-14)
 
 The quiet normal-paced sound-and-hook run completes frame 2,760 with identical

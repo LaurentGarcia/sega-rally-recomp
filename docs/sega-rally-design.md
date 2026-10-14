@@ -226,7 +226,8 @@ board time in 48.519993 seconds including process startup/exit, with zero audio
 input shortfalls or chip/host sample drops. The old sound path recorded 3,222
 estimated input-demand requests at that checkpoint. Hidden presentation and
 SDL counters do not establish user hearing, every course or physical audio
-fidelity; visible-window playback remains a separate test.
+fidelity. The user has separately heard a ten-second native PCM excerpt on the
+Mac speakers; visible-window game playback remains a separate test.
 Bundled assets are verified Xcode resource inputs so signing follows copying,
 including incremental builds; post-signing bundle mutation is not allowed.
 The Mac launcher also copies the selected cabinet replay into app resources

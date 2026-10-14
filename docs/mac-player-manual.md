@@ -103,7 +103,8 @@ driving check completes 47.98 seconds of board time in 48.52 seconds including
 startup and shutdown, with no reported audio input shortfalls or sample drops.
 The [build guide](segarally-build-validation.md) explains both build options
 and the runtime switches `--sound --instruction-boundary-hook`. The older
-sound-off speed app remains silent by design. Listening confirmation is pending.
+sound-off speed app remains silent by design. The user has heard a ten-second
+native PCM sample on the Mac speakers; continuous gameplay sound remains pending.
 
 Other paths and machines may run more slowly. `--unthrottled` disables waiting
 for diagnostic runs and does not guarantee arcade speed. Avoid additional builds

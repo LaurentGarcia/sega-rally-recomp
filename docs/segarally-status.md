@@ -14,7 +14,7 @@ The [design](sega-rally-design.md) records interpretation and hardware limits.
 | Course progress | Desert clear/results show 1:12.15; forested second course enters, times out, then attract returns | Centered steering does not complete second-course bends; remaining courses unvalidated |
 | Metal fidelity | Startup warning matches CPU renderer pixel for pixel; stable fan path is used | Exact racing-scene raster parity remains open |
 | Sound generation | Native linked board captures 2,409,170 stereo frames: 54.6297052 seconds including nonzero 44.1 kHz PCM; shared-core drains agree | Whole-game audio parity unvalidated |
-| Audio output | Sound-and-hook build reaches 2,760 frames with unchanged main state, zero SDL input shortfalls and zero chip/host drops | One quiet hidden-window checkpoint; user listening confirmation pending |
+| Audio output | Sound-and-hook build reaches 2,760 frames with unchanged main state, zero SDL input shortfalls and zero chip/host drops; user heard a ten-second native PCM sample | Continuous visible-game playback unconfirmed |
 | Hardware fidelity | Isolated device/reference tests and instruction-timed diagnostics | PCB timing, extF80 precision and full-machine behavior remain open |
 
 ## Measured Mac speed
@@ -44,14 +44,15 @@ whole-process sound checks, separate from the sound-off race segment above.
 The hook preserves the prior game and sound data: actual Machine comparison
 matches all 3,142 frames through 600 million instructions, and the entire
 54.6297052-second WAV matches the old output byte for byte. SDL stayed supplied
-through this quiet hidden-window check; visible presentation, user hearing and
-longer game paths remain separate checks.
+through this quiet hidden-window check. The user has heard a separate ten-second
+native PCM sample; visible game playback and longer paths remain separate checks.
 
 The latest LaunchServices sound attempt loads its bundled selection replay and
 initializes the machine, then exits at `AudioQueueStart` with CoreAudio error
 `-66681` (`kAudioQueueErr_CannotStart`). The earlier direct-device check passed.
-Launch context and current output-device startup are under investigation; this
-error alone does not establish a permission or sound-generation fault.
+Current direct windowed and hidden probes fail the same way, while the standalone
+native PCM player succeeds. Game startup is under investigation; this error alone
+does not establish a permission or sound-generation fault.
 
 ## Graphics evidence
 
@@ -64,7 +65,7 @@ picture and correct polygon ordering remain distinct from pixel fidelity.
 
 ## Next validation work
 
-Confirm visible-window playback and the Mac listening result, then measure
+Confirm visible-window gameplay sound, then measure
 longer game paths with sound enabled. Preserve exact instruction guards, timing
 and IRQ boundaries in further speed work. Validate fresh
 credit/restart and the remaining courses, then extend independent replay

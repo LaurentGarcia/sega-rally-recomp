@@ -46,8 +46,9 @@ The older execution path exhausted its queue during the same driving checkpoint.
 
 The hook matches the old Machine through 600 million driving instructions,
 every compared frame and every captured PCM sample. This hidden-window result
-does not establish every course or visible presentation; listening confirmation
-remains open. Sound requires both the build option and runtime `--sound`.
+does not establish every course or visible presentation. A ten-second native
+PCM sample has been heard on the Mac speakers; live game audio startup remains
+under investigation. Sound requires both the build option and runtime `--sound`.
 See the [sound instructions](docs/segarally-build-validation.md#optional-sound-experiment).
 
 ## Personal inputs and repository boundaries
