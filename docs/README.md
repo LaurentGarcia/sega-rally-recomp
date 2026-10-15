@@ -27,3 +27,6 @@ revisions are in [THIRD_PARTY.md](../THIRD_PARTY.md). Personal ROMs, imported
 images, generated game C++, captures and apps remain in ignored local folders.
 The status and handoff documents refer to local evidence paths; those captures
 are deliberately absent from the public source tree.
+
+See [source history](source-history.md) for the mapping between historical local
+validation revisions and public commit IDs.

@@ -12,6 +12,8 @@ It does not distribute a playable app, ROMs or generated game code. See the
 [release scope](releases/v0.1.0-rc.1.md) and [setup guide](getting-started.md).
 The recorded gameplay checkpoints below retain their original local identities;
 source publication and host regression checks do not extend their fidelity scope.
+The [source history map](source-history.md) resolves original local commit IDs
+to their public counterparts.
 
 ## Current Mac candidate
 

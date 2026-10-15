@@ -1,5 +1,24 @@
 # Handoff
 
+## Public history identity mapping (2026-10-15)
+
+The isolated publication clone now has branch `main`. The metadata pass changed
+178 maintainer author/committer email fields across 317 reachable commits while
+retaining every source tree and commit message. No upstream signed commit was
+changed; unexpected signature invalidation would stop the pass. The local
+preparation tip is `46e0888d405b92caefdfc79261520c83a696f5da`; its public
+counterpart is `764daacd3fd33b14fd590d0b1c2921adb2855276`. The original branch
+and validation artifacts remain preserved. `docs/revision-map.json` and
+`docs/source-history.md` keep historical evidence IDs resolvable without claiming
+that a metadata change rebuilds or revalidates an older executable.
+
+The source gate passes the integrated preparation tree. Public documentation
+passes 89 local links/anchors and fifteen documented Python command checks.
+The eleven gate fixtures and 35 notice/launcher tests pass. Next is a clean
+Mac build of this public source, CI and the source-only prerelease tag. Only
+`main` and the intended release tag are to be pushed; local worktree/reflog and
+reference branches are not publication inputs.
+
 ## Public source prerelease preparation (2026-10-15)
 
 The public target is the personal `LaurentGarcia/sega-rally-recomp` repository,
