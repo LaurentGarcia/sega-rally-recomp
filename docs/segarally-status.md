@@ -8,14 +8,14 @@ The [design](sega-rally-design.md) records interpretation and hardware limits.
 | Area | Established evidence | Limit |
 | --- | --- | --- |
 | Main native coverage | Frozen v14: 75,207 instructions, 52 native objects, no missing templates | Coverage is a reached graph, not a remaining-work percentage |
-| Interactive Mac | v14 windowed sound session exits normally after 9,344 frames; separate continuation passes the old frontier through frame 14,001 | Second race and remaining courses still need validation; live listening feedback pending |
+| Interactive Mac | v14 windowed sound session exits normally after 9,344 frames; separate continuation passes the old frontier through frame 14,001 | Full-course and live listening validation remain open |
 | Driving parity | Two billion held-gas instructions, 86,328,770 ordered writes, 4,650,936,033 cycles, 113,101 IRQs and 10,701 renders; nineteen replay events match | Sound off; independent CPU with shared boards and final-frame comparison; no full MAME race |
-| Later game paths | Held-gas v13 returns to attract; a fresh two-coin/Start sequence reaches Car Select at frame 11,160 without a frontier | Second race and Game Over overlay not separately validated |
+| Later game paths | Fresh credit/start after attract reaches a second race; sound-on frame 12,800 shows 118 km/h in fourth gear, 15.83 seconds elapsed | Complete second race and Game Over overlay not separately validated |
 | Course progress | Desert clear/results show 1:12.15; forested second course enters, times out, then attract returns | Centered steering does not complete second-course bends; remaining courses unvalidated |
 | Metal fidelity | Optional polygon scanlines improve three scenes; experimental repeated stepping reduces one 3D-only scene from 844 differing pixels to 3; 447 synthetic cases pass | Repeated stepping is diagnostic only, with one worsened pixel; broader scenes and cost remain open |
 | Sound generation | Native linked board captures 2,409,170 stereo frames: 54.6297052 seconds including nonzero 44.1 kHz PCM; shared-core drains agree | Whole-game audio parity unvalidated |
 | Audio output | v14 windowed session supplies 7,163,505 stereo frames with zero chip/host drops and one estimated SDL input-shortfall request; user heard a separate ten-second native PCM sample | Live listening feedback and physical fidelity remain open |
-| Exact host recording | Actual v13 sound-on drive: 5,603 exact resumes replay; recorded and unrecorded 2,801-frame runs match counters, all 20 input boundaries, WAV, final Metal image and saves | Same-Machine reproducibility; full-course manual recordings and independent sound parity remain open |
+| Exact host recording | Actual manual v14 drive replays all 18,689 resumes, PCM hashes and final saves through frame 9,344; earlier scripted recorded/unrecorded checks also match | Same-Machine reproducibility; full-course and independent CPU/sound parity remain open |
 | Hardware fidelity | Isolated device/reference tests and instruction-timed diagnostics | PCB timing, extF80 precision and full-machine behavior remain open |
 
 ## Measured Mac speed
@@ -66,6 +66,17 @@ does not display a numeric credit balance, and this check stops before a
 second race. Sound is off; unthrottled diagnostic cost is not a gameplay-speed
 measurement.
 
+The sound-enabled v14 extension now also starts and drives that second race.
+It preserves the 26 credit-restart events, repeats the known selection timing
+after the second Start, then holds gas. All 32 events apply through frame
+12,800 without a frontier or keyboard takeover. The first 26 logged event
+boundaries match the sound-off restart. The final Metal capture shows an active
+race at 118 km/h in fourth gear, 15.83 seconds elapsed and position 15/15.
+The cockpit view does not directly establish the car's identity. All 25,605
+recorded resumes match scripted pins and their PCM hashes match the WAV;
+9,812,993 stereo frames are generated with zero chip/host drops. This hidden
+unthrottled test uses no physical audio device and is not a speed measurement.
+
 The earlier LaunchServices sound attempt loaded its bundled selection replay
 and initialized the machine, then exited at `AudioQueueStart` with CoreAudio
 error `-66681` (`kAudioQueueErr_CannotStart`). Direct windowed and hidden probes
@@ -105,8 +116,10 @@ this session. The automated continuation, rather than this shorter live
 session, establishes progress beyond the former missing return.
 The live bundle contains 18,689 resumes and actual post-handoff accelerator,
 steering, brake, view and handbrake changes. Its signature, assets, initial/
-final saves and completion record pass read-only audit; offline execution of
-this manual capture remains pending.
+final saves and completion record pass read-only audit. Exact signed-executable
+offline replay subsequently matches every resume, PCM count/hash and final
+save, preserving the entire app, bundle and live saves. This opens no output
+device and establishes reproducibility of the recorded manual drive.
 See the [input guide](segarally-input-replay.md#exact-host-resume-transcripts).
 
 ## Graphics evidence
@@ -173,8 +186,12 @@ combining it with triangle repeated stepping leaves three, with mean channel
 error 0.000042002688/255 and maximum channel error 4. Of 843 changed pixels,
 842 become exact; one previously exact pixel at (434,94) worsens slightly.
 The remaining differences are at (294,94), (434,94) and (98,331), all owned by
-opaque quads in the CPU reference. Their GPU interpolation/depth attribution
-is still pending.
+opaque quads. The subsequent GPU probe confirms identical owners. The first
+two differ in accumulated U/z; a one-ULP change to the CPU step reproduces the
+measured GPU words, though the GPU step itself remains inferred. The last has
+identical repeated parameters but a measured one-ULP reciprocal-z difference
+which moves U across an integer truncation boundary. These are arithmetic
+differences at the measured points, not evidence of changed polygon ownership.
 
 The first instrumented candidate changed one baseline pixel even with its
 diagnostic mode disabled and was rejected. The second separates the new
@@ -189,7 +206,7 @@ or hardware fidelity, or resolve continuous flicker.
 Confirm visible-window gameplay sound, then measure
 longer game paths with sound enabled. Preserve exact instruction guards, timing
 and IRQ boundaries in further speed work. Validate
-the second race and remaining courses, then extend independent replay
+the complete second race and remaining courses, then extend independent replay
 comparison to those paths and coupled sound. Real-race graphics
 comparison, full MAME-machine parity and PCB/precision validation remain required.
 

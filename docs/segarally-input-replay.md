@@ -111,10 +111,24 @@ prefix with neutral controls at frame 10,710, two ten-frame coin pulses at
 the host under scripted control until the 11,160-frame exit. With fresh saves,
 the stable sound-off v13 host reaches Car Select, countdown 08, after all 27
 events and 2,090,501,029 instructions, with no frontier or manual takeover.
-The numeric final credit balance is not shown; the second race has not started.
+The numeric final credit balance is not shown; that check stops before the second race.
 Use the host with explicit `--frames 11160 --instructions 2200000000` and a
 new `--save-dir` for this diagnostic. The boot wrapper's two-billion ceiling
 cannot reach these late inputs. Preserve normal player saves separately.
+
+`config/segarally_second_race.inputs` keeps the first 26 restart events and
+extends them with right steering at 11,320, center at 11,340, gas at 11,360,
+release at 11,370 and held gas at 11,820. These repeat the successful selection
+offsets relative to the second Start. Neutral at 12,799 holds scripted control
+through a 12,800-frame stop. With fresh saves and v14 sound/hook enabled, all
+32 events apply and the first 26 event counters match the earlier restart.
+The host completes 2,392,873,232 instructions without a frontier. The final
+Metal capture shows actual second-race driving at 118 km/h in fourth gear,
+15.83 seconds elapsed. It is a cockpit view, so the car body is not confirmed
+by that image. Use `--frames 12800 --instructions 3000000000` with this script
+and an exclusive save/recording directory. Its 25,605 resumes and 9,812,993
+stereo WAV frames are audited; this does not prove complete second-race,
+remaining-course or independent hardware parity.
 
 ## Exact host resume transcripts
 
@@ -162,7 +176,7 @@ budget to its 81,380 executed instructions would return at a different
 synchronization phase. Its 622-scalar audio prefix separately matches the new
 drain, which establishes those audio bytes only. This cross-generation check
 uses a fresh capture; the production same-executable replay guard is unchanged.
-No v14 same-executable offline replay has been run. Evidence is under
+No offline replay of this raw-executable continuation has been run. Evidence is under
 `build/validation/frontier-005ae800-v14/continuation-001/` and
 `build/validation/frontier-005ae800-v14/independent-review.json`.
 
@@ -170,8 +184,10 @@ The subsequent v14 windowed recording captures actual manual controls after
 selection handoff: 409 snapshot transitions involving throttle, steering,
 brake, view and handbrake. Its 18,689 rows end in normal quit at frame 9,344.
 The read-only audit verifies signature/manifest/assets, initial/final save
-bytes and recording completion; same-executable offline replay is still
-pending. Preserve this signed app with
+bytes and recording completion. Exact signed-executable offline replay then
+matches every resume, PCM count/raw-float digest and final save without
+changing the app, bundle or live saves. Evidence is under
+`build/validation/manual-v14-offline-replay-001/`. Preserve this signed app with
 `build/recordings/mac-v14-20261014-001` for that check.
 
 Preserve the exact captured executable/app and staged assets. Rebuilding,

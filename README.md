@@ -30,8 +30,9 @@ objects. Prior v13 checks run the actual Lancia race, Desert finish/results and
 entry into the forested second course. A two-billion-instruction held-gas replay reaches
 time-over and returns to attract mode without a missing-code or device error.
 A fresh-credit check then accepts two coins and Start, returning to Car Select
-at frame 11,160. Starting that second race, other courses and alternate paths
-still need tests.
+at frame 11,160. The sound-enabled v14 extension starts and drives a second race:
+its frame-12,800 capture shows 118 km/h in fourth gear at 15.83 seconds elapsed.
+Completing that race, other courses and alternate paths still need tests.
 
 The latest observed missing return is now included. A sound-enabled v14 check
 matches the previous 25,580 normal execution/audio steps exactly and continues

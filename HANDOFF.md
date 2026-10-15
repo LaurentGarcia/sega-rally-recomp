@@ -1,5 +1,103 @@
 # Handoff
 
+## Second race starts and drives with sound (2026-10-14)
+
+`config/segarally_second_race.inputs` preserves the first 26 credit-restart
+events through frame 10,770. It removes that script's terminal neutral event
+and shifts the known selection sequence by the Start-frame difference of
+9,520: steer right at 11,320, center at 11,340, gas at 11,360, release at
+11,370, then held gas at 11,820. Neutral at 12,799 retains scripted controls
+through the 12,800-frame stop. There are 32 events. Input SHA-256:
+`b6be8889b49047ef830d4ceb545a50a8d27d21df3f0d8cb390f73d688ce22001`.
+This follows **Inputs** and **Reference & validation**: only cabinet pins
+change; game variables and generated instructions remain untouched.
+
+The unchanged raw v14 host, sound/hook enabled with fresh all-FF saves,
+completes normally after 2,392,873,232 instructions, 5,562,921,029 cycles and
+12,800 frames at PC `0x005d4e08`. Board time is 222,516,841,160 ns. All 32
+inputs apply without manual takeover, and the first 26 logged event boundaries
+match the earlier sound-off restart exactly. All 25,605 recorded resumes have
+matching scripted pins and continuous witnesses; their PCM hashes match the
+complete float WAV of 9,812,993 stereo frames. There are 18,104,188 nonzero
+scalar samples and zero chip/host drops. The hidden unthrottled run opens no
+playback device; it is not a listening or gameplay-speed check.
+
+The final Metal frame is visually verified as active second-race driving:
+118 km/h, fourth gear, elapsed/lap time 15.83 seconds, remaining time 45 and
+position 15/15 on the dirt course. Its cockpit view does not show the car body,
+so the final image alone does not verify Lancia identity. The input history,
+matching restart prefix and active racing HUD establish a new race after fresh
+credits; a frame-limit exit alone would not establish that. Complete second-race
+or remaining-course validation is still open.
+
+Evidence: `build/validation/second-race-v14/capture-001/`. `result.json`
+SHA-256 `3656dc5a5f465c2cb0405ac3d1cf204b38bc9fccd8308df90789734770b7d56c`;
+`visual-review.json` SHA-256
+`80d2a2df0d71ac9c8e1fd8beca9164ee926c5f2c9c0ef54267ce7704e35b5c46`;
+PPM SHA-256 `c365a81ef942ee9f1c931ef3d90733ac4201c4009fe7b0a6473555496520aa71`;
+WAV SHA-256 `2e658bf0af6a555ddbd42ce13ee0f690d1acc67ed890ab206ef47621fe210ee5`.
+Frozen runner `build/validation/second-race-v14/run.py` uses exclusive outputs,
+a three-billion-instruction ceiling, 600-second timeout and 512 MiB artifact
+bound. Preparation and independent review precede execution. Raw executable,
+assets, old captures and helper identities remain unchanged. The lower-level
+result intentionally retains `visual_second_race_verified: false`; the separate
+visual review records the later inspection rather than rewriting raw evidence.
+The independent artifact audit verifies all rows/pins, prior event boundaries,
+PCM hashes and recomputed nonzero/peak/RMS statistics, fresh/final saves and
+unchanged frozen inputs. It separately confirms the racing HUD in the image:
+`build/validation/second-race-v14/independent-review.json`, SHA-256
+`acec64c1cd9ff81dd921e92677402aac9e5caad87236e0f5459cf01c01a6645b`.
+The 114.573042-second capture cost is diagnostic, with concurrent correctness
+work, and supplies no normal-paced performance result.
+
+Next: compare the repeated-step renderer in the three historical complete
+scenes with composition guards, then measure cost in a quiet interval. A
+separate sound-off ordered-resume reference fixture is being developed to
+measure exact Budget/frame/fetch phases before independent manual replay can
+be claimed. Validate later course paths without game-logic shortcuts. Phone
+work remains deferred; no full-race MAME/PCB or release-readiness claim follows.
+
+## Manual v14 replay and final pixel attribution (2026-10-14)
+
+The exact signed v14 executable replays the completed manual session inside
+the sandbox without SDL/GPU/audio-device initialization or live-save writes.
+All 18,689 resumes match inputs, witnesses, return/fault details, PCM counts
+and raw-float hashes, including 7,163,505 stereo audio frames. The normal quit
+witness is 9,344 frames, 1,720,524,703 instructions, 4,060,943,401 reference
+cycles, board time 162,437,736,040 ns and PC `0x005ca570`. Final EEPROM/backup
+bytes agree, and the entire signed app/assets, recording, live saves and log
+are unchanged. Exit is 0 and stderr is empty. Evidence:
+`build/validation/manual-v14-offline-replay-001/result.json`, SHA-256
+`ca78def96fbe9d0cb0f6e30305e0753ce8c52d798b996bf182b1949b4bb76bfb`.
+Its 77.833496-second diagnostic cost is not a visible gameplay measurement.
+This closes same-Machine replay for the actual manual-input session; it does
+not establish independent CPU/sound/hardware or listening fidelity.
+
+The final-three Metal probe also passes the exact disabled-mode guard across
+all 190,464 RGBA pixels. CPU, current and combined-repeat images remain
+byte-identical to accepted attempt02. All GPU owners match the CPU, excluding
+an ownership discrepancy at these points. At (294,94) and (434,94), owner 827
+has identical clipped-start parameters and final reciprocal z, but different
+accumulated U/z. Float32 reconstruction with a one-ULP-different U step
+reproduces both measured GPU words. The actual step was not exported, so its
+value and upstream cause remain inferred. At (98,331), owner 784 has identical
+repeated parameters, but measured reciprocal z differs by one ULP. That alone
+moves fixed U across integer truncation from 42239 to 42240 and changes the
+filtered texel from 87 to 88, explaining the color difference.
+
+Retained SDL source supplies nil runtime Metal compilation options; generated
+MSL uses ordinary division for span reciprocal and z. This source path provides
+no explicit strict-math guarantee, and host compiler flags do not configure it.
+Neither effective runtime options nor hardware instruction lowering was
+measured; do not call a specific compiler mechanism proven. The repeated loop
+remains diagnostic, with no production edit, broader-scene result or speed
+claim. Evidence under
+`build/worktrees/mac-triangle-fidelity/build/validation/final-three-gpu-review/`:
+`attribution.json`, SHA-256
+`0ae24038bdd664d56d8fb919c4e4d6f7877bdfb8f40ad090db089ec4434587bd`;
+`direct.log`, SHA-256
+`83b5bf82548f031af96ef20af64db02bdb68724ff8e173663aac0cd85a6b8f0c`.
+
 ## v14 continuation and completed windowed session (2026-10-14)
 
 The single observed return seed is built and validated. Isolated worktree

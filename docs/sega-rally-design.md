@@ -230,8 +230,11 @@ the existing static table and registration proofs are unchanged. A subsequent
 two-billion-instruction run returns to attract mode without a missing-code or
 device frontier. A separate fresh-save stable-host check subsequently accepts
 two more coins and Start and reaches Car Select at frame 11,160, with all 27
-scripted inputs applied. The Game Over overlay, beginning that second race
-and completion of the remaining courses still require validation.
+scripted inputs applied. The v14 sound-enabled extension preserves the restart
+event boundaries and begins a second race, with its frame-12,800 capture
+showing 118 km/h in fourth gear at 15.83 seconds elapsed. All 32 cabinet events
+apply and the complete captured PCM matches per-resume hashes. The Game Over
+overlay, complete second race and remaining courses still require validation.
 A later sound-enabled v13 recording reaches a missing return at `0x005ae800`
 after 12,785 frames. Adding that observed target and its canonical ROM alias
 extends the v14 graph to 75,207 instructions without changing prior addresses

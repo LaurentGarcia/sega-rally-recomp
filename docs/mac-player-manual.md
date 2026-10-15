@@ -152,6 +152,8 @@ assets directory. Offline replay opens no window or audio device and changes
 no live saves. Preserve the recorded app and assets: rebuilding, re-signing or
 repackaging can change their bytes, and changed identities are rejected.
 The sound-on scripted validation now matches recorded and unrecorded runs
-through frame 2,801, including their WAV, final image and saves. This establishes
-repeatability for that drive; remaining courses and live audio quality still
+through frame 2,801, including their WAV, final image and saves. The later v14
+manual session also replays all 18,689 resumes, PCM hashes and final saves
+through frame 9,344 with the exact signed app. These establish repeatability
+for the captured drives; remaining courses and live audio quality still
 need validation. See the [input guide](segarally-input-replay.md#exact-host-resume-transcripts).
