@@ -16,7 +16,7 @@ The [design](sega-rally-design.md) records interpretation and hardware limits.
 | Sound generation | Native linked board captures 2,409,170 stereo frames: 54.6297052 seconds including nonzero 44.1 kHz PCM; shared-core drains agree | Whole-game audio parity unvalidated |
 | Audio output | Earlier v15 playtest has four SDL estimated demands; later v16 manual test and fresh 7,200-frame neutral capture have zero demands/drops; all 5,519,841 neutral-capture PCM frames match recorded hashes | User reports title-screen glitches; clean later telemetry does not establish audible quality or resolve the cause |
 | Controller input | Xbox One Elite 2 detected; 329 mapping/virtual-device checks, normal build, menu Metal checks and actual-host input isolation pass; live recording contains intermediate steering, throttle and brake values | Recorded cabinet inputs do not identify their physical source; Y/navigation feedback remains open; wheels/force feedback remain outside this implementation |
-| Exact host recording | Actual manual v14 drive replays all 18,689 resumes, PCM hashes and final saves through frame 9,344; earlier scripted recorded/unrecorded checks also match | Same-Machine reproducibility; full-course and independent CPU/sound parity remain open |
+| Exact host recording | Actual analog-input v16 session replays all 25,953 resumes, PCM hashes covering 9,946,388 stereo frames and final saves through frame 12,974; earlier v14 and scripted checks also match | Same-Machine reproducibility; full-course and independent CPU/sound parity remain open |
 | Independent host recording | Actual sound-off driving bundle passes 5,201 resumes, 500,035,460 instructions, 15,156,607 ordered writes, 1,130,001,001 cycles and 2,600 frames after immutable preflight | Independent i960 with shared boards; longer/manual captures, sound-on and hardware parity remain open; fault rows rejected |
 | Hardware fidelity | Isolated device/reference tests and instruction-timed diagnostics | PCB timing, extF80 precision and full-machine behavior remain open |
 
@@ -26,8 +26,9 @@ with zero logged SDL shortfall requests or chip/host drops. A frozen prefix
 contains 2,726 cabinet-input changes after scripted control ended, including
 intermediate analog values. Settings-button feedback and title-screen audio
 quality remain open. Before launch, its 2,600-frame scripted drive preserved
-v15 native audio/image, saves and ordered inputs exactly. The app and complete
-user recording remain preserved; completion alone is not a replay result.
+v15 native audio/image, saves and ordered inputs exactly. Its complete manual
+recording now also replays exactly using the original signed executable, with
+the app, assets, recording and live saves unchanged.
 
 ## Measured Mac speed
 

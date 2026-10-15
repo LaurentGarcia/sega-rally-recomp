@@ -1,5 +1,27 @@
 # Handoff
 
+## Complete v16 manual session replays exactly (2026-10-14)
+
+The original signed v16 executable now replays the completed controller session
+offline. All 25,953 resumes match their input pins, before/after witnesses,
+return/fault fields and PCM counts/raw-float hashes through frame 12,974.
+Terminal state is 2,381,700,896 instructions, 5,638,541,403 cycles and
+PC `005a37a4`; PCM hashes covering all 9,946,388 stereo frames and final
+EEPROM/backup bytes match. Replay finishes normally in 109.633421 seconds,
+under the 300-second watchdog, with empty stderr. It initializes no
+SDL/controller/GPU/audio device and writes no live save. App, all eight actual
+assets, complete recording,
+live saves and log remain byte-identical before/after.
+
+This follows **Reference & validation** and closes same-Machine reproducibility
+for this actual analog-input session. It does not establish independent CPU,
+chip, board, complete-course, hardware or audible-quality parity. The recorded
+pins still do not identify which physical input opened Settings. Evidence:
+`build/validation/mac-controller-v16/manual-replay-001/result.json`, SHA-256
+`0ded284d70289ad3d925bc433f36ce2b906adc8259f586baa765ad792e4d381f`.
+The exact signed executable and immutable bundle were used without identity
+bypass or disabling sound. Independent sound-board work remains separate.
+
 ## Sound CPU comparison includes architectural state (2026-10-14)
 
 The existing pinned-public-microcode differential now also compares D/A

@@ -190,6 +190,16 @@ changing the app, bundle or live saves. Evidence is under
 `build/validation/manual-v14-offline-replay-001/`. Preserve this signed app with
 `build/recordings/mac-v14-20261014-001` for that check.
 
+The later v16 analog-input session also replays exactly with its original
+signed executable: 25,953 resumes, 2,381,700,896 instructions and 12,974 frames,
+including PCM hashes covering 9,946,388 stereo frames and the final save bytes.
+Its 2,774 post-handoff cabinet-input changes include intermediate steering,
+throttle and brake values. The app, assets, recording, live saves and log remain
+unchanged. Evidence is under
+`build/validation/mac-controller-v16/manual-replay-001/`; preserve
+`build/recordings/controller-v16-001` with its captured app. This is another
+same-Machine result, not independent sound or physical-controller attribution.
+
 Preserve the exact captured executable/app and staged assets. Rebuilding,
 re-signing or repackaging can change their bytes; changed identities are
 rejected. The new raw-executable checkpoint and the signed app have
