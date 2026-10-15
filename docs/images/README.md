@@ -1,16 +1,18 @@
 # README screenshot provenance
 
-These four selected screenshots document actual native output from local
+These five selected screenshots document actual native output from local
 validation runs on macOS. They are the explicitly requested documentation
 exception to the source repository's exclusion of raw game captures. They are
 not extracted textures, ROM files, generated game code or a playable game.
 Game imagery and trademarks remain the property of their respective owners;
 the project's BSD source license does not grant rights to those game assets.
 
-Each image retains the original 496 × 384 pixels. PPM captures were converted
+The four original-output images retain the original 496 × 384 pixels. The CRT
+image below is the real production Metal presentation of the same Desert frame.
+PPM captures were converted
 losslessly to PNG; conversion metadata was removed without changing the
-compressed pixel payload. No artwork, retouching, interpolation or invented
-screen content was added. GitHub may scale the display to fit the page.
+compressed pixel payload. The original-output images have no retouching or invented
+screen content. The CRT image applies the documented renderer settings. GitHub may scale the display to fit the page.
 These captures precede the public prerelease build and do not constitute a
 new RC validation run. The Metal hero is captured before CRT/UI effects;
 the gallery uses the native CPU renderer. See the
@@ -49,7 +51,25 @@ SHORT Practice Mountain Stage Clear, native CPU renderer, frame 10200.
 - Local source SHA-256: `7cc3f11cf43021a69f3e6847bee571c05b756fa6c76443ebe508ac54d2838b96`.
 
 The local source files and their broader capture bundles stay ignored. Only the
-four exact reviewed PNG paths/hashes are allowed by the source-release gate.
+five exact reviewed PNG paths/hashes are allowed by the source-release gate.
 Other captures, changed images, recordings, assets, personal ROMs and packaged
 apps remain excluded. New documentation images require an explicit review and
 updated provenance; the allowlist is not a general image-export permission.
+
+## crt.png
+
+The real production `app::CrtRenderer` processed the preserved Metal Desert frame
+through the existing saved-image mode in `tests/test_gpu_crt.cpp`. This is an
+offscreen Metal render/readback, not a photograph or a new live gameplay capture.
+The input RGB values were converted losslessly to BGRA8888 for the GPU upload.
+The native scene is 496 × 384; the target is 1152 × 896 with a 992 × 768 viewport
+at (80, 64). The preset uses scanlines 0.25, phosphor mask 0.12, glow 0.10,
+curvature 0.035 and chromatic displacement 0.25 pixels. The test completes its
+20-draw bound, including disabled/zero-effects behavior, all five controls,
+letterbox clearing and clamping. The renderer and shader sources match this
+public source. This verifies the presentation example, not additional gameplay.
+
+- Published PNG SHA-256: `50e67500868e0305da5f1f24d5c9bb743f79c69a66994f1118422ed6ccf80e14`.
+- Local output: `build/validation/readme-crt-001/render/crt-default.ppm`.
+- Scene: the same `hero.png` input described above.
+- Fixture executable SHA-256: `d2cc7c174369ffedc1abc8251dffed946334ce6f8036e875d39e4d50305a7824`.

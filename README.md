@@ -14,9 +14,9 @@ Generated C++ game code · Native board devices · SDL3 + Metal
 
 **[Build your Mac app](docs/getting-started.md) · [Player manual](docs/mac-player-manual.md) · [Architecture](docs/segarally-architecture.md) · [Tested scope](docs/segarally-status.md)**
 
-<img src="docs/images/hero.png" alt="Metal-rendered Desert: Martini Lancia rear view at 160 km/h" width="960">
+<img src="docs/images/crt.png" alt="Actual Metal CRT presentation: Martini Lancia in Desert with scanlines, phosphor mask and curved screen" width="960">
 
-*Real native output from local validation runs; [renderer and capture details in image provenance](docs/images/README.md).*
+*The production Metal CRT shader applied to a preserved native frame. [Capture details](docs/images/README.md) · [Original pixels](docs/images/hero.png).*
 
 </div>
 
@@ -52,9 +52,29 @@ phone work is deferred. Display enhancements start off on fresh preferences.
 </tr>
 </table>
 
-The Desert hero is a Metal capture with Accurate textures; gallery images use
-the native CPU renderer. These preserved validation captures predate this source
-prerelease and do not represent a new release-candidate test.
+The hero demonstrates the optional Arcade CRT preset: scanlines, phosphor mask,
+glow, curvature and subtle color fringing. It uses the production shader on Metal
+with a preserved Accurate textures frame. Effects remain adjustable and off by
+default. The gallery uses the native CPU renderer; its preserved validation
+captures predate this source prerelease.
+
+<details>
+<summary><b>Compare original pixels and Arcade CRT — the same frame</b></summary>
+
+<table>
+<tr><th>Original native output</th><th>Arcade CRT on Metal</th></tr>
+<tr>
+<td width="50%"><a href="docs/images/hero.png"><img src="docs/images/hero.png" alt="Original native Desert pixels before presentation effects" width="100%"></a></td>
+<td width="50%"><a href="docs/images/crt.png"><img src="docs/images/crt.png" alt="The same frame after the real Metal CRT shader, including screen curvature and scanlines" width="100%"></a></td>
+</tr>
+</table>
+
+The original is 496 × 384; the CRT capture uses a 992 × 768 viewport within a
+1152 × 896 render target. Open the CRT image at full size to see the mask and
+scanlines without the browser's downscaling. This is a presentation capture,
+not a new gameplay or full-fidelity test.
+
+</details>
 
 Recorded Championship paths clear Desert and Forest before retiring near
 Mountain's finish. A separate SHORT Practice Mountain drive finishes, reaches

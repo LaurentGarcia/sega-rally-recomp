@@ -27,6 +27,7 @@ GRADLE_SHA256 = "498495120a03b9a6ab5d155f5de3c8f0d986a449153702fb80fc80e134484f1
 # Only explicitly selected promotional images; all other capture/image paths
 # remain forbidden. Provenance is documented beside the curated files.
 CURATED_SCREENSHOTS: dict[str, str] = {
+    'docs/images/crt.png': '50e67500868e0305da5f1f24d5c9bb743f79c69a66994f1118422ed6ccf80e14',
     'docs/images/hero.png': '80119f52162b2249459b67a5bb8ad3fe5724fb6b0cea4913f95bff1deebfabd0',
     'docs/images/forest.png': '9ad7f662b6d2c7d62b1c17c2fb094a2655a0938269ed566c8a96a9a6a6151a01',
     'docs/images/mountain.png': '005bfe587184233f00d62b03b5da3f9e9e9d33017896c5684bb56417249b1b44',

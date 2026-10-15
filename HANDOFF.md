@@ -1,5 +1,24 @@
 # Handoff
 
+## Actual Metal CRT presentation in README (2026-10-15)
+
+The original screenshots correctly preserved native pixels before presentation,
+so they did not show the requested curvature or scanlines. The README hero now
+uses the actual production CRT renderer on Metal, through the existing saved-
+image fixture. The same preserved Desert input is displayed as an original/CRT
+comparison; the three earlier gameplay images remain clearly labeled. This is
+an offscreen presentation capture of an existing frame, not a new live race.
+
+The pinned existing CRT fixture completes its exact 20 draws and checks all
+five controls, zero/disabled behavior, letterboxes and clamping. The output is
+1152x896 with a 992x768 viewport and the default Arcade CRT settings. Image
+provenance records the source, binary, preset and published SHA-256. The new PNG
+is the fifth exact-hash documentation exception; all other capture restrictions
+remain. Conversion metadata is removed without altering compressed pixel data.
+The first preparation incorrectly assumed frozen sources were at the worktree
+root; they are under the fixture's preserved preparation. No source file or
+rendering behavior was changed for the capture.
+
 ## README showcase and restricted screenshot export (2026-10-15)
 
 The requested public README now includes real native captures: a Metal Accurate
