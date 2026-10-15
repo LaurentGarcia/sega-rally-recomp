@@ -1,7 +1,9 @@
 # Mac player manual
 
-This manual covers the experimental v0.1.0-rc.1 macOS source prerelease, using the original
-game instructions recompiled from verified personal ROMs. The current Mac
+This manual covers the experimental native Mac player. The prebuilt app needs
+no Python, CMake, Xcode, compiler or network connection; its first-run importer
+prepares game data from your own verified ROM ZIP. Developer source builds are
+also supported. The recorded Mac
 checkpoint has sound-enabled Metal replay evidence clearing Desert and Forest,
 then entering Mountain and retiring near its finish. A separate one-lap SHORT
 Practice Mountain drive finishes in 1:16.23, reaches name entry and the score
@@ -11,64 +13,48 @@ See [current evidence](segarally-status.md).
 
 ## Start the game
 
-Build a personal Mac app with the [one-command build](segarally-build-validation.md#build-the-mac-candidate-in-one-command):
+Prebuilt Mac packages are being validated; see [package and platform
+status](release-platforms.md) for availability. The withdrawn compiler-bootstrap
+previews are not the prebuilt player. Current Mac packages target Apple Silicon
+with Metal and are ad-hoc signed, not notarized. Intel execution is unvalidated.
+
+Open the **ROM-import edition** DMG, copy **Sega Rally Native.app** to Applications,
+and open it. Choose your personally supplied complete Revision B (`srallycb`)
+ZIP in the native file picker. Its filename may be `srallyc.zip`; supported bytes,
+not the filename, identify the revision. The app checks size, CRC32 and SHA1 for
+all required files, assembles eight runtime images, and checks their fixed SHA256
+identities before saving an import. No game download or runtime compilation is
+involved. Subsequent launches reuse the verified local import.
+
+The separate **personal edition** already includes its owner's verified game
+data and skips the picker. Keep it private. The ROM-import edition contains no
+ROM archive or extracted game assets, but both editions contain statically
+recompiled game instructions. The project's BSD license covers original runtime
+and tool code, not Sega game content.
+
+The game opens windowed with normal pacing. Sound, instruction-boundary
+execution and Arcade CRT are enabled on direct startup with fresh preferences.
+Saved display choices take precedence. Allow the original reset checks to finish,
+then press and release **C twice**, with a gap between presses, and press
+**Return**. Xbox controls are below. Startup is initially silent; attract sound
+begins after the reset checks. Accurate textures remains opt-in in Settings.
+
+Cancelling the picker exits before starting the game. An unsupported ZIP reports
+an error and lets you choose again. Existing imports and cabinet saves remain
+intact. The importer does not move or modify your selected archive.
+
+To choose a ZIP directly:
 
 ```sh
-python3 scripts/segarally_mac.py --roms /path/to/srallyc.zip \
-    --output build/segarally-player --jobs 4
+"/Applications/Sega Rally Native.app/Contents/MacOS/segarally_native" \
+    --rom /path/to/srallyc.zip
 ```
 
-After the build succeeds, open `build/segarally-player/mac/Sega Rally Native.app`.
-New sound-enabled Mac builds start with sound and the faster native execution
-path when opened directly, without command-line arguments. The game opens in
-a window and uses normal pacing. Allow its original reset checks to finish,
-then insert two coins with **C** and press **Return**. Xbox controls are below.
-CRT effects and Accurate textures are optional Settings controls.
-
-For automatic coin/start/Lancia selection followed by manual control, use:
-
-```sh
-python3 platform/segarally/macos/launch.py \
-    --build-dir build/segarally-player/mac --sound --instruction-boundary-hook \
-    --input-replay config/segarally_lancia_select.inputs
-```
-
-The selection replay chooses the automatic Lancia, then hands over to keyboard
-or controller. Release held buttons and center the stick when control passes
-to you. The longer driving replays are for validation and keep scripted control
-for their entire sequence.
-
-New builds also provide two Practice selection scripts. Replace the
-`--input-replay` file above with one of these:
-
-| Practice course | Selection script |
-| --- | --- |
-| Mountain | [segarally_practice_mountain_select.inputs](../config/segarally_practice_mountain_select.inputs) |
-| Lakeside | [segarally_practice_lakeside_select.inputs](../config/segarally_practice_lakeside_select.inputs) |
-
-Both choose the automatic Lancia through the original game menus, then release
-all controls for manual driving. Lakeside uses the game's built-in gear/brake
-selection sequence. These timed scripts assume fresh default cabinet settings;
-saved settings or credits can change the menu sequence. Use a fresh build/save
-directory and preserve existing saves. These scripts retain the default NORMAL
-game mode; the separate one-lap finish validation uses the original cabinet
-Test menu's SHORT game-mode setting. Older captured builds may predate the Practice callback fixes; preserve their
-exact executables when comparing recordings.
-
-The launcher verifies assets, packages and signs the app, then opens it through
-LaunchServices. It prints app and log paths. Add `--fullscreen` for desktop
-fullscreen. An already running copy is activated; quit it before changing
-startup options. Add `--no-launch` to package only and record the future command
-in `launch-command.json`. This cannot be combined with `--record-inputs`.
-
-Explicit command-line launches still require `--sound --instruction-boundary-hook`
-to enable those features. A direct no-argument launch uses the standard
-application save folder; the launcher uses `live-app-save` beside its build.
-These are separate save sets, as described below.
-
-Preserve any app used to record a drive. Repackaging or signing it again can
-change its identity and make the old recording fail verification. Historical
-preview paths and their validation records are retained in [HANDOFF](../HANDOFF.md).
+Add `--import-only` to verify and save the data without starting the game or
+opening a graphics/audio device. `--rom` enables player defaults; `--player`
+applies them when launching an existing import from the command line. Use
+`--save-dir DIR` to keep a separate import/save set. `--data DIR` is a developer
+asset-directory override and cannot be combined with `--rom`.
 
 ## Controls
 
@@ -95,7 +81,7 @@ Keyboard steering and pedals currently use full-scale cabinet values; releasing
 steering centers it. Gear inputs change on each key press. Optional touch controls can be shown with the
 host's `--touch` flag.
 
-New controller-enabled builds detect recognized SDL gamepads on connection.
+The player detects recognized SDL gamepads on connection.
 Xbox defaults are:
 
 | Controller | Action |
@@ -132,7 +118,7 @@ automatic transmission. Saved cabinet settings can change credit behavior.
 
 ## Display controls
 
-New controller-enabled builds open **Settings** with **F1** or controller **Y**;
+Open **Settings** with **F1** or controller **Y**;
 picture adjustments are on its **Display** tab. The game and
 scripted cabinet inputs pause while it is open. Choose **Resume**, press F1,
 or press Escape to return to play. Inputs held when closing the panel must be
@@ -149,7 +135,7 @@ reproduce a particular arcade monitor.
 when CRT effects are off. **Integer scale** uses whole-number scaling when
 there is enough space. **Accurate textures** is a separate native rendering
 option that improves measured texture edges and interpolation but can reduce
-performance. It does not add CRT scanlines. Current source builds start Arcade
+performance. It does not add CRT scanlines. The current player starts Arcade
 CRT enabled for fresh player preferences. Accurate textures remains opt-in;
 Smooth remains the scaling default. Saved preferences take precedence. Explicit
 diagnostic commands retain their existing opt-in defaults, and
@@ -160,7 +146,7 @@ supplied save directory (`live-app-save` beside a launcher build). They are
 separate from EEPROM and backup RAM. The panel restores valid preferences on
 later launches; malformed or oversized files are ignored with a warning.
 
-The launcher accepts `--crt`, `--accurate-textures`, and
+The developer launcher accepts `--crt`, `--accurate-textures`, and
 `--original-display`. The last selects default presentation for that session;
 do not combine it with `--crt`. For a baseline image check, use
 `--original-display` and omit `--accurate-textures`. The direct host also accepts
@@ -171,9 +157,10 @@ replay remains independent of the display panel.
 
 ## Sound, speed and saves
 
-The one-command Mac build includes native sound. Opening its app directly
-enables sound and the faster instruction-boundary execution path. For explicit
-command-line launches, retain `--sound --instruction-boundary-hook`.
+The prebuilt player and sound-enabled source builds include native sound.
+Direct startup, `--player` and `--rom` enable sound and the faster
+instruction-boundary execution path. Explicit diagnostic commands keep those
+features opt-in with `--sound --instruction-boundary-hook`.
 Performance depends on the Mac and scene. `--unthrottled` is a diagnostic option
 and does not guarantee arcade speed. Avoid additional builds or captures during
 a playtest.
@@ -192,7 +179,10 @@ measured scope.
 
 A direct Finder launch stores cabinet saves and display/control preferences in
 `~/Library/Application Support/sega-rally-recomp/SegaRallyNative/`.
-The launcher uses `live-app-save` beside its build and writes `live-app.log`.
+Imported images live in its `imported-game/import-…/` subfolders; `current.txt`
+selects the completed import. Keep the whole application-support folder when
+backing up saves. A failed import does not replace a previous import or EEPROM.
+The developer launcher uses `live-app-save` beside its build and writes `live-app.log`.
 These save sets are separate. Preserve the log before relaunching because it is
 replaced. The direct host accepts `--save-dir DIR` for an isolated save set.
 Keep existing saves when testing a fresh configuration.
@@ -200,7 +190,60 @@ Keep existing saves when testing a fresh configuration.
 If the window stops with a `frontier` title, preserve the log, build path,
 replay name and visible game state. This means a native-code or hardware path
 still needs implementation. If controls appear inactive, check window focus
-and whether the selection replay has handed over. Physical phone testing remains pending; the unsigned build has passed.
+and whether the selection replay has handed over. Other platform readiness is tracked in [platform status](release-platforms.md).
+
+## Developer builds and scripted selection
+
+To build your own personal app from source, follow [getting
+started](getting-started.md#build-from-source-instead) and the [build
+guide](segarally-build-validation.md#build-the-mac-candidate-in-one-command).
+The source-build tools below are optional and are not required by the prebuilt
+player. Commands run from a prepared repository checkout.
+
+For automatic coin/start/Lancia selection followed by manual control, use:
+
+```sh
+python3 platform/segarally/macos/launch.py \
+    --build-dir build/segarally-player/mac --sound --instruction-boundary-hook \
+    --input-replay config/segarally_lancia_select.inputs
+```
+
+The selection replay chooses the automatic Lancia, then hands over to keyboard
+or controller. Release held buttons and center the stick when control passes
+to you. The longer driving replays are for validation and keep scripted control
+for their entire sequence.
+
+New builds also provide two Practice selection scripts. Replace the
+`--input-replay` file above with one of these:
+
+| Practice course | Selection script |
+| --- | --- |
+| Mountain | [segarally_practice_mountain_select.inputs](../config/segarally_practice_mountain_select.inputs) |
+| Lakeside | [segarally_practice_lakeside_select.inputs](../config/segarally_practice_lakeside_select.inputs) |
+
+Both choose the automatic Lancia through the original game menus, then release
+all controls for manual driving. Lakeside uses the game's built-in gear/brake
+selection sequence. These timed scripts assume fresh default cabinet settings;
+saved settings or credits can change the menu sequence. Use a fresh build/save
+directory and preserve existing saves. These scripts retain the default NORMAL
+game mode; the separate one-lap finish validation uses the original cabinet
+Test menu's SHORT game-mode setting. Older captured builds may predate the Practice callback fixes; preserve their
+exact executables when comparing recordings.
+
+This developer launcher verifies assets, packages and signs the app, then opens it through
+LaunchServices. It prints app and log paths. Add `--fullscreen` for desktop
+fullscreen. An already running copy is activated; quit it before changing
+startup options. Add `--no-launch` to package only and record the future command
+in `launch-command.json`. This cannot be combined with `--record-inputs`.
+
+Explicit diagnostic commands keep sound and the hook opt-in; add
+`--sound --instruction-boundary-hook`, or use `--player` for player defaults. A direct no-argument launch uses the standard
+application save folder; the launcher uses `live-app-save` beside its build.
+These are separate save sets, as described above.
+
+Preserve any app used to record a drive. Repackaging or signing it again can
+change its identity and make the old recording fail verification. Historical
+preview paths and their validation records are retained in [HANDOFF](../HANDOFF.md).
 
 ## Record and replay a drive
 

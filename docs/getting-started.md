@@ -1,9 +1,59 @@
 # Getting started on macOS
 
-This guide builds the experimental **v0.1.0-rc.1 source prerelease** into a local
-Mac app using your own verified Sega Rally Championship Revision B ROM archive.
-No downloadable game or game assets are supplied. The active target is macOS;
-phone and Windows/Linux work is tracked in [platform status](release-platforms.md).
+The prebuilt Mac player runs without Python, CMake, Xcode, a compiler or a network
+connection. It contains compiled native game instructions and imports the game
+data from a supported ZIP you supply. The separate **v0.1.0-rc.1 source
+prerelease** is for developers who want to build from source.
+
+Prebuilt packages are being validated; this guide does not announce their
+publication. Check [package and platform status](release-platforms.md) for what
+is available. Earlier compiler-bootstrap previews were withdrawn. Windows,
+Linux and iPhone readiness is tracked separately there.
+
+## Play a prebuilt Mac app
+
+The current Mac package targets Apple Silicon and Metal; Intel execution has
+not been validated. The app is ad-hoc signed, not notarized.
+
+1. Open the Mac **ROM-import edition** DMG, copy **Sega Rally Native.app** to
+   Applications, and open the app.
+2. At first launch, choose your own complete Sega Rally Championship Revision B
+   ZIP. The filename can be `srallyc.zip`; its contents must match `srallycb`.
+   The app verifies each required ROM's size, CRC32 and SHA1, then prepares and
+   checks eight local runtime images. It does not download ROMs or compile code.
+3. Let the original reset checks finish. Press and release **C twice**, with a
+   gap between presses, then press **Return**. **Left/Right** steer, **Z** is gas
+   and **X** is brake. **F1** opens paused Settings; **Escape** quits when Settings
+   is closed. CRT and sound start enabled for fresh player preferences.
+
+Your selected ZIP stays where it is. Imported data, cabinet saves and settings
+live under `~/Library/Application Support/sega-rally-recomp/SegaRallyNative/`.
+Later launches reuse the verified import. Cancelling the picker exits without
+starting the game; a failed import leaves existing saves and imports intact.
+
+A separate **personal edition** contains the owner's verified game data and
+starts without the picker. Keep that data-inclusive package private. The
+ROM-import edition includes no ROM archive or extracted game assets; its
+executable does contain statically recompiled game instructions. The project
+BSD license covers the original runtime and tools, not Sega game content.
+
+To select a ZIP directly, the installed prebuilt executable accepts:
+
+```sh
+"/Applications/Sega Rally Native.app/Contents/MacOS/segarally_native" \
+    --rom /path/to/srallyc.zip
+```
+
+Add `--import-only` to verify and save the import without starting the game or
+opening a graphics/audio device. Use `--save-dir DIR` for an isolated import and
+save set; keep existing saves. See the [player manual](mac-player-manual.md) for
+controllers, display settings and sound.
+
+## Build from source instead
+
+The remaining sections are the developer workflow. These tools are **not
+required to run the prebuilt player**. A source build uses your verified ROMs to
+generate and compile native game instructions before packaging a personal app.
 
 ## 1. Prepare the tools
 
@@ -43,7 +93,7 @@ git -C extern/lzma checkout --detach 0766b733fe3e06dd2a7f9a3cfbf2108ac73abd17
 ```
 
 These are SDL3 3.4.16, Dear ImGui 1.92.9b and the selected 7-Zip sources used
-for recording hashes. The pipeline checks their exact revisions and refuses
+for import verification and recording hashes. The pipeline checks their exact revisions and refuses
 modified tracked dependency files. Use pristine checkouts; the inherited general
 Daytona setup is not the Rally onboarding command. Preserve existing local
 changes before changing a dependency revision. Dependencies stay ignored and
@@ -74,7 +124,8 @@ and verifies an ad-hoc signature. It does not launch the game. It prints the app
 path, report and optional automatic-selection launch command.
 
 All generated game instructions, assets, binaries and logs remain in ignored
-`build/`. The app contains personal game data and is not a public release asset.
+`build/`. This source-built personal app contains game data and must not be uploaded as
+a public release asset.
 The package is neither notarized nor a universal build.
 
 ## 5. Start and drive
@@ -98,7 +149,7 @@ The launcher repackages the prepared app and uses its separate `live-app-save`
 directory. Quit an active copy first. Read the [player manual](mac-player-manual.md)
 for controllers, Practice courses, save locations and recording precautions.
 
-## If a step stops
+## If a source-build step stops
 
 A failed pipeline preserves `build-result.json` and `logs/` in its output.
 Read the first failed step before choosing another new build directory. An

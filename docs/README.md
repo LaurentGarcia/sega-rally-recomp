@@ -1,8 +1,12 @@
 # Sega Rally documentation
 
-**v0.1.0-rc.1 is an experimental macOS source prerelease.** Build locally with
-your own verified Revision B (`srallycb`) ROMs. No ROMs, game assets or ready-to-play
-app are distributed. Phone work is deferred.
+The [prebuilt Mac player](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.1)
+imports your own verified Revision B (`srallycb`) ZIP without developer tools.
+Its executable contains compiled game instructions; the public download excludes
+ROM archives and extracted assets. Personal packages with game data remain
+private. Signed personal iPhone packaging and Windows/Linux builds are tracked
+in [platform status](release-platforms.md). `v0.1.0-rc.1` is the separate source
+prerelease for developers.
 
 | Guide | Purpose |
 | --- | --- |

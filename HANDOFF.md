@@ -1,5 +1,41 @@
 # Handoff
 
+## Actual Mac players and signed personal iOS binary (2026-10-15)
+
+Mac game source 058d4ab builds for macOS 13/arm64 and passes all thirteen host
+tests. Actual CPU-only `--rom --import-only` succeeds with PATH limited to
+/usr/bin:/bin. The prebuilt public package excludes all asset files and uses
+only system frameworks/libraries. Signed executable SHA-256 is
+`80481d6fd11de6773c854107895bd08111890a5509fe1ea55e9f8238d6328db2`.
+The public DMG is 9,839,642 bytes, SHA-256
+`d86c7e4d584ea4a897e2e157ae4086e8ab93b50df9fc58c3f5b40e8f0a53da10`.
+The matching private personal DMG is 28,995,081 bytes, SHA-256
+`b3c5d8d2e2893ab77419157cbf584403a0caba72eace848439fba6f76921e268`.
+Both are under build/installers/mac-player-{import,personal}-001. Packaging
+revision is bf547ba; the game-source revision remains independently bound.
+
+The exact asset-free public app imports the owned ZIP into a new cache and
+completes a neutral 2,100-frame paced run in 39.817 seconds including startup.
+No explicit sound/hook/CRT flags are used. All three activate; native WAV,
+final image, EEPROM and backup are byte-identical to the 6c22e24 baseline.
+CoreAudio postmix is nonzero and all chip/host drops and device demands are
+zero. App and ZIP are unchanged. Review SHA-256
+`898736feb9418043def203ddefdbc3743d6c8f2d9cb4af9af17e4354e744b503`
+at build/validation/public-player-import-audio-001/review.json. This does not
+prove native picker interaction, speaker audibility or macOS 13 execution.
+The first actual Mac player release is prepared at v0.1.0-player.1.
+
+The personal iOS archive/export at source 64aca2d succeeds with the existing
+personal development identity and wildcard profile, without provisioning
+changes, install, launch or upload. Its 24,341,339-byte IPA SHA-256 is
+`a108448667ffcce4e2db26e2cc1dbe1fb8e661ee8127e604b5737594532224c1`,
+under build/worktrees/ios-personal-signed/build/personal-device-001/export.
+Strict signature, eight images/notices and all 209 reused native files verify.
+The profile covers two devices and expires 2027-10-14. This is a private
+ROM-inclusive IPA, not TestFlight or an arbitrary-device distribution.
+Repaired compiler CI at 64aca2d passes all six jobs. Actual Linux and Windows
+game binary builds remain in progress locally; no generated inputs go to CI.
+
 ## Player package source binding (2026-10-15)
 
 Mac packaging now requires the reviewed game build revision as well as the

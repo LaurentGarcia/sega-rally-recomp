@@ -12,7 +12,7 @@ Generated C++ game code · Native board devices · SDL3 + Metal
 [![Build](https://github.com/LaurentGarcia/sega-rally-recomp/actions/workflows/build.yml/badge.svg)](https://github.com/LaurentGarcia/sega-rally-recomp/actions/workflows/build.yml)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-2e8b57?style=flat-square)](LICENSE)
 
-**[Downloads and platform status](docs/release-platforms.md) · [Build guide](docs/getting-started.md) · [Player manual](docs/mac-player-manual.md) · [Architecture](docs/segarally-architecture.md)**
+**[Download the Mac game](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.1) · [Platform status](docs/release-platforms.md) · [Player manual](docs/mac-player-manual.md) · [Architecture](docs/segarally-architecture.md)**
 
 <img src="docs/images/crt.png" alt="Actual Metal CRT presentation: Martini Lancia in Desert with scanlines, phosphor mask and curved screen" width="960">
 
@@ -33,13 +33,16 @@ SDL3 and Metal put the result on your Mac.
 | Analog steering, accelerator and brake | Optional CRT effects and Accurate textures | Local import, generation, build and test pipeline |
 | Native SCSP sound and cabinet saves | Paused Settings; windowed or fullscreen play | Cabinet-input recording and exact offline replay |
 
-**Experimental source prerelease:** `v0.1.0-rc.1` supplies source and tools, not
-ROMs, generated game code or a ready-to-play app. Mac/iPhone packaging and
-Windows/Linux Vulkan bring-up are active; see the **[four-platform package
-status](docs/release-platforms.md)** for actual availability and requirements.
-Current source builds enable Arcade CRT on fresh player preferences; existing
-choices are retained. The compiler-bootstrap previews have been withdrawn.
-Prebuilt game packages with local ROM import are the current distribution target.
+**Prebuilt Mac player:** open the app and select your own verified Revision B
+ROM ZIP. No compiler, Python, CMake, Xcode or network connection is needed to
+play. The executable contains statically recompiled game instructions; the
+public package excludes ROM archives and extracted game assets. Arcade CRT and
+sound start enabled; saved display choices are retained. The earlier compiler
+bootstrap previews have been withdrawn. See the **[four-platform package
+status](docs/release-platforms.md)** for other builds and current limits.
+
+`v0.1.0-rc.1` remains a separate experimental source prerelease. Developers can
+use the [source build guide](docs/getting-started.md#build-from-source-instead).
 
 ## On the stages
 
