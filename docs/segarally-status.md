@@ -253,6 +253,17 @@ stable/current OFF exactly. This clean common shader is integrated behind the
 existing option; it repeats only at native scale. Application integration and
 paced gameplay measurement follow.
 
+Subsequent raw GPU captures attribute both driving residuals to one-ULP
+differences in the final reciprocal depth. A separate restricted reciprocal
+prototype now passes 262,144 arithmetic rows on Metal: 130,898 signed normal
+results and 131,072 seed/fallback cases match exact integer oracles, while
+174 excluded inputs preserve a separately compiled legacy shader's bits.
+Ordinary division differs on 13,317 sampled normals, at most one ULP. This
+is an arithmetic-only result; the helper is not integrated into production.
+Actual span-step measurement at the remaining first-car pixels, complete-scene
+guards and cost are the next gates. See `HANDOFF.md` for frozen inputs,
+readbacks and the independent artifact audit.
+
 ### Optional CRT and Display controls
 
 Newly built hosts now include a separate CRT presentation pass and F1 Display

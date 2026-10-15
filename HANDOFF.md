@@ -1,5 +1,51 @@
 # Handoff
 
+## Restricted reciprocal passes actual Metal arithmetic gate (2026-10-14)
+
+The frozen common-HLSL helper now passes the actual Metal arithmetic gate:
+262,144 rows in two 512×512 RGBA32_UINT draws/readbacks. All 130,898 signed
+normal-input results match the independent integer nearest-even oracle.
+All 131,072 perturbed/invalid-seed cases match for both the certified path and
+exact fallback. All 174 excluded inputs preserve the separately compiled
+legacy fragment's exact bits, including signed zeros, subnormals, large
+normals, infinities and NaNs. Every input echo and unique row tag matches.
+Ordinary Metal division differs from the oracle on 13,317 sampled normals,
+at most one ULP; the candidate has zero mismatches. This follows **Geometry
+(TGP) and rendering** and **Reference & validation**, without epsilon changes
+or a platform-specific shader fork.
+
+The same DXC release and semantic flags as `scripts/build_shaders.py` produce
+SPIR-V, DXIL and MSL. Inspection retains the domain guard, unsigned limb
+arithmetic, bounded corrections and exact fallback; existing ordinary DXIL
+divides still carry fast flags. Only Metal execution is measured. Pinned SDL
+compiles MSL with its unchanged nil options. Two initial Docker architecture
+metadata preflights failed before any container or download: inspect returned
+an OCI index, not architecture metadata. Both attempts remain preserved. The
+successful isolated toolchain explicitly selects linux/amd64, verifies x86_64
+execution, and records image, archive, package and binary identities. Only
+the ignored fixture directory is mounted in its retained idle container.
+
+The one approved run exits normally with empty stderr in 0.450522 seconds,
+well inside its 30-second watchdog. This is a correctness-run elapsed time,
+not a shader cost or gameplay measurement. All 37 frozen inputs remain
+unchanged. An independent read-only audit recomputes every raw result with a
+generic rational-to-binary32 encoder and verifies the same counts and hashes.
+No game, scene replay, audio device, app rebuild or production edit occurs.
+
+Evidence is under
+`build/worktrees/mac-triangle-fidelity/build/validation/reciprocal-gpu-001/`.
+`run01/result.json` SHA-256 is
+`250e6fe4c9aded9cf8febe4d70c1dba4cb916741cc49c985b8385a7dfc29083d`;
+`run01/render/result.json` is
+`9e3a2f724dc8c68cea3cf9291a5b17bddbbd9741e9c6b2e6d1bc4510de3d19fa`.
+The separate review is
+`build/validation/reciprocal-gpu-independent-review/result.json`, SHA-256
+`60f86c7112e9f3d9229f9482ac3bb80349357abc4346dea20dea5eb2b2279f22`.
+Next measure actual GPU span steps at the remaining first-car residuals
+(294,94) and (434,94), then evaluate an isolated common-shader scene candidate
+with default-off/image guards and cost. The arithmetic pass alone does not
+establish complete-scene, continuous-flicker, all-backend or hardware fidelity.
+
 ## Continuous sound CPU/board reference fixture passes (2026-10-14)
 
 The test-only provider now runs pinned public MAME M68000 microcode with its
