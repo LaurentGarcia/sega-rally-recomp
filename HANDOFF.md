@@ -1,5 +1,50 @@
 # Handoff
 
+## v17 candidate packaged; sound observer mismatch localized (2026-10-14)
+
+A separate v17 Release host at `82c06af` builds and passes all three platform
+CTests. Its 203 generation files remain identical to v16; only the three
+integrated reciprocal shader files differ among production sources. The
+candidate is packaged at
+`build/worktrees/mac-reciprocal-v17/build/mac-v17/Sega Rally Native v17 Candidate.app`
+with a separate bundle identifier and empty saves. Ad-hoc signature verification
+passes. It has not launched: the submitted OFF host check was cancelled after
+waiting for execution approval, and ON was never submitted. There are no
+gameplay outputs or remaining host processes. Packaging does not establish
+v17 gameplay, speaker output, temporal flicker or performance.
+
+The existing launcher is unchanged. An ignored mechanical packaging copy
+requires no-launch mode and removes activation/launch calls. Its recorded
+future command enables sound, the instruction hook, CRT, accurate textures and
+the selection-only Lancia replay; compiled defaults remain unchanged. All
+4,966 frozen host-plan inputs and the preserved v16 app/saves remain exact.
+Package manifest:
+`build/validation/mac-reciprocal-v17/package-001/result.json`, SHA-256
+`751f3ab20d475911807ea98e8a9b3f8ac8006e106310afc44f8c85135756972c`.
+Independent file audit: `package-001/independent-review.json`, SHA-256
+`5a5ac9535fb882cd616519dd63d38e6fe4ec1e0945f329c0a87a42329e861daf`.
+The existing bounded OFF/ON host plan remains the next device validation.
+
+The separate sound diagnostic preserves the failed comparison and pinpoints
+its first count mismatch at instruction 14,803,284, previous PC `600d52`,
+next PC `600d58`, cycle 183,673,204, board time 16,269,237,263 ns. Native
+execution reads a PC-relative operand at `600d9a` and writes it to `00280e`.
+The independent CPU performs both operations with the same values and reaches
+the same architecture/RAM state, but the test labels every opcode-space read
+as prefetch and excludes the operand. The reference port denotes program
+function-code space; it does not by itself identify instruction fetching.
+The preserved diagnostic has 1,905 completed cuts and no successful terminal
+state. All 972 input identities and four prepared artifacts remain unchanged.
+
+This is an observer-classification finding, not evidence for changing the
+production sound CPU or a title-screen audio fix. Pinned microcode review also
+rejects using the IRC latch alone: some immediate/address extensions enter
+DBIN without updating IRC. Next distinguish access purpose from the pinned
+bus-start controls, test PC-relative and instruction-extension cases, then
+repeat the unchanged longer comparison using a separately frozen provider.
+The original failed sources and evidence remain preserved. This follows
+**Reference & validation**, **Audio**, and **Platform layer & build**.
+
 ## Longer sound reference stops at a transfer-count mismatch (2026-10-14)
 
 The first independent CPU run against the nonzero transcript fails after
