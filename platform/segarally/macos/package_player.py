@@ -25,7 +25,11 @@ def main():
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--edition',choices=('import','personal'),required=True)
     parser.add_argument('--executable-sha256',required=True)
+    parser.add_argument('--build-revision',required=True)
     args=parser.parse_args()
+    revision=subprocess.check_output(['git','rev-parse','--verify',args.build_revision+'^{commit}'],cwd=ROOT,text=True).strip()
+    if subprocess.check_output(['git','diff',revision,'--','src','platform/segarally/CMakeLists.txt'],cwd=ROOT):
+        parser.error('Game source changed since the reviewed executable build')
     build=args.build_dir.resolve();out=args.output.resolve()
     if out.exists() or not out.is_relative_to(ROOT/'build') or out==ROOT/'build':
         parser.error('Choose a new output directory inside ignored build/')
@@ -79,6 +83,7 @@ def main():
             'CFBundleName':'Sega Rally Native','CFBundleDisplayName':'Sega Rally Native',
             'CFBundlePackageType':'APPL','CFBundleExecutable':'segarally_native',
             'CFBundleShortVersionString':'0.1.0','CFBundleVersion':'3',
+            'LSMinimumSystemVersion':'13.0',
             'NSHighResolutionCapable':True,'NSPrincipalClass':'NSApplication'},f)
     def run(argv,name):
         result=subprocess.run(list(map(str,argv)),capture_output=True,text=True,timeout=180)
@@ -98,7 +103,8 @@ def main():
     run(['hdiutil','verify',dmg],'verify-dmg')
     if sha(exe)!=args.executable_sha256:raise RuntimeError('Prebuilt input changed during packaging')
     report={'schema':1,'status':'packaged','edition':args.edition,'architecture':arch,
-        'source_revision':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
+        'source_revision':revision,
+        'package_revision':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
         'input_executable_sha256':args.executable_sha256,'contains_recompiled_game_program':True,
         'game_assets_included':args.edition=='personal','requires_development_tools':False,
         'notarized':False,'app':str(app),'files':files,

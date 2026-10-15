@@ -1,5 +1,14 @@
 # Handoff
 
+## Player package source binding (2026-10-15)
+
+Mac packaging now requires the reviewed game build revision as well as the
+input executable hash, rejects intervening game-source changes and records
+game/build versus packaging revisions separately. The app declares macOS 13,
+matching the current game's explicit deployment target. This avoids assigning
+a later packaging-only commit to an older executable. Actual Mac compilation
+and all platform packaging are still running; no new game release is claimed.
+
 ## Prebuilt player import and two package editions (2026-10-15)
 
 The native C++ importer verifies 23 required ZIP members by size, CRC32 and
