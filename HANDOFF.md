@@ -1,5 +1,70 @@
 # Handoff
 
+## Actual sound initialization and interrupts match independent CPU (2026-10-14)
+
+The unchanged audited sound program now matches continuous pinned MAME CPU
+execution for 1,000,000 instructions and 13,096,293 cycles, ending at PC
+`602f7a`, board time 1,160,029,674 ns. Startup reaches PC `6001f2`, SR `2000`,
+after 639,524 instructions and 8,662,138 cycles. Both sides execute 383 IRQ
+entries and 383 RTEs, with 35,955 SCSP writes and four reads. All 1,045,029
+paired observations match full CPU/stack/SR/RAM state, queue order, separate
+RNG state, ordered data accesses and raw float PCM. The 51,158 stereo frames
+are all silent; no external UART commands are supplied. This establishes
+initialization and interrupt agreement, not actual music or a title-glitch fix.
+
+This follows **Audio** and **Reference & validation**. The test authenticates
+all 2,663 immutable-ROM instruction addresses and 660 opcode words. The
+test-only provider requires an explicit 660-word opt-in; its default bound
+remains 64. Preflight confirms the original 31-opcode reset header is
+byte-identical, rejects 660 words without opt-in and rejects the larger bound
+outside provider mode. Production runtime, generated native source, emitter
+instruction semantics and the playable app remain unchanged. The observer
+stamps IRQ-only callbacks before clock advancement; CPU-space IACK rows are
+validated separately because native acknowledgements do not use AddressSpace.
+Reference prefetch remains persistent. Constructor reset bus capture and
+physical per-access timing remain outside scope, as in the prior reset test.
+Shared board/chip implementations and instruction-start MMIO still apply.
+
+The first bounded execution passes in 10.286094 seconds, exit zero, empty
+stderr and unchanged inputs. Sealed state counts 39,985,918 checks; stdout
+includes one subsequent successful file close. There is no retry or relaxed
+comparison. Evidence in
+`build/worktrees/sound-init-reference/build/init-run-001/result.json` has SHA-256
+`7728c60956c09403342609b8294821b66c8d2ef59242e5b6419f3ff1346899b8`;
+`state.json` is
+`930b8aced1d30095d02ac01d4fe9763f578c7d1ccf0cb5ce657f839a312e4f42`.
+All 118 source/image inputs map exactly to MAIN and the preserved external
+inputs; the ten prepared artifacts remain unchanged. This is the original
+worktree execution, not a new MAIN build. Integration review:
+`build/validation/sound-init-reference-integration/review.json`, SHA-256
+`a481c5bc513035c89480aaa85d3ff19297a9a715156a9919acfc04163b01991e`.
+
+Next capture authentic main UART register traffic, including side-effecting
+reads, and prove native recapture before using it with the independent sound
+CPU. Preserve constructor wiring and equal-time ordering; do not substitute
+invented commands or prequeue every register access as a clock callback.
+Independent sound-on recording consumption remains unsupported.
+
+The user requested two more windowed launches of the preserved v16 app.
+`controller-v16-002` closes normally at frame 3,861; its final log reports 135
+positive SDL demand callbacks and 1,103,328 estimated extra input bytes, with
+zero chip/host drops. All 64 periodic rows through frame 3,840 still report
+zero demands; the first nonzero observation is the final row. The final
+interval takes 3.528078 host seconds for 0.365064 board seconds, and no further
+PCM push measures that terminal gap. These are estimated SDL source-demand
+observations, not an audible glitch count or title-screen diagnosis. Read-only
+review: `build/validation/mac-controller-v16/play-002/audio-review.json`, SHA-256
+`95ea927f191e496bae21ad05656aa6a39acec58707f6bccd2a3308843eaf7711`.
+The exact wait/event causing the terminal gap remains unlocalized. The subsequent
+`controller-v16-003` session also closes normally: frame 6,490,
+1,198,352,751 instructions, 2,820,851,951 cycles and PC `005a379c`. Its log at
+`build/validation/mac-controller-v16/play-003/live.log` reports 4,975,983 stereo
+frames and zero chip drops, host drops or positive SDL demands. These new
+recordings have not been replayed. No heavy tests/builds ran during live play;
+both recordings and the signed app remain preserved. Process absence and the
+normal terminal log now release the live hold. The reviewed reciprocal
+candidate's bounded synthetic and complete-scene gates are next.
+
 ## Metal span-step discrepancy directly measured (2026-10-14)
 
 The remaining first-car pixels (294,94) and (434,94) now have direct GPU span

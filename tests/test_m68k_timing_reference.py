@@ -17,7 +17,10 @@ parser.add_argument('--output',type=Path,default=ROOT/'build/validation/m68000-t
 parser.add_argument('--sanitize',action='store_true')
 parser.add_argument('--division-only',action='store_true',help='exhaustive divisor/boundary matrix using independent microcode and emitted native instructions')
 parser.add_argument('--board-opcodes',type=Path,help='test-only live-bus provider header for these public opcode words; generate only')
+parser.add_argument('--board-opcode-limit',type=int,choices=(64,660),default=64,
+ help='explicit test-only provider bound; 660 admits an externally authenticated real-program inventory, not whole-recording support')
 args=parser.parse_args()
+if args.board_opcode_limit!=64 and not args.board_opcodes: parser.error('--board-opcode-limit requires --board-opcodes')
 refs=args.reference_dir.resolve()
 out=args.output.resolve()
 if not out.is_relative_to(ROOT/'build'): raise ValueError('reference output must be ignored build output')
@@ -40,7 +43,7 @@ if args.division_only: ops={0x80c1,0x81c1}
 if args.board_opcodes:
  if args.division_only: raise ValueError('board provider and division matrix are separate modes')
  ops={int(line,16) for line in args.board_opcodes.read_text().splitlines()}
- if not ops or len(ops)>64 or any(op<0 or op>65535 for op in ops): raise ValueError('bounded public opcode list required')
+ if not ops or len(ops)>args.board_opcode_limit or any(op<0 or op>65535 for op in ops): raise ValueError('bounded public opcode list required')
 head=(refs/'m68000.h').read_text()
 helpers=head[head.index('\t// movem step'):head.rindex('\n};')].replace('\tvoid set_ftu_const();','')
 source=(refs/'m68000.cpp').read_text()

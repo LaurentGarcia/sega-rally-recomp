@@ -141,7 +141,8 @@ generated microcode and arithmetic helpers are unchanged. Devices run on
 separate instances of the shared board models under instruction-start MMIO;
 physical bus-phase timing and independent chip parity remain outside this
 comparison. Coverage includes synthetic UART/IRQ/PCM cases and the authenticated
-actual program prefix through its first SCSP write. All program-derived inputs
+actual program's first million instructions through initialization and 383
+IRQ/RTE pairs, with idle serial and silent PCM. All program-derived inputs
 and generated code remain ignored. Source hashes at the same revision:
 
 | Reference file | SHA-256 |

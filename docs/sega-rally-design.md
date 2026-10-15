@@ -418,6 +418,15 @@ queue observation matches CPU/RAM/state, ordered data transfers after reset
 and PCM drains. This first prefix sends no UART commands and establishes no
 nonzero music result. Native constructor-reset bus transfers are not captured;
 native instruction-boundary and reference bus-phase stamps remain distinct.
+A separate initialization fixture extends the unchanged audited program to
+1,000,000 instructions and 13,096,293 cycles, including 383 IRQ entries and
+383 returns. Startup reaches PC `6001f2`, SR `2000`, after instruction 639,524.
+All 1,045,029 paired observations match architecture, RAM, queues, RNG,
+ordered data accesses and raw PCM. The 51,158 stereo frames are all silent;
+no main-board UART commands enter this fixture. Its reference provider admits
+the authenticated 2,663 program addresses and 660 opcode words through an
+explicit test-only limit; the ordinary provider's default bound stays 64.
+Actual command traffic and nonzero music remain the next comparison scope.
 The diagnostic
 is disabled by default, including in the Metal frontend. Daytona's measured
 instruction-rate shortcut is specific to its different Model 1 board and is

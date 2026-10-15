@@ -352,6 +352,32 @@ are claimed. Constructor reset bus transfers are not intercepted; reference
 microcode phase stamps remain distinct from native instruction-boundary
 stamps. Shared device and instruction-start MMIO limits still apply.
 
+The initialization fixture uses the same frozen sound generation and a
+separate preparation directory. It authenticates all 2,663 program addresses
+and explicitly expands the test-only opcode provider to 660 words; the default
+64-word bound is unchanged.
+
+```sh
+python3 tests/test_segarally_sound_init_reference.py --prepare \
+    --sound-dir /path/to/preserved/audited/sound \
+    --reference-dir build/validation/mame-reference \
+    --output build/validation/sound-init-prepared
+python3 tests/test_segarally_sound_init_reference.py --run \
+    --output build/validation/sound-init-prepared \
+    --run-dir build/validation/sound-init-run
+```
+
+Its retained run passes exactly 1,000,000 instructions, 13,096,293 cycles,
+383 IRQ/RTE pairs and 35,955 SCSP writes in 10.286094 seconds. Startup enables
+interrupts at PC `6001f2`, SR `2000`, after 639,524 instructions. All 1,045,029
+paired queue observations and 51,158 stereo PCM frames match. Those frames
+are silent: this fixture sends no main-board UART commands and does not prove
+music playback or resolve the reported title-screen glitch. Bounds are one
+million instructions, two million observations, two seconds of board time,
+180 seconds wall time, 16 MiB logs and 512 MiB output. The passing worktree
+run's 118 source/image inputs map exactly to the integrated sources and
+preserved external inputs; its ten preparation artifacts remain frozen.
+
 ## Optional sound experiment
 
 Sound requires both audited generated sound inputs and an explicit build option:
