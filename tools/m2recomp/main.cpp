@@ -774,7 +774,9 @@ int main(int argc, char **argv) {
             t << "};\nuint32_t chunk_id(uint32_t address) {\n"
               << "    if (address & 3u) return 0;\n"
               << "    const uint32_t page = address >> 12;\n"
-              << "    if (page < " << first_page << "u || page > " << last_page << "u) return 0;\n"
+              << "    if (";
+            if (first_page) t << "page < " << first_page << "u || ";
+            t << "page > " << last_page << "u) return 0;\n"
               << "    const uint32_t index = kPages[page - " << first_page << "u];\n"
               << "    return index ? kInstructionPages[index - 1][(address & 4095u) >> 2] : 0;\n"
               << "}\n} // namespace\n\n"

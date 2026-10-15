@@ -110,7 +110,7 @@ class MacPipeline(unittest.TestCase):
         child.poll.return_value = None
         step = {"command": ["compiler"], "timeout_seconds": 1}
         with patch.object(pipeline.subprocess, "Popen", return_value=child) as popen, \
-             patch.object(pipeline.os, "killpg") as kill, self.assertRaises(subprocess.TimeoutExpired):
+             patch.object(pipeline.os, "killpg", create=True) as kill, self.assertRaises(subprocess.TimeoutExpired):
             pipeline.run_step(step, self.root / "compile.log")
         self.assertTrue(popen.call_args.kwargs["start_new_session"])
         kill.assert_called_once_with(12345, pipeline.signal.SIGTERM)

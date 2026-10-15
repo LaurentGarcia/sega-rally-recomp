@@ -759,9 +759,16 @@ if(Python3_FOUND)
         COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tests/test_segarally_boundary_contract.py)
     add_test(NAME segarally_boundary_audit
         COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tests/test_segarally_boundary_audit.py)
+    # This standalone fixture uses GNU-style flags, like the other Python
+    # native-generation tests. Keep the configured driver where compatible;
+    # Windows cl/clang-cl require the standalone c++ driver instead.
+    set(_i960_timing_compiler "${CMAKE_CXX_COMPILER}")
+    if(MSVC)
+        set(_i960_timing_compiler c++)
+    endif()
     add_test(NAME i960_runtime_timing
         COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tests/test_i960_runtime_timing.py
-                --compiler ${CMAKE_CXX_COMPILER})
+                --compiler ${_i960_timing_compiler})
     add_test(NAME lua_core
         COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tests/lua_core_test.py
                 ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR}/lua_core)

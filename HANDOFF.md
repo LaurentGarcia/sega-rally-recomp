@@ -1,5 +1,35 @@
 # Handoff
 
+## Portable CI fixtures and final release rebuild (2026-10-15)
+
+The first public CI run passes macOS and the source boundary but exposes three
+portable-test faults on Windows/Linux. Indexed dispatch emits an always-false
+unsigned `page < 0u` guard when the first generated page is zero; GCC rejects
+that under the fixture's warning-as-error contract. Generation now omits only
+that mathematically redundant comparison for page zero. Populated graph checks
+exercise exact membership, unaligned addresses, the high page and UINT32_MAX.
+The initial new assertion also ran against the intentionally empty graph; that
+local fixture error is preserved, corrected and all five boundary tests pass.
+
+The timeout mock now creates the POSIX-only `os.killpg` attribute in its Windows
+fixture. Production process handling is unchanged. The standalone runtime-timing
+fixture needs GNU-style flags, so MSVC/clang-cl CMake builds select the same
+standalone `c++` driver used by the other generated-code Python fixtures. Native
+MSVC/clang-cl project builds and C++ tests retain their normal compiler; Linux
+and Mac retain the configured GNU-style driver. No tests or warnings are skipped.
+All eight Mac pipeline tests and the native/reference runtime-timing fixture
+also pass locally. Actual Windows/GCC confirmation requires the next CI run.
+
+A clean build at public source c3ffbb3 already completed generation, all eleven
+Mac CTests and strict signed packaging; its initial sandbox process-list denial
+was preserved and only packaging/signature were repeated with access. Combined
+report: `build/publication/clean-build-package-001/combined-result.json`, SHA-256
+`b3288b7bb507c63cefb61e0e4f28a161d10d02d59b0e16e666e2cf2095a20670`.
+Because the generator now changes, build the final committed release source in
+a new clean checkout and retain both results. Final source archives include only
+reviewed source and the five exact-hash documentation images; no personal app,
+ROM, firmware, generated game code or raw capture bundle is published.
+
 ## Actual Metal CRT presentation in README (2026-10-15)
 
 The original screenshots correctly preserved native pixels before presentation,

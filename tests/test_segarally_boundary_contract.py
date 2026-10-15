@@ -43,7 +43,11 @@ int main(int argc, char **argv) {
     if (argc != 2) return 1;
     bool expected = std::atoi(argv[1]) != 0;
     if (gen::instruction_boundary_hook_compatible() != expected) return 2;
-    if (!expected) return 0; // Never execute an incompatible chunk.
+    if (!expected) return 0; // Never execute an incompatible or empty graph.
+    // Both labels occupy page zero. Check exact membership plus the alignment
+    // and high-page rejection guards, including an unsigned maximum address.
+    if (!gen::has_code(0x40) || !gen::has_code(0x80) || gen::has_code(0x41) ||
+        gen::has_code(0x1000) || gen::has_code(0xffffffffu)) return 4;
     rt::Cpu cpu(nullptr);
     rt::Lockstep ls(cpu);
     cpu.m_IP = 0x40; ls.end_count = 8;
