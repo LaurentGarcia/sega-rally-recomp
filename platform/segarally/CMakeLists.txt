@@ -47,6 +47,7 @@ set(RUNTIME cpu lockstep model2a_bus model2a_clock model2a_machine model2a_contr
     model2a_io model2a_comm comm_board model2_uart model2a_uart tgp m2_tgp_board model2a_video video raster geo)
 set(SOURCES "${ROOT}/src/app/segarally_main.cpp" "${ROOT}/src/app/gpu/gpu_renderer.cpp"
     "${ROOT}/src/app/gpu/crt_renderer.cpp" "${ROOT}/src/app/segarally_display.cpp"
+    "${ROOT}/src/app/segarally_controls.cpp"
     ${GENERATED} "${SEGARALLY_NATIVE_BUILD}/tgp/program.cpp")
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 set(STAGE_ARGS)
@@ -170,6 +171,12 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     # Keep assert-based fixtures active even when the actual host is Release.
     target_compile_options(test_segarally_audio PRIVATE -UNDEBUG)
     add_test(NAME segarally_audio COMMAND test_segarally_audio "${CMAKE_CURRENT_BINARY_DIR}/audio-fixture.wav")
+    add_executable(test_segarally_controls EXCLUDE_FROM_ALL
+        "${ROOT}/tests/test_segarally_controls.cpp" "${ROOT}/src/app/segarally_controls.cpp")
+    target_include_directories(test_segarally_controls PRIVATE "${ROOT}/src")
+    target_link_libraries(test_segarally_controls PRIVATE SDL3::SDL3-static)
+    target_compile_options(test_segarally_controls PRIVATE -UNDEBUG)
+    add_test(NAME segarally_controls COMMAND test_segarally_controls)
     add_executable(test_segarally_display_preferences EXCLUDE_FROM_ALL "${ROOT}/tests/test_segarally_display_preferences.cpp")
     target_include_directories(test_segarally_display_preferences PRIVATE "${ROOT}/src")
     target_link_libraries(test_segarally_display_preferences PRIVATE SDL3::SDL3-static)

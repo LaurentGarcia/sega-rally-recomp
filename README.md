@@ -71,7 +71,7 @@ remaining precision errors are checked. This is not whole-game graphics parity.
 
 ## Display controls
 
-Newly built hosts use **F1** for the paused Display panel and **F6** to toggle
+Newly built hosts use **F1** for paused Settings and **F6** to toggle
 optional CRT effects. Choose Original or Arcade CRT, then adjust scanlines,
 mask, glow, curvature and color fringing. Smooth/Sharp scaling, integer scale
 and Accurate textures are separate controls. Fresh defaults preserve the
@@ -80,6 +80,12 @@ The v15 Mac preview is built and has launched with sound and CRT presentation.
 A 2,600-frame off/on comparison preserves native frames, audio and game state.
 Monitor accuracy and sustained effect cost remain unverified.
 See [the player manual](docs/mac-player-manual.md#display-controls).
+
+Recognized Xbox/SDL gamepads provide analog steering and triggers. Press **Y**
+or **F1** for **Settings → Controls** to enable/disable controller input, remap
+keyboard/controller bindings, and adjust dead zones and steering response.
+Keyboard controls stay available; input preferences are separate from cabinet
+saves. See [controller defaults](docs/mac-player-manual.md#controls).
 
 ## Personal inputs and repository boundaries
 

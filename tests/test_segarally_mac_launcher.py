@@ -104,6 +104,18 @@ class MacLauncher(unittest.TestCase):
         self.assertEqual(self.run_launcher("--fullscreen"), 0)
         self.assertIn("--fullscreen", self.calls[-1][0])
 
+    def test_paced_audio_diagnostics_forwarded(self):
+        self.assertEqual(self.run_launcher("--sound", "--audio-diagnostics"), 0)
+        self.assertIn("--audio-diagnostics", self.calls[-1][0])
+
+    def test_invalid_audio_diagnostics_rejected_before_packaging(self):
+        before = self.tree()
+        for arguments in (("--audio-diagnostics",),
+                          ("--audio-diagnostics", "--sound", "--unthrottled")):
+            self.assertEqual(self.run_launcher(*arguments), 2)
+            self.assertEqual(self.tree(), before)
+        self.assertEqual(self.calls, [])
+
     def test_missing_replay_rejected_before_mutation_or_launch(self):
         before = self.tree()
         self.assertEqual(self.run_launcher("--input-replay", str(self.build / "missing.inputs")), 2)

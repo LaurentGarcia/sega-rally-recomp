@@ -62,6 +62,14 @@ measured PCB timing and do not implement MAME's full timeslice machinery.
 Input replays change cabinet pins at completed-render boundaries, as documented
 in the [replay contract](segarally-input-replay.md).
 
+The host's [Rally input adapter](../src/app/segarally_controls.cpp) maps SDL
+keyboard/gamepad snapshots and touch actions to the same cabinet pins before
+each resume. It adopts Daytona's button/half-axis binding model with Rally's
+own ranges and wiring. Preferences and menu navigation stay outside Machine;
+recordings retain the resolved cabinet inputs. A paused panel, focus loss or
+scripted replay suppresses live controls until held inputs return to neutral.
+Offline recording replay returns before controller initialization.
+
 Native adapters cover I/O, EEPROM, communication, timers/IRQs, UART and video.
 Communication uses explicitly disconnected endpoints; it does not claim linked
 cabinet operation or execution of missing communication firmware. Drive commands

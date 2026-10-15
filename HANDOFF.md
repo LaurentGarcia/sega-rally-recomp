@@ -1,5 +1,73 @@
 # Handoff
 
+## Optional controller input and Settings menu (2026-10-14)
+
+The dedicated Mac host now supports recognized SDL gamepads with hotplug,
+analog steering/triggers and configurable keyboard/button/half-axis bindings.
+The input adapter follows Daytona's half-axis model but retains Rally's exact
+cabinet wiring, full keyboard/touch ranges and neutral-to-fourth shifter. Xbox
+defaults use left stick, RT/LT, RB/LB, A view, X handbrake, Back coin and Start.
+Y opens Settings; F1/F6/Escape and Y remain reserved. The Controls tab provides
+enable/disable, separate dead zones, steering response/inversion, live meters,
+per-binding capture/clear and defaults. Bounded `controls.settings` is separate
+from cabinet/display saves. This follows **Inputs** and **Platform layer & build**.
+
+Settings uses the existing lazy ImGui/Metal panel, with Display/Controls tabs
+and a fixed Resume footer. Only the selected controller supplies navigation.
+Capture input is isolated from UI activation; Escape cancels binding before
+host quit. Pause, focus/background and scripted-input handoff suppress held
+keys/buttons/axes until release or neutral. Focus loss releases actions while
+retaining gear. No guest clocks, sound synthesis, shader or generated-code
+changes are part of this input feature. The Mac launcher also forwards the
+existing opt-in audio diagnostics for the next listening session.
+
+The actual external SDL device probe recognizes Xbox One Elite 2 Controller,
+type xboxone, 19 buttons and six axes. The sandbox probe returned no devices;
+the external read establishes detection, not gameplay or physical navigation.
+The ROM-free mapping/preferences/virtual-gamepad fixture passes 329 checks,
+including ASan/UBSan with uninstrumented SDL and leak detection disabled.
+The normal sound/hook/recording v16 build and all three platform CTests pass;
+launcher regressions pass 12 plus four checks. All ten integrated source files
+match `build/validation/mac-controller-v16/integration/sources-v2.json`.
+
+The actual-host call-substitution fixture passes 16 iterations, 12 guest
+resumes and three paused iterations, covering held Return/shift/steer/gas,
+focus loss/regain and fresh-press gear advancement. It does not inject global
+OS inputs. The Settings UI passes eight Metal draws/readbacks at 640x480 and
+992x768, both with a reachable Resume footer and zero closed backend calls.
+Root also reviewed both Controls images. Physical controller driving remains
+the next user test. The v16 build is separate from preserved older apps.
+
+Evidence: `build/validation/mac-controller-v16/`; input source/test records in
+`build/worktrees/mac-controller-core/build/controls-evidence/`; UI report in
+`build/worktrees/mac-settings-controls/build/settings-evidence/report.json`.
+Preparation findings: inactive mapping initially returned neutral gear, fixed
+and regression-tested before integration; equal keyboard/controller labels
+could share an ImGui ID, fixed with distinct scopes before the visual run.
+Disabled/disconnected controllers cannot begin an unusable binding capture.
+The previous F2/F3 manual/help labels were reversed relative to the retained
+mapping; text now says F2 Test, F3 Service. Title-screen audio diagnosis remains
+open, and its longer neutral capture is still prepared but unrun.
+
+The final v16 representative 2,600-frame sound/hook/CRT replay passes: native
+WAV/frame, saves, all 15 applied input boundaries and complete ordered
+resume/observation payloads equal the preserved v15 comparison. All ten source
+files, 87 static link inputs and 203 generation files are bound in
+`build/validation/mac-controller-v16/final-result.json`, SHA-256
+`9d4b2652f7c73b2944c1a1365530f6dd532cc8bb18ca08ab5e489fffaeed148b`.
+The raw binary SHA-256 is
+`0fe2f5aa3571ebe48ed0af2b38266414ee0d64310ee4534877256cda649add73`.
+
+The separate v16 app has now launched windowed with sound, CRT, opt-in audio
+telemetry and Lancia selection, recording to
+`build/recordings/controller-v16-001`. The ongoing snapshot reaches frame 1,080;
+it is not a completed performance or controller assessment. Startup confirms
+Metal/playback/CRT and initially reports no controller before asynchronous
+discovery; physical Y/navigation feedback remains requested, not assumed.
+`preview-live-result.json` binds the signed app and retained log snapshot.
+All test/build lanes are idle during the user's playtest. Do not repackage,
+re-sign, rebuild or interfere with this running app or its recording.
+
 ## Independent recorded drive through frame 2,600 (2026-10-14)
 
 The prepared sound-off checkpoint now passes an actual captured drive. A fresh

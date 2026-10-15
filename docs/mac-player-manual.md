@@ -26,7 +26,19 @@ When `--input-replay` is supplied, the launcher copies that file into the app's
 resources before signing. Startup reads the bundled copy. Missing files,
 directories and replays larger than 1 MiB are rejected before packaging.
 
-The current display-controls preview is prepared separately at
+The controller-enabled v16 preview is prepared separately at
+`build/worktrees/mac-controller-v16/build/mac-v16/Sega Rally Native.app`.
+It has launched windowed with sound, CRT and input recording. **Y** or **F1**
+opens Settings; choose Controls to remap inputs. To launch a later session:
+
+```sh
+python3 platform/segarally/macos/launch.py \
+    --build-dir build/worktrees/mac-controller-v16/build/mac-v16 \
+    --sound --instruction-boundary-hook --crt --audio-diagnostics \
+    --input-replay config/segarally_lancia_select.inputs
+```
+
+The older display-controls preview is preserved at
 `build/worktrees/mac-display-v15/build/mac-v15/Sega Rally Native.app`.
 It has launched windowed with sound and the CRT preset; F1 opens the panel and
 F6 toggles the effects. Start it with:
@@ -88,7 +100,8 @@ python3 platform/segarally/macos/launch.py --build-dir build/segarally-mac \
 
 The script inserts two coins, starts and selects the automatic Lancia. It holds
 the final input snapshot through one completed frame, then hands controls to
-the keyboard. Keyboard input takes effect after that handoff. The longer driving
+live keyboard/controller input. Live input takes effect after that handoff;
+release any held buttons or pedals first. The longer driving
 and held-gas replays override controls during their recorded drive before the
 interactive host hands back control. Use the selection-only replay for play.
 
@@ -106,17 +119,45 @@ Click the game window to give it keyboard focus.
 | V | Change view |
 | A / S | Gear down / up |
 | Space | Handbrake |
-| F2 | Service |
-| F3 | Test |
-| F1 | Open Display controls; pause or resume |
+| F2 | Test |
+| F3 | Service |
+| F1 | Open Settings; pause or resume |
 | F6 | Toggle CRT effects |
-| Escape | Close Display controls, or quit when the panel is closed |
+| Escape | Cancel remapping, close Settings, or quit when the panel is closed |
 
-These bindings come from the [dedicated frontend](../src/app/segarally_main.cpp).
+These defaults come from the [Rally controls](../src/app/segarally_controls.cpp).
 Keyboard steering and pedals currently use full-scale cabinet values; releasing
-steering centers it. Gear inputs change on each key press. Gamepads and wheels
-are not connected to this host. Optional touch controls can be shown with the
+steering centers it. Gear inputs change on each key press. Optional touch controls can be shown with the
 host's `--touch` flag.
+
+New controller-enabled builds detect recognized SDL gamepads on connection.
+Xbox defaults are:
+
+| Controller | Action |
+| --- | --- |
+| Left stick | Analog steering |
+| RT / LT | Analog accelerator / brake |
+| RB / LB | Gear up / down |
+| A | Change view |
+| X | Handbrake |
+| Back / View button | Coin |
+| Start / Menu button | Start |
+| Y | Open or close Settings |
+
+Open **Settings → Controls** with F1 or Y. Controller input is optional: disable
+it there while retaining keyboard/touch input. Adjust stick and trigger dead
+zones, steering response and inversion; the meters show the adjusted input.
+Select a keyboard or controller binding, release the input used to select it,
+then press the replacement key/button or move the desired stick/trigger.
+Escape cancels capture. F1, F6, Escape and controller Y remain reserved.
+Bindings can be cleared individually or restored to defaults. Changes are
+saved in `controls.settings`, separately from display preferences and cabinet
+saves. These controls apply to newly built apps; preserved v15 apps are unchanged.
+
+Opening Settings pauses the game. Held keys, buttons and axes must be released
+or centered before controlling the game again. Disconnecting the controller
+releases its inputs; keyboard controls remain available. Wheels and force
+feedback are not part of this controller implementation.
 
 With a fresh verified cabinet configuration, press and release **C twice**,
 with a gap between presses. One coin displays `CREDIT 1/2`; it does not buy a
@@ -126,9 +167,10 @@ automatic transmission. Saved cabinet settings can change credit behavior.
 
 ## Display controls
 
-New display-enabled builds open the **Display** panel with **F1**. The game and
+New controller-enabled builds open **Settings** with **F1** or controller **Y**;
+picture adjustments are on its **Display** tab. The game and
 scripted cabinet inputs pause while it is open. Choose **Resume**, press F1,
-or press Escape to return to play. Keys held when closing the panel must be
+or press Escape to return to play. Inputs held when closing the panel must be
 released before they can control the cabinet, so Return used for Resume cannot
 also press Start. The new v15 app has launched with sound and CRT presentation.
 Preserved v14 apps do not gain these controls from a source update.
@@ -171,6 +213,12 @@ sound-off speed app remains silent by design. The user has heard a ten-second
 native PCM sample on the Mac speakers. The latest v14 windowed session supplies
 7,163,505 stereo frames with no chip/host drops and one estimated SDL input
 shortfall request for 552 bytes; live listening feedback remains pending.
+
+The later v15 playtest received positive image/motion feedback but had audible
+title-screen glitches. A short paced diagnostic did not reproduce them; the
+sound issue remains under investigation. Add `--audio-diagnostics` to a paced
+launcher command with `--sound` to timestamp queue demand and host delays in the
+log. This option does not change sound generation or buffering.
 
 Other paths and machines may run more slowly. `--unthrottled` disables waiting
 for diagnostic runs and does not guarantee arcade speed. Avoid additional builds

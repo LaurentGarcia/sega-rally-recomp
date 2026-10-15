@@ -4,6 +4,7 @@
 #include "app/gpu/crt_renderer.h"
 #include "app/gpu_device.h"
 #include "app/segarally_display.h"
+#include "app/segarally_controls.h"
 #include "app/segarally_touch.h"
 #include "app/segarally_audio.h"
 #include "app/segarally_audio_capture.h"
@@ -26,6 +27,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -133,8 +135,9 @@ int segarally_host_main(int argc,char **argv) {
         else if(arg=="--audio-diagnostics") audio_diagnostics=true;
         else if(arg=="--instruction-boundary-hook") instruction_boundary_hook=true;
         else if(arg=="--audio-capture") audio_path=value();
-        else if(arg=="--help") {puts("Sega Rally native: --data DIR --save-dir DIR --frames N --instructions N --capture FILE.ppm --reference-capture FILE.ppm --touch --unthrottled --hidden --fullscreen --log FILE --input-replay FILE --sound --audio-capture FILE.wav --audio-diagnostics --instruction-boundary-hook\nSound is opt-in and uses diagnostic instruction-boundary timing. Unthrottled runs capture/drain audio without device playback.\nKeys: arrows steer, Z gas, X brake, C coin, Return start, V view, A/S gear down/up, Space handbrake, F2 service, F3 test, Escape quit.");
+        else if(arg=="--help") {puts("Sega Rally native: --data DIR --save-dir DIR --frames N --instructions N --capture FILE.ppm --reference-capture FILE.ppm --touch --unthrottled --hidden --fullscreen --log FILE --input-replay FILE --sound --audio-capture FILE.wav --audio-diagnostics --instruction-boundary-hook\nSound is opt-in and uses diagnostic instruction-boundary timing. Unthrottled runs capture/drain audio without device playback.\nKeys: arrows steer, Z gas, X brake, C coin, Return start, V view, A/S gear down/up, Space handbrake, F2 test, F3 service, Escape quit.");
             puts("Display: F1 opens controls and pauses; F6 toggles CRT effects. --crt enables the Arcade CRT preset; --original-display uses display defaults; --accurate-textures enables optional native interpolation; --display-controls opens the panel. Native --capture remains before display effects.");
+            puts("Controls: F1 or Xbox Y opens Settings. Configure keyboard/controller bindings and optional controller input in Controls. Xbox defaults: left stick steer, RT gas, LT brake, LB/RB shift, A view, X handbrake, Back coin, Start start.");
 #ifdef SEGARALLY_INPUT_RECORDING
             puts("--record-inputs DIR creates a new bounded recording bundle. --replay-recording DIR [--data DIR] replays it offline with this exact executable; no window/audio device/live-save writes.");
 #endif
@@ -183,6 +186,7 @@ int segarally_host_main(int argc,char **argv) {
     SDL_Window *window=nullptr;SDL_GPUDevice *device=nullptr;SDL_GPUTexture *screen=nullptr;
     app::GpuRenderer gpu;rally::TouchControls touch;std::unique_ptr<Machine> machine,reference;
     app::CrtRenderer crt;app::DisplayPanel display;app::DisplaySettings display_settings;
+    app::segarally::Controls controls;
     bool crt_ready=false;
     rally::AudioOutput audio;
     std::unique_ptr<rally::AudioCapture> audio_capture;
@@ -226,7 +230,7 @@ int segarally_host_main(int argc,char **argv) {
 #ifdef SEGARALLY_IOS
         flags|=SDL_WINDOW_FULLSCREEN;touch_visible=true;
 #endif
-        window=SDL_CreateWindow("Sega Rally Native | F1 Display | F6 CRT",992,768,flags);
+        window=SDL_CreateWindow("Sega Rally Native | F1 / Y Settings | F6 CRT",992,768,flags);
         device=app::create_gpu_device();
         if(!window || !device || strcmp(SDL_GetGPUDeviceDriver(device),"metal") || !SDL_ClaimWindowForGPUDevice(device,window))
             throw std::runtime_error(std::string("Metal initialization: ")+SDL_GetError());
@@ -243,6 +247,10 @@ int segarally_host_main(int argc,char **argv) {
         if(!display.init(window,device,SDL_GetGPUSwapchainTextureFormat(device,window),saves,display_settings))
             throw std::runtime_error(display.error());
         if(!display.error().empty()) fprintf(stderr,"Display preferences: %s\n",display.error().c_str());
+        if(!controls.init(saves)) fprintf(stderr,"Controller initialization: %s; keyboard remains available\n",controls.error().c_str());
+        else if(!controls.error().empty()) fprintf(stderr,"Control preferences: %s\n",controls.error().c_str());
+        display.attach_controls(&controls);
+        fprintf(stderr,"Controller: %s enabled=%d; F1 or Y opens Settings\n",controls.device_name().c_str(),int(controls.mapper.settings.gamepad_enabled));
         if(original_display) display_settings=app::DisplaySettings{};
         else if(const char *env=std::getenv("SEGARALLY_GPU_POLYGON_SCANLINES"))
             display_settings.accurate_textures=std::strcmp(env,"1")==0;
@@ -254,8 +262,7 @@ int segarally_host_main(int argc,char **argv) {
             int(display_settings.crt.enabled),int(display_settings.accurate_textures));
         audio.enable_diagnostics(audio_diagnostics);
         if(sound && !unthrottled) audio.open();
-        bool quit=false,background=false,stopped=false,display_paused=false;int gear=0;
-        std::array<bool,SDL_SCANCODE_COUNT> display_held_keys{};
+        bool quit=false,background=false,stopped=false,display_paused=false,focused=true;
         uint64_t replay_release_frame=0;bool replay_manual_takeover=false;
         Uint64 start=SDL_GetTicksNS();uint64_t displayed=0,last_frames=0;
         // These wall-time observations do not alter board clocks or PCM. GPU
@@ -290,9 +297,12 @@ int segarally_host_main(int argc,char **argv) {
             Machine::RunResult recorded_result;
 #endif
             SDL_Event event;
+            bool input_transition=false;
             while(SDL_PollEvent(&event)) {
+                const bool controls_consumed=controls.process_event(event);
+                display.process_event(event,controls_consumed);
                 if(event.type==SDL_EVENT_QUIT || event.type==SDL_EVENT_TERMINATING) quit=true;
-                if(event.type==SDL_EVENT_KEY_DOWN && !event.key.repeat) {
+                if(!controls_consumed && event.type==SDL_EVENT_KEY_DOWN && !event.key.repeat) {
                     if(event.key.scancode==SDL_SCANCODE_F1) display.set_open(!display.open());
                     else if(event.key.scancode==SDL_SCANCODE_F6) {
                         display_settings.crt.enabled=!display_settings.crt.enabled;
@@ -301,28 +311,31 @@ int segarally_host_main(int argc,char **argv) {
                         if(display.open()) display.set_open(false);else quit=true;
                     }
                 }
-                if(event.type==SDL_EVENT_WILL_ENTER_BACKGROUND) {background=true;touch.clear();audio.clear();save(*machine,saves);}
-                if(event.type==SDL_EVENT_DID_ENTER_FOREGROUND) {background=false;audio.clear();start=SDL_GetTicksNS()-machine->stats().board_time_ns;}
-                if(event.type==SDL_EVENT_WINDOW_FOCUS_LOST) touch.clear();
+                if(event.type==SDL_EVENT_WILL_ENTER_BACKGROUND) {background=true;input_transition=true;touch.clear();audio.clear();save(*machine,saves);}
+                if(event.type==SDL_EVENT_DID_ENTER_FOREGROUND) {background=false;input_transition=true;audio.clear();start=SDL_GetTicksNS()-machine->stats().board_time_ns;}
+                if(event.type==SDL_EVENT_WINDOW_FOCUS_LOST) {focused=false;input_transition=true;touch.clear();}
+                if(event.type==SDL_EVENT_WINDOW_FOCUS_GAINED) {focused=true;input_transition=true;}
                 if(event.type==SDL_EVENT_WINDOW_RESIZED || event.type==SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED || event.type==SDL_EVENT_WINDOW_SAFE_AREA_CHANGED) touch.layout(window);
-                display.process_event(event);
-                if(!display.open()) touch.event(event);
+                if(!display.open() && focused && !background) touch.event(event);
             }
-            if(background) {producer_at=0;SDL_Delay(20);continue;}
-            const bool *keys=SDL_GetKeyboardState(nullptr);
-            for(size_t key=0;key<display_held_keys.size();++key)
-                if(!keys[key]) display_held_keys[key]=false;
+            controls.poll();
+            if(input_transition) controls.suppress_held();
+            if(controls.take_menu_request() && focused && !background) display.set_open(!display.open());
+            if(background) {controls.sample({},false);producer_at=0;SDL_Delay(20);continue;}
             if(display_paused!=display.open()) {
-                display_paused=display.open();touch.clear();audio.clear();producer_at=0;
+                display_paused=display.open();touch.clear();audio.clear();producer_at=0;controls.suppress_held();
                 if(!display_paused) {
                     start=SDL_GetTicksNS()-machine->stats().board_time_ns;
-                    // A key used to navigate/close the panel must be released
-                    // before it can become a cabinet input (Return is Start).
-                    for(size_t key=0;key<display_held_keys.size();++key)
-                        display_held_keys[key]=keys[key];
                 }
             }
-            const auto held=[&](SDL_Scancode key){return keys[key]&&!display_held_keys[key];};
+            std::array<bool,app::segarally::action_count> touch_actions{};
+            using Action=app::segarally::Action;
+            for(const auto &[action,button]:std::array<std::pair<Action,rally::Button>,10>{{
+                {Action::Left,rally::Left},{Action::Right,rally::Right},{Action::Gas,rally::Gas},
+                {Action::Brake,rally::Brake},{Action::Coin,rally::Coin},{Action::Start,rally::Start},
+                {Action::View,rally::View},{Action::GearDown,rally::GearDown},
+                {Action::GearUp,rally::GearUp},{Action::Handbrake,rally::Handbrake}}})
+                touch_actions[size_t(action)]=touch.held[size_t(button)];
             auto &in=machine->inputs();
             const auto before=machine->stats();
             // Display navigation cannot advance replay events or change the
@@ -340,21 +353,9 @@ int segarally_host_main(int argc,char **argv) {
                 fprintf(stderr,"Input replay complete: manual takeover at frame=%llu\n",static_cast<unsigned long long>(before.frames_rendered));
             }
             if(!replay_active) {
-                in={};
-                auto low=[&](unsigned bit,bool held){if(held) in.in0&=uint8_t(~(1u<<bit));};
-                low(0,held(SDL_SCANCODE_C)||touch.held[rally::Coin]);low(6,held(SDL_SCANCODE_RETURN)||touch.held[rally::Start]);
-                low(5,held(SDL_SCANCODE_V)||touch.held[rally::View]);low(2,held(SDL_SCANCODE_F2));low(3,held(SDL_SCANCODE_F3));
-                static bool last_up=false,last_down=false;
-                const bool up=held(SDL_SCANCODE_S)||touch.held[rally::GearUp],down=held(SDL_SCANCODE_A)||touch.held[rally::GearDown];
-                if(up&&!last_up) gear=std::min(4,gear+1);if(down&&!last_down) gear=std::max(0,gear-1);last_up=up;last_down=down;
-                constexpr uint8_t gears[]={0,0x20,0x10,0x60,0x50};in.in1=uint8_t(0x8f|gears[gear]);
-                in.in2=(held(SDL_SCANCODE_SPACE)||touch.held[rally::Handbrake])?0xff:0;
-                const int steering=int(held(SDL_SCANCODE_RIGHT)||touch.held[rally::Right])-int(held(SDL_SCANCODE_LEFT)||touch.held[rally::Left]);
-                in.analog[0]=steering<0?0:steering>0?255:128;
-                in.analog[1]=(held(SDL_SCANCODE_Z)||touch.held[rally::Gas])?255:0;
-                in.analog[2]=(held(SDL_SCANCODE_X)||touch.held[rally::Brake])?255:0;
-            }
-            }
+                in=controls.sample(touch_actions,focused);
+            } else controls.sample(touch_actions,false);
+            } else controls.sample(touch_actions,false);
             bool new_frame=false;
             if(!stopped && !quit && !display_paused) {
                 const uint64_t completed=machine->stats().instructions;
@@ -522,6 +523,7 @@ int segarally_host_main(int argc,char **argv) {
     audio.close();
     if(device) {SDL_WaitForGPUIdle(device);display.shutdown();crt.shutdown();touch.shutdown();gpu.shutdown();if(screen) SDL_ReleaseGPUTexture(device,screen);
         if(window) SDL_ReleaseWindowFromGPUDevice(device,window);SDL_DestroyGPUDevice(device);}
+    controls.shutdown();
     if(window) SDL_DestroyWindow(window);SDL_Quit();return result;
 }
 
