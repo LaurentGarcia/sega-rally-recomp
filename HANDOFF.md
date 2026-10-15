@@ -1,5 +1,35 @@
 # Handoff
 
+## Reusable reciprocal regression added (2026-10-14)
+
+Added `tests/test_gpu_reciprocal.cpp/.hlsl/.py`, a manual ROM-free Metal
+regression importing the production reciprocal helper. It checks 65,536 public
+input/seed rows using an independent integer quotient/remainder rounding oracle,
+a separate legacy-only shader, input/tag echoes and two raw integer readbacks.
+The rendering and reference-validation design sections govern: one common HLSL
+path, no scene data in Git, and no device claim from source checks.
+
+The explicit prepare/run split pins SDL from `scripts/setup.py`, accepts only
+pristine SDL or the documented exact Vulkan application-name patch, records
+source/tool identities, rejects reused output directories, clears inherited
+SDL/game overrides and bounds subprocess groups. No project CMake or production
+runtime changes. The build guide includes the manual commands and limitations.
+
+Independent source review, strict C++20 syntax and Python syntax checks pass.
+Full preparation and device execution remain unvalidated: the first preparation
+stopped at Docker socket access; a pending escalated submission was cancelled
+without starting. No GPU process or readback exists for this reusable fixture.
+Earlier accepted production arithmetic/scene results remain separate.
+
+Frozen source review: `build/worktrees/reciprocal-regression/build/source-review-004`;
+plan SHA-256 `d5930ad094072e6785fa9db26698fd42f9f5ef1238e5f153dbd8958cc6fc392d`,
+patch `fc20562523e0504c48e06515f6dc5a2896fdd7549c8941f60582ffd074311339`.
+All three integrated files match their frozen hashes. Earlier preparation
+attempts and cancellations remain recorded there. Do not infer a successful
+device check from the fixture's presence. Next priority is completing the sound
+observer correction and authentic nonzero-PCM reference comparison; v17 host
+checks and full-course/hardware validation remain open.
+
 ## v17 candidate packaged; sound observer mismatch localized (2026-10-14)
 
 A separate v17 Release host at `82c06af` builds and passes all three platform

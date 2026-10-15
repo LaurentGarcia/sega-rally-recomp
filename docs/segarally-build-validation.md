@@ -153,6 +153,24 @@ controls, bounds, letterboxing and native/enhanced source-row behavior. The
 retained GPU gate passes 18 synthetic draws plus two scene-preview draws.
 These are presentation checks, not monitor-fidelity or gameplay-speed tests.
 
+The optional ROM-free reciprocal regression imports the production helper and
+checks 65,536 public input/seed rows against an integer rounding oracle and a
+separately compiled legacy shader. Preparation and device execution are explicit:
+
+```sh
+python3 tests/test_gpu_reciprocal.py --prepare --output build/reciprocal-test
+python3 tests/test_gpu_reciprocal.py --run --output build/reciprocal-test
+```
+
+Preparation requires pinned SDL3, CMake, a C++20 compiler, DXC and SPIRV-Cross;
+`--help` describes using an existing tool container. It never downloads tools.
+The Metal run uses two 256×256 integer draws/readbacks with a 30-second watchdog.
+This new reusable fixture has passed source review and C++/Python syntax checks
+only: preparation stopped at Docker socket access and no device run occurred.
+It is separate from the earlier passing 447-case and three-scene measurements.
+Passing it would establish sampled arithmetic behavior, not full-game fidelity
+or performance.
+
 ### Optional instruction boundary hook
 
 For the exact execution candidate, add `--instruction-boundary-hook` to the
