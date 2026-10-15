@@ -74,4 +74,6 @@ jobs:
       # hook ABI with original ROM-free link symbols. This is NOT a game build,
       # and the resulting fixture is never uploaded or packaged as a player.
       - name: Compile Rally frontend with the same toolchain and check host fixtures
-        run: python scripts/segarally_frontend_ci.py
+        run: |
+          python -m unittest discover -s tests -p test_segarally_frontend_ci.py -v
+          python scripts/segarally_frontend_ci.py

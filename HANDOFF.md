@@ -1,5 +1,17 @@
 # Handoff
 
+## Desktop frontend compiler checks repaired (2026-10-15)
+
+Linux GCC and Clang compiled the real host and passed its thirteen tests.
+Windows MSVC and Clang also passed all thirteen tests, then the report step
+failed because Visual Studio omits compiler paths from CMakeCache.txt. The
+reporter now reads generated compiler metadata and verifies actual paths,
+versions, generator and toolset; five focused identity checks pass. Older Mac
+CI libc++ lacks floating from_chars, unlike the local Xcode toolchain. The
+already validated iOS C-locale decimal parser now covers all Apple builds.
+The existing 250 preference and 8,217 grammar/round-trip checks pass locally.
+Hosted confirmation follows this change; no game/device performance is implied.
+
 ## Compiler-bootstrap releases withdrawn (2026-10-15)
 
 The requested deliverable is now explicitly a prebuilt game app, with local

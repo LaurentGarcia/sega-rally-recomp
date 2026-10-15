@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+"""Read-only compiler identity extraction across CMake cache conventions."""
+import importlib.util
+from pathlib import Path
+import tempfile
+import unittest
+ROOT=Path(__file__).resolve().parents[1]
+spec=importlib.util.spec_from_file_location('frontend',ROOT/'scripts/segarally_frontend_ci.py')
+m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+class ToolchainTests(unittest.TestCase):
+ def fixture(self,path,cache_compiler=False):
+  path.mkdir(parents=True)
+  text='CMAKE_GENERATOR:INTERNAL=Visual Studio 17 2022\nCMAKE_GENERATOR_TOOLSET:INTERNAL=ClangCL\nCMAKE_GENERATOR_PLATFORM:INTERNAL=x64\n'
+  if cache_compiler:text+='CMAKE_C_COMPILER:FILEPATH=C:/Program Files/LLVM/bin/clang-cl.exe\n'
+  (path/'CMakeCache.txt').write_text(text)
+  metadata=path/'CMakeFiles/3.30.0';metadata.mkdir(parents=True)
+  for language in ('C','CXX'):
+   (metadata/f'CMake{language}Compiler.cmake').write_text(f'set(CMAKE_{language}_COMPILER "C:/Program Files/LLVM/bin/clang-cl.exe")\nset(CMAKE_{language}_COMPILER_ID "Clang")\nset(CMAKE_{language}_COMPILER_VERSION "19.1.0")\n')
+ def test_visual_studio_missing_cache_paths(self):
+  with tempfile.TemporaryDirectory() as td:
+   root=Path(td)/'build';self.fixture(root);actual=m.toolchain(root)
+   self.assertEqual(actual['CMAKE_CXX_COMPILER'],'C:/Program Files/LLVM/bin/clang-cl.exe')
+   self.assertEqual(actual['CMAKE_CXX_COMPILER_ID'],'Clang')
+   self.assertEqual(actual['CMAKE_CXX_COMPILER_VERSION'],'19.1.0')
+ def test_cache_presence_does_not_change_identity(self):
+  with tempfile.TemporaryDirectory() as td:
+   a,b=Path(td)/'a',Path(td)/'b';self.fixture(a);self.fixture(b,True)
+   m.verify_toolchain(m.toolchain(a),m.toolchain(b))
+ def test_conflicting_cache_rejects(self):
+  with tempfile.TemporaryDirectory() as td:
+   root=Path(td)/'build';self.fixture(root)
+   with (root/'CMakeCache.txt').open('a') as f:f.write('CMAKE_C_COMPILER:FILEPATH=other-compiler\n')
+   with self.assertRaisesRegex(ValueError,'disagree'):m.toolchain(root)
+ def test_changed_compiler_version_and_toolset_reject(self):
+  with tempfile.TemporaryDirectory() as td:
+   root=Path(td)/'build';self.fixture(root);a=m.toolchain(root)
+   for key in ('CMAKE_CXX_COMPILER','CMAKE_CXX_COMPILER_VERSION','CMAKE_GENERATOR_TOOLSET'):
+    b=dict(a);b[key]='other'
+    with self.assertRaisesRegex(RuntimeError,key):m.verify_toolchain(a,b)
+ def test_missing_or_ambiguous_metadata_rejects(self):
+  with tempfile.TemporaryDirectory() as td:
+   root=Path(td)/'build';self.fixture(root)
+   (root/'CMakeFiles/3.30.0/CMakeCCompiler.cmake').unlink()
+   with self.assertRaises(ValueError):m.toolchain(root)
+   (root/'CMakeFiles/3.30.0/CMakeCCompiler.cmake').write_text('set(CMAKE_C_COMPILER "incomplete")\n')
+   with self.assertRaisesRegex(ValueError,'Missing actual'):m.toolchain(root)
+if __name__=='__main__':unittest.main()

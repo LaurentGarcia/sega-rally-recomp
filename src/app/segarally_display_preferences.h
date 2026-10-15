@@ -23,8 +23,8 @@
 
 namespace app::display_preferences {
 inline bool parse_float(const std::string &text, float &value) {
-#if defined(SEGARALLY_LEGACY_FLOAT_PARSE) || (defined(__APPLE__) && TARGET_OS_IPHONE)
-    // libc++ floating from_chars is unavailable before iOS 26. Keep a bounded,
+#if defined(SEGARALLY_LEGACY_FLOAT_PARSE) || defined(__APPLE__)
+    // Older Apple libc++ lacks floating from_chars on macOS and iOS. Keep a bounded,
     // classic-locale parser here; a leading plus is also rejected by from_chars.
     size_t pos=0;
     if(pos<text.size() && text[pos]=='-') ++pos;
