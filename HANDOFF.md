@@ -1,5 +1,38 @@
 # Handoff
 
+## Sound observer distinguishes PC-relative operands (2026-10-14)
+
+Added opt-in `--board-access-roles` to the test-only M68000 provider and a
+ROM-free regression. Program function-code space includes PC-relative data
+operands; treating every such access as instruction prefetch caused the longer
+authentic comparison to reject instruction `0x337b` at `0x600d52`. Purpose now
+comes from the pinned microcode function-code selection and is propagated
+through its control flow to bus completion. Ambiguous or unclassified cycles
+fail generation. Addresses, expected native counts and IRC-latch heuristics do
+not classify accesses. Production runtime and generated game code are unchanged.
+This follows the design's Audio and Reference & validation sections.
+
+The first ROM-free attempt generated all headers successfully but failed C++
+compilation: one combined `auto` declaration mixed distinct plain/tagged nested
+Access types. The separately preserved repair splits the declarations. The next
+bounded attempt passes 486 checks in 1.109561 seconds across nine public opcode
+cases plus reset/IACK, with empty stderr. It verifies both internal observations
+and the mapped callback, full registers/microstate/RAM, addresses, values, masks
+and phases. Old/default headers are byte-identical; stripping only annotation
+assignments/scaffold reconstructs the same generated CPU implementation.
+
+Evidence: `build/worktrees/sound-observer-reference/build/`;
+failed `observer-purpose-fixture-001` and original sources remain unchanged.
+Passing `observer-purpose-repaired-source-001/build/observer-purpose-fixture-002/result.json`
+SHA-256 `9beb63e92096cee42aa8e0ea3617b6579a91f4670d2c4c475e5ef4d60ffabff7`.
+Independent audit `build/validation/sound-observer-independent-review/result.json`
+SHA-256 `4323f60f979eeb7956ac74c1ea516506be710a310bf6c40255c8f596c033338b`
+rechecks all nine inputs and 22 artifacts, both byte-equality proofs and the
+unchanged original source closure. The four integrated source files match the
+passing fixture. No actual tape rerun is claimed yet. Next generate a separate
+corrected full provider and repeat the bounded authentic comparison, preserving
+the original failed trace; title-screen audio quality remains unresolved.
+
 ## Reusable reciprocal regression added (2026-10-14)
 
 Added `tests/test_gpu_reciprocal.cpp/.hlsl/.py`, a manual ROM-free Metal

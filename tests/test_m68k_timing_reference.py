@@ -19,7 +19,9 @@ parser.add_argument('--division-only',action='store_true',help='exhaustive divis
 parser.add_argument('--board-opcodes',type=Path,help='test-only live-bus provider header for these public opcode words; generate only')
 parser.add_argument('--board-opcode-limit',type=int,choices=(64,660),default=64,
  help='explicit test-only provider bound; 660 admits an externally authenticated real-program inventory, not whole-recording support')
+parser.add_argument('--board-access-roles',action='store_true',help='test-only purpose evidence from pinned microcode FC selection; requires board provider')
 args=parser.parse_args()
+if args.board_access_roles and not args.board_opcodes: parser.error('--board-access-roles requires --board-opcodes')
 if args.board_opcode_limit!=64 and not args.board_opcodes: parser.error('--board-opcode-limit requires --board-opcodes')
 refs=args.reference_dir.resolve()
 out=args.output.resolve()
@@ -37,6 +39,10 @@ for name,digest in hashes.items():
 sys.argv=['m68000gen.py','inspect',str(refs/'m68000.lst'),'unused']
 g=runpy.run_path(str(refs/'m68000gen.py'))
 mode=g['GEN'].direct|g['GEN'].full
+access_role_report=None
+if args.board_access_roles:
+ from m68k_reference_access_roles import install
+ access_role_report=install(g)
 # Public instruction patterns only: no game ROM or generated game source.
 ops={op | (2 if mask==0xff00 else 0) for op,mask,_ in g['instructions']}
 if args.division_only: ops={0x80c1,0x81c1}
@@ -114,6 +120,10 @@ if args.board_opcodes:
  pre=pre.replace('#include <algorithm>','#include <algorithm>\n#include <functional>')
  pre=pre.replace('std::vector<Access> accesses;', 'std::vector<Access> accesses;\n std::function<u16(char,u32,u16,u16,bool)> mapped_access;')
  pre=pre.replace("if(kind=='i')return u16(24+(m_next_state>>24));", "if(kind=='i'){if(mapped_access)mapped_access(kind,address,data,mask,write);return u16(24+(m_next_state>>24));}\n  if(mapped_access)return mapped_access(kind,address,data,mask,write);")
+if args.board_access_roles:
+ pre=pre.replace('std::vector<Access> accesses;', "char observer_access_role='?';\n std::vector<Access> accesses;")
+ pre=pre.replace("accesses.push_back({write?'w':kind,", "accesses.push_back({write?'w':kind=='p'?observer_access_role:kind,")
+ pre=pre.replace('if(mapped_access)return mapped_access(kind,address,data,mask,write);', "if(mapped_access)return mapped_access(kind=='p'?observer_access_role:kind,address,data,mask,write);")
 parts=[pre,helpers,ftu]
 for opcode in sorted(ops):
  code=g['generate_intermediate_code_from_instruction'](opcode,0xffff,'test',mode)
@@ -126,6 +136,7 @@ parts.append('inline constexpr uint16_t reference_opcodes[]={'+','.join(hex(op)f
 header=out/('m68000-board-reference.h' if args.board_opcodes else 'm68000-timing-reference.h')
 header.write_text('// Generated from pinned public BSD-3-Clause M68000 microcode; Olivier Galibert.\n'+'\n'.join(parts))
 if args.board_opcodes:
+ if access_role_report is not None:(out/'m68000-access-roles.json').write_text(json.dumps(access_role_report,indent=2)+'\n')
  print(len(ops),'live-bus microcode handlers generated; no compilation/execution')
  raise SystemExit(0)
 compiler=shlex.split(os.environ.get('CXX','c++'))

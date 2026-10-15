@@ -323,6 +323,29 @@ CPU rasterizer; it is not a whole-game texture or performance benchmark.
 
 ## Synthetic sound-board reference test
 
+The board provider can explicitly annotate instruction-stream versus operand
+accesses with `--board-access-roles`. This matters because a PC-relative operand
+uses the 68000's program function-code space without being an instruction fetch.
+The observer derives purpose from pinned microcode bus initiation and propagates
+it to completion; it does not infer purpose from addresses or expected counts.
+The default provider is unchanged. Its ROM-free regression is:
+
+```sh
+mkdir -p build/observer-baseline
+git show 26348a9:tests/test_m68k_timing_reference.py > build/observer-baseline/generator.py
+python3 tests/test_m68k_reference_access_roles.py \
+    --reference-dir build/validation/mame-reference \
+    --baseline-generator build/observer-baseline/generator.py \
+    --output build/observer-purpose-check
+```
+
+The runner pins the baseline hash and public MAME source hashes. All 486 checks
+pass across nine instruction cases plus reset/interrupt acknowledge, including
+mapped callbacks, registers, memory, values, masks and bus phases. Default output
+matches the accepted generator byte for byte; stripping the purpose annotations
+from the tagged provider reconstructs the same CPU code. This validates the
+observer correction only; the authentic longer sound comparison is separate.
+
 With the four pinned M68000 reference sources listed in `THIRD_PARTY.md`
 available locally, run this ROM-free comparison in a fresh output directory:
 
