@@ -579,6 +579,22 @@
       "input_replay_sha256": "48bd6e2e668c280ddbf53ab602398d58feb9a8673d6b173000b752ddb9a3e0e7",
       "observed_executable_sha256": "af826961cd82d1affaf7f4aa1a1c25baf70526af8dc4bce5c33f2b1c72725f5b",
       "provenance": "Actual missing-code frontier at the visible NAME ENTRY screen after the original one-lap Practice Mountain finish, Stage Clear and results transition. Static context identifies this as the second entry of bounded table 0x005b7670 used by dispatcher 0x005b7690; no immediate caller register dump was captured. Frame 10200 remains explicit Mountain Stage Clear, rank 2nd and lap/total 1:16.23. Original NORMAL difficulty / SHORT operator setting, fresh seeds, guest EEPROM and unchanged route-following controls are retained. Canonical ROM PC is runtime minus 0x59f000. Only this actually reached entry is added to observed metadata; remaining static table candidates are separate, with no guest-state/timing/physics/instruction change."
+    },
+    {
+      "address": "0x0001a150",
+      "observed_runtime_address": "0x005b9150",
+      "name": "observed_practice_mountain_name_entry_005b9150",
+      "evidence": "build/worktrees/course-driving/build/course-driving/frontier-005b9150-001/evidence.json",
+      "observed_after_instructions": 2639207401,
+      "observed_reference_cycles": 5991425302,
+      "observed_rendered_frames": 13785,
+      "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+      "source_baseline_commit": "47eb4993a70629e4310be3cd0ad78652a2bab53e",
+      "execution_variant": "hardware_input_replay_short_practice_sound_off_hook_route_controller",
+      "input_replay": "build/worktrees/course-driving/build/course-driving/short-practice-mountain-v28-attempt-001/guest/cabinet.inputs",
+      "input_replay_sha256": "48bd6e2e668c280ddbf53ab602398d58feb9a8673d6b173000b752ddb9a3e0e7",
+      "observed_executable_sha256": "0ae5175f6cc397ba102c3b9a3f55bb00d6e7f3fa726fe2882d84b94c26fcc0ea",
+      "provenance": "Actual missing-code frontier after observed name-entry callback 0x005b8fb0 continued under the reviewed four-entry dispatcher proof. Same rendered frame 13785, 10803 additional native instructions and 16177 reference cycles; no immediate caller register trace was captured. Actual Name Entry and earlier Mountain Stage Clear, rank 2nd and 1:16.23 images are retained. Ordinary NORMAL difficulty / SHORT setting, fresh constructor seeds, guest EEPROM and unchanged controls remain exact. Canonical ROM PC is runtime minus 0x59f000. Only this reached block is added, without unobserved adjacent targets or guest-state/timer/physics/instruction changes."
     }
   ]
 }

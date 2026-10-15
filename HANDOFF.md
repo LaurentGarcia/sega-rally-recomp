@@ -28,6 +28,7 @@ each added seed has a separate provenance audit; generated C++ is not edited.
 | `005b7690` | `00018690` | 10,525 | 2,015,114,063 | 4,574,611,966 |
 | `005b87a0` | `000197a0` | 10,525 | 2,015,114,068 | 4,574,611,988 |
 | `005b8fb0` | `00019fb0` | 13,785 | 2,639,196,598 | 5,991,409,125 |
+| `005b9150` | `0001a150` | 13,785 | 2,639,207,401 | 5,991,425,302 |
 
 The second row is an actual RET reached ten instructions and 23 reference
 cycles after the first; it was not inferred from an adjacent address. Audit
@@ -40,15 +41,19 @@ Their SHA-256 values, in table order, are
 `ee6f6008f8bd66fd278847784241a6379593029392ed4ef0e89f6bbae900fc1c`,
 `1d9edac4a6481ed56708f2ea11efe553b6af2f8c487750cac6243786dbfaed36`,
 `71fb942d924396bc496687277aa1033ecf5986fa2b4738a4409ffcf9d90f288b`,
-and `2bb025467af6e622baf221a30e0ea6c1cd07419a870618ccb215a9ab0eab5030`.
+`2bb025467af6e622baf221a30e0ea6c1cd07419a870618ccb215a9ab0eab5030`,
+and `7d59fef403bef71cfba0eddbb8b77a329ea0c5881de2f704dc77926a426b08aa`.
 The v23 generation contains 76,359 instructions in 52 native objects. The v24
 graph grows to 53 objects, so the ignored helper's inventory check now derives
 the main object list from the boundary contract and checks the 26 non-main
 objects separately instead of assuming the old total. There is no guest or
-runtime semantic change. All ten newly observed entries are integrated;
+runtime semantic change. All eleven newly observed entries are integrated;
 continuation beyond the latest result callback and the final Mac package remain
-pending. The consolidated observed-manifest SHA-256 is
-`f0f332e28ecaf83377f6f4c54f63e3757e850ee7cfe7992c68e76c19f9f3220c`.
+pending. The eleventh entry is reached after the reviewed table-derived
+callback continues for another 10,803 instructions and 16,177 reference cycles
+within frame 13,785. It is a separately observed block outside the table's four
+entries. The v28 failure and exact NAME ENTRY image are retained; the four
+reviewed proof files and all earlier observed rows remain unchanged.
 
 The v26 continuation reaches a visibly confirmed NAME ENTRY screen and then
 stops at the second callback in a bounded four-entry table. This is a real
