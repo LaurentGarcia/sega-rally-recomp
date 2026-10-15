@@ -7,9 +7,11 @@ The sections **i960 static recompiler**, **Reference & validation**, and
 hardware mappings are evidence to inspect, not defaults for Sega Rally.
 
 The 2026-10-15 distribution request resumes iPhone work and adds Windows and
-Linux alongside continued Mac game validation. The existing SDL3 GPU interface
-is the rendering abstraction: Metal on Apple platforms, Vulkan on Windows and
-Linux, with shared game/CRT shaders and the same native machine implementation.
+Linux alongside continued Mac game validation. The long-term runtime target is
+now SDL-free: direct Metal on Apple platforms, direct Vulkan on Windows/Linux,
+and native window, input and audio handling. The existing SDL3 implementation
+remains a working migration baseline. Shared game/CRT shaders, geometry rules
+and the native machine implementation must not fork between backends.
 Platform compilation is not evidence of GPU correctness or full-game fidelity.
 The current deliverables and validation gaps are in [release platforms](release-platforms.md).
 
@@ -19,7 +21,7 @@ The current deliverables and validation gaps are in [release platforms](release-
 - Execute the actual game control flow, including menus, races, and results.
 - Preserve geometry command, polygon-priority, texture, audio, timing, and input
   behavior using tested shared components from Daytona where the hardware agrees.
-- Run through SDL3 and Metal on Mac/iPhone and Vulkan on Windows/Linux, preserving
+- Run through Metal on Mac/iPhone and Vulkan on Windows/Linux, preserving
   keyboard/controller behavior and adding optional touch input on iPhone.
   Validate lifecycle handling and presentation separately on each platform.
 - Validate actual game scenes and replayed inputs, including buildings, car

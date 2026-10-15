@@ -7,7 +7,7 @@ The distribution work targets these four platforms:
 
 | Platform | Graphics | Package | Current validation |
 | --- | --- | --- | --- |
-| Mac, Apple Silicon | Metal | Personal game DMG; separate empty local-builder DMG | Personal package built, signed ad hoc and checksum verified. Empty builder has 20 coordinator tests and a compiled/signed package; full first import is being checked. |
+| Mac, Apple Silicon | Metal | Personal game DMG; separate empty local-builder DMG | Personal package built, signed ad hoc and checksum verified. Empty builder has 20 coordinator tests and a successful fresh download/generation/build/test/package/verification run. GUI interaction remains untested. |
 | iPhone, arm64 | Metal | Locally generated app, signed for its destination | Native platform build and touch integration in progress. No installable public IPA or TestFlight build yet. |
 | Windows, x86-64 | Vulkan through SDL3 GPU | Local builder and personal native game package | Desktop build portability and real-host compilation CI in progress; no validated game binary yet. |
 | Linux, x86-64 | Vulkan through SDL3 GPU | Local builder and personal native game package | Desktop build portability and real-host compilation CI in progress; no validated game binary yet. |
@@ -30,11 +30,13 @@ game app is not an asset for the public source release.
 
 ## One renderer, four hosts
 
-SDL3 GPU already supplies the rendering abstraction. The host selects a backend;
-the game renderer, polygon ordering, Accurate textures and CRT pass stay shared.
-The common shader sources produce SPIR-V for Vulkan, MSL for Metal and DirectX
-formats where supported. Adding Windows/Linux does not call for a second game
-renderer or changes to guest simulation timing.
+The long-term runtime target is SDL-free. Direct Metal and Vulkan backends will
+consume common geometry and shader inputs, while native host adapters supply
+windows, lifecycle, audio and controls. The existing SDL implementation remains
+the working comparison baseline during migration. Removing SDL also requires
+replacing its non-graphics duties; a direct renderer alone does not finish that
+work. The game simulation, polygon ordering, Accurate textures and CRT shader
+rules remain shared. Direct Metal is not presumed faster without measurements.
 
 Build checks, GPU checks and game checks answer different questions. The root
 CI matrix compiles tools and runs ROM-free tests. A native frontend compile/link

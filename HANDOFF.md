@@ -1,5 +1,27 @@
 # Handoff
 
+## First importer completion and SDL-free direction (2026-10-15)
+
+The real empty Mac builder completes all ten pinned pipeline stages in its new
+`importer-e2e-002/20261015-154033-p63p5zup` session, including eleven host CTests,
+packaging, signature and independent receipt/asset verification. It emits
+`completed.json`; no GUI, game launch or upload occurred. The earlier DNS failure
+remains separate. This validates the coordinator-driven first import on this
+Mac, not first-run GUI interaction or other machines.
+
+The first Mac builder CI run compiles/signs the app and creates its DMG, then
+DiskImages reports `Resource temporarily unavailable` during immediate verify.
+Packaging now retains each verify log and retries only that exact transient
+condition, at most three times. Checksum failures and exhausted retries still
+fail; three focused tests cover those outcomes. CI confirmation remains next.
+
+The latest direction replaces the previously proposed permanent SDL GPU layer
+with an SDL-free long-term runtime. Direct Metal and Vulkan prototypes and native
+Apple host work proceed separately; the playable SDL build remains a regression
+baseline during migration. Native window/input/audio replacements are required
+too, and no speedup is inferred merely from removing an abstraction. Common
+geometry/shader rules and the original fidelity gates remain requirements.
+
 ## Local Mac builder and four-platform distribution (2026-10-15)
 
 The requested long-term graphics contract is Metal on Mac/iPhone and Vulkan on

@@ -8,6 +8,7 @@ import plistlib
 import shutil
 import subprocess
 import sys
+import time
 
 ROOT = Path(__file__).resolve().parents[4]
 HERE = Path(__file__).resolve().parent
@@ -17,6 +18,23 @@ def sha(path):
 
 def run(command):
     subprocess.run(list(map(str, command)), check=True, timeout=180)
+
+def verify_dmg(path, attempts=3):
+    # DiskImages can briefly retain a just-created image on hosted Macs.
+    # Retry only its explicit transient resource error; checksum failures fail.
+    for attempt in range(1, attempts + 1):
+        result = subprocess.run(['hdiutil', 'verify', str(path)], capture_output=True,
+                                text=True, timeout=180)
+        print(result.stdout, end='')
+        print(result.stderr, end='', file=sys.stderr)
+        (path.parent / f'verify-{attempt}.log').write_text(result.stdout + result.stderr)
+        if result.returncode == 0:
+            return attempt
+        if 'Resource temporarily unavailable' not in result.stderr or attempt == attempts:
+            raise subprocess.CalledProcessError(result.returncode, result.args,
+                                                result.stdout, result.stderr)
+        time.sleep(attempt)
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -73,7 +91,7 @@ def main():
         dmg = out / 'Sega-Rally-Local-Builder-macOS-arm64.dmg'
         run(['hdiutil', 'create', '-volname', 'Sega Rally Local Builder', '-srcfolder', stage,
              '-format', 'UDZO', '-ov', dmg])
-        run(['hdiutil', 'verify', dmg])
+        result['dmg_verify_attempts'] = verify_dmg(dmg)
         result['dmg'] = {'path': str(dmg), 'size': dmg.stat().st_size, 'sha256': sha(dmg)}
     if source_hashes != {name: sha(HERE / name) for name in source_hashes}:
         raise RuntimeError('Bootstrap sources changed during packaging; preserved output is not a candidate')

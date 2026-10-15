@@ -21,7 +21,9 @@ jobs:
         with:
           python-version: '3.12'
       - name: Test import coordination
-        run: python3 tests/test_segarally_mac_importer.py
+        run: |
+          python3 tests/test_segarally_mac_importer.py
+          python3 tests/test_segarally_importer_package.py
       - name: Build and verify empty app and DMG
         run: python3 platform/segarally/macos/importer/package.py --output build/mac-local-builder --dmg
       - name: Retain package and byte inventory
