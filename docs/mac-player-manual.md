@@ -46,11 +46,13 @@ python3 platform/segarally/macos/launch.py \
 A newer, separately signed candidate is packaged at
 `build/worktrees/mac-reciprocal-v17/build/mac-v17/Sega Rally Native v17 Candidate.app`.
 It includes the reciprocal texture correction and unchanged controller support.
-Its build and three platform tests pass, but it has not launched and its two
-gameplay comparisons remain pending. The prepared launch options are recorded
-in `build/worktrees/mac-reciprocal-v17/build/mac-v17/v17-candidate-launch.json`;
-this file records a future command and does not execute it. v16 remains the
-previously tested interactive app, with its saves preserved.
+Its build, three platform tests and both 2,600-frame gameplay comparisons pass.
+OFF preserves v16 output; ON's final native image matches the software renderer,
+with audio, inputs and saves unchanged. It has launched windowed with sound,
+CRT, Accurate textures and diagnostic recording. The actual launch plan and
+startup evidence are under `build/validation/mac-reciprocal-v17-playtest-001`.
+That session has separate saves; the v16 app and its saves remain preserved.
+Completed-session replay and live audio/graphics feedback are still pending.
 
 The older display-controls preview is preserved at
 `build/worktrees/mac-display-v15/build/mac-v15/Sega Rally Native.app`.

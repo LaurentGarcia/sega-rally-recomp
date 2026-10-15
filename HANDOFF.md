@@ -1,5 +1,49 @@
 # Handoff
 
+## v17 Metal host checks pass; windowed playtest launched (2026-10-15)
+
+Execution permission was granted. The frozen host002 OFF and ON gates each
+complete 2,600 frames, 500,035,460 instructions and 1,130,001,001 cycles at
+PC `0x005e6964`, with all 15 expected applied input boundaries. Both preserve
+v16's complete WAV (1,993,322 stereo frames), initial/final saves, all 5,201
+resume records and their observation payloads. No native frontier, chip drops
+or host drops. OFF's whole final RGB image matches v16; ON's whole 496×384
+image matches the same-runtime software renderer, with supplementary BGRA FNV
+`c0d8039becbf87ce` on both sides. These captures precede CRT/UI; neither run
+establishes all-frame graphics, independent CPU, physical speaker or speed
+parity. Test process times were 24.692002 / 102.467292 seconds, not benchmarks.
+
+Independent review rehashes all 4,966 frozen inputs and 18 OFF / 19 ON evidence
+files, verifies recording seals and recomputes every per-resume PCM hash. No
+retries or test-source changes were needed. Both original cancellation records
+remain preserved. Platform layer & build and Reference & validation govern
+the checks and their stated limits.
+
+Evidence under `build/validation/mac-reciprocal-v17-host-002/`:
+OFF result `1015c5be31cb5cc0b4226d85fa70887539180bd1581fc271141d9e8945bd5220`;
+ON result `b34ed21d424d2cbf298339ea3cd085a7c618bbf63fbe81c72d870863f0178516`;
+independent OFF review `a5265a64ee9367989e675246a32b8d1a455543ff1b4fa18e138be5af1c7d6701`;
+independent ON review `d46b2246e62854b27a724471a59d1d99ac7faa7e1b2cb27337c4470b0a6300cf`.
+
+Reverified all 15 signed candidate bundle files and strict deep codesign before
+LaunchServices opened the separate v17 app. Signed executable remains
+`d7b234ea972117a4e2408f085607f1a203255006e170fc5387dca99f2dd2f538`.
+Windowed, normal-paced Metal/audio startup is observed with CRT and Accurate
+textures enabled, native sound/hook, bundled Lancia selection replay and
+fresh isolated saves/input recording/audio timing diagnostics. PID 6223 was
+observed progressing; the frozen startup snapshot reaches frame 4,200 without
+frontier or exit. Startup reports no connected controller; keyboard is available.
+Heavy tests/builds are held during the user's playtest.
+
+Live evidence: `build/validation/mac-reciprocal-v17-playtest-001/`.
+Launch plan SHA-256 `d9cbcbb76208aab95994ed798aaab7c17f7427ea9c6709764fcda892fc9576ea`;
+`launch-result.json` records the observed process and immutable log prefix.
+The live session remains open, so no final seal/replay, listening verdict or
+full-course claim is made. Earlier packages and saves are untouched. Docs now
+reflect the passed host checks and actual launch. Next collect this session
+after normal close, replay its recording, and use actual feedback to localize
+title-screen audio, controller/menu behavior and continuous texture flicker.
+
 ## v17 device check still awaits execution permission (2026-10-14)
 
 Prepared a separately frozen host runner that records `BaseException` and

@@ -1,6 +1,6 @@
 # Evidence and status
 
-Snapshot: **2026-10-14**. macOS is the active target; phone work is deferred.
+Snapshot: **2026-10-15**. macOS is the active target; phone work is deferred.
 This reference summarizes the latest recorded checkpoints. Exact hashes,
 failure history and ignored evidence locations are in [HANDOFF.md](../HANDOFF.md).
 The [design](sega-rally-design.md) records interpretation and hardware limits.
@@ -12,7 +12,7 @@ The [design](sega-rally-design.md) records interpretation and hardware limits.
 | Driving parity | Two billion held-gas instructions, 86,328,770 ordered writes, 4,650,936,033 cycles, 113,101 IRQs and 10,701 renders; nineteen replay events match | Sound off; independent CPU with shared boards and final-frame comparison; no full MAME race |
 | Later game paths | Fresh credit/start after attract reaches a second race; sound-on frame 12,800 shows 118 km/h in fourth gear, 15.83 seconds elapsed | Complete second race and Game Over overlay not separately validated |
 | Course progress | Desert clear/results show 1:12.15; forested second course enters, times out, then attract returns | Centered steering does not complete second-course bends; remaining courses unvalidated |
-| Metal fidelity | Optional native repeated stepping plus certified reciprocal matches all pixels in three saved scenes; 447 synthetic cases pass; v17 builds, passes three CTests and packages separately | Candidate not launched; OFF/ON host checks await execution approval. Default OFF, continuous flicker and whole-game fidelity remain open |
+| Metal fidelity | Optional native repeated stepping plus certified reciprocal matches all pixels in three saved scenes; 447 synthetic cases pass. Both v17 2,600-frame host checks pass: OFF matches v16; ON's final image matches software, with audio/inputs/saves preserved. v17 has launched windowed | Final-image comparison before CRT/UI, using the same runtime; no all-frame or independent CPU claim. Default OFF, continuous flicker and whole-game fidelity remain open |
 | Sound generation | Native linked board captures 2,409,170 stereo frames: 54.6297052 seconds including nonzero 44.1 kHz PCM; shared-core drains agree | Whole-game audio parity unvalidated |
 | Sound CPU/board comparison | Actual initialization matches persistent MAME CPU execution for 1,000,000 instructions, including 383 IRQ/RTE pairs and 35,955 SCSP writes; synthetic UART/nonzero-PCM cases also pass | The actual initialization's 51,158 PCM frames are silent; shared devices, instruction-start MMIO and idle serial do not establish music or independent sound-on recording parity |
 | Authentic sound commands | Corrected independent MAME CPU comparison passes 14,947,325 instructions, 14,614 IRQ entries and all 1,929 cuts through 55 actual UART accesses; 728,884 PCM frames match, including nonzero audio. The native payload also matches the preserved neutral host WAV prefix | Shared device models and instruction-start MMIO; no independent chip, physical bus-phase, title-music or whole sound-on recording claim. The earlier observer failure remains preserved |
@@ -323,9 +323,9 @@ behavior at frame 1,200, so the reported cover-screen glitch remains open.
 
 ## Next validation work
 
-- Run the prepared v17 OFF host replay, then ON only after PASS. Compare
-  input/PCM/save payloads with v16, OFF's final image with v16, and ON's final
-  image with the same-runtime CPU renderer before an interactive candidate test.
+- Collect and replay the completed v17 interactive session. Both 2,600-frame
+  host checks now pass; the windowed candidate has launched with sound, CRT,
+  Accurate textures, fresh saves and input/audio diagnostics.
 - Localize the reported title-screen audio glitches with paced telemetry and
   native PCM. The corrected independent sound comparison now reaches the first
   nonzero output; extend beyond that bounded interval and keep listening quality

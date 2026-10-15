@@ -69,9 +69,11 @@ See the [sound instructions](docs/segarally-build-validation.md#optional-sound-e
 Optional Accurate textures now combines measured Metal span stepping with a
 certified reciprocal correction. All pixels in three saved complete scenes
 match the CPU renderer, and 447 synthetic cases pass. The separate v17 candidate
-builds and packages, but has not launched; its OFF/ON host comparisons remain
-pending. The option stays off by default. Continuous flicker, live cost and
-whole-game graphics fidelity remain unverified.
+passes both 2,600-frame host comparisons: OFF preserves v16 output and ON's final
+image matches the software renderer. Both preserve audio, inputs and saves.
+It has launched windowed with sound, CRT and Accurate textures. The option stays
+off by default. Continuous flicker, live cost and whole-game graphics fidelity
+remain unverified.
 
 ## Display controls
 
