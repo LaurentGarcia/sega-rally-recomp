@@ -26,7 +26,22 @@ When `--input-replay` is supplied, the launcher copies that file into the app's
 resources before signing. Startup reads the bundled copy. Missing files,
 directories and replays larger than 1 MiB are rejected before packaging.
 
-The latest prepared recording-enabled sound app is in
+The current display-controls preview is prepared separately at
+`build/worktrees/mac-display-v15/build/mac-v15/Sega Rally Native.app`.
+It has launched windowed with sound and the CRT preset; F1 opens the panel and
+F6 toggles the effects. Start it with:
+
+```sh
+python3 platform/segarally/macos/launch.py \
+    --build-dir build/worktrees/mac-display-v15/build/mac-v15 \
+    --sound --instruction-boundary-hook --crt \
+    --input-replay config/segarally_lancia_select.inputs
+```
+
+Omit `--crt` for saved preferences or fresh original defaults. The preview's
+saves and log remain beside its own build, separate from earlier apps.
+
+The earlier recording-enabled sound app is preserved in
 `build/worktrees/observed-frontier-005ae800/build/mac-recording-v14/Sega Rally Native.app`.
 It has launched in a normal window with sound, the instruction boundary hook,
 selection replay and input recording enabled, then closed normally after
@@ -81,7 +96,7 @@ interactive host hands back control. Use the selection-only replay for play.
 
 Click the game window to give it keyboard focus.
 
-| Key | Cabinet input |
+| Key | Action |
 | --- | --- |
 | Left / Right arrows | Steer left / right |
 | Z | Accelerator |
@@ -93,7 +108,9 @@ Click the game window to give it keyboard focus.
 | Space | Handbrake |
 | F2 | Service |
 | F3 | Test |
-| Escape | Quit |
+| F1 | Open Display controls; pause or resume |
+| F6 | Toggle CRT effects |
+| Escape | Close Display controls, or quit when the panel is closed |
 
 These bindings come from the [dedicated frontend](../src/app/segarally_main.cpp).
 Keyboard steering and pedals currently use full-scale cabinet values; releasing
@@ -106,6 +123,42 @@ with a gap between presses. One coin displays `CREDIT 1/2`; it does not buy a
 game. Press Return when a full credit is available. Use steering and accelerator
 on the selection screen; the recorded successful path selects the Lancia with
 automatic transmission. Saved cabinet settings can change credit behavior.
+
+## Display controls
+
+New display-enabled builds open the **Display** panel with **F1**. The game and
+scripted cabinet inputs pause while it is open. Choose **Resume**, press F1,
+or press Escape to return to play. Keys held when closing the panel must be
+released before they can control the cabinet, so Return used for Resume cannot
+also press Start. The new v15 app has launched with sound and CRT presentation.
+Preserved v14 apps do not gain these controls from a source update.
+
+**Original** switches CRT effects off. **Arcade CRT** enables the preset;
+**CRT effects** is the master switch. Adjust Scanlines and Phosphor mask from
+0 to 1, Glow from 0 to 0.5, Curvature from 0 to 0.15, and Color fringing from
+0 to 1 source pixel. These are optional display effects, not a claim to
+reproduce a particular arcade monitor.
+
+**Smooth** is the original linear scaling; **Sharp** selects nearest sampling
+when CRT effects are off. **Integer scale** uses whole-number scaling when
+there is enough space. **Accurate textures** is a separate native rendering
+option that improves measured texture edges and interpolation but can reduce
+performance. It does not add CRT scanlines. All effects and Accurate textures
+start off on a fresh setup; Smooth remains the default.
+
+Changed presentation preferences are saved in `display.settings` inside the
+supplied save directory (`live-app-save` beside a launcher build). They are
+separate from EEPROM and backup RAM. The panel restores valid preferences on
+later launches; malformed or oversized files are ignored with a warning.
+
+The launcher accepts `--crt`, `--accurate-textures`, and
+`--original-display`. The last selects default presentation for that session;
+do not combine it with `--crt`. For a baseline image check, use
+`--original-display` and omit `--accurate-textures`. The direct host also accepts
+`--display-controls` to open the panel after its first rendered frame.
+Native `--capture` images are taken before CRT effects and the overlay; they
+still reflect the selected native texture-rendering mode. Offline recording
+replay remains independent of the display panel.
 
 ## Sound, speed and saves
 

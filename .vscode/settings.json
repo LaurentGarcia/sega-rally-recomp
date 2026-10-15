@@ -5,6 +5,7 @@
         "extern/softfloat",
         "extern/ymfm",
         "extern/lzma",
-        "extern/sdl3"
+        "extern/sdl3",
+        "extern/imgui"
     ]
 }

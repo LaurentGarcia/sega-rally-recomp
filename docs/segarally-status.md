@@ -241,9 +241,33 @@ stable/current OFF exactly. This clean common shader is integrated behind the
 existing option; it repeats only at native scale. Application integration and
 paced gameplay measurement follow.
 
-Polygon scanline rasterization does not add a CRT display filter. CRT scanlines,
-phosphor-mask/glow effects and chromatic aberration are not implemented in the
-Rally host. Future display effects remain optional and disabled for parity checks.
+### Optional CRT and Display controls
+
+Newly built hosts now include a separate CRT presentation pass and F1 Display
+panel. CRT scanlines, phosphor mask, glow, curvature and color fringing are
+adjustable; F6 toggles the effect. Fresh defaults keep CRT and Accurate textures
+off, the panel closed, and the original linear scaling. Display preferences
+persist separately in `display.settings`. Guest execution and cabinet replay
+pause while the panel is open; native captures and offline replay retain their
+separate paths.
+
+The CRT gate passes 18 synthetic draws and two saved-scene draws. Display
+preferences pass 250
+ASan/UBSan checks, and the hidden 640×480 offscreen UI smoke verifies a visible
+Resume button, unchanged preferences and zero backend calls on closed frames.
+Earlier failed fixture attempts remain preserved: the sandbox could not list
+displays, and the initial UI fixture omitted ImGui's layout-only first frame.
+No production behavior was changed to bypass either check. Evidence remains
+ignored under `build/validation/display-panel-smoke/ui-004/` and the CRT
+candidate's `run-01/`.
+
+The v15 host and both platform CTests pass. A 2,600-frame sound-enabled
+off/on comparison preserves native images, PCM, ordered resumes and saves
+exactly. That hidden run precedes the final held-key release guard and does
+not alone establish visible CRT presentation. The final app separately
+launched windowed with sound, and its log confirms CRT swapchain initialization.
+Sustained effect cost, monitor accuracy and whole-game parity remain open.
+Keep effects disabled for baseline image comparisons.
 
 ## Next validation work
 

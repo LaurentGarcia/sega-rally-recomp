@@ -24,6 +24,21 @@ set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
 set(SDL_TESTS OFF CACHE BOOL "" FORCE)
 set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
 add_subdirectory("${SEGARALLY_SDL_SOURCE}" "${CMAKE_BINARY_DIR}/sdl3" EXCLUDE_FROM_ALL)
+# Reuse Daytona's pinned, MIT-licensed display interface and GPU backend.
+set(SEGARALLY_IMGUI_SOURCE "${ROOT}/extern/imgui" CACHE PATH "Pinned Dear ImGui source")
+execute_process(COMMAND git -C "${SEGARALLY_IMGUI_SOURCE}" rev-parse HEAD
+    OUTPUT_VARIABLE IMGUI_REVISION OUTPUT_STRIP_TRAILING_WHITESPACE RESULT_VARIABLE IMGUI_REVISION_STATUS)
+if(NOT IMGUI_REVISION_STATUS EQUAL 0 OR NOT IMGUI_REVISION STREQUAL "f1cc2ae15e53a861a874c3034aae6798fde194ab")
+    message(FATAL_ERROR "Use the pinned Daytona Dear ImGui revision f1cc2ae15e53a861a874c3034aae6798fde194ab (scripts/setup.py)")
+endif()
+add_library(segarally_imgui STATIC
+    "${SEGARALLY_IMGUI_SOURCE}/imgui.cpp" "${SEGARALLY_IMGUI_SOURCE}/imgui_draw.cpp"
+    "${SEGARALLY_IMGUI_SOURCE}/imgui_tables.cpp" "${SEGARALLY_IMGUI_SOURCE}/imgui_widgets.cpp"
+    "${SEGARALLY_IMGUI_SOURCE}/backends/imgui_impl_sdl3.cpp"
+    "${SEGARALLY_IMGUI_SOURCE}/backends/imgui_impl_sdlgpu3.cpp")
+target_include_directories(segarally_imgui SYSTEM PUBLIC "${SEGARALLY_IMGUI_SOURCE}")
+target_link_libraries(segarally_imgui PUBLIC SDL3::SDL3-static)
+configure_file("${SEGARALLY_IMGUI_SOURCE}/LICENSE.txt" "${CMAKE_BINARY_DIR}/licenses/ImGui.txt" COPYONLY)
 file(GLOB GENERATED CONFIGURE_DEPENDS "${SEGARALLY_NATIVE_BUILD}/gen/*.cpp")
 if(NOT GENERATED OR NOT EXISTS "${SEGARALLY_NATIVE_BUILD}/tgp/program.cpp")
     message(FATAL_ERROR "Generate the audited native main/TGP code before configuring the host")
@@ -31,6 +46,7 @@ endif()
 set(RUNTIME cpu lockstep model2a_bus model2a_clock model2a_machine model2a_control model2_io model2_eeprom
     model2a_io model2a_comm comm_board model2_uart model2a_uart tgp m2_tgp_board model2a_video video raster geo)
 set(SOURCES "${ROOT}/src/app/segarally_main.cpp" "${ROOT}/src/app/gpu/gpu_renderer.cpp"
+    "${ROOT}/src/app/gpu/crt_renderer.cpp" "${ROOT}/src/app/segarally_display.cpp"
     ${GENERATED} "${SEGARALLY_NATIVE_BUILD}/tgp/program.cpp")
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 set(STAGE_ARGS)
@@ -126,7 +142,7 @@ if(SEGARALLY_SOUND OR SEGARALLY_INSTRUCTION_BOUNDARY_HOOK)
 endif()
 target_compile_options(segarally_native PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fno-fast-math;-ffp-contract=off>
     $<$<AND:$<CONFIG:Release>,$<COMPILE_LANGUAGE:CXX>>:-O3>)
-target_link_libraries(segarally_native PRIVATE SDL3::SDL3-static "-framework Metal" "-framework QuartzCore")
+target_link_libraries(segarally_native PRIVATE SDL3::SDL3-static segarally_imgui "-framework Metal" "-framework QuartzCore")
 if(SEGARALLY_INPUT_RECORDING AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(SEGARALLY_LZMA_SOURCE "${ROOT}/extern/lzma" CACHE PATH "Pinned public-domain 7-Zip SHA-256 sources")
     execute_process(COMMAND git -C "${SEGARALLY_LZMA_SOURCE}" rev-parse HEAD
@@ -154,6 +170,10 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     # Keep assert-based fixtures active even when the actual host is Release.
     target_compile_options(test_segarally_audio PRIVATE -UNDEBUG)
     add_test(NAME segarally_audio COMMAND test_segarally_audio "${CMAKE_CURRENT_BINARY_DIR}/audio-fixture.wav")
+    add_executable(test_segarally_display_preferences EXCLUDE_FROM_ALL "${ROOT}/tests/test_segarally_display_preferences.cpp")
+    target_include_directories(test_segarally_display_preferences PRIVATE "${ROOT}/src")
+    target_link_libraries(test_segarally_display_preferences PRIVATE SDL3::SDL3-static)
+    add_test(NAME segarally_display_preferences COMMAND test_segarally_display_preferences)
     add_custom_command(TARGET segarally_native POST_BUILD
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/stage_data.py"
             --native-build "${SEGARALLY_NATIVE_BUILD}" --output "${ASSET_DEST}" ${STAGE_ARGS}

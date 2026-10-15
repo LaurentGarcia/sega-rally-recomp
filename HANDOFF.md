@@ -1,5 +1,57 @@
 # Handoff
 
+## Optional CRT controls and windowed v15 preview (2026-10-14)
+
+The dedicated host now has a lazy F1 Display panel and F6 CRT toggle. Common
+HLSL supplies adjustable native-row scanlines, output-pixel RGB mask, spatial
+glow, curvature and color fringing after native composition and before UI.
+Smooth/Sharp scaling, integer scale and the previously verified Accurate
+textures option are separate controls. Fresh defaults retain the original
+linear blit with CRT and Accurate textures off. Preferences use bounded
+`display.settings`, separate from cabinet saves. This follows **Geometry**,
+**Inputs** and **Platform layer & build**: one shader source, native timing,
+optional enhancements, and reuse of Daytona's pinned MIT ImGui backend.
+
+The panel pauses guest execution and replay application, clears audio backlog
+at transitions, and resets host pacing on resume. A review found that Return
+held while activating Resume could also become guest Start. Cabinet key
+mapping now suppresses keys held on panel close until their release; global
+F1/F6 navigation remains available. A bounded validation-host regression for
+that held-key transition is prepared separately; its execution result is still
+pending at this checkpoint. Native captures precede display effects,
+and offline recording replay still returns before SDL/preferences startup.
+
+Metal checks pass 18 synthetic draws plus two saved Lancia scene previews;
+preferences pass 250 ASan/UBSan checks; the final small-window UI smoke fits
+Resume at 640×480 and proves closed frames do not call either backend. The
+normal sound/hook v15 build and both platform CTests pass; existing launcher
+and recording-launcher regressions pass 10+4 tests. Two hidden 2,600-frame
+sound-enabled host runs produce byte-identical native images, PCM, ordered
+resumes, observations and initial/final cabinet saves with CRT off/on. That
+comparison precedes the final held-key guard; its exact executable is retained.
+Hidden rendering alone is not evidence that a visible swapchain pass ran.
+
+The final separate v15 app was signed and opened windowed on the user's
+request, with sound, CRT and Lancia selection. Its log confirms Metal on Apple
+M5, CRT swapchain initialization and manual takeover at frame 1,851. The saved
+ongoing-session snapshot passes frame 7,140 without a frontier; it is not a
+completed audio-quality or sustained-performance verdict. Old apps, recordings
+and generated inputs remain unchanged. See `build/validation/mac-display-v15/`
+for source identities, build logs, `gameplay-001/result.json` and
+`preview-live-result.json`; the app is under
+`build/worktrees/mac-display-v15/build/mac-v15/Sega Rally Native.app`.
+
+Failures retained: the first UI fixture omitted ImGui's layout-only first
+frame; a later layout clipped Resume until constrained to the window area.
+The initial MAIN configure could not stage generation from another checkout's
+relative audit paths. A new worktree uses all 203 hash-verified generation
+files at their original relative paths; audit checks were not relaxed.
+Copying a source file with an older preserved timestamp skipped one rebuild;
+explicitly touching that source forced the corrected panel object to compile.
+Next measure sustained live effect cost and remaining native pixel differences;
+monitor authenticity, complete MAME race parity and all-course coverage remain
+open. The iPhone target stays deferred.
+
 ## Native Metal repeated stepping integrated (2026-10-14)
 
 The common renderer now includes clean repeated span stepping behind the

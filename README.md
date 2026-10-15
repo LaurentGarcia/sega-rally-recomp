@@ -64,10 +64,22 @@ input-shortfall request; live-game listening feedback remains pending.
 Sound requires both the build option and runtime `--sound`.
 See the [sound instructions](docs/segarally-build-validation.md#optional-sound-experiment).
 
-Experimental Metal interpolation reduces one frozen 3D scene from 844 differing
-pixels to three against the CPU renderer. It remains outside production while
-broader scenes, the remaining errors and execution cost are checked. This is
-not a whole-game graphics-fidelity result.
+Optional Accurate textures uses the measured Metal span stepping: three saved
+complete scenes differ from the CPU renderer at only 3, 1 and 1 pixels. It is
+available in the Display panel and remains off by default while live cost and
+remaining precision errors are checked. This is not whole-game graphics parity.
+
+## Display controls
+
+Newly built hosts use **F1** for the paused Display panel and **F6** to toggle
+optional CRT effects. Choose Original or Arcade CRT, then adjust scanlines,
+mask, glow, curvature and color fringing. Smooth/Sharp scaling, integer scale
+and Accurate textures are separate controls. Fresh defaults preserve the
+original display; changed preferences use a separate `display.settings` file.
+The v15 Mac preview is built and has launched with sound and CRT presentation.
+A 2,600-frame off/on comparison preserves native frames, audio and game state.
+Monitor accuracy and sustained effect cost remain unverified.
+See [the player manual](docs/mac-player-manual.md#display-controls).
 
 ## Personal inputs and repository boundaries
 

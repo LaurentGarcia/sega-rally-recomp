@@ -31,6 +31,19 @@ An existing SDL checkout must report that exact revision with
 `git -C extern/sdl3 rev-parse HEAD`. Preserve any local changes before changing
 its revision.
 
+The Display panel uses the same MIT-licensed Dear ImGui 1.92.9b pin as Daytona:
+`f1cc2ae15e53a861a874c3034aae6798fde194ab`. The dedicated host requires this
+checkout at `extern/imgui`; its SDL3 and SDL_GPU backends are built unchanged.
+`scripts/setup.py` prepares the pinned dependencies. To prepare just ImGui:
+
+```sh
+git clone https://github.com/ocornut/imgui.git extern/imgui
+git -C extern/imgui checkout --detach f1cc2ae15e53a861a874c3034aae6798fde194ab
+```
+
+CMake checks the revision and packages the ImGui MIT notice with the app.
+Vendored sources remain ignored.
+
 ## Verify, import and recompile
 
 Use the same `--build-dir` for every import and generated component:
@@ -83,6 +96,62 @@ The launcher audits assets and packages/signs the app before opening it in a
 window. [The player manual](mac-player-manual.md) explains controls and saves.
 The convenience `platform/segarally/build.sh mac` uses
 `SEGARALLY_NATIVE_BUILD` but always builds the host in `build/segarally-mac`.
+
+### Display controls and shaders
+
+Display controls are compiled into newly built hosts; no CRT effect is enabled
+on a fresh setup. F1 opens the paused panel and F6 toggles CRT. The launcher and
+direct host accept `--crt`, `--accurate-textures`, and `--original-display`.
+The direct-only `--display-controls` opens the panel after the first native
+frame. `--crt` and `--original-display` conflict. Saved `display.settings`
+preferences load first; explicit flags then override them. Use
+`--original-display` without `--accurate-textures` for baseline captures.
+
+The CRT pass runs after native image composition and before touch/UI overlays.
+It changes neither native game state nor the raw `--capture` texture. Accurate
+textures selects the separate optional native renderer, so it can affect that
+capture. The original linear blit and closed panel remain the fresh defaults;
+UI and CRT GPU resources initialize only when needed.
+
+Generated common shader headers are committed, so an ordinary host build needs
+no shader tools. When changing shader source, regenerate through the common
+DXC/SPIRV-Cross pipeline (or its Docker fallback):
+
+```sh
+python3 scripts/build_shaders.py
+python3 scripts/build_crt_shaders.py
+```
+
+The first updates `shaders_gen.h` from `m2.hlsl`; the second updates only
+`crt_shaders_gen.h` from `crt.hlsl`. Do not hand-edit generated shader output.
+A separate CPU-only preference regression target is available in the configured
+Mac host build:
+
+```sh
+cmake --build build/segarally-docs-mac --target test_segarally_display_preferences -j 2
+ctest --test-dir build/segarally-docs-mac --output-on-failure -R '^segarally_display_preferences$'
+```
+
+The finite parser, range bounds, round trips, invalid files and separate save
+writes pass 250 synthetic checks under ASan/UBSan. The hidden offscreen UI smoke
+passes at 640×480, including visible Resume and no backend calls on closed
+frames. No game or audio runs in that smoke. A separate 2,600-frame sound-enabled
+host comparison preserves the native image, PCM, ordered resumes and saves
+with CRT off/on. The final v15 app has also launched with visible CRT
+presentation and sound; sustained effect cost remains unmeasured.
+
+The CRT GPU fixture is separately enabled and requires a working Mac display:
+
+```sh
+cmake -S . -B build/metal-tests -DM2_BUILD_WINDOWED_APP=OFF -DM2_METAL_TESTS=ON
+cmake --build build/metal-tests --target test_gpu_crt -j 2
+ctest --test-dir build/metal-tests --output-on-failure -R '^gpu_crt$'
+```
+
+The synthetic assertions cover disabled/zero-effect behavior, individual
+controls, bounds, letterboxing and native/enhanced source-row behavior. The
+retained GPU gate passes 18 synthetic draws plus two scene-preview draws.
+These are presentation checks, not monitor-fidelity or gameplay-speed tests.
 
 ### Optional instruction boundary hook
 

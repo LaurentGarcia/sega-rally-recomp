@@ -211,10 +211,21 @@ the loop cost. This includes encoding/submission/completion wait and excludes
 presentation and readback; it is neither GPU timestamp timing nor gameplay FPS.
 Residual texture precision, live cost and whole-game fidelity remain open;
 the option stays off by default. See [the evidence table](segarally-status.md#graphics-evidence).
-This polygon scanline path does not simulate visible CRT scanlines. The Rally
-host has no CRT postprocessing or chromatic-aberration option. Future display
-effects follow the inherited enhancement policy: optional, disabled by default
-and during image comparisons, applied after native image composition.
+Polygon scanline rasterization is distinct from the optional CRT presentation
+pass. Newly built hosts offer adjustable scanlines, phosphor mask, glow,
+curvature and color fringing after native composition. Effects default off;
+the original linear blit is retained. Common HLSL generates the backend shader
+headers, without a Metal-only implementation. F1 opens a lazy ImGui Display
+panel and pauses guest execution and cabinet replay; resuming clears playback
+backlog and resets host pacing. Presentation preferences use only the separate
+bounded `display.settings` file. Raw captures precede CRT/UI, and offline replay
+still returns before SDL or preference loading. Disable effects and native
+texture enhancements for baseline image comparisons. The CRT fixture passes
+18 synthetic draws and two saved-scene preview draws; the ROM-free UI and
+preference checks pass. A 2,600-frame sound-enabled off/on host comparison
+preserves all ordered resumes, PCM, saves and the native image exactly. The
+final v15 app has launched with a visible CRT swapchain pass and sound. These
+results do not establish monitor fidelity or sustained live effect cost.
 The host also accepts the bounded cabinet replay and holds its final snapshot
 through one complete frame before handing control to keyboard/touch. Both
 rendering instances receive identical inputs. Normal board-time pacing is the

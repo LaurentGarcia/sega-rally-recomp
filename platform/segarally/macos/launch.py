@@ -17,8 +17,13 @@ parser.add_argument("--input-replay",type=Path,help="Optional cabinet input repl
 parser.add_argument("--record-inputs",type=Path,help="Create a new recording bundle for exact same-executable offline replay")
 parser.add_argument("--fullscreen",action="store_true",help="Launch in desktop fullscreen")
 parser.add_argument("--sound",action="store_true",help="Enable the audited diagnostic SCSP sound board")
+parser.add_argument("--crt",action="store_true",help="Start with the adjustable Arcade CRT display effect")
+parser.add_argument("--original-display",action="store_true",help="Use the original display defaults for this session")
+parser.add_argument("--accurate-textures",action="store_true",help="Enable the optional more accurate native texture interpolation")
 parser.add_argument("--instruction-boundary-hook",action="store_true",help="Enable audited exact resident-chunk execution")
 args=parser.parse_args()
+if args.crt and args.original_display:
+    parser.error("--crt and --original-display cannot be combined")
 build=args.build_dir.resolve()
 if not build.is_relative_to(ROOT/"build"):
     parser.error("build directory must be inside the ignored project build directory")
@@ -62,6 +67,8 @@ try:
     # SDL_GetBasePath points at Contents/Resources for a macOS app bundle.
     resources=app/"Contents/Resources";resources.mkdir(parents=True,exist_ok=True)
     shutil.copytree(assets,resources/"assets",dirs_exist_ok=True)
+    if (build/"licenses").is_dir():
+        shutil.copytree(build/"licenses",resources/"licenses",dirs_exist_ok=True)
     # LaunchServices apps read their own signed resources at startup. Do not
     # depend on a separate workspace file being accessible before SDL starts.
     bundled_replay=resources/"input-replay.inputs"
@@ -78,6 +85,9 @@ try:
     if args.unthrottled:startup.append("--unthrottled")
     if args.fullscreen:startup.append("--fullscreen")
     if args.sound:startup.append("--sound")
+    if args.crt:startup.append("--crt")
+    if args.original_display:startup.append("--original-display")
+    if args.accurate_textures:startup.append("--accurate-textures")
     if args.instruction_boundary_hook:startup.append("--instruction-boundary-hook")
     if replay_bytes is not None:startup += ["--input-replay",str(bundled_replay)]
     if recording_path is not None:startup += ["--record-inputs",str(recording_path)]

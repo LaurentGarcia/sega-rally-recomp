@@ -1,7 +1,9 @@
 // The native frontend reuses Daytona's SDL_GPU renderer and shared Model2A machine.
 #include "runtime/model2a_machine.h"
 #include "app/gpu/gpu_renderer.h"
+#include "app/gpu/crt_renderer.h"
 #include "app/gpu_device.h"
+#include "app/segarally_display.h"
 #include "app/segarally_touch.h"
 #include "app/segarally_audio.h"
 #include "app/segarally_audio_capture.h"
@@ -14,6 +16,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <algorithm>
+#include <array>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -93,6 +96,7 @@ int segarally_host_main(int argc,char **argv) {
     std::filesystem::path data,saves,capture_path,reference_path,log_path,replay_path,audio_path;
     uint64_t frame_limit=0,instruction_limit=0;
     bool touch_visible=false,unthrottled=false,hidden=false,fullscreen=false,sound=false;
+    bool crt_requested=false,original_display=false,accurate_textures=false,show_display_controls=false;
     bool instruction_boundary_hook=false;
 #ifdef SEGARALLY_INPUT_RECORDING
     std::filesystem::path record_path,recording_replay_path;
@@ -115,6 +119,10 @@ int segarally_host_main(int argc,char **argv) {
         else if(arg=="--unthrottled") unthrottled=true;
         else if(arg=="--hidden") hidden=true;
         else if(arg=="--fullscreen") fullscreen=true;
+        else if(arg=="--crt") crt_requested=true;
+        else if(arg=="--original-display") original_display=true;
+        else if(arg=="--accurate-textures") accurate_textures=true;
+        else if(arg=="--display-controls") show_display_controls=true;
         else if(arg=="--log") log_path=value();
         else if(arg=="--input-replay") replay_path=value();
 #ifdef SEGARALLY_INPUT_RECORDING
@@ -125,6 +133,7 @@ int segarally_host_main(int argc,char **argv) {
         else if(arg=="--instruction-boundary-hook") instruction_boundary_hook=true;
         else if(arg=="--audio-capture") audio_path=value();
         else if(arg=="--help") {puts("Sega Rally native: --data DIR --save-dir DIR --frames N --instructions N --capture FILE.ppm --reference-capture FILE.ppm --touch --unthrottled --hidden --fullscreen --log FILE --input-replay FILE --sound --audio-capture FILE.wav --instruction-boundary-hook\nSound is opt-in and uses diagnostic instruction-boundary timing. Unthrottled runs capture/drain audio without device playback.\nKeys: arrows steer, Z gas, X brake, C coin, Return start, V view, A/S gear down/up, Space handbrake, F2 service, F3 test, Escape quit.");
+            puts("Display: F1 opens controls and pauses; F6 toggles CRT effects. --crt enables the Arcade CRT preset; --original-display uses display defaults; --accurate-textures enables optional native interpolation; --display-controls opens the panel. Native --capture remains before display effects.");
 #ifdef SEGARALLY_INPUT_RECORDING
             puts("--record-inputs DIR creates a new bounded recording bundle. --replay-recording DIR [--data DIR] replays it offline with this exact executable; no window/audio device/live-save writes.");
 #endif
@@ -143,6 +152,7 @@ int segarally_host_main(int argc,char **argv) {
         return 0;
     }
 #endif
+    if(crt_requested && original_display) throw std::runtime_error("--crt and --original-display cannot be combined");
     if(!audio_path.empty() && !sound) throw std::runtime_error("--audio-capture requires --sound");
 #ifndef M2_SRALLY_SOUND
     if(sound) throw std::runtime_error("Build with SEGARALLY_SOUND=ON before using --sound");
@@ -169,6 +179,8 @@ int segarally_host_main(int argc,char **argv) {
     if(saves.empty()) {char *path=SDL_GetPrefPath("sega-rally-recomp","SegaRallyNative");if(path) {saves=path;SDL_free(path);}else saves="saves";}
     SDL_Window *window=nullptr;SDL_GPUDevice *device=nullptr;SDL_GPUTexture *screen=nullptr;
     app::GpuRenderer gpu;rally::TouchControls touch;std::unique_ptr<Machine> machine,reference;
+    app::CrtRenderer crt;app::DisplayPanel display;app::DisplaySettings display_settings;
+    bool crt_ready=false;
     rally::AudioOutput audio;
     std::unique_ptr<rally::AudioCapture> audio_capture;
     uint64_t audio_frames=0,audio_nonzero=0;
@@ -211,7 +223,7 @@ int segarally_host_main(int argc,char **argv) {
 #ifdef SEGARALLY_IOS
         flags|=SDL_WINDOW_FULLSCREEN;touch_visible=true;
 #endif
-        window=SDL_CreateWindow("Sega Rally Native",992,768,flags);
+        window=SDL_CreateWindow("Sega Rally Native | F1 Display | F6 CRT",992,768,flags);
         device=app::create_gpu_device();
         if(!window || !device || strcmp(SDL_GetGPUDeviceDriver(device),"metal") || !SDL_ClaimWindowForGPUDevice(device,window))
             throw std::runtime_error(std::string("Metal initialization: ")+SDL_GetError());
@@ -225,8 +237,21 @@ int segarally_host_main(int argc,char **argv) {
         if(!screen || !gpu.init(device,ti.format) || !touch.init(device,SDL_GetGPUSwapchainTextureFormat(device,window)))
             throw std::runtime_error(std::string("Metal pipelines: ")+gpu.error()+" "+SDL_GetError());
         touch.visible=touch_visible;touch.layout(window);
+        if(!display.init(window,device,SDL_GetGPUSwapchainTextureFormat(device,window),saves,display_settings))
+            throw std::runtime_error(display.error());
+        if(!display.error().empty()) fprintf(stderr,"Display preferences: %s\n",display.error().c_str());
+        if(original_display) display_settings=app::DisplaySettings{};
+        else if(const char *env=std::getenv("SEGARALLY_GPU_POLYGON_SCANLINES"))
+            display_settings.accurate_textures=std::strcmp(env,"1")==0;
+        if(crt_requested) {display_settings.crt=app::CrtSettings{};display_settings.crt.enabled=true;}
+        if(accurate_textures) display_settings.accurate_textures=true;
+        gpu.set_polygon_scanlines(display_settings.accurate_textures);
+        bool rendered_accurate_textures=display_settings.accurate_textures;
+        fprintf(stderr,"Display controls: F1 opens panel; F6 toggles CRT; effects=%d accurate_textures=%d\n",
+            int(display_settings.crt.enabled),int(display_settings.accurate_textures));
         if(sound && !unthrottled) audio.open();
-        bool quit=false,background=false,stopped=false;int gear=0;
+        bool quit=false,background=false,stopped=false,display_paused=false;int gear=0;
+        std::array<bool,SDL_SCANCODE_COUNT> display_held_keys{};
         uint64_t replay_release_frame=0;bool replay_manual_takeover=false;
         Uint64 start=SDL_GetTicksNS();uint64_t displayed=0,last_frames=0;
         while(!quit) {
@@ -237,17 +262,42 @@ int segarally_host_main(int argc,char **argv) {
             SDL_Event event;
             while(SDL_PollEvent(&event)) {
                 if(event.type==SDL_EVENT_QUIT || event.type==SDL_EVENT_TERMINATING) quit=true;
+                if(event.type==SDL_EVENT_KEY_DOWN && !event.key.repeat) {
+                    if(event.key.scancode==SDL_SCANCODE_F1) display.set_open(!display.open());
+                    else if(event.key.scancode==SDL_SCANCODE_F6) {
+                        display_settings.crt.enabled=!display_settings.crt.enabled;
+                        if(!display.save(display_settings)) fprintf(stderr,"Display preferences: %s\n",display.error().c_str());
+                    } else if(event.key.scancode==SDL_SCANCODE_ESCAPE) {
+                        if(display.open()) display.set_open(false);else quit=true;
+                    }
+                }
                 if(event.type==SDL_EVENT_WILL_ENTER_BACKGROUND) {background=true;touch.clear();audio.clear();save(*machine,saves);}
                 if(event.type==SDL_EVENT_DID_ENTER_FOREGROUND) {background=false;audio.clear();start=SDL_GetTicksNS()-machine->stats().board_time_ns;}
                 if(event.type==SDL_EVENT_WINDOW_FOCUS_LOST) touch.clear();
                 if(event.type==SDL_EVENT_WINDOW_RESIZED || event.type==SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED || event.type==SDL_EVENT_WINDOW_SAFE_AREA_CHANGED) touch.layout(window);
-                touch.event(event);
+                display.process_event(event);
+                if(!display.open()) touch.event(event);
             }
             if(background) {SDL_Delay(20);continue;}
             const bool *keys=SDL_GetKeyboardState(nullptr);
-            if(keys[SDL_SCANCODE_ESCAPE]) quit=true;
+            for(size_t key=0;key<display_held_keys.size();++key)
+                if(!keys[key]) display_held_keys[key]=false;
+            if(display_paused!=display.open()) {
+                display_paused=display.open();touch.clear();audio.clear();
+                if(!display_paused) {
+                    start=SDL_GetTicksNS()-machine->stats().board_time_ns;
+                    // A key used to navigate/close the panel must be released
+                    // before it can become a cabinet input (Return is Start).
+                    for(size_t key=0;key<display_held_keys.size();++key)
+                        display_held_keys[key]=keys[key];
+                }
+            }
+            const auto held=[&](SDL_Scancode key){return keys[key]&&!display_held_keys[key];};
             auto &in=machine->inputs();
             const auto before=machine->stats();
+            // Display navigation cannot advance replay events or change the
+            // remembered shifter while guest execution is paused.
+            if(!display_paused) {
             if(replay && replay->apply(before.frames_rendered,in)) {
                 fprintf(stderr,"Input replay event: frame=%llu instructions=%llu cycles=%llu in0=%02x steer=%02x gas=%02x brake=%02x\n",
                     static_cast<unsigned long long>(before.frames_rendered),static_cast<unsigned long long>(before.instructions),
@@ -262,20 +312,21 @@ int segarally_host_main(int argc,char **argv) {
             if(!replay_active) {
                 in={};
                 auto low=[&](unsigned bit,bool held){if(held) in.in0&=uint8_t(~(1u<<bit));};
-                low(0,keys[SDL_SCANCODE_C]||touch.held[rally::Coin]);low(6,keys[SDL_SCANCODE_RETURN]||touch.held[rally::Start]);
-                low(5,keys[SDL_SCANCODE_V]||touch.held[rally::View]);low(2,keys[SDL_SCANCODE_F2]);low(3,keys[SDL_SCANCODE_F3]);
+                low(0,held(SDL_SCANCODE_C)||touch.held[rally::Coin]);low(6,held(SDL_SCANCODE_RETURN)||touch.held[rally::Start]);
+                low(5,held(SDL_SCANCODE_V)||touch.held[rally::View]);low(2,held(SDL_SCANCODE_F2));low(3,held(SDL_SCANCODE_F3));
                 static bool last_up=false,last_down=false;
-                const bool up=keys[SDL_SCANCODE_S]||touch.held[rally::GearUp],down=keys[SDL_SCANCODE_A]||touch.held[rally::GearDown];
+                const bool up=held(SDL_SCANCODE_S)||touch.held[rally::GearUp],down=held(SDL_SCANCODE_A)||touch.held[rally::GearDown];
                 if(up&&!last_up) gear=std::min(4,gear+1);if(down&&!last_down) gear=std::max(0,gear-1);last_up=up;last_down=down;
                 constexpr uint8_t gears[]={0,0x20,0x10,0x60,0x50};in.in1=uint8_t(0x8f|gears[gear]);
-                in.in2=(keys[SDL_SCANCODE_SPACE]||touch.held[rally::Handbrake])?0xff:0;
-                const int steering=int(keys[SDL_SCANCODE_RIGHT]||touch.held[rally::Right])-int(keys[SDL_SCANCODE_LEFT]||touch.held[rally::Left]);
+                in.in2=(held(SDL_SCANCODE_SPACE)||touch.held[rally::Handbrake])?0xff:0;
+                const int steering=int(held(SDL_SCANCODE_RIGHT)||touch.held[rally::Right])-int(held(SDL_SCANCODE_LEFT)||touch.held[rally::Left]);
                 in.analog[0]=steering<0?0:steering>0?255:128;
-                in.analog[1]=(keys[SDL_SCANCODE_Z]||touch.held[rally::Gas])?255:0;
-                in.analog[2]=(keys[SDL_SCANCODE_X]||touch.held[rally::Brake])?255:0;
+                in.analog[1]=(held(SDL_SCANCODE_Z)||touch.held[rally::Gas])?255:0;
+                in.analog[2]=(held(SDL_SCANCODE_X)||touch.held[rally::Brake])?255:0;
+            }
             }
             bool new_frame=false;
-            if(!stopped && !quit) {
+            if(!stopped && !quit && !display_paused) {
                 const uint64_t completed=machine->stats().instructions;
                 if(instruction_limit && completed>=instruction_limit) {
 #ifdef SEGARALLY_INPUT_RECORDING
@@ -312,7 +363,7 @@ int segarally_host_main(int argc,char **argv) {
                     if(frame_limit||instruction_limit) quit=true;
                 }
             }
-            if(sound) {
+            if(sound && !display_paused) {
                 const auto samples=machine->take_audio();
                 if(reference && reference->take_audio()!=samples)
                     throw std::runtime_error("Native software/Metal machines produced different SCSP samples");
@@ -338,17 +389,52 @@ int segarally_host_main(int argc,char **argv) {
 #endif
             }
             if(quit && !new_frame) break;
-            if(!new_frame && !stopped) continue;
+            if(!new_frame && !stopped && !display_paused) continue;
+            if(show_display_controls && new_frame) {display.set_open(true);show_display_controls=false;}
+            if(!display.new_frame(display_settings)) throw std::runtime_error(display.error());
             auto *cmd=SDL_AcquireGPUCommandBuffer(device);if(!cmd) throw std::runtime_error(SDL_GetError());
+            display.prepare(cmd);
             SDL_GPUTexture *swapchain=nullptr;Uint32 sw=0,sh=0;
             if(!SDL_WaitAndAcquireGPUSwapchainTexture(cmd,window,&swapchain,&sw,&sh)) throw std::runtime_error(SDL_GetError());
-            if(new_frame) {gpu.render(cmd,screen,496,384,machine->video());++displayed;}
+            const bool texture_mode_changed=rendered_accurate_textures!=display_settings.accurate_textures;
+            if(new_frame || (displayed && texture_mode_changed)) {
+                gpu.set_polygon_scanlines(display_settings.accurate_textures);
+                gpu.render(cmd,screen,496,384,machine->video());
+                rendered_accurate_textures=display_settings.accurate_textures;
+                if(new_frame) ++displayed;
+            }
             if(swapchain && displayed) {
-                const float scale=std::min(sw/496.f,sh/384.f);const Uint32 dw=Uint32(496*scale),dh=Uint32(384*scale);
-                SDL_GPUBlitInfo blit{};blit.source.texture=screen;blit.source.w=496;blit.source.h=384;
-                blit.destination.texture=swapchain;blit.destination.x=(sw-dw)/2;blit.destination.y=(sh-dh)/2;blit.destination.w=dw;blit.destination.h=dh;
-                blit.load_op=SDL_GPU_LOADOP_CLEAR;blit.clear_color={0,0,0,1};blit.filter=SDL_GPU_FILTER_LINEAR;
-                SDL_BlitGPUTexture(cmd,&blit);touch.draw(cmd,swapchain);
+                float scale=std::min(sw/496.f,sh/384.f);
+                if(display_settings.integer_scale && scale>=1) scale=std::floor(scale);
+                const Uint32 dw=std::max(1u,Uint32(496*scale)),dh=std::max(1u,Uint32(384*scale));
+                if(display_settings.crt.enabled) {
+                    if(!crt_ready) {
+                        if(!crt.init(device,SDL_GetGPUSwapchainTextureFormat(device,window))) {
+                            SDL_CancelGPUCommandBuffer(cmd);throw std::runtime_error(crt.error());
+                        }
+                        crt_ready=true;
+                        fprintf(stderr,"Display CRT pipeline initialized for swapchain presentation\n");
+                    }
+                    const SDL_Rect viewport{int((sw-dw)/2),int((sh-dh)/2),int(dw),int(dh)};
+                    if(!crt.render(cmd,screen,swapchain,viewport,display_settings.crt)) {
+                        SDL_CancelGPUCommandBuffer(cmd);throw std::runtime_error(crt.error());
+                    }
+                } else {
+                    SDL_GPUBlitInfo blit{};blit.source.texture=screen;blit.source.w=496;blit.source.h=384;
+                    blit.destination.texture=swapchain;blit.destination.x=(sw-dw)/2;blit.destination.y=(sh-dh)/2;blit.destination.w=dw;blit.destination.h=dh;
+                    blit.load_op=SDL_GPU_LOADOP_CLEAR;blit.clear_color={0,0,0,1};
+                    blit.filter=display_settings.linear_filter?SDL_GPU_FILTER_LINEAR:SDL_GPU_FILTER_NEAREST;
+                    SDL_BlitGPUTexture(cmd,&blit);
+                }
+                touch.draw(cmd,swapchain);
+            }
+            if(swapchain && display.open()) {
+                SDL_GPUColorTargetInfo target{};target.texture=swapchain;
+                target.load_op=displayed?SDL_GPU_LOADOP_LOAD:SDL_GPU_LOADOP_CLEAR;
+                target.store_op=SDL_GPU_STOREOP_STORE;target.clear_color={0,0,0,1};
+                auto *pass=SDL_BeginGPURenderPass(cmd,&target,1,nullptr);
+                if(!pass) throw std::runtime_error(SDL_GetError());
+                display.render(cmd,pass);SDL_EndGPURenderPass(pass);
             }
             if(!SDL_SubmitGPUCommandBuffer(cmd)) throw std::runtime_error(SDL_GetError());
             const auto stats=machine->stats();
@@ -367,7 +453,7 @@ int segarally_host_main(int argc,char **argv) {
                 const Uint64 deadline=start+stats.board_time_ns,now=SDL_GetTicksNS();
                 if(deadline>now) SDL_DelayNS(deadline-now);
             }
-            if(stopped) SDL_Delay(20);
+            if(stopped || display_paused) SDL_Delay(10);
         }
         if(!capture_path.empty() && displayed) capture(device,screen,capture_path);
         if(reference && displayed) capture_reference(reference->video(),reference_path);
@@ -390,7 +476,7 @@ int segarally_host_main(int argc,char **argv) {
             static_cast<unsigned long long>(stats.reference_cycles),stats.pc,result);
     } catch(const std::exception &error) {fprintf(stderr,"Sega Rally native: %s\n",error.what());result=1;}
     audio.close();
-    if(device) {SDL_WaitForGPUIdle(device);touch.shutdown();gpu.shutdown();if(screen) SDL_ReleaseGPUTexture(device,screen);
+    if(device) {SDL_WaitForGPUIdle(device);display.shutdown();crt.shutdown();touch.shutdown();gpu.shutdown();if(screen) SDL_ReleaseGPUTexture(device,screen);
         if(window) SDL_ReleaseWindowFromGPUDevice(device,window);SDL_DestroyGPUDevice(device);}
     if(window) SDL_DestroyWindow(window);SDL_Quit();return result;
 }
