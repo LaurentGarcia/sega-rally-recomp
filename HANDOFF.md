@@ -1,5 +1,32 @@
 # Handoff
 
+## README showcase and restricted screenshot export (2026-10-15)
+
+The requested public README now includes real native captures: a Metal Accurate
+textures Desert hero, CPU-rendered Forest and Mountain driving, and the SHORT
+Practice Mountain Stage Clear with the Lancia. Each is the original 496x384
+image from preserved validation evidence, not a fresh RC capture or a new
+fidelity claim. Image provenance records the source and published hashes.
+The first PNG import rejected conversion-added EXIF metadata; the final files
+retain only image/color chunks with unchanged compressed pixel payloads.
+
+This expressly requested showcase narrows the no-capture rule only for these
+four reviewed documentation images. Source rules, contribution and release
+notes state the exception and separate game imagery from the BSD source license.
+The source gate accepts only the four exact paths/hashes. Unknown, renamed or
+modified images remain rejected. All twelve gate fixtures pass, plus actual
+hash/mutation checks for the selected files. No ROM, raw trace, generated game
+code, texture/sample extraction, packaged app or broader capture bundle is added.
+
+The first final-build preflight found documentation changing concurrently and
+stopped before dependencies/build execution. Its failure remains in
+`build/publication/clean-build-001/failure.json`. The build now uses a separate
+clean checkout at `c3ffbb36220b8d32928d9ee8e6c8bbf6fafdd774`; this README/gate
+change does not alter runtime or app packaging inputs. Final results must name
+the tested revision rather than silently treating the later documentation commit
+as the exact binary source. Continue CI/source-archive verification before the
+source-only prerelease tag.
+
 ## Public history identity mapping (2026-10-15)
 
 The isolated publication clone now has branch `main`. The metadata pass changed

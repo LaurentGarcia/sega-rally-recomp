@@ -68,7 +68,10 @@ checkpoint without publishing game data.
 
 Do not attach ROMs, imported images, generated game instructions, extracted
 textures/samples, game-derived captures, emulator dumps or packaged apps to
-issues, patches or releases. Keep them in ignored local storage. Do not use or
+issues, patches or releases. Keep them in ignored local storage. The four
+expressly reviewed [README screenshots](docs/images/README.md) are a narrow
+documentation exception, pinned by exact hash; this is not permission to upload
+additional captures or extracted assets. Do not use or
 submit leaked game source, SDKs or internal documentation. Preserve the source
 repository's original-code and public-reference boundaries in [rules.md](rules.md).
 

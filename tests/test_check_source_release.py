@@ -96,6 +96,26 @@ class SourceRelease(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "filename"):
             release.classify("another-wrapper.jar", b"synthetic archive")
 
+    def test_curated_screenshot_requires_exact_path_and_bytes(self):
+        # Invented data exercises the identity boundary, not game-image content.
+        path = "docs/images/invented-screen.png"
+        data = b"\x89PNG\r\n\x1a\n" + b"self-authored screenshot identity fixture"
+        with patch.object(release, "CURATED_SCREENSHOTS", {path: release.sha256(data)}):
+            self.assertEqual(release.classify(path, data), "curated_documentation_screenshot")
+            with self.assertRaisesRegex(ValueError, "screenshot bytes"):
+                release.classify(path, data + b"changed")
+            for unknown in ("docs/images/other.png", "elsewhere/invented-screen.png"):
+                with self.subTest(path=unknown), self.assertRaisesRegex(ValueError, "filename"):
+                    release.classify(unknown, data)
+            self.commit({path: data})
+            manifest = self.manifest()
+            row = next(r for r in manifest["files"] if r["path"] == path)
+            self.assertEqual(row["classification"], "curated_documentation_screenshot")
+            self.assertEqual(row["sha256"], release.sha256(data))
+            self.commit({path: data + b"changed"})
+            with self.assertRaisesRegex(ValueError, "screenshot bytes"):
+                self.manifest()
+
     def test_credential_failure_never_includes_the_value(self):
         token = b"ghp_" + b"A" * 36
         with self.assertRaises(ValueError) as caught:
