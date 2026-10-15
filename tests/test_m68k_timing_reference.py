@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Differential native timing check against pinned public M68000 microcode.
+"""Differential native state/timing check against pinned public M68000 microcode.
 
 Requires the four pinned MAME sources under ignored build/validation.
 Generated reference helpers are BSD-3-Clause, copyright Olivier Galibert.
 No game images are consulted and generated reference code stays under build/.
+Always regenerate the native fixture with the current production emitter;
+an older header can retain obsolete cycle and ordered-write behavior.
 """
 from pathlib import Path
 import runpy,sys,re
@@ -118,5 +120,5 @@ exe=out/'test-m68000-reference'
 test_source='tests/test_m68k_division_reference.cpp' if args.division_only else 'tests/test_m68k_timing_reference.cpp'
 run(compiler+flags+[test_source,'src/m68k/decode.cpp','src/m68k/timing.cpp','src/runtime/snd_cpu.cpp','-o',str(exe)])
 run([str(exe)])
-(out/'audit.json').write_text(json.dumps({'reference_commit':'dddd73680656e355bb2b5beecab1167c9f07bf81','reference_sha256':hashes,'public_opcode_patterns':len(ops),'sanitized':args.sanitize,'division_only':args.division_only,'scope':('Production-emitted DIVU/DIVS total cycles, results and defined flags against independent microcode for all nonzero divisors and boundary/random dividends. Zero-divide exception delivery remains unsupported.' if args.division_only else 'Instruction total cycles, mapped waits, total bus transfer counts, ordered write address/data/masks, reset and phase-dependent autovector entry. Bus-stage timing, prefetch values and other exception timing are not claimed.')},indent=2)+'\n')
+(out/'audit.json').write_text(json.dumps({'reference_commit':'dddd73680656e355bb2b5beecab1167c9f07bf81','reference_sha256':hashes,'public_opcode_patterns':len(ops),'sanitized':args.sanitize,'division_only':args.division_only,'scope':('Production-emitted DIVU/DIVS total cycles, results and defined flags against independent microcode for all nonzero divisors and boundary/random dividends. Zero-divide exception delivery remains unsupported.' if args.division_only else 'Instruction total cycles, mapped waits, total bus transfer counts, ordered write address/data/masks, completed architectural registers/stack banks/PC/defined SR and complete synthetic memory; reset and phase-dependent autovector entry. DIV overflow N/Z and reset undefined state are excluded. Existing instruction cases start supervisor with X=0; IRQ cases start supervisor. Bus-stage timing, prefetch values, other exceptions, SCSP and coupled-board fidelity are not claimed.')},indent=2)+'\n')
 print(len(ops),'microcode oracle handlers generated')

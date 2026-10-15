@@ -251,11 +251,14 @@ The separate test-only whole-bundle consumer now reuses canonical immutable
 preflight and the raw harness's two board instances. It binds the actual capture
 host/assets/options/seeds, existing measured source/object/link evidence and
 generated instruction inventory before stepping. Capability flags alone cannot
-approve a capture. One fresh sound-off v14 bundle passes all six resumes through
-two frames and 563,041 instructions, with 283,375 ordered writes and 910,200
-cycles. Evidence remains under `build/validation/independent-recording-v14/`.
-This is a short neutral-input check with shared device implementations, not
-full-race, sound-on or hardware parity. See the
+approve a capture. The initial fresh sound-off v14 bundle passes six resumes
+through two frames and 563,041 instructions. A subsequent fresh driving bundle
+passes all 5,201 resumes, 500,035,460 instructions, 15,156,607 ordered writes and
+1,130,001,001 cycles through frame 2,600. All 15 applied script events and
+terminal witnesses match; its bytes remain unchanged. Evidence is retained in
+`build/validation/independent-recording-v14/` and
+`build/validation/independent-drive-v14/`. These checks use shared device
+implementations and do not establish full-race, sound-on or hardware parity. See the
 [bounded consumer procedure](segarally-build-validation.md#independent-sound-off-recording-consumer).
 
 The ROM-free tests cover 98 stream/contract checks and 84 Machine checks in

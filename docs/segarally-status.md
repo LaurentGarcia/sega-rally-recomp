@@ -14,17 +14,20 @@ The [design](sega-rally-design.md) records interpretation and hardware limits.
 | Course progress | Desert clear/results show 1:12.15; forested second course enters, times out, then attract returns | Centered steering does not complete second-course bends; remaining courses unvalidated |
 | Metal fidelity | Optional native repeated stepping is integrated into v15; three complete scenes fall from 2,519 differing pixels to 5, and 447 synthetic cases pass | Default OFF; sustained cost, continuous flicker and whole-game fidelity remain open |
 | Sound generation | Native linked board captures 2,409,170 stereo frames: 54.6297052 seconds including nonzero 44.1 kHz PCM; shared-core drains agree | Whole-game audio parity unvalidated |
-| Audio output | v15 supplies 23,250,561 stereo frames with zero chip/host drops and four SDL estimated shortfall requests totaling 25,248 input bytes | User reports title-screen glitches; location/cause and physical fidelity remain open |
-| Controller input | Xbox One Elite 2 detected; 329 mapping/virtual-device checks, normal build, menu Metal checks and actual-host input isolation pass | Physical controller driving/navigation awaits user test; wheels/force feedback remain outside this implementation |
+| Audio output | Earlier v15 playtest has four SDL estimated demands; later v16 manual test and fresh 7,200-frame neutral capture have zero demands/drops; all 5,519,841 neutral-capture PCM frames match recorded hashes | User reports title-screen glitches; clean later telemetry does not establish audible quality or resolve the cause |
+| Controller input | Xbox One Elite 2 detected; 329 mapping/virtual-device checks, normal build, menu Metal checks and actual-host input isolation pass; live recording contains intermediate steering, throttle and brake values | Recorded cabinet inputs do not identify their physical source; Y/navigation feedback remains open; wheels/force feedback remain outside this implementation |
 | Exact host recording | Actual manual v14 drive replays all 18,689 resumes, PCM hashes and final saves through frame 9,344; earlier scripted recorded/unrecorded checks also match | Same-Machine reproducibility; full-course and independent CPU/sound parity remain open |
 | Independent host recording | Actual sound-off driving bundle passes 5,201 resumes, 500,035,460 instructions, 15,156,607 ordered writes, 1,130,001,001 cycles and 2,600 frames after immutable preflight | Independent i960 with shared boards; longer/manual captures, sound-on and hardware parity remain open; fault rows rejected |
 | Hardware fidelity | Isolated device/reference tests and instruction-timed diagnostics | PCB timing, extF80 precision and full-machine behavior remain open |
 
-The separate v16 controller app has launched for a windowed user test with
-sound, CRT and queue diagnostics. Before launch, its 2,600-frame scripted drive
-preserves v15 native audio/image, saves and ordered inputs exactly. That is
-reproducibility evidence; physical-controller feedback and title-screen audio
-quality remain open. The live app and recording are preserved during testing.
+The separate v16 controller app exited normally after a 12,974-frame windowed
+test with sound, CRT and queue diagnostics. It supplied 9,946,388 stereo frames
+with zero logged SDL shortfall requests or chip/host drops. A frozen prefix
+contains 2,726 cabinet-input changes after scripted control ended, including
+intermediate analog values. Settings-button feedback and title-screen audio
+quality remain open. Before launch, its 2,600-frame scripted drive preserved
+v15 native audio/image, saves and ordered inputs exactly. The app and complete
+user recording remain preserved; completion alone is not a replay result.
 
 ## Measured Mac speed
 

@@ -227,9 +227,22 @@ preserves all ordered resumes, PCM, saves and the native image exactly. The
 final v15 app has launched with a visible CRT swapchain pass and sound. These
 results do not establish monitor fidelity or sustained live effect cost.
 The host also accepts the bounded cabinet replay and holds its final snapshot
-through one complete frame before handing control to keyboard/touch. Both
+through one complete frame before handing control to keyboard/controller/touch. Both
 rendering instances receive identical inputs. Normal board-time pacing is the
 Mac launch default; unthrottled runs are explicit diagnostics.
+
+The v16 host adds optional SDL gamepad input and a Controls tab within the
+paused Settings panel. It retains Rally's cabinet ranges and wiring while
+adapting Daytona's button/half-axis model. Bindings, dead zones and steering
+response persist separately from cabinet state. Menu/focus/replay transitions
+require held controls to return to neutral before rearming. The pure mapper
+and virtual SDL devices pass 329 checks; the actual host passes pause/focus
+input-isolation checks, and the menu passes both small and normal window sizes.
+The connected Xbox One Elite 2 is detected by an external SDL probe. Physical
+driving/navigation feedback is separate from those checks. The final v16
+2,600-frame sound/CRT scripted comparison preserves native PCM, pixels, saves
+and ordered resume observations exactly; no guest timing change is involved.
+
 Manual capture needs a separate host-resume transcript because controls are
 sampled between bounded execution calls, including mid-frame. An IRQ can also
 complete a frame at an unchanged instruction count. The tested transcript core
@@ -283,6 +296,14 @@ CPU harness uses a null hook callback and shared boards/TGP/geometry, with
 sound off. Full video RAM and framebuffer equality are terminal checks;
 per-instruction state/write/event checks do not establish per-frame pixel,
 Model2AMachine scheduling, coupled-sound or full MAME/PCB parity.
+
+The newer whole-recording consumer separately checks actual Machine resume
+boundaries under the declared phase contract. A fresh sound-off v14 driving
+bundle matches 5,201 resumes, 500,035,460 instructions and 15,156,607 ordered
+writes through frame 2,600, with exact cycle/PC/input witnesses and unchanged
+bundle bytes. It still uses independent i960 execution with shared boards and
+rejects sound-on/fault captures. This closes the earlier short-boot-only scope
+for that one recorded drive, not complete race or coupled-sound validation.
 
 The slow sensation of speed is measured in a hidden, normally paced Mac Metal
 run with sound disabled: 480 race frames take 14.163 seconds of wall time for
@@ -377,8 +398,13 @@ UART exchange real serial pin edges; no command reply is substituted.
 This follows the inherited **Audio** section's static-program approach with a
 Rally-specific scheduling contract. MMIO still occurs at each instruction's
 start boundary, with no value-bearing prefetch or individual bus-phase model.
-Independent public microcode tests validate totals, waits and ordered writes;
-whole-game audio parity and physical timing remain unverified. The diagnostic
+Independent public microcode tests also compare architectural registers,
+stack banks, PC, defined SR and complete synthetic memory: 11,551 completed
+instruction cases, 280 IRQ entries and two resets pass with fresh generated
+fixtures. Undefined division-overflow flags, reset state and unsupported
+exceptions remain explicit exclusions. These cases do not validate coupled
+sound-board sequencing; whole-game audio parity and physical timing remain
+unverified. The diagnostic
 is disabled by default, including in the Metal frontend. Daytona's measured
 instruction-rate shortcut is specific to its different Model 1 board and is
 not reused for Rally.

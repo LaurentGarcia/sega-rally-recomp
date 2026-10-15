@@ -209,7 +209,8 @@ options and no captured fault rows. It uses the canonical immutable preflight,
 actual initial/final saves and the existing raw harness's two board instances;
 production same-executable replay and raw parity defaults remain unchanged.
 The first actual check passes six resumes, 563,041 instructions, 283,375 ordered
-writes and two frames. Longer/manual captures and coupled sound remain open.
+writes and two frames. The subsequent driving checkpoint below extends this
+to frame 2,600; full-race/manual captures and coupled sound remain open.
 
 The ROM-free recording checks require the pinned `extern/lzma` revision
 `0766b733fe3e06dd2a7f9a3cfbf2108ac73abd17` for SHA-256, alongside the
@@ -335,8 +336,12 @@ are opt-in. Extra input bytes are SDL estimates, not exact missing device
 samples; presentation wall time includes host waiting and is not GPU timing.
 No-sound, unthrottled and offline-recording combinations reject before SDL.
 One paced 2,600-frame CRT check preserves native WAV/image, saves and all ordered
-resumes exactly, with no shortfalls or drops. Its clean result does not reproduce
-or resolve the reported title-screen glitch. Commands, hashes, dummy-stream
+resumes exactly, with no shortfalls or drops. A separate fresh 7,200-frame
+neutral attract capture seals 14,404 resumes and verifies every recorded PCM
+hash against its 5,519,841-frame WAV. Its first 2,400 resumes and PCM prefix
+equal the earlier run before coin insertion; all 121 telemetry rows report
+zero demands or drops. These clean results do not establish audible quality or
+resolve the reported title-screen glitch. Commands, hashes, dummy-stream
 test and retained preparation failure are in
 `build/validation/audio-diagnostics-v15/`.
 

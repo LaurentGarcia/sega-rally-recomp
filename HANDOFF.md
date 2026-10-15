@@ -1,5 +1,143 @@
 # Handoff
 
+## Sound CPU comparison includes architectural state (2026-10-14)
+
+The existing pinned-public-microcode differential now also compares D/A
+registers, active/inactive stack banks, architectural PC, defined SR bits and
+the complete synthetic 16 MiB memory image, retaining all previous timing and
+ordered-write checks. The freshly generated current fixture passes 11,551
+instruction cases, 280 IRQ entries and two resets with zero errors. Generation,
+compilation and execution take 21.185635 seconds on this Mac. This follows
+**Audio** and **Reference & validation**; no game ROM or runtime code changed.
+
+The first attempt reused an obsolete native fixture and failed 1,011 cases.
+The unchanged old test against those same inputs reproduced every failure
+count/opcode. Read-only provenance then showed the old fixture still used
+high-word-first ORI.L writes and obsolete fixed bit-operation timings; retained
+v3 fixtures and the current production emitter already contain the fixes.
+Fresh generation used the unmodified current emitter and pinned reference
+sources in a new directory. The independent microcode header remains exactly
+`53bf9dfb...`; native fixture SHA-256 changes from `1ea26c9d...` to
+`9a90675b3093e7f6a67879e18a44b6d2ed14ec3165540c51d937c991a9d75188`.
+No generated file was hand-edited and no comparison was weakened. Keep both
+failed runs: the lesson is to regenerate fixtures with their current emitter,
+not to treat a convenient old header as the current baseline. A prepared
+aggregate diagnostic was unnecessary after the fresh matrix passed and was
+not compiled or run.
+
+Explicit limits remain: 16 zero-divide frontiers, 16 prefetch frontiers,
+169 odd-address exceptions, 456 unsupported timing and 16 unemitted cases.
+One DIV overflow case excludes undefined N/Z; reset excludes undefined CCR
+and general registers. Instruction cases start supervisor with X=0; IRQ cases
+start supervisor. There is no value-bearing prefetch, exact bus phase, SCSP,
+coupled-board or hardware claim. Next build the separate independent sound
+board comparison before attributing the title-screen symptom to CPU timing.
+
+Evidence: `build/worktrees/m68k-state-reference/build/state-reference-evidence/`,
+with `fresh-001/result.json`, SHA-256
+`324b344400c4eb2967c84b064656512500097fa89df5e33fcab5d0bce0d7126b`,
+and `review-summary.json`, SHA-256
+`3b67500335adbb80cfb67006eb49c617e96e5087835bbe1b7d5867c8e0f72773`.
+The integrated C++ fixture matches the tested bytes. The Python wrapper's
+documentation/audit scope is updated; generation and execution logic remain
+unchanged, verified by AST comparison after excluding those two string changes.
+All ten shared generator/runtime source files match the tested worktree;
+`build/validation/m68k-state-integration/result.json` records the integration.
+Playtest apps and all old evidence remain preserved.
+
+## Restricted reciprocal prototype passes CPU arithmetic check (2026-10-14)
+
+An ignored common-HLSL prototype certifies the nearest-even reciprocal for
+signed normal inputs whose reciprocal is also normal. Its exact guard is
+`00800000 <= absbits <= 7e800000`. Powers of two are packed directly; other
+inputs use one exact 24-by-24-bit product, at most two neighboring candidate
+corrections and a cold 24-step integer fallback. Correctness does not assume
+the hardware seed's accuracy. Zero, subnormal, overflowing, infinite and NaN
+cases keep the original source operation; backend bit equality is unproven.
+This follows **Geometry (TGP) and rendering**: one shader path, no epsilon or
+per-platform fork, preserving signed span widths and operation ordering.
+
+A mechanical CPU translation passes all 8,388,608 normalized mantissas, both
+signs, exponent boundaries, perturbed/invalid seeds and exact product bounds:
+260,232,785 checks, including 204 excluded-input forwarding/CPU comparisons.
+Strict compilation and unchanged-source checks pass. Filesystem timestamps
+bound the whole compile/test interval at approximately 1.53 seconds; there is
+no GPU or game-performance inference. HLSL bodies are mechanically retained,
+with loop attributes removed and two division literals explicitly float.
+
+Evidence is under
+`build/worktrees/mac-triangle-fidelity/build/validation/reciprocal-source-audit/`:
+`audit.json`, SHA-256
+`8823e29943d31b76dacb1013ecb07f88556a79d2e39b71df8dd9a5403da5bbc9`,
+and `cpu-oracle-001/run01/result.json`, SHA-256
+`f8491c511aa250e8d57a9e923982e0ebfcd7775ada5200bb00e588f3125335a6`.
+No production shader changed. Next compile the isolated helper through the
+shared shader toolchain, check actual GPU arithmetic and excluded-class guards,
+then directly attribute the remaining span-step differences before integration.
+CPU success alone does not establish shader semantics, cost or pixel fidelity.
+
+## Longer neutral sound capture completes (2026-10-14)
+
+After the controller window closed, the prepared fresh neutral attract check
+ran alone through 7,200 frames in 126.378242 seconds including process startup
+and exit. It reaches 1,399,415,787 instructions, 3,129,161,000 cycles and
+PC `005ca464`, with a normal frame-limit exit. Both neutral events apply at
+frames 0 and 7,199, all twelve cabinet pins remain neutral and no manual
+handoff occurs. The sound-enabled recording seals 14,404 ordered resumes.
+
+The finite float32 stereo 44.1 kHz WAV contains 5,519,841 frames. Every drain's
+sample count and SHA-256 matches its recording observation; the first 2,400
+resumes and 7,360,272 PCM bytes exactly match the previous paced capture before
+its first coin at frame 1,200. Distinct recording/executable identities remain
+intact. All 121 telemetry rows show zero positive SDL demands or host drops,
+and the native log reports zero chip drops. Interval maxima are 23.750417 ms
+producer gap, 7.252333 ms Machine execution, 2.693875 ms presentation wall time
+and 42.259833 ms pacing lateness. These are host observations, not GPU timings
+or exact speaker-sample accounting. Frozen inputs are unchanged.
+
+The terminal image shows the tree-lined course with CREDIT 0/2 during attract.
+There are no screenshots labeling earlier title intervals and no verified
+listening assessment. This run therefore does not resolve the reported audible
+title glitch; do not change buffering or chip behavior from its clean counters.
+No retry or concurrent build/device test occurred. Next investigate independent
+sound CPU/board state, and use a reported audible interval to localize any
+further output experiment. The v16 playtest app remains unchanged.
+
+Evidence: `build/validation/audio-diagnostics-v15/neutral-title-001/result.json`,
+SHA-256 `be731ef578c01e9e57d544454dfac755921a8cd100046b08e33031785f6e1d34`;
+separate artifact audit `neutral-review-001/result.json`, SHA-256
+`40e161c41a3544e8d2c4b7aa7a4b00f509ef8537de5c074e9db26529cf975f7d`.
+The original terminal PPM, its PNG review conversion, full WAV, seeds and
+ordered recording are retained under ignored build output.
+
+## Completed v16 controller playtest (2026-10-14)
+
+The windowed sound/CRT session exits normally at frame 12,974 after
+2,381,700,896 instructions and 5,638,541,403 cycles, PC `005a37a4`.
+The sealed recording contains 25,953 linked resumes and observations. Actual
+signed executable, assets-report identity, startup/final saves, row witnesses,
+terminal seal and preserved live prefix all validate. PCM counts total
+9,946,388 stereo frames, matching the host log; this session did not save raw
+PCM, so its per-row PCM hashes have not been independently recomputed. All 217
+telemetry rows report zero positive SDL demands or host drops; final native
+audio also reports zero chip drops. The two final queue counts were sampled
+at different times while playback drained and are not an inconsistency.
+
+The frozen prefix through frame 11,847 includes 2,726 cabinet-input changes
+after scripted handoff: steering has 250 distinct values, throttle 226 and
+brake 132. Intermediate values establish analog-path activity, not the physical
+input source or whether Y opened Settings. No persisted `controls.settings`
+was present in a separate read; this is not proof of the complete historical
+in-memory settings. The completed bundle has not been replayed. Title-screen
+audio quality remains unresolved despite clean counters in this session.
+
+Evidence: `build/validation/mac-controller-v16/live-final-001/result.json`,
+SHA-256 `c786db6836999a081a4f5b82d84b5bd747d079de3bfb598c5d9da0a9f41a900e`;
+the earlier `live-prefix-001` and original preview artifacts remain unchanged.
+No build, device probe or rendering test ran during the live playtest. The app
+and complete recording remain preserved. Design and replay documentation now
+also reflect the completed 500-million-instruction independent driving check.
+
 ## Optional controller input and Settings menu (2026-10-14)
 
 The dedicated Mac host now supports recognized SDL gamepads with hotplug,
