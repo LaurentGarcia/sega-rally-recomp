@@ -15,6 +15,7 @@ struct BuildBinding {
     std::span<const uint32_t> instruction_addresses;
     std::span<const Relocation> relocations;
     uint64_t maximum_instructions;
+    uint64_t progress_instructions = 0; // Test reporting only; disabled by default.
 };
 using Profile = std::map<uint32_t,reference_resume::GuardedInstruction>;
 inline Profile validate(const recording::PreflightBundle &bundle,

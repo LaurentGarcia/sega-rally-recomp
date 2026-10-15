@@ -5,11 +5,31 @@
         rr::load_startup_seeds(native_eeprom,nb.board,recording.initial_eeprom(),recording.initial_backup());
         rr::load_startup_seeds(reference_eeprom,rb.board,recording.initial_eeprom(),recording.initial_backup());
         uint64_t writes=0;bool pending_phase=false;
+        const auto started=std::chrono::steady_clock::now();
+        uint64_t active_resume=0,next_progress=recording_contract.progress_instructions;
+        const auto progress=[&]{
+            if(!recording_contract.progress_instructions||ls.count<next_progress)return;
+            const auto elapsed=std::chrono::duration<double>(std::chrono::steady_clock::now()-started).count();
+            std::printf("PROGRESS independent sound-off recording resume=%llu instructions=%llu writes=%llu cycles=%llu frames=%llu pc=%08x elapsed_seconds=%.3f\n",
+                (unsigned long long)active_resume,(unsigned long long)ls.count,(unsigned long long)writes,
+                (unsigned long long)native.reference_cycles,(unsigned long long)native_renders,native.m_IP,elapsed);
+            std::fflush(stdout);
+            next_progress=ls.count>UINT64_MAX-recording_contract.progress_instructions?UINT64_MAX:
+                ls.count+recording_contract.progress_instructions;
+        };
         const auto compare_phase=[&]{
             if(!same(native,ref)||nb.writes!=rb.writes||native_irqs.events!=reference_irqs.events||
                !same_io()||!same_comm()||!same_control()||!same_clock()||!same_video()||!same_uart()||
-               native_frames!=reference_frames||native_parses!=reference_parses||native_renders!=reference_renders)
+               native_frames!=reference_frames||native_parses!=reference_parses||native_renders!=reference_renders) {
+                std::fprintf(stderr,"MISMATCH independent recording resume=%llu native_instructions=%llu native_pc=%08x reference_pc=%08x native_cycles=%llu reference_cycles=%llu native_board_ns=%llu reference_board_ns=%llu native_frames=%llu reference_frames=%llu\n",
+                    (unsigned long long)active_resume,(unsigned long long)ls.count,native.m_IP,ref.m_IP,
+                    (unsigned long long)native.reference_cycles,(unsigned long long)ref.reference_cycles,
+                    (unsigned long long)native_clock.now_ns(),(unsigned long long)reference_clock.now_ns(),
+                    (unsigned long long)native_renders,(unsigned long long)reference_renders);
+                for(unsigned n=0;n<32;++n)if(native.m_r[n]!=ref.m_r[n])
+                    std::fprintf(stderr,"r%u native=%08x reference=%08x\n",n,native.m_r[n],ref.m_r[n]);
                 throw rt::Fatal("independent recording: CPU/write/IRQ/device phase mismatch");
+            }
         };
         const auto native_witness=[&]{return hi::Witness{ls.count,native.reference_cycles,native_clock.now_ns(),native_renders,native.m_IP};};
         rr::Hooks hooks;
@@ -28,7 +48,7 @@
             const auto before=ls.count;ls.end_count=before+1;
             while(!ls.finished())gen::run(env);
             if(ls.count!=before+1)throw rt::Fatal("independent recording: native opcode count differs");
-            compare_phase();writes+=nb.writes.size();pending_phase=false;
+            compare_phase();writes+=nb.writes.size();pending_phase=false;progress();
         };
         // validate() above checked the complete immutable bundle, the actual
         // host/assets and linked profile before either CPU was constructed.
@@ -37,7 +57,7 @@
             throw rt::Fatal("independent recording: startup witness differs");
         recording.each([&](const hi::Resume &row,const rt::Model2AMachine::RunResult &expected,uint64_t,const std::string &){
             if(native_witness()!=row.before)throw rt::Fatal("independent recording: native pre-witness differs");
-            native_io.inputs=row.inputs;const auto result=stepper.consume(row);compare_phase();
+            active_resume=row.index;native_io.inputs=row.inputs;const auto result=stepper.consume(row);compare_phase();
             if(native_witness()!=row.after||std::tie(result.reason,result.pc,result.instructions,result.message,result.address,result.value,result.width,result.write)!=
                 std::tie(expected.reason,expected.pc,expected.instructions,expected.message,expected.address,expected.value,expected.width,expected.write))
                 throw rt::Fatal("independent recording: captured native witness/return differs");

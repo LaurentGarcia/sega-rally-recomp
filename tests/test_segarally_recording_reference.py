@@ -138,7 +138,7 @@ def verify_host(build: Path, evidence: Path):
 
 
 def prepare(generation: Path, host_build: Path, host_evidence: Path, output: Path,
-            maximum_instructions: int):
+            maximum_instructions: int, progress_instructions: int = 0):
     host_root, host_sources, files = verify_host(host_build, host_evidence)
     # Import the original, byte-identical audit verifier so its established
     # confined relative paths stay intact; do not rebind ROOT or rewrite audits.
@@ -207,7 +207,7 @@ def prepare(generation: Path, host_build: Path, host_evidence: Path, output: Pat
     lines += ["}};", f"inline constexpr std::array<recording_reference::Relocation,{len(relocations)}> relocations{{{{"]
     lines.extend("{" + ",".join(str(r[k]) + "u" for k in ("guest","program_offset","size")) + "}," for r in relocations)
     lines += ["}};", "inline recording_reference::BuildBinding binding() { return {",
-              f'"{host_digest}","{assets_digest}",addresses,relocations,{maximum_instructions}ull}}; }}', "}"]
+              f'"{host_digest}","{assets_digest}",addresses,relocations,{maximum_instructions}ull,{progress_instructions}ull}}; }}', "}"]
     header.write_text("\n".join(lines) + "\n")
     sources = [ROOT / "tests/test_segarally_boot_parity.cpp", ROOT / "tools/srally_boot/recording_bundle.cpp",
                ROOT / "src/refcore/i960_ref.cpp", ROOT / "src/i960/decode.cpp", ROOT / "src/i960/isa.cpp"]
@@ -243,12 +243,21 @@ def prepare(generation: Path, host_build: Path, host_evidence: Path, output: Pat
     for name,entry in assets["images"].items():
         require(identity(assets_dir/entry["file"])=={"bytes":entry["size"],"sha256":entry["sha256"]},"staged image changed during build")
     snapshot[str(output/"recording_reference")]=identity(output/"recording_reference")
-    result = {"scope":"independent_i960_shared_boards_sound_off_only", "maximum_instructions":maximum_instructions,
+    result = {"scope":"independent_i960_shared_boards_sound_off_only", "maximum_instructions":maximum_instructions,"progress_instructions":progress_instructions,
               "executable":identity(output/"recording_reference"), "actual_capture_host":identity(exe),
               "actual_assets_report":identity(assets_dir/"assets.json"),"instruction_count":len(addresses),
               "measured_inputs":snapshot,"generation_provenance_limits":"existing source/object measurements; TGP source identity_only; no hardware attestation"}
     (output / "prepared.json").write_text(json.dumps(result,indent=2)+"\n")
     return exe, assets_dir, snapshot
+
+
+def execution_limits(maximum_instructions: int, timeout: int, long_checkpoint: bool,
+                     progress_instructions: int = 0):
+    instruction_limit, time_limit = (600000000, 2400) if long_checkpoint else (20000000, 180)
+    require(1 <= maximum_instructions <= instruction_limit and 1 <= timeout <= time_limit,
+            f"checkpoint bound is 1..{instruction_limit} instructions and <={time_limit} seconds; long runs require --long-checkpoint")
+    require(progress_instructions == 0 or 100000 <= progress_instructions <= 10000000,
+            "progress interval must be zero (disabled) or 100000..10000000 instructions")
 
 
 def main():
@@ -259,8 +268,10 @@ def main():
     parser.add_argument("--run",action="store_true",help="Execute the preflighted sound-off bundle after build")
     parser.add_argument("--max-instructions",type=int,default=20000000)
     parser.add_argument("--timeout",type=int,default=90)
+    parser.add_argument("--long-checkpoint",action="store_true",help="Explicitly allow <=600M instructions and <=2400 seconds; defaults unchanged")
+    parser.add_argument("--progress-instructions",type=int,default=0,help="Flush matched CPU progress every N instructions (100k..10M); zero disables")
     args=parser.parse_args()
-    require(1<=args.max_instructions<=20000000 and 1<=args.timeout<=180,"first checkpoint bound is 1..20M instructions and <=180 seconds")
+    execution_limits(args.max_instructions,args.timeout,args.long_checkpoint,args.progress_instructions)
     require(not args.run or args.bundle is not None,"--run requires --bundle")
     common=Path(subprocess.run(["git","rev-parse","--path-format=absolute","--git-common-dir"],cwd=ROOT,capture_output=True,text=True,check=True).stdout.strip()).parent
     for name in ("generation","host_build","host_evidence","output","bundle"):
@@ -268,7 +279,7 @@ def main():
         if value is not None:setattr(args,name,confined(value,common/"build"))
     require(args.output.is_relative_to(ROOT/"build"),"output must be under this checkout's ignored build/")
     args.output.mkdir(parents=True,exist_ok=False)
-    exe,data,snapshot=prepare(args.generation,args.host_build,args.host_evidence,args.output,args.max_instructions)
+    exe,data,snapshot=prepare(args.generation,args.host_build,args.host_evidence,args.output,args.max_instructions,args.progress_instructions)
     if args.run:
         command=[str(args.output/"recording_reference"),"--recording",str(args.bundle),str(data),str(exe)]
         (args.output/"run-command.json").write_text(json.dumps(command,indent=2)+"\n")

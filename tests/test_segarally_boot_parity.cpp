@@ -6,6 +6,7 @@
 #include "runtime/model2a_clock.h"
 #include "tools/srally_boot/input_replay.h"
 #ifdef M2_SRALLY_RECORDING_REFERENCE
+#include <chrono>
 #include "tools/srally_boot/recording_reference.h"
 #include M2_SRALLY_RECORDING_CONTRACT_HEADER
 #endif
@@ -135,7 +136,8 @@ int main(int argc,char** argv) {
     try {
 #ifdef M2_SRALLY_RECORDING_REFERENCE
         const auto recording=srally::recording::preflight_bundle(argv[2],argv[3],argv[4]);
-        const auto profile=srally::recording_reference::validate(recording,argv[4],srally::recording_contract::binding());
+        const auto recording_contract=srally::recording_contract::binding();
+        const auto profile=srally::recording_reference::validate(recording,argv[4],recording_contract);
         const auto &opts=recording.options();
         enable_io=opts.io;enable_comm=opts.comm;enable_control=opts.control;
         enable_video=opts.video;enable_screen=opts.screen;enable_uart=opts.uart;

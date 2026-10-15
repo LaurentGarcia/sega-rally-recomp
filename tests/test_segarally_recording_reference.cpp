@@ -65,6 +65,9 @@ int main(int argc,char **argv){try{
  const auto exe_hash=rt::sha256_file(exe,1024ull*1024*1024).hex,assets_hash=rt::sha256_hex(assets);
  srally::recording_contract::fixture={exe_hash,assets_hash,addresses,{},100};
  check(run(bundle,data,exe)==0,"complete independent synthetic recording failed");
+ srally::recording_contract::fixture.progress_instructions=2;
+ check(run(bundle,data,exe)==0,"progress reporting changed complete independent comparison");
+ srally::recording_contract::fixture.progress_instructions=0;
  const auto frozen=rec::preflight_bundle(bundle,data,exe);const auto original=read(bundle/"resumes.txt");write(bundle/"resumes.txt","changed after preflight\n");
  unsigned rows=0;frozen.each([&](const auto&,const auto&,uint64_t,const auto&){++rows;});check(rows==4&&frozen.initial_backup()==backup,"preflight did not preserve actual immutable rows/seeds");
  bool refused=false;try{frozen.verify_stream_files_unchanged();}catch(const std::exception&){refused=true;}check(refused,"preflight disk edit diagnostic missing");write(bundle/"resumes.txt",original);

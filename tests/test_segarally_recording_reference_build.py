@@ -45,6 +45,20 @@ class BindingTests(unittest.TestCase):
         self.put(self.current/"src/runtime/model2a_machine.cpp","different");self.assertRaises(ValueError,self.verify)
     def test_changed_link(self):
         self.put(self.out/"CMakeFiles/segarally_native.dir/link.txt","c++ unmeasured.o");self.assertRaises(ValueError,self.verify)
+    def test_short_limits_unchanged(self):
+        build.execution_limits(20000000,90,False)
+        build.execution_limits(20000000,180,False)
+        for instructions,timeout in ((20000001,180),(20000000,181),(0,90)):
+            self.assertRaises(ValueError,build.execution_limits,instructions,timeout,False)
+    def test_explicit_long_limits(self):
+        build.execution_limits(600000000,2400,True,5000000)
+        self.assertRaises(ValueError,build.execution_limits,600000000,2400,False,5000000)
+        for instructions,timeout in ((600000001,2400),(600000000,2401)):
+            self.assertRaises(ValueError,build.execution_limits,instructions,timeout,True)
+    def test_progress_bound(self):
+        for value in (0,100000,10000000):build.execution_limits(20000000,90,False,value)
+        for value in (-1,1,99999,10000001):self.assertRaises(ValueError,build.execution_limits,20000000,90,False,value)
+
     def test_duplicate_keys_and_bounds(self):
         self.put(self.root/"bad.json",'{"value":1,"value":2}');self.assertRaises(ValueError,build.read_json,self.root/"bad.json")
         self.assertRaises(ValueError,build.identity,self.obj,1)

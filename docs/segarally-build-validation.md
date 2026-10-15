@@ -234,12 +234,23 @@ The evidence directory must contain the original `compiled-object-contract.json`
 Missing evidence is rejected, not replaced by a supplied digest. TGP source
 identity remains `identity_only`, not independently authenticated generation.
 
-The default prepares only. To execute, add `--bundle DIR --run`, an explicit
-`--max-instructions` (at most 20 million) and `--timeout` (at most 180 seconds).
-The first actual check uses one million and 90 seconds. Output retains the
-build/run commands, frozen identities and comparison transcript; no SDL/GPU,
-audio output or live-save writes occur. Preserve the original raw host and its
-matching measurements; a changed or signed executable needs matching evidence.
+The default prepares only, retaining a 20-million-instruction cap and 90-second
+timeout; the short-checkpoint timeout ceiling is 180 seconds. To execute, add
+`--bundle DIR --run`. The first actual check uses one million and 90 seconds.
+Longer checkpoints require explicit `--long-checkpoint`, with at most
+600 million instructions and 2,400 seconds. For example, add
+`--max-instructions 600000000 --timeout 2400 --progress-instructions 5000000`
+to prepare or run that bounded candidate. Progress is disabled by default;
+when enabled, matched instruction/write/cycle/frame/PC counters are flushed at
+the selected interval without changing guest synchronization.
+
+Output retains build/run commands, frozen identities and comparison transcript;
+no SDL/GPU, audio output or live-save writes occur. The longer limit is an opt-in
+resource bound, not a completed driving-validation result. The prepared driving
+plan uses `nice -n 10` for capture and replay, fresh exclusive saves/output,
+immutable input copies and first-mismatch stop; it remains deferred during the
+active playtest/audio diagnosis. Preserve the original raw host and its matching
+measurements; a changed or signed executable needs matching evidence.
 
 Relevant source-level regression checks include:
 

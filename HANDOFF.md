@@ -31,6 +31,27 @@ sound-off drive preparation and residual texture arithmetic analysis continue
 separately; heavy execution waits for that quiet audio check. The v15 app and
 its saves stay preserved. Mac remains the active target.
 
+## Longer sound-off recording checkpoint prepared (2026-10-14; not run)
+
+An explicit `--long-checkpoint` opt-in permits at most 600 million instructions
+and 2,400 seconds; existing 20-million/90-second defaults and the 180-second
+short ceiling stay unchanged. Optional matched-instruction progress is flushed
+without guest synchronization changes, and first mismatches report counters/PCs.
+All four focused CTests pass: 23 bundle, ten limit/binding, 165 existing bundle
+and 249 phase checks. All six integrated source files match the frozen tested
+files exactly. No long sound-off recording exists yet: current sound-off
+bundles cover only two boot frames, and sound-on bundles remain untouched.
+
+A measured consumer is prepared from existing audited objects for a fresh v14
+raw-host Lancia script through frame 2,600, with fresh saves and exclusive output.
+Future capture/replay commands use `nice -n 10`, 600/2,400-second hard timeouts,
+immutable identity checks and first-failure stop. Five-million-instruction
+progress is enabled. The roughly 18-minute estimate for 500 million instructions
+comes only from boot; driving/TGP cost and interactive contention may be higher.
+Evidence and exact commands: `build/validation/independent-drive-v14/`.
+Capture, final driving-image inspection and long independent replay remain
+pending; execution is deferred for the active v15 playtest/audio diagnosis.
+
 ## Short independent whole-recording validation (2026-10-14)
 
 A separate test-only sound-off consumer now reuses canonical immutable bundle
