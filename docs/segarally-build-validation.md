@@ -77,6 +77,9 @@ It includes controller/Settings support and input recording. Display enhancement
 retain their off-by-default settings. It never downloads dependencies or launches
 the game; the final output prints the windowed launch command with sound and the
 execution hook enabled, using the bundled Lancia selection replay.
+New Mac binaries also enable compiled sound and the hook when started with no
+arguments, including a direct Finder launch. Explicit command-line invocations
+retain the opt-in switches shown in this guide.
 Use pristine pinned dependency checkouts for this entrypoint. It refuses tracked
 dependency modifications, including the optional Vulkan patch applied by the
 inherited general setup script; the explicit clone/checkouts above are sufficient

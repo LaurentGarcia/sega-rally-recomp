@@ -1,5 +1,36 @@
 # Handoff
 
+## Fresh Mac build verified; direct startup defaults corrected (2026-10-15)
+
+The first fresh candidate is generated from the supplied archive at commit
+`d79ec86`, built Release with sound/hook/recording, and passes all nine dedicated
+Mac CTests in 1.56 seconds. The one-command pipeline then correctly stops when
+the sandbox denies `pgrep` access (exit 3, unavailable sysmond). The original
+failure report/log remain unchanged. Retrying the exact package-only command
+with OS access succeeds, followed by strict deep signature verification.
+No game launch occurred. Evidence: `build/mac-candidate-001/`;
+`package-recovery-001.json` SHA-256
+`291f1d009ceab416e4bc0c8ada37bfa3e5daf74ac1f3df1b6b12c09f92284263`.
+
+Independent audit verifies all 20 bundle files, eight original images and seven
+notice files. All 52 freshly generated main C++ files and complete reachability,
+TGP source and timed sound source match v17 exactly. The boundary contract is
+valid; all 26 file-backed Mach-O sections match before/after signing. Report:
+`build/validation/mac-release-audit/fresh-candidate-001-review.json`, SHA-256
+`aeea2788271302058b24bcfd4b6230a33d8169440b059cc28ebda42a4ca8cc7a`.
+This establishes fresh build/package reproduction, not new gameplay validation.
+
+The packaging audit also found a real player-facing default: Finder invokes
+the native executable without the launcher's arguments, so the previous app
+started with sound and the faster instruction-boundary path disabled. Mac
+startup with no arguments now enables those two capabilities when compiled in.
+Explicit diagnostic commands and offline recording replay retain their existing
+defaults; display preferences/effects and iOS are unchanged. The exact host
+source passes strict syntax checks in ordinary, sound/hook/recording, and
+hook-only configurations. Actual no-argument startup still needs a bounded
+device check in the next build. This follows Platform layer & build; no game
+instructions, clocks, audio generation or shader behavior changed.
+
 ## v17 manual replay passes; Mac candidate pipeline prepared (2026-10-15)
 
 The latest v17 session closed normally at 4,729 frames, 890,065,301 main

@@ -100,6 +100,18 @@ int segarally_host_main(int argc,char **argv) {
     bool touch_visible=false,unthrottled=false,hidden=false,fullscreen=false,sound=false;
     bool crt_requested=false,original_display=false,accurate_textures=false,show_display_controls=false;
     bool instruction_boundary_hook=false,audio_diagnostics=false;
+#if defined(__APPLE__) && !defined(SEGARALLY_IOS)
+    // Finder starts the dedicated app without arguments. Explicit diagnostic
+    // commands retain their opt-in defaults, including offline replay.
+    if(argc==1) {
+#ifdef M2_SRALLY_SOUND
+        sound=true;
+#endif
+#ifdef M2_INSTRUCTION_BOUNDARY_HOOK
+        instruction_boundary_hook=true;
+#endif
+    }
+#endif
 #ifdef SEGARALLY_INPUT_RECORDING
     std::filesystem::path record_path,recording_replay_path;
     bool recording_replay_conflict=false;
@@ -135,7 +147,7 @@ int segarally_host_main(int argc,char **argv) {
         else if(arg=="--audio-diagnostics") audio_diagnostics=true;
         else if(arg=="--instruction-boundary-hook") instruction_boundary_hook=true;
         else if(arg=="--audio-capture") audio_path=value();
-        else if(arg=="--help") {puts("Sega Rally native: --data DIR --save-dir DIR --frames N --instructions N --capture FILE.ppm --reference-capture FILE.ppm --touch --unthrottled --hidden --fullscreen --log FILE --input-replay FILE --sound --audio-capture FILE.wav --audio-diagnostics --instruction-boundary-hook\nSound is opt-in and uses diagnostic instruction-boundary timing. Unthrottled runs capture/drain audio without device playback.\nKeys: arrows steer, Z gas, X brake, C coin, Return start, V view, A/S gear down/up, Space handbrake, F2 test, F3 service, Escape quit.");
+        else if(arg=="--help") {puts("Sega Rally native: --data DIR --save-dir DIR --frames N --instructions N --capture FILE.ppm --reference-capture FILE.ppm --touch --unthrottled --hidden --fullscreen --log FILE --input-replay FILE --sound --audio-capture FILE.wav --audio-diagnostics --instruction-boundary-hook\nNo-argument Mac startup enables compiled sound and exact instruction-boundary execution. Explicit commands keep sound opt-in with diagnostic instruction-boundary timing. Unthrottled runs capture/drain audio without device playback.\nKeys: arrows steer, Z gas, X brake, C coin, Return start, V view, A/S gear down/up, Space handbrake, F2 test, F3 service, Escape quit.");
             puts("Display: F1 opens controls and pauses; F6 toggles CRT effects. --crt enables the Arcade CRT preset; --original-display uses display defaults; --accurate-textures enables optional native interpolation; --display-controls opens the panel. Native --capture remains before display effects.");
             puts("Controls: F1 or Xbox Y opens Settings. Configure keyboard/controller bindings and optional controller input in Controls. Xbox defaults: left stick steer, RT gas, LT brake, LB/RB shift, A view, X handbrake, Back coin, Start start.");
 #ifdef SEGARALLY_INPUT_RECORDING
