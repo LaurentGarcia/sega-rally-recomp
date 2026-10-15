@@ -1,5 +1,98 @@
 # Handoff
 
+## Fresh credit/start after attract (2026-10-14)
+
+`config/segarally_credit_restart.inputs` preserves all nineteen held-gas rows,
+releases gas at frame 10,710, pulses two coins at 10,720/10,740 and Start at
+10,760, releasing each after ten frames. A final neutral row at 11,159 keeps
+scripted control active until the 11,160-frame exit. This exercises cabinet
+pins and real game code under **Inputs** and **Reference & validation**.
+
+The preserved window-first v13 Mac binary, sound off and hook enabled, applies
+all 27 events and exits 0 after 11,160 renders, 2,090,501,029 instructions and
+4,850,177,003 cycles at PC `0x005a37a4`. The actual capture shows CAR SELECT,
+countdown 08 and the default Toyota automatic choice. This establishes a new
+accepted start after the earlier timeout/attract path; it does not establish
+a second race or a numeric final credit balance (not shown on that menu).
+Fresh saves stayed inside the evidence directory, with no manual takeover.
+The hidden/unthrottled run cost 93.387532 seconds under development load;
+it is not a quiet pacing or sound-performance test.
+
+No native-driver cap was changed: the host already accepts frame/instruction
+limits. This run requests 11,160 frames, an explicit 2.2-billion instruction
+ceiling and a 600-second process timeout. The older boot wrapper's two-billion
+cap cannot reach these late inputs. The preserved playable app is unchanged.
+Evidence is in `build/validation/restart-credit-v13/`; replay SHA-256 is
+`ae9998a13f2f6300d74ecc6cbd0e2ffd3c2ffef94d03cc64ad8a6f86dde1d993`.
+`run.log` SHA-256 is
+`5a929aa284c5e55b0f9134466a2378a96262903387c7d43ef3e11b1e59b47ab9`;
+`result.json` is
+`666dd52bf272729d836e49e20105c29fef8d971d02a6a076fd84324b1e4828ae`;
+`visual-review.json` is
+`11cc718fb0d5c8e90963e91995f4b47f11d346ca6479f04213329af02fbb8294`.
+The final PNG is only a lossless format conversion of the PPM for inspection.
+Next: confirm a second race and repeat longer paths with sound/capture enabled.
+
+## Two-billion-instruction held-gas CPU comparison (2026-10-14)
+
+The preserved audited raw parity binary passes 2,000,000,000 main instructions,
+86,328,770 ordered writes, 4,650,936,033 reference cycles, 113,101 IRQ entries
+and 10,701 renders. All nineteen held-gas events apply, with no missing-code
+or device frontier. Terminal PC is `0x005a37a8`, framebuffer hash
+`2e2d4fb9e7f002ad`. The bounded process exits 0 in 1,077.580024 wall seconds;
+this is validation cost under concurrent development, not a gameplay benchmark.
+The original source identities remain unchanged before/after execution.
+
+A separate saved-log audit matches all nineteen frame/instruction/cycle/input
+boundaries, final instruction/cycle/IRQ/frame counts, PC and framebuffer hash to
+`build/segarally-timed-v13/evidence/lancia-hold-gas-2b-complete`. That evidence
+is in MAIN's build tree, not the suggested boundary-hook worktree. The old
+native log does not count writes, so its write total is not independently
+compared. Both runs use the same held-gas bytes and imported image identities.
+This extends independent CPU evidence through the already observed Desert
+results, second-course timeout and return to attract.
+
+Scope follows **Reference & validation**: separate CPU engines and device
+instances, shared board/TGP/geometry implementations, sound off, UART idle RX,
+null instruction callback. CPU state, writes and events are checked at each
+opcode; full video RAM and framebuffer comparison is terminal-only. This is
+not every-frame pixel comparison, Model2AMachine scheduling or full MAME/PCB
+parity. The previous sound-enabled scheduler/PCM comparisons remain separate.
+
+Evidence directory: `build/validation/raw-parity-hold-gas-2b/`.
+`run.log` SHA-256 is
+`408238534c38ca4736c9a06dc6ba26891f1ea23d62b6db0880553e09365e2cec`;
+`result.json` is
+`6194f802d48e4fd0c9554ffc3116c521f06ab243658796764aea157f2630ea9d`;
+`native-evidence-comparison.json` is
+`afd2900bc100eb32ea50f7a3dd0e8e13401f64f54b6ec0c497eeb40a36250a74`.
+The preserved binary SHA-256 remains
+`04e3bc4d1c18fa8786ab901ee696eb6a961faeaa6e2a9f920a7effc5ef23a3cf`.
+The separate fresh-credit/start check is recorded above. Exact host capture
+with coupled sound remains required; neither follows from CPU parity alone.
+
+## Residual triangle interpolation rounding identified (2026-10-14)
+
+At (95,31), CPU and optional GPU both select triangle 787 with identical
+uploaded plane coefficients. CPU repeated additions yield U/V 5630/42001,
+texel 84 and RGB (20,24,0). A single 38-pixel offset from the same clipped
+start yields V 42002, texel 83 and RGB (17,21,0), exactly matching the GPU.
+An ignored shader toggle that repeats the additions restores all three CPU
+interpolant bit patterns and the exact color, with the same owner and planes.
+This measured discrepancy is interpolation rounding, not coverage, ownership,
+alpha acceptance or plane setup. Mode-0 instrumentation matches all 190,464
+normal-output RGBA pixels.
+
+No production change follows: the loop's cost and broader scene behavior are
+unmeasured. All five frozen triangle source hashes remain unchanged. Evidence
+is in `build/worktrees/mac-triangle-fidelity/build/validation/pixel-95-31-gpu/`;
+`attribution.json` SHA-256 is
+`b7dbefa62d432c301093d2063615bb0424bae85b8ee3039b16d0d6387acfe8a4`.
+`direct.log` is
+`8a7635e89015ac7a3ca9e0eed6467a69006c883d4a26e7e07d59028e3f0cc16b`;
+`repeat.log` is
+`2676683c1b709a17360e375be9181bc1e11c9464e2d568facc679a7e9102ec8c`.
+
 ## Optional Metal triangle coverage (2026-10-14)
 
 The optional scanline path now covers triangles as well as 4–8-vertex

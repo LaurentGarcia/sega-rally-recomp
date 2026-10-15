@@ -29,13 +29,17 @@ The frozen v13 graph contains 75,205 native i960 instructions in 52 compiled
 objects. It runs the actual Lancia race, Desert finish/results and entry into
 the forested second course. A two-billion-instruction held-gas replay reaches
 time-over and returns to attract mode without a missing-code or device error.
-Other courses, alternate paths and a fresh second-credit start still need tests.
+A fresh-credit check then accepts two coins and Start, returning to Car Select
+at frame 11,160. Starting that second race, other courses and alternate paths
+still need tests.
 
-Independent CPU comparison passes 600 million driving instructions, all nineteen
-recorded input events, 19,641,024 ordered writes and 3,142 rendered frames.
-It uses separately instantiated shared device implementations, so it is not
-full MAME-machine or PCB proof. Extended-precision FP, exact racing-scene pixels
-and physical timing remain open requirements.
+Independent CPU comparison now passes the two-billion-instruction held-gas
+path: all nineteen input events, 86,328,770 ordered writes, 4,650,936,033
+reference cycles and 10,701 rendered frames. CPU state, writes and events are
+checked per instruction; the full framebuffer is checked at the end. This
+sound-off test uses separately instantiated shared board implementations,
+not the full Machine scheduler or independent MAME/PCB hardware. Extended-
+precision FP, exact racing-scene pixels and physical timing remain open.
 
 Indexed lookup and the opt-in instruction boundary hook reduce execution
 overhead while preserving instruction guards and timing. With native SCSP sound

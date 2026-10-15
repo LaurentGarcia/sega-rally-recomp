@@ -9,8 +9,8 @@ The [design](sega-rally-design.md) records interpretation and hardware limits.
 | --- | --- | --- |
 | Main native coverage | Frozen v13: 75,205 instructions, 52 native objects, no missing templates | Coverage is a reached graph, not a remaining-work percentage |
 | Interactive Mac | Stable SDL3/Metal host, manual control after selection handoff; sound-enabled windowed session exits normally after 9,347 frames | User feedback on live audio quality pending |
-| Driving parity | 600 million instructions, 19,641,024 ordered writes, 1,365,742,448 cycles, 32,576 IRQs and 3,142 renders; nineteen replay events match | Independent CPU with shared board implementations; no full MAME race |
-| Later game paths | Held-gas v13 runs two billion instructions and 10,701 renders without a code/device frontier; returns to attract | Game Over overlay and a new credit/start sequence not separately validated |
+| Driving parity | Two billion held-gas instructions, 86,328,770 ordered writes, 4,650,936,033 cycles, 113,101 IRQs and 10,701 renders; nineteen replay events match | Sound off; independent CPU with shared boards and final-frame comparison; no full MAME race |
+| Later game paths | Held-gas v13 returns to attract; a fresh two-coin/Start sequence reaches Car Select at frame 11,160 without a frontier | Second race and Game Over overlay not separately validated |
 | Course progress | Desert clear/results show 1:12.15; forested second course enters, times out, then attract returns | Centered steering does not complete second-course bends; remaining courses unvalidated |
 | Metal fidelity | Optional polygon scanlines reduce error in three real scenes; triangle coverage further improves the saved 3D layer; 447 synthetic cases pass | Still off by default; exact racing-scene raster parity and updated performance remain open |
 | Sound generation | Native linked board captures 2,409,170 stereo frames: 54.6297052 seconds including nonzero 44.1 kHz PCM; shared-core drains agree | Whole-game audio parity unvalidated |
@@ -46,6 +46,24 @@ matches all 3,142 frames through 600 million instructions, and the entire
 54.6297052-second WAV matches the old output byte for byte. SDL stayed supplied
 through this quiet hidden-window check. The user has heard a separate ten-second
 native PCM sample; longer paths and physical audio fidelity remain separate checks.
+
+The longer independent CPU comparison passes the held-gas path through the
+known first-course results, second-course timeout and return to attract. All
+nineteen input instruction/cycle boundaries, terminal PC, frame counts and
+final framebuffer hash match the preserved native two-billion run. This uses
+the separate reference CPU with shared board/TGP/geometry implementations,
+sound disabled and a null instruction callback. It compares CPU state, writes
+and events at instruction boundaries, with full video RAM/framebuffer checks
+at the terminal checkpoint. It does not compare every rendered framebuffer
+or extend the sound-enabled Machine scheduler test beyond its prior checkpoint.
+
+The separate stable-host restart check uses fresh saves and holds scripted
+controls through frame 11,160. After the known attract checkpoint, two coins
+and Start bring up Car Select with countdown 08. All 27 inputs apply, with no
+manual takeover or frontier, through 2,090,501,029 instructions. The menu
+does not display a numeric credit balance, and this check stops before a
+second race. Sound is off; unthrottled diagnostic cost is not a gameplay-speed
+measurement.
 
 The earlier LaunchServices sound attempt loaded its bundled selection replay
 and initialized the machine, then exited at `AudioQueueStart` with CoreAudio
@@ -103,7 +121,10 @@ was invalidated before this attribution; see the handoff for evidence.
 The triangle extension now makes (147,20) exact. In the saved 3D-only
 reconstruction, differing pixels fall from 969 to 844 and mean channel error
 from 0.0215019 to 0.0188207/255. Of 127 changed pixels, 126 become exact;
-one at (95,31) worsens slightly and remains under investigation. This snapshot
+one at (95,31) worsens slightly through accumulated interpolation rounding.
+Both paths select the same triangle and plane coefficients; an isolated
+repeated-addition shader restores the CPU result. That diagnostic loop is
+not in production and its cost is unmeasured. This snapshot
 lacks tile/character RAM, so its counts are separate from the complete-scene
 table above. Default-off output remains byte-identical in this comparison.
 The CPU's repeated floating-point additions are not reproduced exactly by
@@ -115,8 +136,8 @@ remain to test before enabling this path for play.
 Confirm visible-window gameplay sound, then measure
 longer game paths with sound enabled. Preserve exact instruction guards, timing
 and IRQ boundaries in further speed work. Validate fresh
-credit/restart and the remaining courses, then extend independent replay
-comparison beyond the current 600-million driving checkpoint. Real-race graphics
+the second race and remaining courses, then extend independent replay
+comparison to those paths and coupled sound. Real-race graphics
 comparison, full MAME-machine parity and PCB/precision validation remain required.
 
 Inherited Daytona results and the earlier lifted-C Rally prototype provide

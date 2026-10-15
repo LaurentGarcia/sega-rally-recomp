@@ -95,7 +95,26 @@ compiled in v6. The full nineteen-event v6 driving replay now also passes:
 600,000,000 instructions, 19,641,024 ordered writes, 1,365,742,448 cycles,
 32,576 IRQs and 3,142 rendered frames, hash `f6c10714158f5366`. All nineteen
 event boundaries match the shared machine, with no missing-code frontier.
-Longer course and race-end comparisons remain outstanding.
+The v13 held-gas replay also passes the raw independent CPU comparison through
+2,000,000,000 instructions, 86,328,770 ordered writes, 4,650,936,033 cycles,
+113,101 IRQs and 10,701 renders. All nineteen input boundaries and the final
+framebuffer hash `2e2d4fb9e7f002ad` match the preserved native run. This covers
+the already observed first-course result, second-course timeout and return to
+attract. The reference CPU shares board/TGP/geometry implementations; sound
+is off and the hook callback is null. Full video RAM/framebuffer comparison
+is terminal-only, separate from per-opcode CPU/write/event checks. It does
+not establish full MAME/PCB, coupled-sound or Machine scheduler parity.
+
+`config/segarally_credit_restart.inputs` extends the unchanged held-gas
+prefix with neutral controls at frame 10,710, two ten-frame coin pulses at
+10,720/10,740 and a Start pulse at 10,760. A final neutral event at 11,159 keeps
+the host under scripted control until the 11,160-frame exit. With fresh saves,
+the stable sound-off v13 host reaches Car Select, countdown 08, after all 27
+events and 2,090,501,029 instructions, with no frontier or manual takeover.
+The numeric final credit balance is not shown; the second race has not started.
+Use the host with explicit `--frames 11160 --instructions 2200000000` and a
+new `--save-dir` for this diagnostic. The boot wrapper's two-billion ceiling
+cannot reach these late inputs. Preserve normal player saves separately.
 
 ## Exact host resume transcripts
 

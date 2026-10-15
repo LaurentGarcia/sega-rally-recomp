@@ -211,12 +211,21 @@ centered steering rather than following the second course's bends. Six additiona
 actually executed callbacks extend the frozen v13 graph to 75,205 instructions;
 the existing static table and registration proofs are unchanged. A subsequent
 two-billion-instruction run returns to attract mode without a missing-code or
-device frontier. The Game Over overlay was not separately captured, and a
-second credit/start sequence and completion of the remaining courses still
-require validation.
+device frontier. A separate fresh-save stable-host check subsequently accepts
+two more coins and Start and reaches Car Select at frame 11,160, with all 27
+scripted inputs applied. The Game Over overlay, beginning that second race
+and completion of the remaining courses still require validation.
 Independent v6 driving comparison matches 600 million instructions, all nineteen
 input events, 19,641,024 ordered writes and 3,142 renders against the reference
 CPU with shared board implementations. It is not complete MAME-machine parity.
+The frozen v13 held-gas path also passes two billion instructions,
+86,328,770 ordered writes, 4,650,936,033 reference cycles, 113,101 IRQs and
+10,701 renders. All nineteen input boundaries and the final framebuffer hash
+`2e2d4fb9e7f002ad` match the preserved actual native run. This raw independent
+CPU harness uses a null hook callback and shared boards/TGP/geometry, with
+sound off. Full video RAM and framebuffer equality are terminal checks;
+per-instruction state/write/event checks do not establish per-frame pixel,
+Model2AMachine scheduling, coupled-sound or full MAME/PCB parity.
 
 The slow sensation of speed is measured in a hidden, normally paced Mac Metal
 run with sound disabled: 480 race frames take 14.163 seconds of wall time for
