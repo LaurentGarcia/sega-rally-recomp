@@ -328,6 +328,30 @@ are shared. This is a bounded synthetic CPU/board comparison; it does not
 validate actual game audio, speakers, physical bus phases or sound-enabled
 recordings in the independent consumer. No playback device is opened.
 
+The actual reset-prefix fixture separately pins the retained v14 sound images,
+native generation and audit files. Another generation requires a source and
+provenance review; this is not a generic acceptance test for arbitrary builds.
+Prepare it in a fresh directory, then execute its frozen inputs explicitly:
+
+```sh
+python3 tests/test_segarally_sound_reset_reference.py --prepare \
+    --sound-dir /path/to/preserved/audited/sound \
+    --reference-dir build/validation/mame-reference \
+    --output build/validation/sound-reset-prepared
+python3 tests/test_segarally_sound_reset_reference.py --run \
+    --output build/validation/sound-reset-prepared \
+    --run-dir build/validation/sound-reset-run
+```
+
+Preparation authenticates all live instruction words and compiles only. The
+run has a 180-second process watchdog and stops after exactly the first SCSP
+write: instruction 278,302, PC `60018a`, 4,506,445 cycles. The retained run
+matches 291,684 paired state observations, ordered data transfers after reset
+and 17,604 stereo frames in 3.10043 seconds. No UART commands or nonzero music
+are claimed. Constructor reset bus transfers are not intercepted; reference
+microcode phase stamps remain distinct from native instruction-boundary
+stamps. Shared device and instruction-start MMIO limits still apply.
+
 ## Optional sound experiment
 
 Sound requires both audited generated sound inputs and an explicit build option:

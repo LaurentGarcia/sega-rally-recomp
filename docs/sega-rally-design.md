@@ -411,7 +411,14 @@ generation and compilation. The reference retains its own prefetch state;
 native execution still uses live instruction guards. SCSP, UART, memory-map
 and queue implementations and the instruction-start MMIO contract are shared.
 This validates the tested coupling, not independent chip, whole-game audio or
-physical bus-phase timing. The diagnostic
+physical bus-phase timing. The actual sound program's authenticated reset
+prefix also matches persistent reference CPU execution through the first SCSP
+write: 278,302 instructions, 4,506,445 cycles and PC `60018a`. Every paired
+queue observation matches CPU/RAM/state, ordered data transfers after reset
+and PCM drains. This first prefix sends no UART commands and establishes no
+nonzero music result. Native constructor-reset bus transfers are not captured;
+native instruction-boundary and reference bus-phase stamps remain distinct.
+The diagnostic
 is disabled by default, including in the Metal frontend. Daytona's measured
 instruction-rate shortcut is specific to its different Model 1 board and is
 not reused for Rally.

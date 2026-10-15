@@ -64,6 +64,9 @@ public:
     int irq_line()const{return irq_;}
     bool nmi_pending()const{return nmi_;}
     const std::vector<Access> &accesses()const{return accesses_;}
+    // Evidence only: a long bounded comparator consumes each callback's rows
+    // before clearing them. CPU/prefetch/cycle/queue state is unchanged.
+    void drain_accesses(){accesses_.clear();}
     Stats stats()const{auto result=stats_;result.pc=cpu_.m_pc-2;return result;}
     std::vector<snd::Model2Scsp::Sample> take_samples(){return chip_.take_samples();}
     uint64_t sample_count()const{return chip_.sample_count();}

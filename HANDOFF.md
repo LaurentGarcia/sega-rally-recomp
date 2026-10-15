@@ -1,5 +1,52 @@
 # Handoff
 
+## Actual sound-program reset prefix matches independent CPU (2026-10-14)
+
+The authenticated real sound program now matches persistent pinned MAME CPU
+execution through its first SCSP write. Before that write both sides reach
+278,301 instructions, 4,506,428 cycles and PC `600184`, with all 512 KiB RAM
+cleared and no IRQ activity. Exactly one write to `100400`, data `0300`, mask
+`ff00`, completes instruction 278,302 at 4,506,445 cycles and PC `60018a`.
+Execution stops there. All 291,684 paired queue observations match CPU/stack/SR
+state, full RAM, queue ordering, RNG and sample drains; 262,147 reference data
+transfers are recorded, with ordered native/reference data comparisons after
+reset. The 17,604 stereo frames match bit for bit. The single run completes
+in 3.10043 seconds with exit zero and empty stderr. Sealed state records
+11,061,054 checks; stdout includes the subsequent successful file-close check,
+for 11,061,055. No retry occurs.
+
+This follows **Audio** and **Reference & validation**. The frozen native source
+is included unchanged under a test-only namespace wrapper; a bus observer
+distinguishes modeled data accesses from live guards using `timing_active()`.
+The reference uses 38 authenticated program addresses and 31 public opcode
+handlers, within the existing 64-opcode bound. Its continuous prefetch state
+is retained, and access evidence is consumed at every boundary before clearing
+the bounded log. No production runtime, emitter, game instruction or app changes.
+
+Constructor reset bus accesses are not intercepted on the native side; reset
+architectural state is compared, with general registers zero by harness
+agreement. Native bus stamps are instruction-boundary cycles, while reference
+stamps retain microcode phases. At the first write those are 4,506,428 versus
+4,506,437 cycles, both observing board time 399,166,313 ns under the declared
+instruction-start MMIO contract. They are deliberately not asserted equal or
+described as physical timing. SCSP/memory/queue models remain shared. No UART
+commands, nonzero music, independent chip, speaker or whole-recording result
+is established; the title-screen symptom remains open. The old timed boot
+probe's `on_cycles` scheduler is not used as a reference for this newer board.
+
+Evidence: `build/worktrees/sound-reset-reference/build/actual-reset-run-001/`.
+`result.json` SHA-256 is
+`f51b1a65d12eb99fcfcf7a4a4562f31e44b21f605263efe87ce8eb305a021ee1`;
+`state.json` is
+`8997393a7a148c78a73d7a862cdfed56660bce4dc600668601bf6b3f44a8ff79`.
+Independent read-only review verifies all 116 source/image inputs, ten prepared
+artifacts and the sealed outputs. The three integrated test files and their
+mapped main-tree dependency closure match the tested bytes, recorded in
+`build/validation/sound-reset-reference-integration/result.json`, SHA-256
+`050223cba9087f882398d2dd86dd3885ea582a18f1e01c00e9714b4708226a0a`.
+Next extend the independently executing CPU through sound initialization and
+actual serial traffic before enabling a sound-on independent recording path.
+
 ## Restricted reciprocal passes actual Metal arithmetic gate (2026-10-14)
 
 The frozen common-HLSL helper now passes the actual Metal arithmetic gate:
