@@ -1,5 +1,49 @@
 # Handoff
 
+## Opt-in audio timing diagnostics (2026-10-14)
+
+`--audio-diagnostics` now observes paced `--sound` playback without changing
+guest clocks, PCM, queue policy or rendering. It reports once per 60 frames,
+on new positive SDL demand and at exit: queue depth, cumulative counters,
+callback time and interval maxima for producer gaps, Machine execution,
+presentation wall time and pacing lateness. Timestamp work in the callback is
+opt-in; no logging, allocation or sample generation runs there. Separately
+sampled atomics are observations, not an exact output-sample ledger. Invalid
+no-sound/unthrottled combinations and offline replay flags reject before SDL.
+This follows **Audio**, **Reference & validation** and **Platform layer & build**.
+
+The actual SDL dummy-stream fixture passes timestamp-enabled/disabled demand,
+priming, bounds, clear/restart and exact float WAV checks. The integrated three
+source files exactly match those tested; current MAIN host headers also pass a
+strict syntax compile. One paced visible 2,600-frame sound/hook/CRT replay
+preserves the earlier full WAV, native frame, startup/final saves, all 15 applied
+input boundaries and 5,201 resume/observation rows plus terminal footer.
+It records 44 telemetry rows, no estimated SDL shortfalls and no chip/host drops.
+Queue observations range from 1,876 to 8,715 frames and end at 2,280. Startup
+records maximum producer gap 118.55 ms, presentation wall time 114.82 ms and
+pacing lateness 158.83 ms; these are host observations, not GPU execution time.
+The maximum measured Machine step is 7.565 ms.
+
+The title-screen glitch remains open. This replay inserts coins at frame 1,200
+and starts at 1,240, so it does not cover a complete recurring neutral title
+sequence. A longer neutral attract capture is prepared but has not run.
+The previous user session's four demands remain unlocalized. Do not alter
+buffering or sound-chip semantics from these counters alone.
+
+Evidence: `build/validation/audio-diagnostics-v15/`, including `frozen.json`,
+`main-integration/result.json` and `review.json` (SHA-256
+`0717a1c0211ce22ae589a53965c5c83140ccd8004fa8b205ab20e0dabcd4aded`).
+The diagnostic binary reuses authenticated frozen v15 objects and libraries;
+old apps remain unchanged. An initial preparation mixed newer recording headers
+with old objects; dependency verification rejected it before execution. Rebuilding
+the new host translation unit against the complete frozen header closure fixed
+that preparation error. Only the successful binary was run.
+
+New requested work: optional Xbox controller input and a configurable Controls
+menu, reusing Daytona's input components while retaining Rally's cabinet pin
+layout. This proceeds separately from the audio investigation. Mac remains the
+active target, and the existing motion/board timing remains unchanged.
+
 ## Display input isolation and live sound feedback (2026-10-14)
 
 The final v15 host passes a bounded input-isolation regression using only

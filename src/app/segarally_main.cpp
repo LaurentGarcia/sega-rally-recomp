@@ -97,7 +97,7 @@ int segarally_host_main(int argc,char **argv) {
     uint64_t frame_limit=0,instruction_limit=0;
     bool touch_visible=false,unthrottled=false,hidden=false,fullscreen=false,sound=false;
     bool crt_requested=false,original_display=false,accurate_textures=false,show_display_controls=false;
-    bool instruction_boundary_hook=false;
+    bool instruction_boundary_hook=false,audio_diagnostics=false;
 #ifdef SEGARALLY_INPUT_RECORDING
     std::filesystem::path record_path,recording_replay_path;
     bool recording_replay_conflict=false;
@@ -130,9 +130,10 @@ int segarally_host_main(int argc,char **argv) {
         else if(arg=="--replay-recording") recording_replay_path=value();
 #endif
         else if(arg=="--sound") sound=true;
+        else if(arg=="--audio-diagnostics") audio_diagnostics=true;
         else if(arg=="--instruction-boundary-hook") instruction_boundary_hook=true;
         else if(arg=="--audio-capture") audio_path=value();
-        else if(arg=="--help") {puts("Sega Rally native: --data DIR --save-dir DIR --frames N --instructions N --capture FILE.ppm --reference-capture FILE.ppm --touch --unthrottled --hidden --fullscreen --log FILE --input-replay FILE --sound --audio-capture FILE.wav --instruction-boundary-hook\nSound is opt-in and uses diagnostic instruction-boundary timing. Unthrottled runs capture/drain audio without device playback.\nKeys: arrows steer, Z gas, X brake, C coin, Return start, V view, A/S gear down/up, Space handbrake, F2 service, F3 test, Escape quit.");
+        else if(arg=="--help") {puts("Sega Rally native: --data DIR --save-dir DIR --frames N --instructions N --capture FILE.ppm --reference-capture FILE.ppm --touch --unthrottled --hidden --fullscreen --log FILE --input-replay FILE --sound --audio-capture FILE.wav --audio-diagnostics --instruction-boundary-hook\nSound is opt-in and uses diagnostic instruction-boundary timing. Unthrottled runs capture/drain audio without device playback.\nKeys: arrows steer, Z gas, X brake, C coin, Return start, V view, A/S gear down/up, Space handbrake, F2 service, F3 test, Escape quit.");
             puts("Display: F1 opens controls and pauses; F6 toggles CRT effects. --crt enables the Arcade CRT preset; --original-display uses display defaults; --accurate-textures enables optional native interpolation; --display-controls opens the panel. Native --capture remains before display effects.");
 #ifdef SEGARALLY_INPUT_RECORDING
             puts("--record-inputs DIR creates a new bounded recording bundle. --replay-recording DIR [--data DIR] replays it offline with this exact executable; no window/audio device/live-save writes.");
@@ -152,6 +153,8 @@ int segarally_host_main(int argc,char **argv) {
         return 0;
     }
 #endif
+    if(audio_diagnostics && (!sound || unthrottled))
+        throw std::runtime_error("--audio-diagnostics requires paced --sound playback");
     if(crt_requested && original_display) throw std::runtime_error("--crt and --original-display cannot be combined");
     if(!audio_path.empty() && !sound) throw std::runtime_error("--audio-capture requires --sound");
 #ifndef M2_SRALLY_SOUND
@@ -249,11 +252,38 @@ int segarally_host_main(int argc,char **argv) {
         bool rendered_accurate_textures=display_settings.accurate_textures;
         fprintf(stderr,"Display controls: F1 opens panel; F6 toggles CRT; effects=%d accurate_textures=%d\n",
             int(display_settings.crt.enabled),int(display_settings.accurate_textures));
+        audio.enable_diagnostics(audio_diagnostics);
         if(sound && !unthrottled) audio.open();
         bool quit=false,background=false,stopped=false,display_paused=false;int gear=0;
         std::array<bool,SDL_SCANCODE_COUNT> display_held_keys{};
         uint64_t replay_release_frame=0;bool replay_manual_takeover=false;
         Uint64 start=SDL_GetTicksNS();uint64_t displayed=0,last_frames=0;
+        // These wall-time observations do not alter board clocks or PCM. GPU
+        // submission/presentation wall time includes host waiting, not GPU time.
+        const Uint64 diagnostic_origin=audio_diagnostics?SDL_GetTicksNS():0;
+        Uint64 producer_at=0,max_producer_gap=0,max_step=0,max_presentation=0,max_lateness=0;
+        uint64_t diagnostic_requests=0,diagnostic_period=0;
+        const auto diagnostic_log=[&](bool final=false) {
+            if(!audio_diagnostics) return;
+            const auto demand=audio.demand_snapshot();
+            const auto stats=machine->stats();
+            const bool periodic=stats.frames_rendered/60!=diagnostic_period;
+            const bool shortfall=demand.requests!=diagnostic_requests;
+            if(!final && !periodic && !shortfall) return;
+            const Uint64 now=SDL_GetTicksNS();
+            fprintf(stderr,"Audio diagnostics: reason=%s frame=%llu board_ns=%llu host_elapsed_ns=%llu queued_frames=%u started=%d received_frames=%llu submitted_frames=%llu dropped_frames=%llu shortfall_requests=%llu estimated_extra_input_bytes=%llu last_shortfall_host_ns=%llu max_producer_gap_ns=%llu max_machine_step_ns=%llu max_presentation_wall_ns=%llu max_pacing_lateness_ns=%llu\n",
+                final?"final":shortfall?"shortfall":"periodic",
+                static_cast<unsigned long long>(stats.frames_rendered),static_cast<unsigned long long>(stats.board_time_ns),
+                static_cast<unsigned long long>(now-diagnostic_origin),audio.queued_frames(),int(audio.started()),
+                static_cast<unsigned long long>(audio.received_frames()),static_cast<unsigned long long>(audio.submitted_frames()),
+                static_cast<unsigned long long>(audio.dropped_frames()),static_cast<unsigned long long>(demand.requests),
+                static_cast<unsigned long long>(demand.extra_input_bytes),
+                static_cast<unsigned long long>(demand.last_shortfall_ns>=diagnostic_origin?demand.last_shortfall_ns-diagnostic_origin:0),
+                static_cast<unsigned long long>(max_producer_gap),static_cast<unsigned long long>(max_step),
+                static_cast<unsigned long long>(max_presentation),static_cast<unsigned long long>(max_lateness));
+            diagnostic_period=stats.frames_rendered/60;diagnostic_requests=demand.requests;
+            max_producer_gap=max_step=max_presentation=max_lateness=0;
+        };
         while(!quit) {
 #ifdef SEGARALLY_INPUT_RECORDING
             std::optional<srally::host_input::Resume> recorded_resume;
@@ -278,12 +308,12 @@ int segarally_host_main(int argc,char **argv) {
                 display.process_event(event);
                 if(!display.open()) touch.event(event);
             }
-            if(background) {SDL_Delay(20);continue;}
+            if(background) {producer_at=0;SDL_Delay(20);continue;}
             const bool *keys=SDL_GetKeyboardState(nullptr);
             for(size_t key=0;key<display_held_keys.size();++key)
                 if(!keys[key]) display_held_keys[key]=false;
             if(display_paused!=display.open()) {
-                display_paused=display.open();touch.clear();audio.clear();
+                display_paused=display.open();touch.clear();audio.clear();producer_at=0;
                 if(!display_paused) {
                     start=SDL_GetTicksNS()-machine->stats().board_time_ns;
                     // A key used to navigate/close the panel must be released
@@ -339,7 +369,9 @@ int segarally_host_main(int argc,char **argv) {
                 if(recording){srally::host_input::Resume row;row.index=recording->records();row.budget=budget;
                     row.before=srally::host_input::Witness::of(machine->stats());row.inputs=in;recorded_resume=row;}
 #endif
+                const Uint64 step_start=audio_diagnostics?SDL_GetTicksNS():0;
                 const auto outcome=machine->run_until_frame(budget);
+                if(audio_diagnostics) max_step=std::max(max_step,SDL_GetTicksNS()-step_start);
 #ifdef SEGARALLY_INPUT_RECORDING
                 if(recorded_resume){recorded_resume->after=srally::host_input::Witness::of(machine->stats());recorded_resume->reason=outcome.reason;recorded_result=outcome;}
 #endif
@@ -374,7 +406,14 @@ int segarally_host_main(int argc,char **argv) {
                     audio_energy+=double(sample)*sample;
                 }
                 if(audio_capture) audio_capture->push(samples);
-                if(!unthrottled && !stopped) audio.push(samples);
+                if(!unthrottled && !stopped) {
+                    if(audio_diagnostics && !samples.empty()) {
+                        const Uint64 now=SDL_GetTicksNS();
+                        if(producer_at) max_producer_gap=std::max(max_producer_gap,now-producer_at);
+                        producer_at=now;
+                    }
+                    audio.push(samples);
+                }
 #ifdef SEGARALLY_INPUT_RECORDING
                 if(recorded_resume)recording->append(*recorded_resume,recorded_result,samples);
 #endif
@@ -389,7 +428,8 @@ int segarally_host_main(int argc,char **argv) {
 #endif
             }
             if(quit && !new_frame) break;
-            if(!new_frame && !stopped && !display_paused) continue;
+            if(!new_frame && !stopped && !display_paused) {diagnostic_log();continue;}
+            const Uint64 presentation_start=audio_diagnostics?SDL_GetTicksNS():0;
             if(show_display_controls && new_frame) {display.set_open(true);show_display_controls=false;}
             if(!display.new_frame(display_settings)) throw std::runtime_error(display.error());
             auto *cmd=SDL_AcquireGPUCommandBuffer(device);if(!cmd) throw std::runtime_error(SDL_GetError());
@@ -437,6 +477,7 @@ int segarally_host_main(int argc,char **argv) {
                 display.render(cmd,pass);SDL_EndGPURenderPass(pass);
             }
             if(!SDL_SubmitGPUCommandBuffer(cmd)) throw std::runtime_error(SDL_GetError());
+            if(audio_diagnostics) max_presentation=std::max(max_presentation,SDL_GetTicksNS()-presentation_start);
             const auto stats=machine->stats();
             if(displayed/60!=last_frames/60) fprintf(stderr,"frames=%llu instructions=%llu cycles=%llu pc=%08x\n",
                 static_cast<unsigned long long>(displayed),static_cast<unsigned long long>(stats.instructions),
@@ -451,10 +492,13 @@ int segarally_host_main(int argc,char **argv) {
             if(!unthrottled && new_frame) {
                 // Pace the host to the machine's exact board time, without changing device clocks.
                 const Uint64 deadline=start+stats.board_time_ns,now=SDL_GetTicksNS();
+                if(audio_diagnostics && now>deadline) max_lateness=std::max(max_lateness,now-deadline);
                 if(deadline>now) SDL_DelayNS(deadline-now);
             }
+            diagnostic_log();
             if(stopped || display_paused) SDL_Delay(10);
         }
+        diagnostic_log(true);
         if(!capture_path.empty() && displayed) capture(device,screen,capture_path);
         if(reference && displayed) capture_reference(reference->video(),reference_path);
         save(*machine,saves);

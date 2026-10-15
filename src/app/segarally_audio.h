@@ -18,6 +18,14 @@ public:
     AudioOutput() = default;
     AudioOutput(const AudioOutput &) = delete;
     AudioOutput &operator=(const AudioOutput &) = delete;
+    struct DemandSnapshot {
+        uint64_t requests, extra_input_bytes, last_shortfall_ns;
+    };
+    void enable_diagnostics(bool enabled) { diagnostics_.store(enabled,std::memory_order_relaxed); }
+    // Concurrent callback counters are observational, not a sample-accurate ledger.
+    DemandSnapshot demand_snapshot() const {
+        return {shortfall_requests(),requested_extra_bytes(),last_shortfall_ns_.load(std::memory_order_relaxed)};
+    }
     void open() {
         close();
         if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) fail();
@@ -88,6 +96,8 @@ private:
     static void SDLCALL request(void *context,SDL_AudioStream *,int additional,int) {
         if(additional<=0) return;
         auto &self=*static_cast<AudioOutput *>(context);
+        if(self.diagnostics_.load(std::memory_order_relaxed))
+            self.last_shortfall_ns_.store(SDL_GetTicksNS(),std::memory_order_relaxed);
         self.shortfall_requests_.fetch_add(1,std::memory_order_relaxed);
         self.requested_extra_bytes_.fetch_add(uint64_t(additional),std::memory_order_relaxed);
         // Device callbacks observe presentation demand only. They neither run
@@ -97,6 +107,7 @@ private:
     SDL_AudioStream *stream_ = nullptr;
     bool initialized_ = false, started_ = false;
     uint64_t received_frames_ = 0, submitted_frames_ = 0, dropped_frames_ = 0;
-    std::atomic<uint64_t> shortfall_requests_{0}, requested_extra_bytes_{0};
+    std::atomic<bool> diagnostics_{false};
+    std::atomic<uint64_t> shortfall_requests_{0}, requested_extra_bytes_{0}, last_shortfall_ns_{0};
 };
 } // namespace rally

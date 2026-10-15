@@ -275,7 +275,12 @@ close remain neutral until released; fresh presses then control the cabinet.
 This checks the actual host transition, not ImGui Resume-button activation.
 The user subsequently reported a good image and near-perfect-feeling motion;
 the 30,328-frame session ended normally, with title-screen audio glitches and
-four SDL estimated input shortfalls. Queue/timing localization is next.
+four SDL estimated input shortfalls. A subsequent paced 2,600-frame sound/CRT
+diagnostic preserves native PCM, image, saves, inputs and ordered resumes
+exactly. Its 44 telemetry rows contain no estimated demand shortfalls or drops.
+Startup includes 158.83 ms maximum pacing lateness and a 114.82 ms presentation
+wall interval; neither is GPU execution time. The run leaves neutral title
+behavior at frame 1,200, so the reported cover-screen glitch remains open.
 
 ## Next validation work
 

@@ -324,6 +324,20 @@ therefore does not validate speakers. Source/assets/generated-code changes
 require renewed sound audits; the host checks provenance during incremental
 builds. A ten-second captured-race check through the real SDL/CoreAudio output
 submitted 441,000 stereo frames with no queue drops or reported input shortfalls.
+
+For a paced playback investigation, add `--audio-diagnostics` to the direct
+host's `--sound` command. It logs queue depth and interval maxima for producer
+gaps, Machine execution, presentation wall time and pacing lateness every
+60 frames, on new SDL demand and at exit. Positive-demand callback timestamps
+are opt-in. Extra input bytes are SDL estimates, not exact missing device
+samples; presentation wall time includes host waiting and is not GPU timing.
+No-sound, unthrottled and offline-recording combinations reject before SDL.
+One paced 2,600-frame CRT check preserves native WAV/image, saves and all ordered
+resumes exactly, with no shortfalls or drops. Its clean result does not reproduce
+or resolve the reported title-screen glitch. Commands, hashes, dummy-stream
+test and retained preparation failure are in
+`build/validation/audio-diagnostics-v15/`.
+
 The older outer-loop execution reaches 2,760 frames with unchanged main state
 and no sample drops, but records 3,222 SDL requests for extra input. With the
 instruction boundary hook enabled, the same checkpoint completes in 48.519993
