@@ -1,5 +1,30 @@
 # Handoff
 
+## v17 device check still awaits execution permission (2026-10-14)
+
+Prepared a separately frozen host runner that records `BaseException` and
+always stops/reaps a live child process group in `finally`. The original runner
+could skip cleanup on interruption. The new runner retains the same v17 binary,
+2,600-frame / 600-million-instruction / 180-second limits, payload/image
+comparisons and OFF-before-ON order, with new output directories. Independent
+source review found no blocker; it has not executed a game.
+
+The single new OFF submission remained at execution approval and was cancelled
+after 108.1 seconds. No session/PID/output was returned, neither gameplay output
+directory exists, and a subsequent process listing found no game, host runner
+or sound/GPU fixture process. ON was never submitted; no automatic retry.
+This was an unapproved/cancelled request, not an executed test failure or an
+automatic approval rejection. The packaged v17 candidate remains unlaunched.
+
+Evidence: `build/validation/mac-reciprocal-v17-host-002/`.
+Runner SHA-256 `982a7c7003b32b1494dec1ac1d56d9a5a12302665c2e5b35244da70aadd6b283`;
+plan `c8e451ab3f6a29bb44dfc7c15ac604aed6630a8abf93848a317f39c423ba3eea`;
+`cancelled-submission-001.json`
+`c48c795b487cea469dbb5ab98a690ce1bbfe08e14f45fbb44ab92bbc6847e76a`.
+Original and revised runner/plan hashes remain unchanged. The next device gate
+requires macOS execution permission; completed sound and launcher work below
+is committed independently of this permission boundary.
+
 ## Independent sound comparison reaches nonzero PCM (2026-10-14)
 
 The corrected reference observer completes the authentic UART transcript:
