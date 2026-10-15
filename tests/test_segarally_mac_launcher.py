@@ -51,15 +51,16 @@ class MacLauncher(unittest.TestCase):
         return {str(p.relative_to(self.build)): p.read_bytes() if p.is_file() else None
                 for p in self.build.rglob("*")}
 
-    def run_launcher(self, *arguments, active=False):
+    def run_launcher(self, *arguments, active=False, process_error=None):
         def fake_run(command, **kwargs):
             self.calls.append((command, kwargs))
             if command[0] == "pgrep":
                 self.assertEqual(command, ["pgrep", "-f", re.escape(str(
                     self.app / "Contents/MacOS/segarally_native"))])
                 self.assertEqual(kwargs, {"capture_output": True, "text": True})
-                return subprocess.CompletedProcess(command, 0 if active else 1,
-                                                   stdout="12345\n" if active else "", stderr="")
+                return subprocess.CompletedProcess(command, process_error if process_error is not None else (0 if active else 1),
+                                                   stdout="12345\n" if active else "",
+                                                   stderr="process query failed" if process_error is not None else "")
             if command[0] == "codesign":
                 self.assertEqual(command, ["codesign", "--force", "--sign", "-", str(self.app)])
                 self.assertEqual(kwargs, {"check": True})
@@ -166,6 +167,45 @@ class MacLauncher(unittest.TestCase):
         self.assertEqual(self.tree(), before)
         self.assertEqual([c[0][0] for c in self.calls], ["pgrep", "open"])
         self.assertEqual(self.calls[-1][0], ["open", str(self.app)])
+
+    def test_process_query_errors_preserve_package_and_never_launch(self):
+        self.resources.mkdir(parents=True)
+        self.bundled.write_bytes(b"preserved signed replay")
+        before = self.tree()
+        for code in (2, 3, -9):
+            for arguments in ((), ("--no-launch",)):
+                with self.subTest(code=code, arguments=arguments):
+                    self.calls.clear()
+                    self.assertEqual(self.run_launcher(*arguments, process_error=code), 2)
+                    self.assertEqual(self.tree(), before)
+                    self.assertEqual([c[0][0] for c in self.calls], ["pgrep"])
+
+    def test_no_launch_signs_and_records_exact_future_arguments(self):
+        self.sign_checks = lambda: self.assertEqual(self.bundled.read_bytes(), self.data)
+        self.assertEqual(self.run_launcher("--no-launch", "--sound", "--crt", "--accurate-textures",
+            "--instruction-boundary-hook", "--input-replay", str(self.replay)), 0)
+        self.assertEqual([c[0][0] for c in self.calls], ["pgrep", "codesign"])
+        future = json.loads((self.build / "launch-command.json").read_text())
+        self.assertEqual(future, {"executed": False, "command": ["open", "-n", str(self.app),
+            "--args", "--save-dir", str(self.build / "live-app-save"),
+            "--log", str(self.build / "live-app.log"), "--sound", "--crt", "--accurate-textures",
+            "--instruction-boundary-hook", "--input-replay", str(self.bundled)]})
+        self.assertFalse((self.build / "live-app-save").exists())
+        self.assertFalse((self.build / "live-app.log").exists())
+
+    def test_no_launch_rejects_recording_before_mutation(self):
+        before = self.tree()
+        self.assertEqual(self.run_launcher("--no-launch", "--record-inputs", str(self.build / "recording")), 2)
+        self.assertEqual(self.tree(), before)
+        self.assertEqual(self.calls, [])
+
+    def test_no_launch_refuses_running_app_without_mutation_or_activation(self):
+        self.resources.mkdir(parents=True)
+        self.bundled.write_bytes(b"preserved signed replay")
+        before = self.tree()
+        self.assertEqual(self.run_launcher("--no-launch", active=True), 2)
+        self.assertEqual(self.tree(), before)
+        self.assertEqual([c[0][0] for c in self.calls], ["pgrep"])
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@ This dedicated host runs the generated Sega Rally i960 core and native Model 2A 
 
 Use the [project wiki](../../docs/README.md), [Mac player manual](../../docs/mac-player-manual.md) and [build guide](../../docs/segarally-build-validation.md) for current instructions and evidence. Optional native SCSP sound requires `SEGARALLY_SOUND=ON` with an audited sound generation, then `--sound` at runtime. The sound builds also enable the exact instruction boundary hook. The v14 continuation passes the former missing return at `0x005ae800`, matching the previous normal execution/audio prefix before reaching frame 14,001. Its windowed app closes normally after 9,344 frames with zero chip/host drops and one SDL input-shortfall request. The older v13 app and frontier recording remain preserved. A ten-second native PCM sample has been heard on the Mac speakers; live-game listening feedback remains pending.
 
-SDL3 is pinned to Daytona's revision `fa2c02bb6e21974a89ea9824bc53c9932abe5f9c` (3.4.16). Clone that revision into ignored `extern/sdl3`. Generate the main CPU, TGP, and verified video imports into `build/segarally-timed` using the project pipeline first. The standalone frontend project does not require ImGui or the Daytona launcher.
+SDL3 is pinned to Daytona's revision `fa2c02bb6e21974a89ea9824bc53c9932abe5f9c` (3.4.16). Clone that revision into ignored `extern/sdl3`. The Settings panel also requires Dear ImGui at `f1cc2ae15e53a861a874c3034aae6798fde194ab` in `extern/imgui`. The [build guide](../../docs/segarally-build-validation.md#inputs-and-tools) lists the dependency setup commands. Generate the main CPU, TGP, and verified video imports into `build/segarally-timed` using the project pipeline first. The standalone frontend does not use the Daytona launcher.
 
 Mac builds enable `SEGARALLY_INPUT_RECORDING=ON` by default. This builds optional runtime recording/replay support and requires the public-domain 7-Zip sources at `0766b733fe3e06dd2a7f9a3cfbf2108ac73abd17` in ignored `extern/lzma`, fetched by `python3 scripts/setup.py`. Set `SEGARALLY_INPUT_RECORDING=OFF` when configuring to retain the minimal host build without this dependency. Runtime recording remains opt-in.
 
@@ -23,6 +23,12 @@ Add `--hidden` to run a bounded Mac capture without activating a visible window.
 Pass `--fullscreen` to the host or Mac launcher to use desktop fullscreen. Escape closes the app; steering uses the arrows, acceleration uses Z, and braking uses X.
 
 The Mac launcher builds an ignored `.app` from the verified executable/assets and uses LaunchServices to leave the window open independently of a shell session. Its diagnostic output is `live-app.log` in the build directory. Pass `--build-dir build/segarally-mac-v3` to launch a different prepared generation.
+
+Add `--no-launch` to package and sign without opening or activating a window.
+It refuses to overwrite a running app and records the future argument list in
+`launch-command.json` beside the build. No saves or recording are created by
+packaging; `--no-launch` cannot be combined with `--record-inputs`. A failed process check
+stops packaging rather than assuming the app is closed.
 
 Interactive launches use normal board-time pacing; `--unthrottled` is an explicit diagnostic option. The host and launcher accept `--input-replay FILE`, reusing the boot tool's `segarally-input-v1` parser and completed-render boundary semantics. Replayed cabinet snapshots remain unchanged between events. The final snapshot is held for one completed frame, then keyboard/touch take over with neutral inputs where no control is held. This interactive handoff intentionally differs from the headless boot tool, which retains its final snapshot indefinitely. Parsing failures stop before native execution. A paired software capture receives the identical inputs at every resumed step, including handoff.
 

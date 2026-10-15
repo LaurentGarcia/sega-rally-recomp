@@ -22,6 +22,11 @@ Normal board-time pacing is the default. Startup can take time while the game
 executes its reset checks. The launcher activates an already running copy of
 the same app; quit it before changing startup options.
 
+For packaging only, add `--no-launch`. The app must be closed; this mode signs
+the package and records its future command in `launch-command.json` beside the
+build, without opening a window. Packaging alone is not a playability check.
+`--record-inputs` requires a launched session and cannot be combined with this mode.
+
 When `--input-replay` is supplied, the launcher copies that file into the app's
 resources before signing. Startup reads the bundled copy. Missing files,
 directories and replays larger than 1 MiB are rejected before packaging.

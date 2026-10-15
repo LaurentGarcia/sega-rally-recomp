@@ -1,5 +1,32 @@
 # Handoff
 
+## Mac packaging can stop before launch (2026-10-14)
+
+The tracked Mac launcher now supports `--no-launch`: verify assets, package and
+sign, then write the future argument list to `launch-command.json` with
+`executed: false`. It refuses an active app and `--record-inputs`, creates no
+live saves/log/recording, and never calls LaunchServices in this mode. Normal
+launch and existing-app activation remain supported. A failed `pgrep` query now
+stops packaging instead of being mistaken for "no running app", preventing an
+unchecked overwrite of the package. Platform layer & build governs this change.
+
+Sixteen launcher tests and four recording-launcher tests pass with subprocesses
+mocked, covering failed process queries, unchanged existing package bytes,
+no-launch arguments, replay bundling before signing and normal activation.
+The launcher fixture is now registered with root CTest. This is CPU-only test
+evidence, not a fresh codesign, device launch or gameplay check. The existing
+v16/v17 packages, saves and frozen gameplay evidence were not modified.
+
+Corrected the standalone-host README's obsolete claim that ImGui is optional,
+and moved the default-on recording dependency's pinned 7-Zip setup into the
+build guide's dependency section. Source/test evidence is
+`build/worktrees/mac-launcher-contract/build/validation/launcher-contract-001`;
+patch SHA-256 `9bd9d1a479ddbc282ca47083d69692b6a6ae58349c8d7393f2ea21bd30ef8985`.
+The integrated launcher and test bytes match the tested sources. Sound observer
+validation is complete at the synthetic level; the longer authentic comparison
+is next. The v17 gameplay/device gates and reported title-screen glitch remain
+open.
+
 ## Sound observer distinguishes PC-relative operands (2026-10-14)
 
 Added opt-in `--board-access-roles` to the test-only M68000 provider and a

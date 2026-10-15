@@ -44,6 +44,19 @@ git -C extern/imgui checkout --detach f1cc2ae15e53a861a874c3034aae6798fde194ab
 CMake checks the revision and packages the ImGui MIT notice with the app.
 Vendored sources remain ignored.
 
+Mac input recording support is enabled by default, even when no recording is
+requested at runtime. It also requires the pinned public-domain 7-Zip sources
+for SHA-256 at `extern/lzma`:
+
+```sh
+git clone https://github.com/ip7z/7zip.git extern/lzma
+git -C extern/lzma checkout --detach 0766b733fe3e06dd2a7f9a3cfbf2108ac73abd17
+```
+
+Preserve local changes in an existing checkout before changing its revision.
+Alternatively, configure with `-DSEGARALLY_INPUT_RECORDING=OFF` to build without
+recording/replay support and this dependency. SDL3 and ImGui are still required.
+
 ## Verify, import and recompile
 
 Use the same `--build-dir` for every import and generated component:
@@ -94,6 +107,9 @@ python3 platform/segarally/macos/launch.py --build-dir build/segarally-docs-mac 
 
 The launcher audits assets and packages/signs the app before opening it in a
 window. [The player manual](mac-player-manual.md) explains controls and saves.
+Add `--no-launch` to stop after packaging; the future launch arguments are saved
+in `launch-command.json` beside the build. This mode requires the app to be
+closed and does not execute the game or open a window.
 The convenience `platform/segarally/build.sh mac` uses
 `SEGARALLY_NATIVE_BUILD` but always builds the host in `build/segarally-mac`.
 

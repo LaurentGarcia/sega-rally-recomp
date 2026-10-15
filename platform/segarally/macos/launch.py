@@ -12,6 +12,7 @@ import subprocess
 ROOT=Path(__file__).resolve().parents[3]
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--build-dir",type=Path,default=ROOT/"build/segarally-mac")
+parser.add_argument("--no-launch",action="store_true",help="Package and sign only; record the launch command without opening a window")
 parser.add_argument("--unthrottled",action="store_true",help="Disable board-time pacing for diagnostics")
 parser.add_argument("--input-replay",type=Path,help="Optional cabinet input replay, then manual control")
 parser.add_argument("--record-inputs",type=Path,help="Create a new recording bundle for exact same-executable offline replay")
@@ -23,6 +24,8 @@ parser.add_argument("--original-display",action="store_true",help="Use the origi
 parser.add_argument("--accurate-textures",action="store_true",help="Enable the optional more accurate native texture interpolation")
 parser.add_argument("--instruction-boundary-hook",action="store_true",help="Enable audited exact resident-chunk execution")
 args=parser.parse_args()
+if args.no_launch and args.record_inputs:
+    parser.error("--no-launch and --record-inputs cannot be combined; recording requires a launched session")
 if args.crt and args.original_display:
     parser.error("--crt and --original-display cannot be combined")
 if args.audio_diagnostics and (not args.sound or args.unthrottled):
@@ -49,7 +52,10 @@ try:
     app=build/"Sega Rally Native.app"
     binary=app/"Contents/MacOS"
     active=subprocess.run(["pgrep","-f",re.escape(str(binary/"segarally_native"))],capture_output=True,text=True)
+    if active.returncode not in (0,1):
+        raise ValueError(f"cannot check whether the app is running (pgrep exit {active.returncode}): {active.stderr.strip()}")
     if active.returncode==0:
+        if args.no_launch:raise ValueError("close the active app before packaging with --no-launch")
         if args.record_inputs:raise ValueError("close the active app before starting a new recorded session; recording requires startup input and saves")
         subprocess.run(["open",str(app)],check=True)
         print(f"Activated existing native app, PID(s) {active.stdout.strip()}")
@@ -95,7 +101,13 @@ try:
     if args.instruction_boundary_hook:startup.append("--instruction-boundary-hook")
     if replay_bytes is not None:startup += ["--input-replay",str(bundled_replay)]
     if recording_path is not None:startup += ["--record-inputs",str(recording_path)]
-    subprocess.run(["open","-n",str(app),"--args",*startup],check=True)
-    print(f"Opened {app}; startup log {build/'live-app.log'}")
+    launch=["open","-n",str(app),"--args",*startup]
+    if args.no_launch:
+        command_path=build/"launch-command.json"
+        command_path.write_text(json.dumps({"command":launch,"executed":False},indent=2)+"\n")
+        print(f"Packaged {app} without launch; future command {command_path}")
+    else:
+        subprocess.run(launch,check=True)
+        print(f"Opened {app}; startup log {build/'live-app.log'}")
 except (OSError,ValueError,KeyError,subprocess.SubprocessError) as error:
     parser.exit(2,f"launch: {error}\n")

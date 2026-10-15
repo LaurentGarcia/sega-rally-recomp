@@ -738,6 +738,8 @@ if(Python3_Interpreter_FOUND)
         COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tests/test_segarally_recording_reference_build.py)
 endif()
 if(Python3_FOUND)
+    add_test(NAME segarally_mac_launcher
+        COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tests/test_segarally_mac_launcher.py)
     add_test(NAME segarally_recording_launcher
         COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tests/test_segarally_recording_launcher.py)
     add_test(NAME segarally_staging_provenance
