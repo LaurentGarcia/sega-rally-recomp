@@ -73,7 +73,7 @@ def main():
     with (contents / 'Info.plist').open('wb') as f:
         plistlib.dump({'CFBundleExecutable': binary.name, 'CFBundleIdentifier': 'org.segarally.native.local-builder',
           'CFBundleName': 'Sega Rally Local Builder', 'CFBundlePackageType': 'APPL',
-          'CFBundleShortVersionString': '0.1.0', 'CFBundleVersion': '1', 'LSMinimumSystemVersion': '13.0',
+          'CFBundleShortVersionString': '0.1.0', 'CFBundleVersion': '2', 'LSMinimumSystemVersion': '13.0',
           'NSHighResolutionCapable': True, 'NSHumanReadableCopyright': 'See Resources/LICENSE.txt.'}, f)
     run(['codesign', '--force', '--sign', '-', app])
     run(['codesign', '--verify', '--deep', '--strict', app])

@@ -1,7 +1,7 @@
 # App packages and platform status
 
 [Source prerelease v0.1.0-rc.1](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-rc.1)
-contains source archives. The separate [Mac local builder preview](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-mac-builder.1)
+contains source archives. The separate [Mac local builder preview](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-mac-builder.2)
 now supplies an empty arm64 DMG with a byte manifest and checksums. There are not
 yet four playable game binaries.
 

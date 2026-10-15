@@ -6,6 +6,13 @@ The user selects their own Revision B ZIP. The coordinator checks Git, Python 3.
 
 Every attempt receives a new folder under `~/Library/Application Support/Sega Rally Importer/Imports/`. Existing apps and saves are preserved. A failed or cancelled attempt retains logs and never receives `completed.json`. Launch verifies the receipt, exact executable/assets and signature again and uses the import's own `player-saves` folder. A running game or redirected save folder prevents launching a second copy. The last completed folder is remembered for the next bootstrap launch. Cancel/quit asks the coordinator to stop; the pinned pipeline receives SIGINT so its existing interruption handler reaps its separately grouped build step before the coordinator exits.
 
+Preview 2 pins game source `6c22e241286b9e936395c47039a0403225e53ac8`
+and launches with player defaults: compiled sound and Arcade CRT enabled on
+fresh preferences. Saved display choices remain authoritative; F6 toggles CRT.
+The arcade boot is initially silent before attract audio starts. An import made
+with preview 1 must be rebuilt with preview 2 to use the new game executable;
+installing the new builder does not replace an existing personal app or saves.
+
 Build locally from the repository root (no game files needed):
 
 ```sh

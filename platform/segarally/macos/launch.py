@@ -107,7 +107,7 @@ try:
             "CFBundleShortVersionString":"0.1","CFBundleVersion":"1",
             "NSHighResolutionCapable":True,"NSPrincipalClass":"NSApplication"},file)
     subprocess.run(["codesign","--force","--sign","-",str(app)],check=True)
-    startup=["--save-dir",str(build/"live-app-save"),"--log",str(build/"live-app.log")]
+    startup=["--player","--save-dir",str(build/"live-app-save"),"--log",str(build/"live-app.log")]
     if args.unthrottled:startup.append("--unthrottled")
     if args.fullscreen:startup.append("--fullscreen")
     if args.sound:startup.append("--sound")

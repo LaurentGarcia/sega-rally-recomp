@@ -146,7 +146,7 @@ class ImportTests(unittest.TestCase):
         self.coordinator.launch(s)
         call = self.runner.calls[-1][0]
         self.assertEqual(call[:3], ['/usr/bin/open','-n',str(app)])
-        self.assertEqual(call[3:], ['--args','--save-dir',str(s/'player-saves'),'--sound','--instruction-boundary-hook'])
+        self.assertEqual(call[3:], ['--args','--player','--save-dir',str(s/'player-saves')])
     def test_active_game_prevents_second_launch(self):
         s = self.coordinator.root/'session'; app=self.app(s)
         m.write_new(s/'completed.json', {'source_revision':m.SOURCE_REVISION,'app':str(app),

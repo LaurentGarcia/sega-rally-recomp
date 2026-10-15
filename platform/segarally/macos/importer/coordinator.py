@@ -18,7 +18,7 @@ import time
 import zipfile
 
 SOURCE_URL = 'https://github.com/LaurentGarcia/sega-rally-recomp.git'
-SOURCE_REVISION = '9c969c140a6f3d050395abda6fab8a29ff0bcf9e'
+SOURCE_REVISION = '6c22e241286b9e936395c47039a0403225e53ac8'
 DEPENDENCIES = {
     'sdl3': ('https://github.com/libsdl-org/SDL.git', 'fa2c02bb6e21974a89ea9824bc53c9932abe5f9c'),
     'imgui': ('https://github.com/ocornut/imgui.git', 'f1cc2ae15e53a861a874c3034aae6798fde194ab'),
@@ -297,8 +297,8 @@ class Coordinator:
         active = self.runner.run(['/usr/bin/pgrep', '-x', 'segarally_native'], quiet=True, accepted_codes=(0, 1))
         if active.strip():
             raise ImportFailure('Close the running Sega Rally app before launching this copy. Its saves have not been changed.')
-        self.runner.run(['/usr/bin/open', '-n', app, '--args', '--save-dir', saves,
-                         '--sound', '--instruction-boundary-hook'], quiet=True)
+        self.runner.run(['/usr/bin/open', '-n', app, '--args', '--player',
+                         '--save-dir', saves], quiet=True)
         self.runner.notify('launched')
 
 def main(argv=None):

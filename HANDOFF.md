@@ -1,5 +1,35 @@
 # Handoff
 
+## Mac player defaults and builder preview 2 (2026-10-15)
+
+The exact clean 6c22e24 Mac app completes all ten local pipeline stages and
+twelve host CTests. A fresh-save, neutral, paced 2,100-frame run using `--player`
+without explicit sound, instruction-hook or CRT switches confirms hook=1,
+playback=1, effects=1 and actual CRT pipeline creation. Native PCM has 1,676,601
+nonzero scalar samples; CoreAudio logical-device postmix has 1,672,673. Both are
+44,100 Hz stereo, with no chip/host drops or device shortfall requests. The native
+PCM is byte-identical to the previous app's explicit-sound check. Evidence is
+`build/validation/player-defaults-6c22e24-001/run-001/result.json`, SHA-256
+`aa1f145e06b1bf2a298d9e36d221722ad98675cd1116ad4d0c5d89ce912de2a3`.
+This proves startup configuration and digital output, not physical audibility
+or the cause of the reported silent session. A separate read-only CoreAudio
+query reports unmuted output at 0.625 volume; no system settings were changed.
+Fresh arcade boot has about 16.27 seconds of native silence before attract audio.
+
+The empty Mac builder now pins that verified game source and launches with
+`--player`; the developer Mac launcher passes the same flag so save/log arguments
+do not suppress interactive defaults. Existing display preferences still win.
+Preview 1 imports require a new import to receive the new executable. The 21
+launcher, 20 coordinator and three package retry tests pass. One initial launch
+command assertion still expected the old argument list; it was updated to
+require the player switch. New empty DMG CI and release publication follow.
+
+Native Vulkan CRT CI is now green at run 38820833067 on 6c22e24. Discovering the
+actual `lvp_icd.json` resolves the earlier instance-creation failure. GCC 13 and
+Mesa llvmpipe execute both common-shader cases: 24,576 C++ and 24,576 independent
+Python channel checks pass. This is a software-driver offscreen check, not
+Windows/game/hardware performance validation.
+
 ## Shared frame packets, portable host and player startup (2026-10-15)
 
 The dedicated host now selects Metal on Apple and Vulkan on Windows/Linux.

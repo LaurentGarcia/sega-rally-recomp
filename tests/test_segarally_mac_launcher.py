@@ -154,7 +154,7 @@ class MacLauncher(unittest.TestCase):
     def test_flags_and_save_log_paths_preserved_without_fullscreen(self):
         self.assertEqual(self.run_launcher("--input-replay", str(self.replay), "--sound",
                                          "--instruction-boundary-hook", "--unthrottled"), 0)
-        self.assertEqual(self.calls[-1][0][4:], ["--save-dir", str(self.build / "live-app-save"),
+        self.assertEqual(self.calls[-1][0][4:], ["--player", "--save-dir", str(self.build / "live-app-save"),
             "--log", str(self.build / "live-app.log"), "--unthrottled", "--sound",
             "--instruction-boundary-hook", "--input-replay", str(self.bundled.resolve())])
 
@@ -244,7 +244,7 @@ class MacLauncher(unittest.TestCase):
         self.assertEqual([c[0][0] for c in self.calls], ["pgrep", "codesign"])
         future = json.loads((self.build / "launch-command.json").read_text())
         self.assertEqual(future, {"executed": False, "command": ["open", "-n", str(self.app),
-            "--args", "--save-dir", str(self.build / "live-app-save"),
+            "--args", "--player", "--save-dir", str(self.build / "live-app-save"),
             "--log", str(self.build / "live-app.log"), "--sound", "--crt", "--accurate-textures",
             "--instruction-boundary-hook", "--input-replay", str(self.bundled)]})
         self.assertFalse((self.build / "live-app-save").exists())
