@@ -1,5 +1,29 @@
 # Handoff
 
+## Mac preview 2 published and opened for testing (2026-10-15)
+
+Tag `v0.1.0-mac-builder.2` is public at a18ed52 under the personal account.
+GitHub Actions run 38821643272 builds the empty DMG; downloaded source hashes,
+DiskImages checksum and all three uploaded release-asset digests match. DMG
+SHA-256: `ff1f98afed13346ff3ed96507e72b65ce45f5b958d2fd1762f20b8afac854c75`.
+The public builder pins the validated 6c22e24 game source. The personal package
+remains local at `build/installers/mac-6c22e24-002/`, DMG SHA-256
+`4586decff59192d9c7566b265d6526c71f386f9bea054723c1ce4a884c828109`.
+Its signature, all eight assets/notices and unchanged copied app bytes pass.
+Attempt 001 failed because sandboxed DiskImages could not configure a device;
+the separate authorized packaging attempt passes. Both records remain intact.
+
+The exact validated game app is open in a window with a new player save folder
+under `build/player-defaults-6c22e24-001/`. Its live startup log confirms Metal,
+sound playback, enabled CRT and actual presentation-pipeline creation. Existing
+player saves are untouched. Physical audibility still needs the user's feedback;
+the digital capture checks above do not establish the original silence cause.
+Avoid competing local GPU/audio validation while this interactive session runs.
+
+Parallel work remains isolated: Windows/Linux public builders, desktop frontend
+CI and direct Vulkan scene rendering. Frozen native Metal and Apple host patches
+remain local candidates pending integration; they do not change this player.
+
 ## Mac player defaults and builder preview 2 (2026-10-15)
 
 The exact clean 6c22e24 Mac app completes all ten local pipeline stages and
