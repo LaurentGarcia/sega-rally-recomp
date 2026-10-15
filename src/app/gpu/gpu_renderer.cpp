@@ -465,6 +465,9 @@ void GpuRenderer::build(const rt::Video &video, int w, int h, int scale) {
                 // chains. Supply the global minimum y for the shader's row
                 // bounds, even when a horizontal edge was skipped.
                 for (size_t k = first; k < poly_edges_.size(); ++k) poly_edges_[k].tail[3] = v[minv].y;
+                // The native span starts after clipping, before checker
+                // alignment and repeated parameter stepping in the shader.
+                poly_edges_.push_back({{float(x0), 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}});
 
                 emit_proxy(v[minv].y, v[maxv].y, first, counts);
             }

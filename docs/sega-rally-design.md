@@ -193,12 +193,18 @@ confirms GPU cutout ownership changes caused by accumulated rounding. Combined
 repeated stepping leaves three differing pixels in the same 3D-only snapshot,
 including one slightly worsened pixel; all 447 synthetic cases and the exact
 disabled-mode image guard pass. The initial candidate failed that guard and is
-excluded. This remains ignored experimental source. A subsequent three-complete-scene
+excluded. A subsequent three-complete-scene
 gate reproduces historical CPU/stable outputs and raw tile/character composition
 exactly before comparison. Combined repetition reduces differing pixels from
 697/1,241/581 to 3/1/1, with one newly worsened pixel per scene. Those saved
 v5/v6 states support complete scene replay without executing the game.
-An initial bounded offscreen measurement finds repeated-path completed-render
+A clean implementation now lives behind the existing default-OFF option. Its
+regenerated common shaders pass all 447 synthetic cases and reproduce those
+three accepted complete images exactly, while OFF preserves the historical
+stable images. Repetition applies only at native scale 1; enhanced scales keep
+their previous direct interpolation. No diagnostic switches remain in this path.
+An initial bounded offscreen measurement of the diagnostic, not the clean
+implementation, finds repeated-path completed-render
 medians of 2.119/2.126/2.527 ms on Apple M5. The first-car diagnostic comparison
 shows about 51% higher latency; driving controls vary too much to generalize
 the loop cost. This includes encoding/submission/completion wait and excludes

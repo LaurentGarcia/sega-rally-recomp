@@ -12,7 +12,7 @@ The [design](sega-rally-design.md) records interpretation and hardware limits.
 | Driving parity | Two billion held-gas instructions, 86,328,770 ordered writes, 4,650,936,033 cycles, 113,101 IRQs and 10,701 renders; nineteen replay events match | Sound off; independent CPU with shared boards and final-frame comparison; no full MAME race |
 | Later game paths | Fresh credit/start after attract reaches a second race; sound-on frame 12,800 shows 118 km/h in fourth gear, 15.83 seconds elapsed | Complete second race and Game Over overlay not separately validated |
 | Course progress | Desert clear/results show 1:12.15; forested second course enters, times out, then attract returns | Centered steering does not complete second-course bends; remaining courses unvalidated |
-| Metal fidelity | Experimental repeated stepping reduces differences across three complete scenes from 2,519 pixels to 5; composition guards and 447 synthetic cases pass | Diagnostic only; first bounded offscreen timing measured, live cost/continuous flicker/whole-game fidelity remain open |
+| Metal fidelity | Optional native repeated stepping is integrated; three complete scenes fall from 2,519 differing pixels to 5, and 447 synthetic cases pass | Default OFF; clean app/live cost/continuous flicker/whole-game fidelity remain open |
 | Sound generation | Native linked board captures 2,409,170 stereo frames: 54.6297052 seconds including nonzero 44.1 kHz PCM; shared-core drains agree | Whole-game audio parity unvalidated |
 | Audio output | v14 windowed session supplies 7,163,505 stereo frames with zero chip/host drops and one estimated SDL input-shortfall request; user heard a separate ten-second native PCM sample | Live listening feedback and physical fidelity remain open |
 | Exact host recording | Actual manual v14 drive replays all 18,689 resumes, PCM hashes and final saves through frame 9,344; earlier scripted recorded/unrecorded checks also match | Same-Machine reproducibility; full-course and independent CPU/sound parity remain open |
@@ -234,8 +234,12 @@ and a GPU completion wait. Readback, file I/O and presentation are excluded;
 per-draw fences serialize completion. The first-car repetition costs about 51%
 against its diagnostic direct control, consistently across blocks. Driving
 controls vary too much to infer a general loop cost or speedup. This is not
-pure GPU timing or live gameplay FPS. A clean candidate needs fresh image
-guards before application integration and paced gameplay measurement.
+pure GPU timing or live gameplay FPS. A clean candidate now passes fresh image
+guards: all 447 synthetic cases and all three complete saved scenes match the
+accepted diagnostic ON output, while actual default OFF matches historical
+stable/current OFF exactly. This clean common shader is integrated behind the
+existing option; it repeats only at native scale. Application integration and
+paced gameplay measurement follow.
 
 Polygon scanline rasterization does not add a CRT display filter. CRT scanlines,
 phosphor-mask/glow effects and chromatic aberration are not implemented in the

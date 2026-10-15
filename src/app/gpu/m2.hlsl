@@ -71,6 +71,25 @@ int round_coordinate(float value) {
     return int(ipart) + ((value - ipart > 0.5) ? 1 : 0);
 }
 
+// At native resolution, draw_tex_span advances from the clipped span start
+// with separate float additions. A direct offset can cross a texel or cutout
+// threshold because its rounding differs. Checker spans first align to odd
+// parity, then add a doubled increment. Work grows with distance from the
+// clipped start; this remains behind the optional polygon-scanline path.
+float3 advance_span(float3 start, float3 increment, int clipped_left, int2 pixel, uint flags) {
+    precise float3 accumulated = start;
+    precise float3 step = increment;
+    int cursor = clipped_left;
+    int stride = 1;
+    if ((flags & 4u) != 0u) {
+        if (((cursor ^ pixel.y) & 1) == 0) { ++cursor; accumulated += step; }
+        stride = 2;
+        step *= 2.0;
+    }
+    [loop] for (; cursor < pixel.x; cursor += stride) accumulated += step;
+    return accumulated;
+}
+
 // Raster::render_triangle uses direct edge slopes and determinant parameter
 // planes. Two PolyEdge records hold its sorted geometry and plane coefficients;
 // this is deliberately distinct from the 4–8-vertex polygon edge chains.
@@ -98,14 +117,14 @@ float3 triangle_oz(PolyOut i) {
     const int clipped_left = max(left, int(plane.tail.w * scale));
     precise float fullstartx = (float(clipped_left) + 0.5) / scale;
     precise float3 start = plane.origin.xyz + fullstartx * plane.step.xyz + p.y * plane.tail.xyz;
-    // Preserve the clipped-start evaluation order. A direct offset still does
-    // not promise bit identity with the CPU's repeated per-pixel additions.
+    if (scale == 1.0) return advance_span(start, plane.step.xyz, clipped_left, pixel, i.info.x);
+    // Higher resolutions retain their enhanced sample grid and direct offset.
     precise float offset = float(pixel.x - clipped_left) / scale;
     precise float3 oz = start + offset * plane.step.xyz;
     return oz;
 }
 
-// Diagnostic coverage/interpolation from Raster::render_polygon. A rectangle
+// Optional coverage/interpolation from Raster::render_polygon. A rectangle
 // supplies fragment candidates; both solid and textured polygons accept only
 // their rounded, left-inclusive/right-exclusive outer-edge span.
 float3 polygon_oz(PolyOut i) {
@@ -140,6 +159,13 @@ float3 polygon_oz(PolyOut i) {
     precise float3 lp = float3(le.origin.zw, le.tail.x) + ldy * le.step.yzw;
     precise float3 rp = float3(re.origin.zw, re.tail.x) + rdy * re.step.yzw;
     precise float3 dpdx = (rp - lp) * (1.0 / (stopx - startx));
+    if (scale == 1.0) {
+        const int clip_left = int(polyedges[i.edges.x + nl + nr].origin.x);
+        const int clipped_left = max(min(left, right), clip_left);
+        precise float fullstartx = float(clipped_left) + 0.5;
+        precise float3 start = lp + (fullstartx - startx) * dpdx;
+        return advance_span(start, dpdx, clipped_left, pixel, i.info.x);
+    }
     precise float3 oz = lp + (p.x - startx) * dpdx;
     return oz;
 }

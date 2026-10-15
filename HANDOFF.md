@@ -1,5 +1,31 @@
 # Handoff
 
+## Native Metal repeated stepping integrated (2026-10-14)
+
+The common renderer now includes clean repeated span stepping behind the
+existing default-OFF polygon scanline option. It retains clipped-left and
+checker alignment, and repeats only at native scale 1; higher scales retain
+their existing direct interpolation. Diagnostic modes, primitive IDs and
+probe switches are absent. The common HLSL is regenerated for all three
+backends; only Metal execution has been tested. This follows **Geometry**:
+preserve polygon ordering/composition and verify pixels before changing defaults.
+
+Fresh clean-shader checks pass 447 synthetic cases (85,137,408 pixel comparisons)
+and all three saved complete scenes. Their CPU/composition witnesses match,
+actual default-OFF images equal both historical stable and current OFF images,
+and ON equals the accepted diagnostic images exactly: 3/1/1 differing pixels,
+RGB error sums 24/13/11. Independent source review found no blocker; all 216
+preserved diagnostic/input identities remain unchanged. Clean source and final
+image identities were checked again after integration.
+
+Evidence: `build/worktrees/mac-triangle-fidelity/build/validation/clean-repeat-candidate/report.json`,
+SHA-256 `07c72b87af9ce1a57abc6ee234224fa4eb05559b5094eb34934c86baf8ec2285`;
+source review: `build/validation/full-scene-repeat-independent/clean-source-review.json`,
+SHA-256 `49941e4fe90350694a7f865bfb458e425487fc793f72e7bd2436e20278d4fe6f`.
+Previous diagnostic timings do not measure this newly compiled candidate.
+Next integrate into a separate Mac app and measure paced gameplay with sound;
+continuous flicker, remaining precision residuals and whole-game fidelity stay open.
+
 ## Independent ordered-resume phase component (2026-10-14)
 
 `tools/srally_boot/reference_resume.h` adds a test-only sound-off interpreter

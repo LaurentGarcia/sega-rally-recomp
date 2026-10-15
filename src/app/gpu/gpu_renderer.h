@@ -35,7 +35,9 @@ public:
     bool ok() const { return poly_pipe_ != nullptr; }
     const std::string &error() const { return error_; }
     // Diagnostic opt-in: 3–8 vertex polygons use CPU-reference scanline
-    // coverage/interpolation and GPU shading. Default remains the fan path.
+    // coverage/interpolation and GPU shading. At native resolution, parameters
+    // advance by repeated additions from the clipped start; GPU setup/division
+    // can still differ from the CPU. Default remains the fan path.
     void set_polygon_scanlines(bool enabled) { polygon_scanlines_ = enabled; }
 
     // Draws the frame into `target` (at least w x h times `scale`, created
