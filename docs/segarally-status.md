@@ -16,7 +16,7 @@ The [design](sega-rally-design.md) records interpretation and hardware limits.
 | Sound generation | Native linked board captures 2,409,170 stereo frames: 54.6297052 seconds including nonzero 44.1 kHz PCM; shared-core drains agree | Whole-game audio parity unvalidated |
 | Audio output | v15 supplies 23,250,561 stereo frames with zero chip/host drops and four SDL estimated shortfall requests totaling 25,248 input bytes | User reports title-screen glitches; location/cause and physical fidelity remain open |
 | Exact host recording | Actual manual v14 drive replays all 18,689 resumes, PCM hashes and final saves through frame 9,344; earlier scripted recorded/unrecorded checks also match | Same-Machine reproducibility; full-course and independent CPU/sound parity remain open |
-| Independent host recording | One actual sound-off bundle passes six resumes, 563,041 instructions, 283,375 ordered writes, 910,200 cycles and two frames after immutable preflight | Short neutral-input check with shared board implementations; longer/manual captures, sound-on and hardware parity remain open; fault rows rejected |
+| Independent host recording | Actual sound-off driving bundle passes 5,201 resumes, 500,035,460 instructions, 15,156,607 ordered writes, 1,130,001,001 cycles and 2,600 frames after immutable preflight | Independent i960 with shared boards; longer/manual captures, sound-on and hardware parity remain open; fault rows rejected |
 | Hardware fidelity | Isolated device/reference tests and instruction-timed diagnostics | PCB timing, extF80 precision and full-machine behavior remain open |
 
 ## Measured Mac speed

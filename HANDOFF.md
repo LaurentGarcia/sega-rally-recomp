@@ -1,5 +1,29 @@
 # Handoff
 
+## Independent recorded drive through frame 2,600 (2026-10-14)
+
+The prepared sound-off checkpoint now passes an actual captured drive. A fresh
+v14 raw-host capture completes 5,201 resumes and 500,035,460 instructions through
+frame 2,600, with 1,130,001,001 cycles and PC `005e6964`. All 15 applied script
+events match every recorded pin snapshot; four later events remain pending.
+The final image shows the Lancia driving at 160 km/h in third gear, with 4.50 s
+on the race timer. This confirms the captured state, not image fidelity.
+
+Independent replay then matches all resumes, 15,156,607 ordered writes and
+terminal witnesses in 450.991573 seconds. Bundle bytes and all measured inputs
+remain unchanged. Scope is independent i960 execution with shared board/TGP/
+video implementations and sound off; full-machine, sound and hardware parity
+are still open. Evidence: `build/validation/independent-drive-v14/`, with
+`capture-001/result.json`, `capture-001/visual-review.json` and
+`replay-001/result.json`. The original PPM is preserved; a PNG conversion was
+needed because the review viewer could not decode PPM.
+
+Both commands requested `nice -n 10`, but the replay's stderr records
+`setpriority: Operation not permitted`. The program still ran and passed;
+reduced scheduling priority was not established. Do not describe this as a
+quiet performance benchmark or repeat the completed parity run solely for that
+priority request. The long run is complete and no replay process remains.
+
 ## Opt-in audio timing diagnostics (2026-10-14)
 
 `--audio-diagnostics` now observes paced `--sound` playback without changing

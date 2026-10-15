@@ -246,10 +246,12 @@ the selected interval without changing guest synchronization.
 
 Output retains build/run commands, frozen identities and comparison transcript;
 no SDL/GPU, audio output or live-save writes occur. The longer limit is an opt-in
-resource bound, not a completed driving-validation result. The prepared driving
-plan uses `nice -n 10` for capture and replay, fresh exclusive saves/output,
-immutable input copies and first-mismatch stop; it remains deferred during the
-active playtest/audio diagnosis. Preserve the original raw host and its matching
+resource bound. The actual driving checkpoint now passes 5,201 captured resumes,
+500,035,460 instructions and 15,156,607 ordered writes through frame 2,600.
+It uses fresh exclusive saves/output, immutable input copies and first-mismatch
+stop. Replay takes 450.99 seconds; its requested `nice -n 10` is refused by the
+sandbox, so lower scheduling priority is not established. This is a correctness
+check, not a quiet performance benchmark. Preserve the original raw host and its matching
 measurements; a changed or signed executable needs matching evidence.
 
 Relevant source-level regression checks include:
