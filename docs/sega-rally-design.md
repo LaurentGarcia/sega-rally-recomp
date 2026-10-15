@@ -443,8 +443,13 @@ the first `ff` byte's physical transfer and its SCSP MIDI read/IRQ clear.
 Full sound architecture, RAM, ordered transfers and 63,722 stereo PCM frames
 match. The PCM is silent. Register operations occur after draining all queued
 events through their timestamps; UART construction and equal-time access
-ordering are preserved. This establishes native recapture for that prefix;
-the independent sound CPU and nonzero music remain separate gates.
+ordering are preserved. A subsequent paired run also matches independent
+MAME CPU execution through all 163 original cuts: 1,260,947 instructions,
+660 IRQ entries and 2,761,745 paired observations. The native interval hashes
+stay unchanged; reference microcode-phase stamps are recorded separately
+instead of equated with native boundary stamps. This validates the tested
+authentic command prefix under shared devices and instruction-start MMIO;
+nonzero music and whole-recording comparison remain separate gates.
 The diagnostic
 is disabled by default, including in the Metal frontend. Daytona's measured
 instruction-rate shortcut is specific to its different Model 1 board and is

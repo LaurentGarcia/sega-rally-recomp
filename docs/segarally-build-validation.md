@@ -409,6 +409,30 @@ Side-effecting read support is implemented but not exercised by these seven
 writes. This is native-to-native recapture with shared devices, not independent
 CPU, chip, nonzero-music or whole-recording validation.
 
+The separate reference fixture consumes that exact successful short capture
+and its successful native recapture, with the prepared initialization provider:
+
+```sh
+python3 tests/test_segarally_sound_uart_reference.py --prepare \
+    --native-prepared build/validation/sound-uart-prepared \
+    --reference-prepared build/validation/sound-init-prepared \
+    --capture-dir build/validation/sound-uart-capture \
+    --native-recapture-dir build/validation/sound-uart-recapture \
+    --output build/validation/sound-uart-reference-prepared
+python3 tests/test_segarally_sound_uart_reference.py --run \
+    --output build/validation/sound-uart-reference-prepared \
+    --run-dir build/validation/sound-uart-reference-run
+```
+
+It keeps a fresh native recapture byte-exact against all original cuts while
+comparing a persistent independent MAME CPU at every paired event boundary.
+The retained run passes in 28.065956 seconds: 1,260,947 instructions,
+16,312,806 cycles, 660 IRQ entries and 2,761,745 paired observations. All
+63,722 PCM frames remain silent. Full SR and modeled transfers are compared;
+internal reference bus-phase stamps remain distinct from native boundary
+stamps. The 90-second watchdog and four-million-observation limit apply only
+to this fixed short transcript. It does not accept arbitrary longer recordings.
+
 ## Optional sound experiment
 
 Sound requires both audited generated sound inputs and an explicit build option:

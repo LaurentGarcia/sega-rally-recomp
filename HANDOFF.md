@@ -1,5 +1,51 @@
 # Handoff
 
+## Independent sound CPU matches authentic UART prefix (2026-10-14)
+
+The first real UART transcript now passes persistent pinned-MAME sound CPU
+execution as well as native recapture. The single bounded run ends at
+1,444,941,000 ns with 1,260,947 sound instructions, 16,312,806 cycles and 660
+IRQ entries. All 2,761,745 paired observations, 925,827 ordered modeled data
+transfers and 163 original native cuts match. The 63,722 stereo PCM frames
+also match bit for bit and remain silent. MAME independently reads the
+observed `ff` byte at 1,443,240,416 ns. Its microcode-phase stamp is 16,293,612
+cycles; the native boundary stamp is 16,293,607. Both are retained separately.
+
+The original transcript contains native phase-bearing interval hashes, so
+the test keeps a fresh native recapture matching those original cuts exactly,
+then compares independent CPU state, full SR/stack/RAM, queue/RNG/UART state,
+ordered modeled data and raw PCM against that recapture. It neither rewrites
+the tape nor normalizes reference phases. Native guards remain separate from
+bus transfers; reference prefetch words and CPU-space IACK are checked
+independently. This follows **Audio** and **Reference & validation**. Shared
+devices and instruction-start MMIO remain explicit limits; independent chip,
+physical timing, title-music and sound-on recording claims remain open.
+
+Compile-only preparation passes in 11.276108 seconds without fixes. The first
+guest run passes in 28.065956 seconds with empty stderr and unchanged inputs;
+this is correctness elapsed time, not a performance comparison. Evidence:
+`build/worktrees/sound-init-reference/build/uart-reference-run-001/result.json`,
+SHA-256 `1eca628de6f1e8a3d1b60a1ae49dfdcfcf5bf6f32c5011a97b256160893569aa`;
+`state.json` SHA-256
+`85ef72a8dfc118d948aba7dd8bc567de60b950e9cd5f21f977f08e53536f7968`.
+Independent review checks all 959 measured inputs, four prepared artifacts,
+the result ledger and all silent PCM hashes:
+`build/validation/sound-uart-reference-independent-review/result.json`, SHA-256
+`5fb266e063151dcbe0207eb2d52a2b82f0c9335a09f3a03a10f598f239f47376`.
+All 113 local source inputs map exactly to MAIN; other inputs retain their
+original external/build identities. Integration record:
+`build/validation/sound-uart-reference-integration/result.json`, SHA-256
+`bee409b78eecc08f121191750fc285a36834c0fb1593183661b272c3253f200d`.
+
+Next extend authentic main traffic to first nonzero PCM, require native
+recapture, then extend the independent CPU comparison. A read of the preserved
+neutral 7,200-frame WAV locates its first nonzero at stereo frame 717,489,
+16.269591837 seconds at 44.1 kHz, raw first scalar `b8000000`. This supplies a
+measured discovery target, not a title-scene or music label. The new fixture
+must preserve the completed short prefix and use new explicit bounds. The
+separate v17 Mac worktree at `82c06af` is building the integrated shader;
+no new app playability or paced-render result is claimed yet.
+
 ## Native texture reciprocal correction integrated (2026-10-14)
 
 The optional native-scale texture path now uses the tested integer-certified
