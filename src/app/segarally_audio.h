@@ -1,6 +1,7 @@
 // Presentation only: the shared machine supplies already-clocked SCSP samples.
 #pragma once
 #include "app/segarally_audio_output_capture.h"
+#include "app/segarally_audio_policy.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <atomic>
@@ -13,9 +14,9 @@
 namespace rally {
 class AudioOutput {
 public:
-    static constexpr unsigned kRate = 44100, kChannels = 2;
-    static constexpr unsigned kPrimeFrames = kRate * 60 / 1000;
-    static constexpr unsigned kMaximumFrames = kPrimeFrames * 4;
+    static constexpr unsigned kRate = AudioQueuePolicy::kRate, kChannels = 2;
+    static constexpr unsigned kPrimeFrames = AudioQueuePolicy::kBaseFrames;
+    static constexpr unsigned kMaximumFrames = AudioQueuePolicy::kMaximumFrames;
     ~AudioOutput() { close(); }
     AudioOutput() = default;
     AudioOutput(const AudioOutput &) = delete;
@@ -35,6 +36,12 @@ public:
         const SDL_AudioSpec format{SDL_AUDIO_F32, kChannels, kRate};
         stream_ = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &format, request, this);
         if (!stream_) fail(); // SDL opens this device paused; prime before playback.
+        SDL_AudioSpec actual{};int frames=0;
+        if(!SDL_GetAudioDeviceFormat(SDL_GetAudioStreamDevice(stream_),&actual,&frames)) fail();
+        policy_.configure(actual.freq,frames);
+        if(diagnostics_.load(std::memory_order_relaxed))
+            std::fprintf(stderr,"Audio queue: base_frames=%u device_rate=%d device_frames=%d burst_input_frames=%u target_frames=%u maximum_frames=%u\n",
+                kPrimeFrames,actual.freq,frames,policy_.burst_frames,policy_.target_frames,kMaximumFrames);
     }
     void close() {
         if (output_capture_) {
@@ -85,15 +92,15 @@ public:
             // stale backlog. Retain only a bounded tail of newly produced PCM.
             dropped_frames_ += queued;
             clear();
-            if (frames > kPrimeFrames) {
-                dropped_frames_ += frames - kPrimeFrames;
-                samples = samples.last(kPrimeFrames * kChannels);
+            if (frames > policy_.target_frames) {
+                dropped_frames_ += frames - policy_.target_frames;
+                samples = samples.last(policy_.target_frames * kChannels);
             }
         }
         if (!SDL_PutAudioStreamData(stream_, samples.data(), int(samples.size_bytes()))) fail();
         submitted_frames_ += samples.size() / kChannels;
         const auto buffered = queued_frames();
-        if (!started_ && buffered >= kPrimeFrames) {
+        if (!started_ && buffered >= policy_.target_frames) {
             if (!SDL_ResumeAudioStreamDevice(stream_)) fail();
             started_ = true;
         }
@@ -101,8 +108,7 @@ public:
         if (started_) {
             // Match Daytona's bounded host-device drift trim. This changes
             // only presentation, never SCSP samples or the shared board clock.
-            const float error = std::clamp((float(buffered) - kPrimeFrames) / kPrimeFrames, -1.0f, 1.0f);
-            ratio=1.0f + 0.005f * error;
+            ratio=policy_.ratio(buffered);
             if (!SDL_SetAudioStreamFrequencyRatio(stream_, ratio)) fail();
         }
         if(output_capture_attached_) output_capture_->producer(received_frames_,submitted_frames_,queued,buffered,ratio);
@@ -114,6 +120,7 @@ public:
         return unsigned(bytes) / (kChannels * sizeof(float));
     }
     bool started() const { return started_; }
+    unsigned target_frames() const { return policy_.target_frames; }
     uint64_t received_frames() const { return received_frames_; }
     uint64_t submitted_frames() const { return submitted_frames_; }
     uint64_t dropped_frames() const { return dropped_frames_; }
@@ -135,6 +142,7 @@ private:
     }
     [[noreturn]] static void fail() { throw std::runtime_error(std::string("SDL audio: ") + SDL_GetError()); }
     SDL_AudioStream *stream_ = nullptr;
+    AudioQueuePolicy policy_;
     std::unique_ptr<AudioOutputCapture> output_capture_;
     bool output_capture_attached_=false;
     bool initialized_ = false, started_ = false;

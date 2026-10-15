@@ -1,5 +1,122 @@
 # Handoff
 
+## Device-period audio headroom (2026-10-15)
+
+Audio and Reference & validation govern a measured presentation-buffer fix.
+An unbound SDL stream reproduces all 5,512,192 frames of candidate 002's captured
+postmix bit for bit, including the 288-frame shortage, with all 14,404 recorded
+pre-push queue values exact. It recomputes the existing 60 ms drift policy rather
+than merely replaying recorded frequency ratios. On the identical PCM and
+delivery/demand schedule, adding one measured device period to the target removes
+all short packets. This establishes the captured starvation mechanism; the
+specific cause of the host pause and every previously heard glitch remain open.
+
+`AudioQueuePolicy` now converts the actual output period to 44.1 kHz source
+frames, rounding upward, and adds it to the 60 ms base. The observed 44.1 kHz /
+1,024-frame device uses 3,670 frames, about 83.22 ms: nominally 23.22 ms additional
+audio buffering. Initial/re-priming, retained overflow tail and drift control
+use that target. The 240 ms backlog cap and ±0.5% trim bounds remain unchanged.
+The target is limited to half the cap so startup cannot repeatedly clear before
+crossing the prime threshold. Invalid formats or device periods over 60 ms fail
+explicitly; this compatibility limit and lack of adaptive route-change retuning
+must remain visible. No generated PCM, board clock or game code changes.
+
+The existing audio fixture now reproduces a three-callback late-producer case
+(288 missing frames with the old policy, zero with the new), and checks rate
+conversion, invalid/oversized periods, startup bounds, backlog recovery and WAV
+behavior. It and the 24,389-check output-capture fixture pass, as does strict
+host syntax. Independent source review finds no blocker. Counterfactual playback
+begins later and has one fewer output packet; it is not a same-length or actual
+device result. Source patch SHA-256
+`78784f5fa0336e8b91768ae014bd129be0fb8d0d5ecbf44ffbc33c38fd22bd4a`;
+report `build/worktrees/audio-device-headroom/build/validation/headroom-001/report.json`,
+SHA-256 `4205f794345b02ce99e39e494808a4ca7574f9e01a436ce1d96039e0c399c5ed`.
+All three integrated source files match the report. A fresh candidate 003 build
+and one visible, paced, neutral paired capture are next. Original candidate 002
+and its failed audio result are preserved.
+
+## Fresh Mac candidate, championship coverage and captured audio starvation (2026-10-15)
+
+Candidate 002 completes the entire fresh build/package pipeline at clean source
+`481bf63764ae61c9cb3f1b46e1d3f7fff4775570`: all ten steps and eleven dedicated
+Mac CTests pass. The ad-hoc signed app is
+`build/mac-candidate-002/mac/Sega Rally Native.app`; executable SHA-256
+`4d365a25d628cf26dbfa713598cc6bc762ca1d39cd7d46845269cf37507b53e8`.
+Independent audit checks source/compile contracts, all 52 generated main files,
+TGP/timed sound against v17, all eight images, seven notices, twenty bundle
+files and 26 matching raw/signed Mach-O sections. Evidence:
+`build/validation/mac-release-audit/fresh-candidate-002-review.json`, SHA-256
+`b5870281c64f275b448398e2860023ee7a6321927d8a768f37e1d54657148c9a`.
+
+A bounded direct invocation of the signed executable with no arguments and an
+isolated save environment verifies the new Mac defaults: Metal, native sound,
+instruction-boundary execution and enhancements off. It closes normally after
+25 seconds at 1,293 frames, 254,204,037 instructions and 561,978,800 cycles,
+producing 991,331 stereo PCM frames. This exercises direct executable startup,
+not a Finder event-delivery test. One estimated SDL input shortfall is retained;
+startup success is not an audio-quality pass. Result:
+`build/validation/mac-candidate-002-host/startup-001/result.json`, SHA-256
+`5275cf9c9a12b054b124714774b1f4efae24aff31fd6ef66cf550f21910e6ca5`.
+
+The neutral paired capture then reaches 7,200 frames / 1,399,415,787 main
+instructions / 3,129,161,000 cycles / PC `005ca464`, exit zero. The whole native
+WAV is byte-identical to the preserved neutral reference: 5,519,841 stereo
+frames, SHA-256 `c2dff02d3df9b30228802404c1e7dfc59547d549f806b6fb7a09862a5355bbdc`.
+It nevertheless FAILS the planned zero-demand playback criterion: one request
+estimates 2,296 additional input bytes. The failed result remains unchanged at
+`build/validation/mac-candidate-002-host/audio-001/result.json`, SHA-256
+`c60702abff489a0d1dd96a3ad9fedffd7eac8dfc9e45f8b6676a4574041103df`.
+
+Independent artifact review passes all 14,404 neutral resumes, witness
+continuity, every PCM interval hash, recording seal, initial/final saves and
+full transcript/observation equality with the preserved neutral run. Postmix
+contains 5,512,192 finite stereo frames in 5,383 contiguous packets, no capture
+drops/format failure, and records 2,065 queued input frames on detach. This is
+the app's logical SDL mix before CoreAudio, not physical speaker capture.
+Integrity report: `build/validation/mac-release-audit/candidate002-audio-review.json`,
+SHA-256 `c74860c5f022d77aa2507dd35254a313f02861549f2740b3852952c75dc3d3c8`.
+The first review tried equating board nanoseconds with CPU cycles times forty
+at every resume; that is invalid during the established synchronization phase.
+The corrected review checks exact witness continuity and reference transcript
+equality instead. No production code or captured evidence changed.
+
+The paired stream exposes an actual 288-frame / 6.530612 ms zero tail absent
+from native PCM. A 52.918334 ms producer pause exhausts the stream during a
+1,024-frame output request. Native stepping and GPU presentation measurements
+do not identify the source of that pause; oversleep, scheduling and unmeasured
+host I/O remain distinct possibilities. Offline SDL schedule reproduction and
+a device-sized buffer remedy are being validated. Do not report the audible
+issue resolved merely because native PCM or capture integrity matches.
+
+The separate championship gate proceeds under a new frozen plan that binds
+the original audio failure and independent integrity review. It runs without
+device playback and does not relax or relabel the failed audio criterion.
+All 4,398 input events apply through 20,000 frames / 3,662,512,354 instructions /
+8,692,041,001 cycles / PC `005ca464`, with 15,332,761 stereo PCM frames, no
+chip/host drops, frontier or manual takeover. Terminal counters and all 670
+CPU-only course checkpoints match the valid-input Desert/Forest/Mountain path.
+That path clears Desert in 1:00.38 and Forest in 1:21.37, then retires near
+Mountain's finish; neither Mountain completion nor Lakeside is established.
+Result: `build/validation/mac-candidate-002-host/championship-001/result.json`,
+SHA-256 `cf06426f683f75466388e94fca2d90fe1c00a7efc8b05f348b306b60cfa19185`.
+It took 177.20 seconds with other work active; this is not a speed measurement.
+Independent integrity review verifies all 40,006 resumes, the full twelve-pin
+input schedule, every PCM interval hash and final saves. One bounded offline
+replay with the exact signed executable then passes all of those comparisons
+in 168.850059 seconds, with the app, recording and live saves unchanged. Result:
+`build/validation/mac-release-audit/championship002-offline-001/result.json`,
+SHA-256 `9b89fd17a7185d1cb2e2e39301cb0db4fa18427e8c3d8d11bd41113f2f0b5024`.
+This remains same-Machine reproducibility, not independent CPU/device parity.
+The final default-OFF Metal image differs from software composition, as expected
+for that renderer mode; this gate did not assert optional accurate-mode equality.
+
+Test runner evolution is explicit: original startup script/plan, neutral-capture
+script/plan and failed result remain preserved; plan-v3 binds them before the
+independent championship run. The neutral capture uses the preserved frame-0 /
+7,199 input schedule to exclude live controls. No game code, physics or saves
+were modified to extend course coverage. README/player/status now describe the
+current build workflow and keep earlier checkpoints in the evidence record.
+
 ## Bounded output-audio diagnostics and longer input replays (2026-10-15)
 
 Offline analysis of the preserved 125.166-second neutral-title capture found

@@ -633,6 +633,16 @@ buffer is drained on the main thread. This does not capture other applications
 or the physical speaker/backend, and resampled output is not expected to equal
 native 44.1 kHz samples bit for bit. Normal playback does not install this tap.
 
+Playback now reserves a 60 ms base plus one output-device period, converted
+upward to input frames. On the measured 44.1 kHz / 1,024-frame device, the target
+is 3,670 frames (83.22 ms), adding about 23.22 ms of nominal audio buffering.
+The 240 ms backlog cap and ±0.5% trim remain fixed. Diagnostics print the actual
+rate, period and target. Invalid periods or periods longer than 60 ms fail
+explicitly; device changes after opening are not adaptively retuned. A captured
+52.9 ms delivery pause caused a verified 288-frame postmix gap, absent from native
+PCM. Replaying that exact SDL schedule with the new policy removes its shortage;
+fresh device validation and broader listening confirmation remain separate.
+
 One paced 2,600-frame CRT check preserves native WAV/image, saves and all ordered
 resumes exactly, with no shortfalls or drops. A separate fresh 7,200-frame
 neutral attract capture seals 14,404 resumes and verifies every recorded PCM

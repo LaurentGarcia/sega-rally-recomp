@@ -407,6 +407,14 @@ UART exchange real serial pin edges; no command reply is substituted.
 This follows the inherited **Audio** section's static-program approach with a
 Rally-specific scheduling contract. MMIO still occurs at each instruction's
 start boundary, with no value-bearing prefetch or individual bus-phase model.
+Rally's SDL presentation queue now adds one actual device period to the inherited
+60 ms base. A captured 52.9 ms producer pause caused a 288-frame output gap while
+native PCM stayed exact; an unbound SDL stream reproduced the entire capture
+bit for bit, and the added-period policy removed that shortage on the same
+schedule. The measured device targets 83.22 ms, with unchanged 240 ms backlog
+cap and ±0.5% trim. Periods over 60 ms fail explicitly to keep the priming target
+at most half the cap. This changes presentation buffering, not game/sound clocks
+or generated samples; actual-device and listening checks remain necessary.
 Independent public microcode tests also compare architectural registers,
 stack banks, PC, defined SR and complete synthetic memory: 11,551 completed
 instruction cases, 280 IRQ entries and two resets pass with fresh generated

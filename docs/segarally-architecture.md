@@ -92,8 +92,10 @@ its separate experimental sample-mixer mode in [native-audio.md](native-audio.md
 is also distinct from Rally's backend. Sound MMIO occurs at instruction
 start boundaries; individual bus phases and value-bearing prefetch remain
 unverified. The machine drains bounded 44.1 kHz stereo PCM without advancing
-device clocks. SDL output primes 60 ms, caps its queue at 240 ms and limits
-presentation-rate trim to ±0.5%. Capture and shared-core PCM agreement do not
+device clocks. SDL output primes a 60 ms base plus one actual output-device
+period, caps its queue at 240 ms and limits presentation-rate trim to ±0.5%.
+The measured 44.1 kHz / 1,024-frame device therefore targets about 83.22 ms.
+Periods over 60 ms are rejected to retain bounded, viable priming. Capture and shared-core PCM agreement do not
 establish speaker playback or complete sound parity.
 
 ## Validation boundaries

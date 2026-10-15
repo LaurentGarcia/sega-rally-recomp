@@ -2,7 +2,8 @@
 
 This is a development build of Sega Rally Championship, using the original
 game instructions recompiled from verified personal ROMs. The current Mac
-checkpoint can drive the Lancia through Desert and enter the second course.
+checkpoint has sound-enabled Metal replay evidence clearing Desert and Forest,
+then entering Mountain and retiring near its finish.
 All-course completion, exact graphics and hardware fidelity remain unverified.
 See [current evidence](segarally-status.md).
 
@@ -16,6 +17,11 @@ python3 scripts/segarally_mac.py --roms /path/to/srallyc.zip \
 ```
 
 After the build succeeds, open `build/segarally-player/mac/Sega Rally Native.app`.
+The preserved candidate 002 package is
+`build/mac-candidate-002/mac/Sega Rally Native.app`, built at source `481bf63`
+with all eleven dedicated Mac CTests passing. Its bounded 25-second no-argument
+startup reaches 1,293 frames with Metal, sound and the instruction boundary hook.
+This startup check does not establish full-course or audible-quality validation.
 New sound-enabled Mac builds start with sound and the faster native execution
 path when opened directly, without command-line arguments. The game opens in
 a window and uses normal pacing. Allow its original reset checks to finish,
@@ -157,6 +163,11 @@ a playtest.
 
 Title-screen audio glitches were reported in an earlier preview. Later captures
 have clean queue telemetry, but the audible issue is not yet confirmed resolved.
+The fresh candidate's 7,200-frame paired capture preserves native PCM and has no
+capture drops, but logs one SDL input-shortfall request; it does not clear the
+reported title-screen issue. Analysis exposes a 6.53 ms silence gap in the SDL
+output that is absent from native PCM. A buffering remedy is still under
+development; the current packaged app does not include a validated fix.
 Add `--audio-diagnostics` to a paced launcher command with `--sound` when
 investigating; it timestamps queue demand and host delays without changing audio
 generation or buffering. See [current evidence](segarally-status.md) for the
@@ -195,6 +206,13 @@ through frame 2,801, including their WAV, final image and saves. The later v14
 manual session also replays all 18,689 resumes, PCM hashes and final saves
 through frame 9,344 with the exact signed app. The later v16 analog-input session
 replays all 25,953 resumes and PCM hashes through frame 12,974 with its original
-signed app and final saves unchanged. These establish repeatability
+signed app and final saves unchanged. The preserved v17 session matches all
+9,459 resumes, PCM hashes covering 3,625,487 stereo frames and final saves
+through frame 4,729 with its exact signed executable. Candidate 002 also replays
+its 20,000-frame sound-on course run exactly: all 40,006 resumes, PCM hashes and
+final saves match. The source run applies 4,398 input events and clears Desert
+and Forest before retiring near Mountain's finish. It is unthrottled and opens
+no playback device, so it does not measure live speed or sound quality. These
+checks establish repeatability
 for the captured drives; remaining courses and live audio quality still
 need validation. See the [input guide](segarally-input-replay.md#exact-host-resume-transcripts).
