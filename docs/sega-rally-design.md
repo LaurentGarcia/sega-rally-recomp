@@ -193,10 +193,22 @@ confirms GPU cutout ownership changes caused by accumulated rounding. Combined
 repeated stepping leaves three differing pixels in the same 3D-only snapshot,
 including one slightly worsened pixel; all 447 synthetic cases and the exact
 disabled-mode image guard pass. The initial candidate failed that guard and is
-excluded. This remains ignored experimental source with unmeasured loop cost
-and no broader-scene validation. Residual texture precision remains open. No new
-performance result or whole-game fidelity claim follows;
+excluded. This remains ignored experimental source. A subsequent three-complete-scene
+gate reproduces historical CPU/stable outputs and raw tile/character composition
+exactly before comparison. Combined repetition reduces differing pixels from
+697/1,241/581 to 3/1/1, with one newly worsened pixel per scene. Those saved
+v5/v6 states support complete scene replay without executing the game.
+An initial bounded offscreen measurement finds repeated-path completed-render
+medians of 2.119/2.126/2.527 ms on Apple M5. The first-car diagnostic comparison
+shows about 51% higher latency; driving controls vary too much to generalize
+the loop cost. This includes encoding/submission/completion wait and excludes
+presentation and readback; it is neither GPU timestamp timing nor gameplay FPS.
+Residual texture precision, live cost and whole-game fidelity remain open;
 the option stays off by default. See [the evidence table](segarally-status.md#graphics-evidence).
+This polygon scanline path does not simulate visible CRT scanlines. The Rally
+host has no CRT postprocessing or chromatic-aberration option. Future display
+effects follow the inherited enhancement policy: optional, disabled by default
+and during image comparisons, applied after native image composition.
 The host also accepts the bounded cabinet replay and holds its final snapshot
 through one complete frame before handing control to keyboard/touch. Both
 rendering instances receive identical inputs. Normal board-time pacing is the

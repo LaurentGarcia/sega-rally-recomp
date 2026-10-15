@@ -12,7 +12,7 @@ The [design](sega-rally-design.md) records interpretation and hardware limits.
 | Driving parity | Two billion held-gas instructions, 86,328,770 ordered writes, 4,650,936,033 cycles, 113,101 IRQs and 10,701 renders; nineteen replay events match | Sound off; independent CPU with shared boards and final-frame comparison; no full MAME race |
 | Later game paths | Fresh credit/start after attract reaches a second race; sound-on frame 12,800 shows 118 km/h in fourth gear, 15.83 seconds elapsed | Complete second race and Game Over overlay not separately validated |
 | Course progress | Desert clear/results show 1:12.15; forested second course enters, times out, then attract returns | Centered steering does not complete second-course bends; remaining courses unvalidated |
-| Metal fidelity | Optional polygon scanlines improve three scenes; experimental repeated stepping reduces one 3D-only scene from 844 differing pixels to 3; 447 synthetic cases pass | Repeated stepping is diagnostic only, with one worsened pixel; broader scenes and cost remain open |
+| Metal fidelity | Experimental repeated stepping reduces differences across three complete scenes from 2,519 pixels to 5; composition guards and 447 synthetic cases pass | Diagnostic only; first bounded offscreen timing measured, live cost/continuous flicker/whole-game fidelity remain open |
 | Sound generation | Native linked board captures 2,409,170 stereo frames: 54.6297052 seconds including nonzero 44.1 kHz PCM; shared-core drains agree | Whole-game audio parity unvalidated |
 | Audio output | v14 windowed session supplies 7,163,505 stereo frames with zero chip/host drops and one estimated SDL input-shortfall request; user heard a separate ten-second native PCM sample | Live listening feedback and physical fidelity remain open |
 | Exact host recording | Actual manual v14 drive replays all 18,689 resumes, PCM hashes and final saves through frame 9,344; earlier scripted recorded/unrecorded checks also match | Same-Machine reproducibility; full-course and independent CPU/sound parity remain open |
@@ -197,9 +197,48 @@ The first instrumented candidate changed one baseline pixel even with its
 diagnostic mode disabled and was rejected. The second separates the new
 branch from baseline polygon shading: its disabled output matches all 190,464
 RGBA pixels and all 447 synthetic cases pass. No production shader change
-has been made; this loop's cost and behavior in broader composed scenes are
-unmeasured. Three residual pixels in one snapshot do not establish whole-game
+has been made; subsequent broader-scene and timing evidence follows below.
+Three residual pixels in one snapshot do not establish whole-game
 or hardware fidelity, or resolve continuous flicker.
+
+The broader complete-scene gate now passes too. Historical CPU/stable images
+and exact game-state witnesses match, then exported raw tile/character RAM
+reconstructs all decoded layers, flags, registers and palette pens. Default
+OFF and diagnostic mode-0 guards are exact in all three complete RGBA images.
+
+| Complete scene | Current optional differing pixels | Combined repeated stepping | RGB absolute-error sum, current → repeated |
+| --- | ---: | ---: | ---: |
+| 1,634 | 697 | 3 | 9,568 → 24 |
+| 2,329 | 1,241 | 1 | 15,147 → 13 |
+| 2,599 | 581 | 1 | 7,015 → 11 |
+
+These are 496×384 full images, including the HUD. Across them, 2,517 pixels
+become exact and three previously exact pixels worsen, one per scene. The two
+driving residuals remain unattributed. An independent audit recomputes the
+counts and decodes the tile/character layers from raw bytes. These historical
+v5/v6 scenes do not establish current-v14 whole-game fidelity or continuous
+flicker. Production remains unchanged.
+
+One bounded offscreen timing run on Apple M5 (10 GPU cores) passed all image
+guards, with 32 samples per arm/scene after warmup:
+
+| Scene | Default OFF | Current optional | Diagnostic direct | Diagnostic repeated |
+| --- | ---: | ---: | ---: | ---: |
+| 1,634 | 1.168 ms | 1.491 ms | 1.408 ms | 2.119 ms |
+| 2,329 | 1.319 ms | 1.541 ms | 2.257 ms | 2.126 ms |
+| 2,599 | 1.913 ms | 2.585 ms | 2.258 ms | 2.527 ms |
+
+These are median completed-render latencies including CPU encoding, submission
+and a GPU completion wait. Readback, file I/O and presentation are excluded;
+per-draw fences serialize completion. The first-car repetition costs about 51%
+against its diagnostic direct control, consistently across blocks. Driving
+controls vary too much to infer a general loop cost or speedup. This is not
+pure GPU timing or live gameplay FPS. A clean candidate needs fresh image
+guards before application integration and paced gameplay measurement.
+
+Polygon scanline rasterization does not add a CRT display filter. CRT scanlines,
+phosphor-mask/glow effects and chromatic aberration are not implemented in the
+Rally host. Future display effects remain optional and disabled for parity checks.
 
 ## Next validation work
 

@@ -1,5 +1,77 @@
 # Handoff
 
+## Repeated stepping across complete scenes (2026-10-14)
+
+The diagnostic now passes three historical complete scenes, including HUD/tile
+composition. A new ignored helper reuses authenticated mac-v5/timed-v6 objects
+with two resets: neutral to frame 1,634 and the driving replay through 2,329
+and 2,599. All frame/instruction/cycle/PC/polygon-count witnesses and original
+CPU/stable PPMs match. Exporting actual tile RAM (64 KiB), character RAM
+(512 KiB), geometry and 3D regions leaves the machine witness unchanged.
+Fresh Video instances restored from these bytes reproduce the CPU image,
+decoded layers/flags, registers/pens and stable GPU image. Current default OFF
+equals stable RGBA; diagnostic mode 0 equals the current optional renderer.
+No scene was skipped or invalidated. This follows **Geometry** and **Reference
+& validation**: verify scene/composition inputs before attributing differences.
+
+| Complete scene | Current optional differing pixels | Combined repeat | RGB error sum, current to repeat | Maximum channel error, current to repeat |
+| --- | ---: | ---: | ---: | ---: |
+| 1,634 | 697 | 3 | 9,568 to 24 | 168 to 4 |
+| 2,329 | 1,241 | 1 | 15,147 to 13 | 8 to 5 |
+| 2,599 | 581 | 1 | 7,015 to 11 | 52 to 4 |
+
+Across three 496x384 images, differences fall from 2,519 pixels to five.
+2,517 pixels become exact; three previously exact pixels worsen, one per scene.
+The first-car residuals are attributed in older entries below. Driving residuals
+at (449,281) in frame 2,329 and (479,369) in frame 2,599 remain unattributed:
+CPU/current RGB (204,188,153) becomes (209,192,157), and (162,149,122) becomes
+(166,153,125). This is historical scene fidelity, not current-v14 gameplay,
+continuous flicker or whole-game/hardware parity. Production, original captures
+and the accepted diagnostic shader remain unchanged. Its earlier 447-case
+synthetic proof applies to the same shader bytes.
+
+A single bounded offscreen timing run on Apple M5 (10 GPU cores) then passed
+12 image guards and completed 144 warmup plus 384 measured draws, with 32
+samples per arm/scene. Default OFF/current optional/diagnostic direct/repeat
+completed-render medians in milliseconds are 1.168/1.491/1.408/2.119 at 1,634,
+1.319/1.541/2.257/2.126 at 2,329, and 1.913/2.585/2.258/2.527 at 2,599.
+The first-car repeated path costs about 51% more than diagnostic direct in
+this run, with higher latency in every block; driving control variability
+prevents a universal incremental-cost or speedup claim. Timing includes CPU
+encoding, submission and completion wait, excludes readback and presentation,
+and serializes draws with fences. These are static-scene host elapsed times,
+not pure GPU time or gameplay FPS. Ordinary desktop activity remained during
+the coordinated build/game pause; no retry was performed.
+
+Evidence under `build/worktrees/mac-triangle-fidelity/build/validation/full-scene-repeat/`:
+`report.json`, SHA-256
+`84c65bf1e12ddf4a5a434bf6841215b1b8fad548710fe9339fc155af674394cb`;
+`neutral.log`, SHA-256
+`05784ddeff940a30f6b344698fc02a53c9e3de31d37c72c73ea7182988e4905e`;
+`race.log`, SHA-256
+`40f4e825538f1afad88ff7e80c6f47a6d183a44038b9e7c2af6954dfd877addd`.
+Independent audit recomputes all four variant metrics per scene, guards and
+raw tile/character decoding, flags, registers and pens:
+`build/validation/full-scene-repeat-independent/review.json`, SHA-256
+`45362d44bea216a5ac673a2140d9459a2d04530312e1552992b189463e5c663b`.
+Full saved scenes now support replay without executing game instructions.
+Timing evidence is under the same directory at `timing/run-01/report.json`,
+SHA-256 `ccc17cdd940b77a2b81badc5f18885d086b784883ec95445f950f37ea58bc1d5`;
+`samples.csv`, SHA-256
+`7ebcac2ea23367c68bcf51273badc087c17c3e97f0c68d9abfc3e15e95aa33a1`.
+Independent timing audit recomputes all groups and verifies 138 hash bindings:
+`build/validation/full-scene-repeat-independent/timing-review.json`, SHA-256
+`4be56403bb5f963e30463f014e6f8cc71d5607b41f85948c9cdd9c6188ca7bf9`.
+Next is a clean candidate without diagnostic instrumentation, retaining the
+default-OFF guard and common shader. Its compiled output needs the synthetic
+and saved complete-scene checks before application integration and live pacing.
+
+Polygon scanline rasterization is separate from visible CRT scanlines. CRT
+postprocessing and chromatic aberration are not implemented in the Rally host.
+Any future display effects belong after native image composition, remain
+optional/off by default, and are disabled for image parity checks, following
+the inherited **Geometry** enhancement policy. No CRT feature was added here.
+
 ## Second race starts and drives with sound (2026-10-14)
 
 `config/segarally_second_race.inputs` preserves the first 26 credit-restart
