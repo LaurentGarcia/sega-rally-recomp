@@ -1,707 +1,245 @@
 # Mac build and validation guide
 
-Run commands from this checkout's root. Use separate ignored directories for a
-new generation and host so preserved playtests remain available. These commands
-are a reproduction guide; do not run builds or heavy probes during an active
-player speed test. Phone work is deferred.
+The experimental **v0.1.0-rc.1 source prerelease** builds a local Mac app from
+verified personal Revision B (`srallycb`) ROMs. For a fresh checkout, follow
+[getting started](getting-started.md) first. Phone builds and testing are deferred.
+Commands below run from the repository root.
 
 ## Inputs and tools
 
-Supply your own ROM archive containing the verified Revision B (`srallycb`)
-inputs. The archive may be named `srallyc.zip`; its contents, sizes, CRC32 and
-SHA1 must match the committed manifests. Renaming an incompatible set does not
-make it valid. See the manifests under [config](../config).
+Use Apple's C/C++/Objective-C toolchain with C++20 support, Python 3.10 or newer,
+CMake 3.25 or newer (including CTest), Git, `codesign` and `pgrep`. A Metal-capable
+Mac and desktop/audio session are required to play. Apple Silicon is the recorded
+validation platform; Intel execution and a minimum macOS version have not been
+established by the Rally checks. The pipeline builds the current host architecture.
 
-The scripts use Python 3 and a C++20 compiler (`CXX` or `--compiler` selects it).
-The dedicated Mac project requires CMake 3.25 or newer, Apple's C/C++/Objective-C
-toolchain and the pinned SDL3 source at `extern/sdl3`. The SDL revision is
-`fa2c02bb6e21974a89ea9824bc53c9932abe5f9c` (3.4.16), enforced by
-[CMake](../platform/segarally/CMakeLists.txt). Record dependency revisions and
-licenses in [THIRD_PARTY.md](../THIRD_PARTY.md); vendored checkouts stay ignored.
-This guide does not assume a published Rally remote or an automatic installer.
+The dedicated Mac pipeline requires these pristine source checkouts:
 
-If `extern/sdl3` is absent, prepare the pinned dependency once:
+| Directory | Upstream | Required commit |
+| --- | --- | --- |
+| `extern/sdl3` | [SDL3](https://github.com/libsdl-org/SDL) | `fa2c02bb6e21974a89ea9824bc53c9932abe5f9c` |
+| `extern/imgui` | [Dear ImGui](https://github.com/ocornut/imgui) | `f1cc2ae15e53a861a874c3034aae6798fde194ab` |
+| `extern/lzma` | [7-Zip](https://github.com/ip7z/7zip) | `0766b733fe3e06dd2a7f9a3cfbf2108ac73abd17` |
 
-```sh
-git clone https://github.com/libsdl-org/SDL.git extern/sdl3
-git -C extern/sdl3 checkout --detach fa2c02bb6e21974a89ea9824bc53c9932abe5f9c
-```
+Exact clone/checkout commands are in [getting started](getting-started.md#2-get-the-source-and-pinned-dependencies).
+The build checks revisions and refuses modified tracked dependency files.
+The inherited generic setup may modify SDL for a different graphics backend;
+use clean pins for this Metal pipeline. An ordinary build needs no MAME, Ghidra,
+DXC, SPIRV-Cross or Docker. The root Daytona CMake project has separate dependency
+requirements and is not this guide's build entrypoint.
 
-An existing SDL checkout must report that exact revision with
-`git -C extern/sdl3 rev-parse HEAD`. Preserve any local changes before changing
-its revision.
-
-The Display panel uses the same MIT-licensed Dear ImGui 1.92.9b pin as Daytona:
-`f1cc2ae15e53a861a874c3034aae6798fde194ab`. The dedicated host requires this
-checkout at `extern/imgui`; its SDL3 and SDL_GPU backends are built unchanged.
-`scripts/setup.py` prepares the pinned dependencies. To prepare just ImGui:
-
-```sh
-git clone https://github.com/ocornut/imgui.git extern/imgui
-git -C extern/imgui checkout --detach f1cc2ae15e53a861a874c3034aae6798fde194ab
-```
-
-CMake checks the revision and retains the project BSD license, dependency record,
-SDL and ImGui licenses, and original runtime source notices with the app. Recording
-builds also retain the selected 7-Zip sources' public-domain declarations and
-upstream license file. Missing required notices stop packaging. Vendored sources
-remain ignored.
-
-Mac input recording support is enabled by default, even when no recording is
-requested at runtime. It also requires the pinned public-domain 7-Zip sources
-for SHA-256 at `extern/lzma`:
-
-```sh
-git clone https://github.com/ip7z/7zip.git extern/lzma
-git -C extern/lzma checkout --detach 0766b733fe3e06dd2a7f9a3cfbf2108ac73abd17
-```
-
-Preserve local changes in an existing checkout before changing its revision.
-Alternatively, configure with `-DSEGARALLY_INPUT_RECORDING=OFF` to build without
-recording/replay support and this dependency. SDL3 and ImGui are still required.
+Supply a ZIP archive containing all entries required by the manifests in
+[config](../config). The importer checks every required input's size, CRC32 and
+SHA1. The archive's name does not determine its revision. Keep ROMs outside the
+checkout or in ignored `roms/`; the pipeline never downloads them. Generated game
+C++, extracted images, compiled apps and captures remain ignored local output.
 
 ## Build the Mac candidate in one command
-
-With the pinned dependencies above installed, build from your personal archive
-into a new directory:
 
 ```sh
 python3 scripts/segarally_mac.py --roms /path/to/srallyc.zip \
     --output build/segarally-player --jobs 4
 ```
 
-This verifies and generates the main CPU, TGP, graphics and timed sound inputs,
-builds the Release Metal host with indexed dispatch and the instruction boundary
-hook, runs its host regression tests, packages the app and verifies its signature.
-This is an ad-hoc signed local package for the build Mac's architecture, not a
-notarized or universal distribution. It includes personal ROM-derived assets
-and must stay outside the source repository.
-It includes controller/Settings support and input recording. Display enhancements
-retain their off-by-default settings. It never downloads dependencies or launches
-the game; the final output prints the windowed launch command with sound and the
-execution hook enabled, using the bundled Lancia selection replay.
-New Mac binaries also enable compiled sound and the hook when started with no
-arguments, including a direct Finder launch. Explicit command-line invocations
-retain the opt-in switches shown in this guide.
-Use pristine pinned dependency checkouts for this entrypoint. It refuses tracked
-dependency modifications, including the optional Vulkan patch applied by the
-inherited general setup script; the explicit clone/checkouts above are sufficient
-for Metal. Preserve any existing dependency changes before preparing a clean copy.
+Choose a new output directory. The pipeline runs these stages in order:
 
-`--plan` prints the exact argument lists without creating files or running tools.
-An existing output directory is rejected to preserve earlier apps, recordings and
-saves. Failure stops the pipeline; inspect `build-result.json` and `logs/` in its
-output before choosing a new directory. The report records commands, timings,
-source and input identities, and the packaged executable hash. It establishes a
-build and regression checkpoint, not complete gameplay or hardware fidelity.
-The commands below expose each stage separately for development.
+1. Verify/import and generate main i960 code with the expanded seed profile,
+   indexed dispatch and exact instruction boundary hook.
+2. Generate Rally's TGP program and import graphics inputs.
+3. Import sound images and generate/audit the timed 68000 program.
+4. Configure and compile the Release Mac host with sound, controls, Settings
+   and recording support, plus its regression executables.
+5. Run the dedicated Mac CTests, package assets/notices and verify the signature.
 
-The dedicated Mac CTest suite includes audio, controls, display preferences,
-asset staging, launcher, notice packaging and pipeline checks. The five C++
-test executables are excluded from the default build; the command above builds
-them explicitly. For a manually configured host, build them before running CTest:
+The eleven registered Mac CTests cover host audio, controls, display preferences,
+input parsing, asset staging, launcher, notice packaging and pipeline behavior.
+Their passing result is a build/regression gate, not complete gameplay validation.
+The source and test registration live in
+[platform/segarally/CMakeLists.txt](../platform/segarally/CMakeLists.txt).
+
+The command prints the app path, build report and optional automatic-selection
+launch command. It never launches the game. Open
+`build/segarally-player/mac/Sega Rally Native.app` to play, or follow the printed
+launch command. Direct no-argument startup enables compiled sound and the exact
+instruction boundary hook; explicit diagnostic launches retain opt-in switches.
+Enhancements start off with fresh preferences.
+
+The package is ad-hoc signed for local use, not notarized or universal. No Apple
+developer account is required for that local signature. Because it contains
+personal ROM-derived inputs, it is not a public source-release asset. Project,
+SDL, ImGui, selected 7-Zip and runtime notices are bundled; missing required
+notices stop packaging. See [THIRD_PARTY.md](../THIRD_PARTY.md).
+
+`--plan` prints the command lists without writing output or running build tools.
+`--jobs` accepts 1 through 8. Existing output directories are rejected to preserve
+apps and recordings. A failure leaves `build-result.json` and `logs/` in its output.
+The report records source/dependency/input identities, commands, durations and
+artifact hashes. Preserve the first failed report before choosing another output.
+
+## Run the dedicated host tests again
+
+The one-command pipeline already builds the test executables and runs CTest:
 
 ```sh
-cmake --build build/segarally-docs-mac --target test_segarally_audio \
-    test_segarally_controls test_segarally_display_preferences \
-    test_segarally_audio_output_capture test_segarally_input_replay -j 4
-ctest --test-dir build/segarally-docs-mac --output-on-failure
+ctest --test-dir build/segarally-player/mac --output-on-failure
 ```
 
-Candidate 006 at source `0b9ba0e` passes the ten-step pipeline and all eleven
-dedicated Mac CTests. Three subsequent sound-enabled Metal captures pass:
-NORMAL Championship through 20,000 frames, SHORT Practice Mountain through
-18,000 frames and NORMAL Practice Lakeside through 14,000 frames. The first
-preserves the earlier Championship execution, native WAV and saves exactly;
-the Practice captures' final images match their frozen CPU images pixel for
-pixel. The SHORT run completes a one-lap finish, name entry, score table and
-return to attract. Lakeside retires near its finish; no course victory is
-claimed there. These hidden, unthrottled checks use Accurate textures with CRT
-and playback devices off. They validate the captured paths, not live sound
-quality, game speed or whole-machine arcade fidelity. See
-[current evidence](segarally-status.md) for retained reports and limitations.
+For a manually configured host, the test executables are excluded from its default
+build. Build them explicitly before running CTest:
 
-The complete 18,000-frame SHORT recording also passes the production offline
-consumer with the exact signed candidate 006: all 36,014 resumes, PCM hashes
-covering 13,799,492 stereo frames, fault fields and final saves match. This opens
-no window or playback device and writes no live saves. It proves repeatability
-of that capture, not independent hardware agreement.
+```sh
+cmake --build build/segarally-player/mac --target test_segarally_audio \
+    test_segarally_controls test_segarally_display_preferences \
+    test_segarally_audio_output_capture test_segarally_input_replay -j 4
+ctest --test-dir build/segarally-player/mac --output-on-failure
+```
+
+Avoid concurrent builds or heavy probes while measuring gameplay or listening.
+Recorded run durations depend on the Mac and active work; they are not portable
+performance guarantees.
 
 ## Verify, import and recompile
 
-Use the same `--build-dir` for every import and generated component:
+For development, the stages can be run separately. Keep a common generation
+directory for main, TGP, video and sound inputs:
 
 ```sh
 python3 scripts/segarally_recompile.py --roms /path/to/srallyc.zip \
-    --build-dir build/segarally-docs --verify-only
+    --build-dir build/segarally-dev --verify-only
 python3 scripts/segarally_recompile.py --roms /path/to/srallyc.zip \
-    --build-dir build/segarally-docs --seed-profile lift-labels --indexed-dispatch
+    --build-dir build/segarally-dev --seed-profile lift-labels \
+    --indexed-dispatch --instruction-boundary-hook
 python3 scripts/segarally_tgp.py --roms /path/to/srallyc.zip \
-    --build-dir build/segarally-docs
+    --build-dir build/segarally-dev
 python3 scripts/segarally_video.py --roms /path/to/srallyc.zip \
-    --build-dir build/segarally-docs
+    --build-dir build/segarally-dev
+python3 scripts/segarally_sound.py --roms /path/to/srallyc.zip \
+    --build-dir build/segarally-dev
+python3 scripts/segarally_sound_recompile.py --build-dir build/segarally-dev --timed
 ```
 
-`lift-labels` uses the expanded audited seed profile. The default `bootstrap`
-profile is smaller. Indexed dispatch is opt-in; omit its flag to reproduce
-the original routing. Record the checkout revision and resulting import,
-coverage and source hashes: fresh generation from a newer checkout is not
-automatically either frozen v13 or v14 checkpoint.
-
-Staging now records those actual artifact identities under `assets.json`'s
-versioned `provenance` object. Hook generation retains its boundary-contract
-verification. Ordinary main/TGP generated sources are labeled `identity_only`:
-their hashes identify consumed files without claiming that older audits
-authenticate how they were generated. Available inventories, reachability and
-the declared TGP upload bytes are checked before changing the package. Audits
-use paths relative to their originating checkout; stage worktree builds in
-that checkout's context rather than weakening path checks.
-
-ROM-derived images, generated C++ and objects remain under ignored `build/`.
-Import success proves input identity; coverage success proves the generated
-graph, not every course or hardware behavior. Fix the generator or seed evidence
-when a missing target is reached, then regenerate and validate.
+`lift-labels` is the expanded seed profile; `bootstrap` is the smaller default.
+A seed candidate is not proof of execution or complete indirect coverage.
+Generated code is never hand-edited: fix the generator or audited seed evidence,
+then regenerate. Asset staging checks imported image identities and available
+source/object provenance. Hashes identify consumed artifacts; they do not turn
+an older identity-only audit into proof of how a file was generated.
 
 ## Build and launch the Mac host
 
-Direct CMake configuration permits an isolated host directory:
+For those manually generated inputs:
 
 ```sh
-cmake -S platform/segarally -B build/segarally-docs-mac \
+cmake -S platform/segarally -B build/segarally-dev-mac \
     -DCMAKE_BUILD_TYPE=Release \
-    -DSEGARALLY_NATIVE_BUILD="$PWD/build/segarally-docs"
-cmake --build build/segarally-docs-mac -j 4
-python3 platform/segarally/macos/launch.py --build-dir build/segarally-docs-mac \
+    -DSEGARALLY_NATIVE_BUILD="$PWD/build/segarally-dev" \
+    -DSEGARALLY_SOUND_BUILD="$PWD/build/segarally-dev" \
+    -DSEGARALLY_SOUND=ON -DSEGARALLY_INSTRUCTION_BOUNDARY_HOOK=ON
+cmake --build build/segarally-dev-mac -j 4
+python3 platform/segarally/macos/launch.py --build-dir build/segarally-dev-mac \
+    --sound --instruction-boundary-hook \
     --input-replay config/segarally_lancia_select.inputs
 ```
 
-The launcher audits assets and packages/signs the app before opening it in a
-window. [The player manual](mac-player-manual.md) explains controls and saves.
-Add `--no-launch` to stop after packaging; the future launch arguments are saved
-in `launch-command.json` beside the build. This mode requires the app to be
-closed and does not execute the game or open a window.
-The convenience `platform/segarally/build.sh mac` uses
-`SEGARALLY_NATIVE_BUILD` but always builds the host in `build/segarally-mac`.
+The launcher verifies inputs, packages/signs, then opens a window through
+LaunchServices. `--no-launch` packages only and saves `launch-command.json`.
+Quit the app before repackaging. Preserve recorded executables and assets exactly;
+re-signing or rebuilding can invalidate their identity-bound recordings.
+The [manual](mac-player-manual.md) explains saves and controller handoff.
+
+### Optional instruction boundary hook
+
+The generation flag, CMake option and explicit runtime switch above must agree.
+Rebuild every native object after changing the hook contract. Stale/mixed artifact
+layouts are rejected. Indexed routing changes address lookup; the hook keeps
+execution inside a native chunk while retaining live-word guards, per-instruction
+cycle charges, event synchronization and IRQ boundaries. The old outer loop remains
+available for comparison in a compatible binary. See the
+[architecture](segarally-architecture.md) and [status](segarally-status.md).
 
 ### Display controls and shaders
 
-Display controls are compiled into newly built hosts; no CRT effect is enabled
-on a fresh setup. F1 opens the paused panel and F6 toggles CRT. The launcher and
-direct host accept `--crt`, `--accurate-textures`, and `--original-display`.
-The direct-only `--display-controls` opens the panel after the first native
-frame. `--crt` and `--original-display` conflict. Saved `display.settings`
-preferences load first; explicit flags then override them. Use
-`--original-display` without `--accurate-textures` for baseline captures.
+F1 opens paused Settings; F6 toggles optional CRT. The launcher accepts `--crt`,
+`--accurate-textures` and `--original-display`. The last restores baseline display
+preferences for a session; do not combine it with `--crt`. Omit
+`--accurate-textures` when making baseline captures. Native `--capture` is before
+CRT and UI but reflects the selected native texture mode.
 
-The CRT pass runs after native image composition and before touch/UI overlays.
-It changes neither native game state nor the raw `--capture` texture. Accurate
-textures selects the separate optional native renderer, so it can affect that
-capture. The original linear blit and closed panel remain the fresh defaults;
-UI and CRT GPU resources initialize only when needed.
-
-Generated common shader headers are committed, so an ordinary host build needs
-no shader tools. When changing shader source, regenerate through the common
-DXC/SPIRV-Cross pipeline (or its Docker fallback):
+Generated common shader headers are committed. If you edit shader sources,
+regenerate through the separate DXC/SPIRV-Cross pipeline or documented container
+fallback; do not hand-edit generated headers:
 
 ```sh
 python3 scripts/build_shaders.py
 python3 scripts/build_crt_shaders.py
 ```
 
-The first updates `shaders_gen.h` from `m2.hlsl`; the second updates only
-`crt_shaders_gen.h` from `crt.hlsl`. Do not hand-edit generated shader output.
-A separate CPU-only preference regression target is available in the configured
-Mac host build:
-
-```sh
-cmake --build build/segarally-docs-mac --target test_segarally_display_preferences -j 2
-ctest --test-dir build/segarally-docs-mac --output-on-failure -R '^segarally_display_preferences$'
-```
-
-The finite parser, range bounds, round trips, invalid files and separate save
-writes pass 250 synthetic checks under ASan/UBSan. The hidden offscreen UI smoke
-passes at 640×480, including visible Resume and no backend calls on closed
-frames. No game or audio runs in that smoke. A separate 2,600-frame sound-enabled
-host comparison preserves the native image, PCM, ordered resumes and saves
-with CRT off/on. The final v15 app has also launched with visible CRT
-presentation and sound; sustained effect cost remains unmeasured.
-
-The CRT GPU fixture is separately enabled and requires a working Mac display:
-
-```sh
-cmake -S . -B build/metal-tests -DM2_BUILD_WINDOWED_APP=OFF -DM2_METAL_TESTS=ON
-cmake --build build/metal-tests --target test_gpu_crt -j 2
-ctest --test-dir build/metal-tests --output-on-failure -R '^gpu_crt$'
-```
-
-The synthetic assertions cover disabled/zero-effect behavior, individual
-controls, bounds, letterboxing and native/enhanced source-row behavior. The
-retained GPU gate passes 18 synthetic draws plus two scene-preview draws.
-These are presentation checks, not monitor-fidelity or gameplay-speed tests.
-
-The optional ROM-free reciprocal regression imports the production helper and
-checks 65,536 public input/seed rows against an integer rounding oracle and a
-separately compiled legacy shader. Preparation and device execution are explicit:
-
-```sh
-python3 tests/test_gpu_reciprocal.py --prepare --output build/reciprocal-test
-python3 tests/test_gpu_reciprocal.py --run --output build/reciprocal-test
-```
-
-Preparation requires pinned SDL3, CMake, a C++20 compiler, DXC and SPIRV-Cross;
-`--help` describes using an existing tool container. It never downloads tools.
-The Metal run uses two 256×256 integer draws/readbacks with a 30-second watchdog.
-This new reusable fixture has passed source review and C++/Python syntax checks
-only: preparation stopped at Docker socket access and no device run occurred.
-It is separate from the earlier passing 447-case and three-scene measurements.
-Passing it would establish sampled arithmetic behavior, not full-game fidelity
-or performance.
-
-### Optional instruction boundary hook
-
-For the exact execution candidate, add `--instruction-boundary-hook` to the
-recompile command and generate into a separate build directory. Retain
-`--seed-profile lift-labels --indexed-dispatch` and import TGP/video into that
-same directory. Configure its Mac host with
-`-DSEGARALLY_INSTRUCTION_BOUNDARY_HOOK=ON`, then pass
-`--instruction-boundary-hook` to the launcher or direct host to enable it.
-Omitting the runtime flag keeps the old outer loop in that compatible binary.
-Sound can be enabled alongside it with the options below.
-
-This requires rebuilding every native object. The pipeline records matching
-source, header, generated-code and object hashes; staging and runners reject
-stale or mixed artifacts. The boot runner accepts the runtime flag with
-`--with-control`. The independent CPU harness links the matching build layout
-but keeps its boundary callback disabled; actual Machine scheduling equivalence
-is tested separately by `tests/test_segarally_boundary_game.py`.
+These developer tools have additional requirements; inspect their source before
+use. Shader regeneration is not part of an ordinary Mac build.
 
 ## Bounded checks and independent comparison
 
-First reproduce a bounded boot with the generated components:
+A bounded native boot uses the same generated inputs and shared devices:
 
 ```sh
-python3 scripts/segarally_boot.py --build-dir build/segarally-docs \
+python3 scripts/segarally_boot.py --build-dir build/segarally-dev \
     --instructions 100000000 --with-tgp --with-io --with-comm \
     --with-control --with-video --with-screen --with-uart --capture-frame
 ```
 
-The default one-million budget stops inside reset work. `boot.json` records
-the bounded outcome; exit 3 means unsupported board access and exit 4 means
-missing native code. Budget exhaustion is a checkpoint, not a complete boot
-or race. `--step-frames` resumes the same machine one rendered frame at a time.
+The default one-million budget stops inside reset work. `boot.json` records the
+outcome; exit 3 means unsupported board access and exit 4 means missing native
+code. Budget exhaustion is a checkpoint, not full-game completion. Input scripts
+change cabinet pins; they do not replace game variables.
 
-The measured driving checkpoint can be compared with the independent CPU:
+The independent i960 engine can compare the recorded driving path:
 
 ```sh
-python3 tests/test_segarally_boot_parity.py --build-dir build/segarally-docs \
+python3 tests/test_segarally_boot_parity.py --build-dir build/segarally-dev \
     --instructions 600000000 --timeout 1200 \
     --tgp --io --comm --control --video --screen --uart \
     --input-replay config/segarally_lancia_drive.inputs
 ```
 
-The harness defaults to two million instructions and a 180-second timeout.
-Longer runs accept an explicit `--timeout`; permitted budgets extend to two
-billion instructions. This compares CPU state, ordered writes, interrupts,
-device state and frames using shared device implementations. It is not complete
-MAME-machine or PCB parity. Keep input hashes and final checkpoint counts beside
-the report; see [replay format](segarally-input-replay.md).
+This compares CPU state, ordered writes, IRQs and separately instantiated shared
+devices. It is not a full independent MAME machine. Defaults are two million
+instructions and 180 seconds; longer budgets/timeouts must be explicit. Record
+checkout, import, input and final checkpoint identities with every claim.
 
 ### Independent sound-off recording consumer
 
-The separate test consumer accepts a sealed sound-off recording with supported
-options and no captured fault rows. It uses the canonical immutable preflight,
-actual initial/final saves and the existing raw harness's two board instances;
-production same-executable replay and raw parity defaults remain unchanged.
-The first actual check passes six resumes, 563,041 instructions, 283,375 ordered
-writes and two frames. The subsequent driving checkpoint below extends this
-to frame 2,600; full-race/manual captures and coupled sound remain open.
-
-The ROM-free recording checks require the pinned `extern/lzma` revision
-`0766b733fe3e06dd2a7f9a3cfbf2108ac73abd17` for SHA-256, alongside the
-normal reference-test dependencies. Run them through CMake:
-
-```sh
-cmake -S . -B build/recording-tests -DM2_BUILD_WINDOWED_APP=OFF
-cmake --build build/recording-tests --parallel 2 --target \
-    test_segarally_recording_reference test_segarally_recording_bundle \
-    test_segarally_reference_resume
-ctest --test-dir build/recording-tests --output-on-failure \
-    -R '^segarally_(recording_reference|recording_reference_build|recording_bundle|reference_resume)$'
-```
-
-`tests/test_segarally_recording_reference.py` verifies the actual preserved raw
-host, its `compile_commands.json`, measured source/object/link artifacts,
-staged assets and audited generation. Supply `--generation`, `--host-build`,
-`--host-evidence` and a new exclusive `--output` directory. It links existing
-verified native/TGP objects; it does not regenerate or compile native chunks.
-The evidence directory must contain the original `compiled-object-contract.json`,
-`linked-artifact-identities.json`, `native-link.txt` and `recording-link.txt`.
-Missing evidence is rejected, not replaced by a supplied digest. TGP source
-identity remains `identity_only`, not independently authenticated generation.
-
-The default prepares only, retaining a 20-million-instruction cap and 90-second
-timeout; the short-checkpoint timeout ceiling is 180 seconds. To execute, add
-`--bundle DIR --run`. The first actual check uses one million and 90 seconds.
-Longer checkpoints require explicit `--long-checkpoint`, with at most
-600 million instructions and 2,400 seconds. For example, add
-`--max-instructions 600000000 --timeout 2400 --progress-instructions 5000000`
-to prepare or run that bounded candidate. Progress is disabled by default;
-when enabled, matched instruction/write/cycle/frame/PC counters are flushed at
-the selected interval without changing guest synchronization.
-
-Output retains build/run commands, frozen identities and comparison transcript;
-no SDL/GPU, audio output or live-save writes occur. The longer limit is an opt-in
-resource bound. The actual driving checkpoint now passes 5,201 captured resumes,
-500,035,460 instructions and 15,156,607 ordered writes through frame 2,600.
-It uses fresh exclusive saves/output, immutable input copies and first-mismatch
-stop. Replay takes 450.99 seconds; its requested `nice -n 10` is refused by the
-sandbox, so lower scheduling priority is not established. This is a correctness
-check, not a quiet performance benchmark. Preserve the original raw host and its matching
-measurements; a changed or signed executable needs matching evidence.
-
-Relevant source-level regression checks include:
-
-```sh
-python3 tests/test_segarally_bootstrap.py
-python3 tests/test_segarally_table_seeds.py
-python3 tests/test_segarally_continuations.py
-python3 tests/test_segarally_native_templates.py
-python3 tests/test_i960_runtime_timing.py
-python3 tests/test_segarally_tgp_import.py
-python3 tests/test_segarally_video_import.py
-```
-
-For paired renderer evidence, the prepared executable accepts:
-
-```sh
-build/segarally-docs-mac/segarally_native --frames 180 --hidden --unthrottled \
-    --capture build/segarally-docs-mac/metal.ppm \
-    --reference-capture build/segarally-docs-mac/reference.ppm
-```
-
-This captures matching generated-machine states through two renderers. Choose
-a recorded race checkpoint for race claims; 180 startup frames do not establish
-racing-scene graphics fidelity. Hidden capture avoids activating another visible
-window but still consumes CPU/GPU time.
-
-### Optional polygon scanlines
-
-Newly compiled hosts accept `SEGARALLY_GPU_POLYGON_SCANLINES=1` in the direct
-process environment to enable the diagnostic polygon span path. It remains
-off by default, and preserved playtest binaries do not acquire it from source
-changes. Compare native 496×384 captures first; enhanced resolution has separate
-sampling behavior. The [status table](segarally-status.md#graphics-evidence)
-records current improvements and remaining differences.
-
-The synthetic fixture needs no game data. It does require the pinned SDL3
-checkout and a working macOS Metal/display session:
-
-```sh
-cmake -S . -B build/metal-tests -DM2_BUILD_WINDOWED_APP=OFF -DM2_METAL_TESTS=ON
-cmake --build build/metal-tests --target test_gpu_polygon_scanlines -j 2
-ctest --test-dir build/metal-tests --output-on-failure -R '^gpu_polygon_scanlines$'
-```
-
-`M2_METAL_TESTS` defaults to off so ordinary headless tests do not require a GPU.
-This explicitly enabled path builds SDL without requiring the inherited launcher.
-The fixture tests native-resolution coverage and layered cutouts against the
-CPU rasterizer; it is not a whole-game texture or performance benchmark.
-
-## Synthetic sound-board reference test
-
-The board provider can explicitly annotate instruction-stream versus operand
-accesses with `--board-access-roles`. This matters because a PC-relative operand
-uses the 68000's program function-code space without being an instruction fetch.
-The observer derives purpose from pinned microcode bus initiation and propagates
-it to completion; it does not infer purpose from addresses or expected counts.
-The default provider is unchanged. Its ROM-free regression is:
-
-```sh
-mkdir -p build/observer-baseline
-git show 26348a9:tests/test_m68k_timing_reference.py > build/observer-baseline/generator.py
-python3 tests/test_m68k_reference_access_roles.py \
-    --reference-dir build/validation/mame-reference \
-    --baseline-generator build/observer-baseline/generator.py \
-    --output build/observer-purpose-check
-```
-
-The runner pins the baseline hash and public MAME source hashes. All 486 checks
-pass across nine instruction cases plus reset/interrupt acknowledge, including
-mapped callbacks, registers, memory, values, masks and bus phases. Default output
-matches the accepted generator byte for byte; stripping the purpose annotations
-from the tagged provider reconstructs the same CPU code. This validates the
-observer correction only; the authentic longer sound comparison is separate.
-
-With the four pinned M68000 reference sources listed in `THIRD_PARTY.md`
-available locally, run this ROM-free comparison in a fresh output directory:
-
-```sh
-python3 tests/test_model2a_sound_reference.py \
-    --reference-dir build/validation/mame-reference \
-    --output build/validation/model2a-sound-reference
-```
-
-It generates a synthetic program with the production emitter, then compares
-it with persistent MAME CPU execution on separate board instances. Both
-2 ms event-order cases pass: 305,780 checks, including two UART echoes and
-IRQ/RTE sequences per case, complete RAM/state, queue ordering and 89 stereo
-frames per case (87 nonzero). Generation, compilation and execution take
-5.738680 seconds on the development Mac. The ordinary instruction matrix also
-passes 11,551 instruction cases, 280 IRQ entries and two resets with unchanged
-generated fixture hashes after the wrapper extension.
-
-The board's SCSP/UART/memory/queue models and instruction-start MMIO contract
-are shared. This is a bounded synthetic CPU/board comparison; it does not
-validate actual game audio, speakers, physical bus phases or sound-enabled
-recordings in the independent consumer. No playback device is opened.
-
-The actual reset-prefix fixture separately pins the retained v14 sound images,
-native generation and audit files. Another generation requires a source and
-provenance review; this is not a generic acceptance test for arbitrary builds.
-Prepare it in a fresh directory, then execute its frozen inputs explicitly:
-
-```sh
-python3 tests/test_segarally_sound_reset_reference.py --prepare \
-    --sound-dir /path/to/preserved/audited/sound \
-    --reference-dir build/validation/mame-reference \
-    --output build/validation/sound-reset-prepared
-python3 tests/test_segarally_sound_reset_reference.py --run \
-    --output build/validation/sound-reset-prepared \
-    --run-dir build/validation/sound-reset-run
-```
-
-Preparation authenticates all live instruction words and compiles only. The
-run has a 180-second process watchdog and stops after exactly the first SCSP
-write: instruction 278,302, PC `60018a`, 4,506,445 cycles. The retained run
-matches 291,684 paired state observations, ordered data transfers after reset
-and 17,604 stereo frames in 3.10043 seconds. No UART commands or nonzero music
-are claimed. Constructor reset bus transfers are not intercepted; reference
-microcode phase stamps remain distinct from native instruction-boundary
-stamps. Shared device and instruction-start MMIO limits still apply.
-
-The initialization fixture uses the same frozen sound generation and a
-separate preparation directory. It authenticates all 2,663 program addresses
-and explicitly expands the test-only opcode provider to 660 words; the default
-64-word bound is unchanged.
-
-```sh
-python3 tests/test_segarally_sound_init_reference.py --prepare \
-    --sound-dir /path/to/preserved/audited/sound \
-    --reference-dir build/validation/mame-reference \
-    --output build/validation/sound-init-prepared
-python3 tests/test_segarally_sound_init_reference.py --run \
-    --output build/validation/sound-init-prepared \
-    --run-dir build/validation/sound-init-run
-```
-
-Its retained run passes exactly 1,000,000 instructions, 13,096,293 cycles,
-383 IRQ/RTE pairs and 35,955 SCSP writes in 10.286094 seconds. Startup enables
-interrupts at PC `6001f2`, SR `2000`, after 639,524 instructions. All 1,045,029
-paired queue observations and 51,158 stereo PCM frames match. Those frames
-are silent: this fixture sends no main-board UART commands and does not prove
-music playback or resolve the reported title-screen glitch. Bounds are one
-million instructions, two million observations, two seconds of board time,
-180 seconds wall time, 16 MiB logs and 512 MiB output. The passing worktree
-run's 118 source/image inputs map exactly to the integrated sources and
-preserved external inputs; its ten preparation artifacts remain frozen.
-
-The authentic UART fixture reuses an already measured sound/hook-enabled host
-build and its original evidence. It checks source/object/image bindings before
-linking a forwarding observer; it does not regenerate game code. Use the same
-preserved v14 generation accepted by the initialization fixture:
-
-```sh
-python3 tests/test_segarally_sound_uart_capture.py --prepare \
-    --generation /path/to/preserved/native-generation \
-    --host-build /path/to/preserved/mac-host-build \
-    --host-evidence /path/to/preserved/host-evidence \
-    --reference-dir build/validation/mame-reference \
-    --output build/validation/sound-uart-prepared
-python3 tests/test_segarally_sound_uart_capture.py --capture \
-    --output build/validation/sound-uart-prepared \
-    --run-dir build/validation/sound-uart-capture
-python3 tests/test_segarally_sound_uart_capture.py --recapture \
-    --output build/validation/sound-uart-prepared \
-    --capture-dir build/validation/sound-uart-capture \
-    --run-dir build/validation/sound-uart-recapture
-```
-
-Preparation compiles only. Capture permits at most 20 million main instructions,
-two seconds of board time and 4,096 UART accesses; each execution has a
-90-second watchdog. The transcript is limited to 16 MiB and authenticated in
-full before recapture executes. The retained capture passes in 2.112635 seconds
-and recapture in 0.660414 seconds: seven real writes, 163 exact state cuts,
-63,722 silent stereo frames and genuine first-byte receive/IRQ-clear evidence.
-Side-effecting read support is implemented but not exercised by these seven
-writes. This is native-to-native recapture with shared devices, not independent
-CPU, chip, nonzero-music or whole-recording validation.
-
-The separate reference fixture consumes that exact successful short capture
-and its successful native recapture, with the prepared initialization provider:
-
-```sh
-python3 tests/test_segarally_sound_uart_reference.py --prepare \
-    --native-prepared build/validation/sound-uart-prepared \
-    --reference-prepared build/validation/sound-init-prepared \
-    --capture-dir build/validation/sound-uart-capture \
-    --native-recapture-dir build/validation/sound-uart-recapture \
-    --output build/validation/sound-uart-reference-prepared
-python3 tests/test_segarally_sound_uart_reference.py --run \
-    --output build/validation/sound-uart-reference-prepared \
-    --run-dir build/validation/sound-uart-reference-run
-```
-
-It keeps a fresh native recapture byte-exact against all original cuts while
-comparing a persistent independent MAME CPU at every paired event boundary.
-The retained run passes in 28.065956 seconds: 1,260,947 instructions,
-16,312,806 cycles, 660 IRQ entries and 2,761,745 paired observations. All
-63,722 PCM frames remain silent. Full SR and modeled transfers are compared;
-internal reference bus-phase stamps remain distinct from native boundary
-stamps. The 90-second watchdog and four-million-observation limit apply only
-to this fixed short transcript. It does not accept arbitrary longer recordings.
-
-The first-nonzero native fixture uses separate outputs and requires that accepted
-short capture. Its complete header and all 170 access/cut rows are preserved
-before extending to the first nonzero sample plus a 250 ms tail:
-
-```sh
-python3 tests/test_segarally_sound_uart_nonzero.py --prepare \
-    --generation /path/to/preserved/native-generation \
-    --host-build /path/to/preserved/mac-host-build \
-    --host-evidence /path/to/preserved/host-evidence \
-    --reference-dir build/validation/mame-reference \
-    --short-capture build/validation/sound-uart-capture \
-    --output build/validation/sound-nonzero-prepared
-python3 tests/test_segarally_sound_uart_nonzero.py --capture \
-    --output build/validation/sound-nonzero-prepared \
-    --run-dir build/validation/sound-nonzero-capture
-python3 tests/test_segarally_sound_uart_nonzero.py --recapture \
-    --output build/validation/sound-nonzero-prepared \
-    --capture-dir build/validation/sound-nonzero-capture \
-    --run-dir build/validation/sound-nonzero-recapture
-```
-
-Bounds are 250 million main instructions, 20 seconds of board time, 180 seconds
-per execution, 4,096 UART accesses and 12,000 transcript rows. The retained
-capture/recapture pass in 9.703119/4.455683 seconds: 55 actual UART accesses,
-1,929 exact cuts and 728,884 stereo frames, including 22,784 nonzero scalar
-samples. The raw float32 little-endian payload is retained under ignored build
-output; every interval hash and aggregate metric is independently checked.
-First nonzero is stereo frame 717,489, raw scalar bits `b8000000`. Its derived
-sample deadline is 16,269,591,837 ns, distinct from the first observed drain
-at 16,279,520,560 ns. These checks establish native recapture through nonzero
-PCM, not independent sound CPU/chip parity or resolution of the reported glitch.
-The short independent fixture above does not accept this longer transcript.
-
-The corrected independent consumer is
-`tests/test_segarally_sound_uart_nonzero_reference.py`. It requires the archived
-original comparison preparation, full initialization provider, authentic tape,
-native objects and accepted observer proof. These manifests pin the retained
-artifact identities; a clean checkout without that archive cannot run this
-specific evidence consumer. `--help` lists its explicit prerequisite paths,
-including compiler SDK metadata. Preparation regenerates only public reference
-microcode, binds the actual compiler include list, and requires unchanged native
-inputs before the separate bounded `--run` step.
-
-Its single corrected run passes 14,947,325 instructions, 14,614 IRQ entries,
-32,159,463 paired observations and all 1,929 original cuts in 310.080869 seconds.
-All 728,884 stereo PCM frames match, including 22,784 nonzero scalar samples.
-The original observer failure and the later SDK-metadata preflight failure are
-preserved. Full-660 default and stripped tagged providers are byte-identical;
-all 1,006 inputs and 16 artifacts remain unchanged. This compares independent
-CPU execution with shared SCSP/UART models at instruction-start MMIO times.
-It does not validate physical bus phases, a full sound-on host recording or the
-reported audible glitch. Exact evidence identities are in HANDOFF.
+A separate developer consumer tests supported sealed sound-off recordings using
+the independent i960 engine and shared board implementations. It rejects fault
+rows and unsupported options. See
+[tests/test_segarally_recording_reference.py](../tests/test_segarally_recording_reference.py)
+and the [replay contract](segarally-input-replay.md) for its exact CLI and scope.
+This differs from production offline replay, which uses the exact same signed
+executable to verify captured resumes, cabinet pins, PCM hashes and final saves.
 
 ## Optional sound experiment
 
-Sound requires both audited generated sound inputs and an explicit build option:
+The one-command pipeline includes sound. The CMake default is OFF for manual
+builds; enable `SEGARALLY_SOUND` and supply the audited timed sound directory,
+then use `--sound` for explicit runtime launches. The headless boot runner instead
+uses `--with-sound`, requires `--with-uart` and accepts `--sound-build-dir`.
 
-```sh
-python3 scripts/segarally_sound.py --roms /path/to/srallyc.zip \
-    --build-dir build/segarally-docs
-python3 scripts/segarally_sound_recompile.py --build-dir build/segarally-docs --timed
-cmake -S platform/segarally -B build/segarally-docs-audio \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DSEGARALLY_NATIVE_BUILD="$PWD/build/segarally-docs" \
-    -DSEGARALLY_SOUND=ON -DSEGARALLY_SOUND_BUILD="$PWD/build/segarally-docs"
-cmake --build build/segarally-docs-audio -j 4
-python3 platform/segarally/macos/launch.py --build-dir build/segarally-docs-audio --sound
-```
+The direct host accepts `--audio-capture FILE.wav` with sound. Unthrottled runs
+capture/drain without opening a playback device, so they do not validate listening.
+Paced `--sound --audio-diagnostics` logs queue demands and host delays. A separate
+`--audio-output-capture FILE.wav` also requires paced sound, audio diagnostics
+and a distinct native capture; it records this application's SDL logical-device
+mix before CoreAudio, not hardware loopback or microphone audio.
 
-Sound stays off without `--sound`. The headless runner instead accepts
-`--with-sound` and optional `--sound-build-dir`, alongside `--with-uart`.
-The direct host accepts `--sound --audio-capture FILE.wav`; unthrottled mode
-drains/captures PCM without opening a playback device. A successful WAV capture
-therefore does not validate speakers. Source/assets/generated-code changes
-require renewed sound audits; the host checks provenance during incremental
-builds. A ten-second captured-race check through the real SDL/CoreAudio output
-submitted 441,000 stereo frames with no queue drops or reported input shortfalls.
-
-For a paced playback investigation, add `--audio-diagnostics` to the direct
-host's `--sound` command. It logs queue depth and interval maxima for producer
-gaps, Machine execution, presentation wall time and pacing lateness every
-60 frames, on new SDL demand and at exit. Positive-demand callback timestamps
-are opt-in. Extra input bytes are SDL estimates, not exact missing device
-samples; presentation wall time includes host waiting and is not GPU timing.
-No-sound, unthrottled and offline-recording combinations reject before SDL.
-For a paired playback diagnostic, the direct host also accepts
-`--audio-output-capture output.wav` alongside paced `--sound --audio-diagnostics
---audio-capture native.wav`. Use fresh, distinct output paths. The extra WAV
-contains this app's logical-device float mix after SDL conversion; its
-`.events.txt` sidecar records device format, packet timestamps, producer ratios,
-overflow/format status and the queued tail when capture stops. A bounded callback
-buffer is drained on the main thread. This does not capture other applications
-or the physical speaker/backend, and resampled output is not expected to equal
-native 44.1 kHz samples bit for bit. Normal playback does not install this tap.
-
-Playback now reserves a 60 ms base plus one output-device period, converted
-upward to input frames. On the measured 44.1 kHz / 1,024-frame device, the target
-is 3,670 frames (83.22 ms), adding about 23.22 ms of nominal audio buffering.
-The 240 ms backlog cap and ±0.5% trim remain fixed. Diagnostics print the actual
-rate, period and target. Invalid periods or periods longer than 60 ms fail
-explicitly; device changes after opening are not adaptively retuned. A captured
-52.9 ms delivery pause caused a verified 288-frame postmix gap, absent from native
-PCM. Replaying that exact SDL schedule with the new policy removes its shortage.
-Candidate 003 then passes a visible 7,200-frame check with CRT and Accurate
-textures, no shortfalls/drops, exact native PCM and captured SDL logical-device
-output with no underflow-added silence. Other devices and broader listening
-confirmation remain separate.
-
-One paced 2,600-frame CRT check preserves native WAV/image, saves and all ordered
-resumes exactly, with no shortfalls or drops. A separate fresh 7,200-frame
-neutral attract capture seals 14,404 resumes and verifies every recorded PCM
-hash against its 5,519,841-frame WAV. Its first 2,400 resumes and PCM prefix
-equal the earlier run before coin insertion; all 121 telemetry rows report
-zero demands or drops. These clean results do not establish audible quality or
-resolve the reported title-screen glitch. Commands, hashes, dummy-stream
-test and retained preparation failure are in
-`build/validation/audio-diagnostics-v15/`.
-
-The older outer-loop execution reaches 2,760 frames with unchanged main state
-and no sample drops, but records 3,222 SDL requests for extra input. With the
-instruction boundary hook enabled, the same checkpoint completes in 48.519993
-seconds including startup and shutdown, with zero extra input requests and
-zero chip/host drops. These counters estimate SDL input demand, not exact
-hardware output samples. The user confirmed hearing a separate ten-second native
-PCM sample through the Mac speakers. The earlier windowed session exits
-normally after 9,347 frames and supplies 7,165,805 stereo frames with no drops
-or estimated input shortages. Live-game listening feedback and full-game sound
-parity remain pending.
-
-The current v14 app's recorded windowed session closes normally at 9,344
-frames, supplying 7,163,505 stereo frames with zero chip/host drops and one
-estimated SDL input-shortfall request for 552 bytes. Separately, its hidden
-sound-enabled continuation passes the old missing return through frame 14,001
-with exact prior normal execution/PCM observations. That unthrottled test
-opens no playback device. See the [manual](mac-player-manual.md) for the
-prepared app path and [status](segarally-status.md) for precise evidence limits.
+Playback primes a 60 ms base plus one actual device period, caps its queue at
+240 ms and limits presentation-rate trim to ±0.5%. Device periods longer than
+60 ms are rejected. Native PCM identity, queue health and physical listening are
+separate evidence. Sound CPU MMIO remains at instruction-start boundaries;
+full physical bus phases and whole-game audio parity remain unverified.
 
 ## Reference firmware
 
-The initial personal archive lacked three files needed by the MAME reference.
-Additional personal archives now supply all three, verified by size, CRC32 and
-SHA1:
+Full MAME reference work additionally needs the verified drive, communication
+and billboard firmware, beyond what the native frontend executes:
 
 | File | Device | Bytes | CRC32 |
 | --- | --- | ---: | --- |
@@ -709,31 +247,16 @@ SHA1:
 | `epr-16726.bin` | Communication board | 131,072 | `c179b8c7` |
 | `epr-18022.ic2` | Billboard | 65,536 | `0ca70f80` |
 
-The first two identities match the retained pinned MAME `model2.cpp`. The
-billboard identity is confirmed separately by installed MAME 0.289 metadata
-and upstream [segabill.cpp](https://github.com/mamedev/mame/blob/master/src/mame/sega/segabill.cpp);
-this does not establish the installed binary's source revision. The earlier
-negative local search remains recorded in
-`build/validation/firmware-local-search-001/result.json`.
-
-The local setup is under ignored `roms/reference/`: `srallyc.7z` provides the
-Revision C parent/shared files, `segabill.zip` provides the billboard device,
-and `srallycb/` contains the two verified Revision B main program files copied
-from the original personal archive. `firmware/` holds the three verified loose
-images for analysis. Both new archives were moved from Desktop with unchanged
-SHA-256 values. The original Revision B archive and native app are unchanged.
-
-Audit this ROM inventory without starting the game:
+Supply these from your own archive inventory using the layouts expected by your
+MAME version. A local reference inventory can be audited without starting a game:
 
 ```sh
-mame -rompath "$PWD/roms/reference" -verifyroms srallycb
+mame -rompath /path/to/your/reference-roms -verifyroms srallycb
 ```
 
-Installed MAME 0.289 reports `srallycb [srallyc] is good`, exit zero and empty
-stderr. Evidence: `build/validation/firmware-import-001/result.json`, SHA-256
-`755afa1dc1b34ed78078393616a8c516c886c0f8e7a303f04fb7ff34092f2f6c`.
-This establishes input readiness only. Full reference execution, input/timing
-alignment and comparison still need validation against a recorded MAME source
-and build identity; the installed executable is not automatically that oracle.
-The inherited `scripts/run_trace.sh` defaults to Daytona and replaces its output
-directory, so it is not a ready-made Rally validation command.
+A passing ROM audit proves input readiness, not correct native execution or
+full-race parity. Retain MAME source/build identity and align input/timing before
+comparing traces. The inherited `scripts/run_trace.sh` defaults to Daytona and
+replaces its output directory; it is not a ready-made Rally validation command.
+The [status](segarally-status.md), [design](sega-rally-design.md) and
+[handoff](../HANDOFF.md) retain detailed historical results and known limitations.

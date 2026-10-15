@@ -63,7 +63,7 @@ try:
         print(f"Activated existing native app, PID(s) {active.stdout.strip()}")
         raise SystemExit(0)
     license_source=build/"licenses"
-    required_notices={"Project-BSD-3-Clause.txt", "THIRD_PARTY.md", "SDL.txt", "ImGui.txt", "Source-notices.txt"}
+    required_notices={"Project-BSD-3-Clause.txt", "THIRD_PARTY.md", "SDL.txt", "ImGui.txt", "ImGui-embedded-fonts.txt", "Source-notices.txt"}
     if license_source.is_symlink() or any(not (license_source/name).is_file() or
             (license_source/name).is_symlink() for name in required_notices):
         raise ValueError("rebuild the host to retain required distribution notices before packaging")

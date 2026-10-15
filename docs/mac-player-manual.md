@@ -1,6 +1,6 @@
 # Mac player manual
 
-This is a development build of Sega Rally Championship, using the original
+This manual covers the experimental v0.1.0-rc.1 macOS source prerelease, using the original
 game instructions recompiled from verified personal ROMs. The current Mac
 checkpoint has sound-enabled Metal replay evidence clearing Desert and Forest,
 then entering Mountain and retiring near its finish. A separate one-lap SHORT
@@ -19,10 +19,6 @@ python3 scripts/segarally_mac.py --roms /path/to/srallyc.zip \
 ```
 
 After the build succeeds, open `build/segarally-player/mac/Sega Rally Native.app`.
-The current candidate 006 package is
-`build/mac-candidate-006/mac/Sega Rally Native.app`, built at source `0b9ba0e`
-with all eleven dedicated Mac CTests passing. It includes the Practice finish
-and name-entry continuations and the earlier verified audio-buffer fix.
 New sound-enabled Mac builds start with sound and the faster native execution
 path when opened directly, without command-line arguments. The game opens in
 a window and uses normal pacing. Allow its original reset checks to finish,
@@ -56,8 +52,8 @@ selection sequence. These timed scripts assume fresh default cabinet settings;
 saved settings or credits can change the menu sequence. Use a fresh build/save
 directory and preserve existing saves. These scripts retain the default NORMAL
 game mode; the separate one-lap finish validation uses the original cabinet
-Test menu's SHORT game-mode setting. Earlier captured apps, including candidate
-003, predate the Practice callback fixes.
+Test menu's SHORT game-mode setting. Older captured builds may predate the Practice callback fixes; preserve their
+exact executables when comparing recordings.
 
 The launcher verifies assets, packages and signs the app, then opens it through
 LaunchServices. It prints app and log paths. Add `--fullscreen` for desktop
@@ -179,14 +175,13 @@ Performance depends on the Mac and scene. `--unthrottled` is a diagnostic option
 and does not guarantee arcade speed. Avoid additional builds or captures during
 a playtest.
 
-The current package retains candidate 003's verified playback-buffer fix for a
-captured 6.53 ms audio gap. It adds one output-device period of headroom, about
-23 ms on the tested Mac. A complete visible 7,200-frame candidate 003 capture
-has no shortfalls, drops or missing output samples while preserving the prior
-native PCM byte for byte.
-This resolves the captured starvation mechanism; broader listening feedback on
-the earlier title-screen report is still welcome. Device periods longer than
-60 ms are unsupported; see the [audio details](segarally-build-validation.md#optional-sound-experiment).
+The current playback buffer includes one output-device period of headroom in
+addition to its 60 ms base. This fixes a measured starvation mechanism without
+changing native PCM. A visible 7,200-frame validation capture has no shortfalls,
+drops or missing output samples. Broader listening quality and hardware fidelity
+remain separate checks; see [the evidence record](segarally-status.md).
+Device periods longer than 60 ms are unsupported; see the
+[audio details](segarally-build-validation.md#optional-sound-experiment).
 Add `--audio-diagnostics` to a paced launcher command with `--sound` when
 investigating; it timestamps queue demand and host delays without changing audio
 generation or buffering. See [current evidence](segarally-status.md) for the
@@ -220,23 +215,11 @@ Replay with the exact captured executable using
 assets directory. Offline replay opens no window or audio device and changes
 no live saves. Preserve the recorded app and assets: rebuilding, re-signing or
 repackaging can change their bytes, and changed identities are rejected.
-The sound-on scripted validation now matches recorded and unrecorded runs
-through frame 2,801, including their WAV, final image and saves. The later v14
-manual session also replays all 18,689 resumes, PCM hashes and final saves
-through frame 9,344 with the exact signed app. The later v16 analog-input session
-replays all 25,953 resumes and PCM hashes through frame 12,974 with its original
-signed app and final saves unchanged. The preserved v17 session matches all
-9,459 resumes, PCM hashes covering 3,625,487 stereo frames and final saves
-through frame 4,729 with its exact signed executable. Candidate 002 also replays
-its 20,000-frame sound-on course run exactly: all 40,006 resumes, PCM hashes and
-final saves match. The source run applies 4,398 input events and clears Desert
-and Forest before retiring near Mountain's finish. It is unthrottled and opens
-no playback device, so it does not measure live speed or sound quality. These
-checks establish repeatability
-for the captured drives. Candidate 006's separate SHORT Practice Mountain
-recording also replays exactly through all 18,000 frames: 36,014 resumes,
-13,799,492 stereo PCM frames and final saves match with the same signed app.
-That drive includes the one-lap finish, name entry, score table and attract
-return. It opens no playback device and does not measure live speed or listening
-quality. Remaining course finishes and full arcade comparison still need
-validation. See the [input guide](segarally-input-replay.md#exact-host-resume-transcripts).
+Exact replay has been checked on recorded sound-on driving and Practice sessions,
+including a 20,000-frame Championship path and an 18,000-frame SHORT Practice
+Mountain finish/name-entry/scoreboard path. Replay verifies recorded inputs,
+execution outcomes, PCM hashes and final saves using the original executable.
+It opens no playback device and is not a speed, listening or independent-hardware
+test. A completed capture does not imply all courses are implemented or validated.
+See the [input guide](segarally-input-replay.md#exact-host-resume-transcripts) and
+[status reference](segarally-status.md) for exact recorded checkpoints.

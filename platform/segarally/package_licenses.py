@@ -14,6 +14,26 @@ def leading_comments(text: str) -> str:
     return match.group(0).strip() if match else ''
 
 
+def embedded_font_notices(imgui: Path, mit_license: bytes) -> bytes:
+    """Retain upstream comment notices and terms, never compressed font data."""
+    draw = (imgui / 'imgui_draw.cpp').read_bytes()
+    sections = []
+    for font in (b'ProggyClean.ttf', b'ProggyForever-Regular-minimal.ttf'):
+        pattern = (rb'(?m)^//[- ]{3,}\r?\n// \[SECTION\] Default font data \(' + re.escape(font) +
+                   rb'\)\r?\n(?://[^\r\n]*(?:\r?\n|$))*')
+        matches = list(re.finditer(pattern, draw))
+        if len(matches) != 1:
+            raise ValueError(f'embedded font notice missing or ambiguous: {font.decode()}')
+        notice = matches[0].group(0)
+        if not re.search(rb'(?m)^// MIT [Ll]icense / Copyright \(c\) .+', notice):
+            raise ValueError(f'embedded font no longer declares its MIT copyright: {font.decode()}')
+        sections.append(notice)
+    # The font sections declare MIT. Preserve their exact copyright text plus
+    # the complete unchanged MIT terms already shipped for pinned Dear ImGui.
+    return (b'Dear ImGui embedded font notices (imgui_draw.cpp)\n\n' +
+            b'\n'.join(sections) + b'\nDear ImGui LICENSE.txt (MIT terms)\n\n' + mit_license)
+
+
 def collect(root: Path, sdl: Path, imgui: Path, lzma: Path | None = None) -> dict[str, bytes]:
     files = {'Project-BSD-3-Clause.txt': root / 'LICENSE',
              'THIRD_PARTY.md': root / 'THIRD_PARTY.md',
@@ -21,6 +41,7 @@ def collect(root: Path, sdl: Path, imgui: Path, lzma: Path | None = None) -> dic
     if lzma is not None:
         files['7-Zip-License.txt'] = lzma / 'DOC/License.txt'
     notices = {name: path.read_bytes() for name, path in files.items()}
+    notices['ImGui-embedded-fonts.txt'] = embedded_font_notices(imgui, notices['ImGui.txt'])
     retained = []
     for path in sorted((root / 'src').rglob('*')):
         if path.suffix not in ('.cpp', '.h', '.hlsl'):

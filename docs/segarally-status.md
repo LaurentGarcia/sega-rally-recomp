@@ -5,6 +5,14 @@ This reference summarizes the latest recorded checkpoints. Exact hashes,
 failure history and ignored evidence locations are in [HANDOFF.md](../HANDOFF.md).
 The [design](sega-rally-design.md) records interpretation and hardware limits.
 
+## Public source prerelease
+
+`v0.1.0-rc.1` packages the source project and documentation for local Mac builds.
+It does not distribute a playable app, ROMs or generated game code. See the
+[release scope](releases/v0.1.0-rc.1.md) and [setup guide](getting-started.md).
+The recorded gameplay checkpoints below retain their original local identities;
+source publication and host regression checks do not extend their fidelity scope.
+
 ## Current Mac candidate
 
 Candidate 006 is generated from the supplied ROM archive at source revision

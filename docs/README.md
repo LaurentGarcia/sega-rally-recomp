@@ -1,29 +1,29 @@
-# Sega Rally project wiki
+# Sega Rally documentation
 
-The active target is **macOS**. Phone work is deferred. This wiki covers the
-generated Sega Rally Championship Revision B (`srallycb`) runtime and its
-dedicated SDL3/Metal host.
+**v0.1.0-rc.1 is an experimental macOS source prerelease.** Build locally with
+your own verified Revision B (`srallycb`) ROMs. No ROMs, game assets or ready-to-play
+app are distributed. Phone work is deferred.
 
-| Read this | For |
+| Guide | Purpose |
 | --- | --- |
-| [Mac player manual](mac-player-manual.md) | Starting a prepared app, controls, coins and troubleshooting |
-| [Build and validation](segarally-build-validation.md) | Importing personal ROMs, recompiling, building and reproducing checks |
-| [Technical architecture](segarally-architecture.md) | Native execution, device timing, graphics and optional sound |
-| [Evidence and status](segarally-status.md) | Observed behavior, measurements and open validation gaps |
-| [Cabinet input replay](segarally-input-replay.md) | Replay format and input boundary semantics |
-| [Project design](sega-rally-design.md) | Rally scope, hardware contracts and detailed findings |
-| [Handoff](../HANDOFF.md) | Dated engineering record, hashes and local evidence paths |
+| [Getting started](getting-started.md) | Fresh checkout, Mac requirements, exact dependency pins and first play |
+| [Mac player manual](mac-player-manual.md) | Controls, Practice selection, settings, sound, saves and recordings |
+| [Build and validation](segarally-build-validation.md) | Pipeline, individual build stages, tests and reference setup |
+| [Technical architecture](segarally-architecture.md) | Generated CPUs, native devices, clock, Metal and SDL3 audio |
+| [Evidence and status](segarally-status.md) | Recorded behavior, measurements and unresolved validation |
+| [Cabinet input replay](segarally-input-replay.md) | Script format, frame boundaries and exact host recordings |
+| [Project design](sega-rally-design.md) | Rally scope, implementation contracts and findings |
+| [Handoff](../HANDOFF.md) | Detailed chronological evidence and historical failure modes |
 
-[Project rules](../rules.md) and the
-[inherited design](daytona-usa-recomp-design.md) govern engineering work.
-The inherited [getting-started guide](getting-started.md),
-[Daytona README](daytona-upstream-readme.md) and
-[native audio backend](native-audio.md) describe Daytona targets. Their
-launcher, ROM sets, audio modes and platform claims do not establish Rally
-support. The earlier lifted-C Rally prototype is a separate project; its
-captures are useful comparisons, not validation of this generated runtime.
+The [project rules](../rules.md) and
+[inherited design](daytona-usa-recomp-design.md) govern development. The
+[inherited Daytona README](daytona-upstream-readme.md) and
+[Daytona native audio backend](native-audio.md) describe separate reference
+targets. Daytona results and the earlier lifted-C Rally prototype do not prove
+this runtime's fidelity.
 
-Only source tools, hardware code, manifests, address annotations, tests and
-written analysis belong in Git. Personal ROMs, imported images, generated game
-C++, captures and apps remain in ignored local directories. No game assets or
-original game source are distributed here.
+Source is licensed under [BSD-3-Clause](../LICENSE); dependency notices and
+revisions are in [THIRD_PARTY.md](../THIRD_PARTY.md). Personal ROMs, imported
+images, generated game C++, captures and apps remain in ignored local folders.
+The status and handoff documents refer to local evidence paths; those captures
+are deliberately absent from the public source tree.

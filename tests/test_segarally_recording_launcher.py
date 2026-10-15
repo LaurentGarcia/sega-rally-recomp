@@ -23,7 +23,7 @@ class RecordingLauncherTests(unittest.TestCase):
         self.build = Path(self.temporary.name)
         (self.build / "segarally_native").write_bytes(b"synthetic executable")
         (self.build / "licenses").mkdir()
-        for name in ("Project-BSD-3-Clause.txt", "THIRD_PARTY.md", "SDL.txt", "ImGui.txt", "Source-notices.txt"):
+        for name in ("Project-BSD-3-Clause.txt", "THIRD_PARTY.md", "SDL.txt", "ImGui.txt", "ImGui-embedded-fonts.txt", "Source-notices.txt"):
             (self.build / "licenses" / name).write_text("synthetic notice " + name)
         assets = self.build / "assets"
         assets.mkdir()

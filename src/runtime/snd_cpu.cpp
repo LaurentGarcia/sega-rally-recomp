@@ -1,3 +1,9 @@
+// license:BSD-3-Clause
+// copyright-holders:Olivier Galibert
+// The division cycle-accounting helpers adapt the pinned MAME M68000
+// microcode; its original notice is retained above. The remaining native
+// sound context and board services are project code. See THIRD_PARTY.md.
+
 #include "runtime/snd_cpu.h"
 
 #include <cstdio>

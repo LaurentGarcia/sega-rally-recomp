@@ -1,122 +1,77 @@
 # Sega Rally Championship native recompilation
 
-Sega Rally Championship (1995, Model 2A), running as generated native C++ from
-verified personal ROMs, with shared native hardware code, SDL3 and Metal.
-**macOS is the active target; phone work is deferred.**
+Sega Rally Championship (1995, Model 2A) running as native C++ generated from
+verified personal ROMs, with native board devices, SDL3 and Metal on macOS.
 
-The Mac app provides keyboard and Xbox/SDL gamepad driving, remappable controls,
-analog steering and pedals, persistent cabinet saves, native SCSP sound and
-exact input recording/replay. Optional CRT effects and Accurate textures are
-available in paused Settings; enhancements start off on a fresh setup.
+**v0.1.0-rc.1 is an experimental source prerelease.** Build your own local app
+from ROMs you supply. This project distributes source and analysis, not the game,
+ROMs, extracted assets or a ready-to-play app. macOS is the active target;
+phone work is deferred.
 
-## Build and play
+## What works
 
-With the [required tools and pinned dependencies](docs/segarally-build-validation.md)
-in place, run from this checkout:
+- Windowed Mac play with native SCSP sound, keyboard and recognized SDL gamepads.
+- Analog steering and pedals, remappable controls, cabinet saves and paused Settings.
+- Optional CRT effects and Accurate textures, off by default on a fresh setup.
+- Cabinet-input recordings and exact same-executable offline replay.
+- Recorded Championship paths through Desert and Forest clears, plus a separate
+  SHORT Practice Mountain finish, name entry, scoreboard and return to attract.
+
+**Full Championship completion is not established.** Championship Mountain and Practice Lakeside still
+lack finish evidence. Full-game graphics, extended-precision floating
+point, physical timing and full MAME-machine/PCB parity remain open. A measured
+playback-buffer starvation bug is fixed; broader listening feedback is still
+needed. See [evidence and limits](docs/segarally-status.md).
+
+## Build and play on Mac
+
+Start with [getting started](docs/getting-started.md) to install the required tools
+and three pinned source dependencies. Then run from the checkout:
 
 ```sh
 python3 scripts/segarally_mac.py --roms /path/to/srallyc.zip \
     --output build/segarally-player --jobs 4
 ```
 
-Choose a new output directory. The command verifies the supplied Revision B
-ROMs, generates native main/TGP/sound code, builds, runs host checks and packages
-an ad-hoc signed local app. Open
-`build/segarally-player/mac/Sega Rally Native.app` afterward.
-No game data is included in the repository.
-The package targets the build Mac's architecture and is not notarized for public
-distribution.
+The pipeline verifies Revision B ROM identities, generates main CPU/TGP/sound
+code, builds the Metal host, runs its tests and creates an ad-hoc signed local
+app. Open `build/segarally-player/mac/Sega Rally Native.app`. The app targets
+the build Mac's architecture and is not notarized. Keep it and its personal
+assets local.
 
-Direct no-argument startup enables compiled-in sound and the faster instruction
-boundary path. The app opens windowed with normal pacing. Press and release
-**C twice** for a fresh cabinet credit, then **Return** to start. Steer with
-**Left/Right**, accelerate with **Z**, brake with **X**, and change view with
-**V**. Press **F1** or controller **Y** for Settings. See the
-[Mac player manual](docs/mac-player-manual.md) for controller defaults,
-automatic selection, display controls and saves.
+Allow startup checks to finish. Press and release **C twice**, then **Return**
+to start with fresh cabinet settings. **Left/Right** steer, **Z** accelerates,
+**X** brakes and **V** changes view. **F1** or controller **Y** opens Settings.
+The [player manual](docs/mac-player-manual.md) covers controller defaults,
+Practice selection, saves and recording.
 
-## Current checkpoint
+## How it works
 
-Candidate 006 was built from the supplied archive at source revision `0b9ba0e`.
-All eleven dedicated Mac CTests pass. Its signed package is
-`build/mac-candidate-006/mac/Sega Rally Native.app`.
+The importer verifies your ROM bytes against committed manifests. Static
+recompilers turn reached i960, TGP and 68000 instructions into local C++ build
+artifacts. A shared runtime supplies Model 2A memory, events, I/O, video and sound;
+SDL3 handles the Mac window, controls, audio output and Metal presentation.
+Missing code or unsupported hardware stops with a diagnostic rather than skipping
+game behavior. See the [architecture](docs/segarally-architecture.md).
 
-**A measured audio-playback starvation bug is fixed.** Preserved candidate 003 passes a
-7,200-frame visible check with CRT and Accurate textures, zero audio shortfalls
-or drops, and unchanged native PCM, game execution and final image. The complete
-captured SDL logical-device postmix also reproduces exactly offline, with no
-short callbacks or underflow-added silence. The fix adds one device period of
-buffering—about 23 ms on this Mac. Broader listening
-confirmation and hardware fidelity remain separate checks.
+The [documentation index](docs/README.md) links the build guide, player manual,
+replay contract, design and engineering record. Inherited Daytona targets remain
+separate reference targets; their results do not establish Rally compatibility.
 
-The preserved sound-enabled Metal candidate 002 applies all 4,398 recorded input
-events through 20,000 frames, clearing Desert in **1:00.38** and Forest in
-**1:21.37**, entering
-Mountain and retiring near its finish. Its exact signed-executable offline
-replay matches all 40,006 resumes, PCM hashes and final saves. This unthrottled
-run uses no playback device and is not a speed or listening check. Candidate
-006 preserves that full execution/PCM/save result exactly. **Full-game
-completion is not established.** Earlier independent CPU comparison and the
-preserved v17 manual replay remain documented in the status reference; neither
-is full MAME-machine or PCB parity.
+## Source, credits and boundaries
 
-Practice Mountain now clears through ordinary cabinet controls with the
-operator's SHORT mode, then reaches name entry, the Top 8 scoreboard and attract.
-Candidate 006's sound-on Metal capture matches the 18,000-frame CPU terminal
-and final image; its exact signed-executable replay matches all 36,014 resumes,
-PCM hashes and final saves. A separate independent CPU comparison covers two billion
-instructions, including the Practice start and finish callbacks. A narrowly
-verified four-entry callback table adds static candidates without treating
-neighboring ROM words as code. A separate sound-on Metal Practice Lakeside
-check matches its CPU terminal counters and final image, reaching the final
-route segments before retirement. Full Championship completion remains
-unverified.
+Started from [alphanu1/daytona-arcade-recomp](https://github.com/alphanu1/daytona-arcade-recomp)
+at `b33baeb28a1e1c94d90a4a80811f0b2c7f61106b`, retaining its history and
+[BSD-3-Clause license](LICENSE). Dependency revisions, licenses and retained
+notices are recorded in [THIRD_PARTY.md](THIRD_PARTY.md). This project reconstructs
+behavior; it is not Sega's original source code and is not affiliated with Sega.
+Sega Rally Championship and related names belong to their respective owners.
 
-Optional Accurate textures matches all pixels in three saved complete scenes
-and passes 447 synthetic cases; its v17 host checks preserve audio, inputs and
-saves. Whole-game graphics fidelity, extended-precision FP, physical timing,
-remaining game paths and sustained display-effect cost remain open.
+Only original tools, hardware code, manifests, address annotations, tests and
+analysis belong in the source repository. Personal ROMs, generated game code,
+extracted images, captures and apps remain ignored. No leaked source or SDK is
+used. The public source repository is
+[LaurentGarcia/sega-rally-recomp](https://github.com/LaurentGarcia/sega-rally-recomp).
 
-## Documentation
-
-Start with the [project wiki](docs/README.md):
-
-- [Mac player manual](docs/mac-player-manual.md): launch, controls, coins and saves.
-- [Build and validation guide](docs/segarally-build-validation.md): reproducible
-  import, generation, Mac builds and bounded checks.
-- [Technical architecture](docs/segarally-architecture.md): CPU, devices, timing,
-  graphics and audio.
-- [Evidence and status](docs/segarally-status.md): measured checkpoints,
-  historical comparisons and remaining validation.
-
-The [design](docs/sega-rally-design.md), [project rules](rules.md) and
-[handoff](HANDOFF.md) retain contracts, hashes and the detailed engineering record.
-
-## Personal inputs and repository boundaries
-
-Supply an archive matching the committed Revision B (`srallycb`) manifests.
-The importer checks sizes, CRC32 and SHA1; filenames alone do not establish the
-revision. ROMs, extracted images, generated game C++, captures and apps stay in
-ignored local directories. Source tools, native hardware code, manifests,
-address annotations, tests and analysis are versioned.
-
-Unsupported hardware and missing native targets stop with diagnostics. They
-are not skipped or replaced with invented game behavior. The earlier lifted-C
-phone prototype lives separately in `../segarally95-recomp`; its captures and
-Daytona's results do not establish this runtime's fidelity.
-
-The three previously missing drive, communication and billboard firmware images
-are now verified from additional personal archives. The local reference set
-passes MAME's Revision B ROM audit; see the
-[reference setup](docs/segarally-build-validation.md#reference-firmware).
-This clears the missing-file prerequisite, not full-machine or PCB validation.
-
-## Source base
-
-Started from [`alphanu1/daytona-arcade-recomp`](https://github.com/alphanu1/daytona-arcade-recomp)
-at `b33baeb28a1e1c94d90a4a80811f0b2c7f61106b`. The upstream Git history and
-BSD-3-Clause license are retained. Third-party pins and licenses are recorded in
-[THIRD_PARTY.md](THIRD_PARTY.md). `daytona-upstream` is a read/reference remote;
-this project currently has no publication remote. The
-[inherited Daytona documentation](docs/daytona-upstream-readme.md) describes the
-upstream reference build, whose targets remain available separately.
+For changes and feedback, read [Contributing](CONTRIBUTING.md) and the
+[prerelease scope](docs/releases/v0.1.0-rc.1.md).

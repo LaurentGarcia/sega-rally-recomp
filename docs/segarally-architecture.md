@@ -5,17 +5,37 @@ with native Model 2A devices. It does not replace game logic with the earlier
 lifted-C prototype. macOS is the active frontend target.
 
 ```mermaid
-flowchart LR
-    R[Personal verified ROMs] --> I[Import and seed audits]
-    I --> G[Generated i960 and TGP C++]
-    G --> M[Model2AMachine]
-    M --> B[Runtime memory bus]
-    B --> D[Native board devices and shared clock]
-    D --> V[Geometry and video]
-    V --> P[SDL3 Metal presentation]
-    D --> S[Optional 68000 and SCSP]
-    S --> A[PCM drain and optional SDL playback]
+flowchart TD
+    ROM[Personal Revision B ROM archive] --> AUDIT[Size, CRC32 and SHA1 audits]
+    AUDIT --> MAIN[Generated i960 C++]
+    AUDIT --> TGP[Generated Rally TGP C++]
+    AUDIT --> SND[Generated 68000 C++]
+    AUDIT --> DATA[Verified local graphics and sample images]
+    MAIN --> MACHINE[Model2AMachine: CPU, bus and event queue]
+    INPUT[SDL3 keyboard and gamepad cabinet inputs] --> MACHINE
+    MACHINE <--> BOARD[Native I/O, EEPROM, IRQ, UART and communication devices]
+    MACHINE <--> GEO[TGP board and geometry]
+    TGP --> GEO
+    DATA --> GEO
+    GEO --> VIDEO[Video and polygon-priority composition]
+    VIDEO --> GPU[Shared SDL_GPU renderer on Metal]
+    GPU --> UI[Optional CRT pass and ImGui Settings]
+    UI --> WINDOW[SDL3 Mac window]
+    BOARD <--> SOUND[Native sound board and SCSP]
+    SND --> SOUND
+    DATA --> SOUND
+    SOUND --> PCM[Bounded 44.1 kHz stereo PCM]
+    PCM --> AUDIO[SDL3 audio stream and Mac output]
+    MACHINE --> RECORD[Optional exact resume and cabinet-input recording]
+    PCM --> RECORD
+    RECORD --> REPLAY[Same-executable offline replay without output devices]
 ```
+
+Generated game instructions and personal images remain local build artifacts.
+The source repository supplies generators, manifests, hardware implementations
+and frontends, not a pre-generated game. See the
+[build guide](segarally-build-validation.md) for the artifact pipeline.
+
 
 ## Execution and coverage
 
@@ -72,8 +92,9 @@ Offline recording replay returns before controller initialization.
 
 Native adapters cover I/O, EEPROM, communication, timers/IRQs, UART and video.
 Communication uses explicitly disconnected endpoints; it does not claim linked
-cabinet operation or execution of missing communication firmware. Drive commands
-are latched without executing the missing drive-board firmware.
+cabinet operation or execute the communication firmware. Drive commands are
+latched without executing the drive-board firmware. Having verified reference
+firmware available does not change these native device limits.
 
 ## Graphics and sound
 
@@ -83,10 +104,12 @@ verified polygon and texture images plus CPU-written RAM. The
 feeds the inherited CPU renderer or the shared SDL_GPU renderer. The dedicated
 [host](../src/app/segarally_main.cpp) requires Metal on Mac. Polygon priority
 retains window, sort-bucket, submission and face rules; camera depth does not
-replace arcade ordering. The current stable GPU path uses triangle fans;
-whole-polygon interpolation fidelity remains an open graphics task.
+replace arcade ordering. The default GPU path uses triangle fans. Optional Accurate textures uses measured
+span stepping and a certified reciprocal correction; saved-scene pixel matches
+do not establish every frame or all-game raster fidelity. CRT postprocessing and
+Settings run after native composition and do not alter the game instructions.
 
-Rally's optional sound path uses its generated 68000 program, native SCSP and
+Rally's sound path uses its generated 68000 program, native SCSP and
 physical UART/serial pin edges. Daytona uses a different Model 1 sound board;
 its separate experimental sample-mixer mode in [native-audio.md](native-audio.md)
 is also distinct from Rally's backend. Sound MMIO occurs at instruction

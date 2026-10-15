@@ -10,6 +10,19 @@ on:
 permissions:
   contents: read
 jobs:
+  source-boundary:
+    name: Source release boundary
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Boundary regression tests
+        run: python3 -m unittest discover -s tests -p test_check_source_release.py -v
+      - name: Check committed source and export
+        run: |
+          git archive --format=tar --output="$RUNNER_TEMP/segarally-source.tar" HEAD
+          python3 scripts/check_source_release.py --archive "$RUNNER_TEMP/segarally-source.tar" --output "$RUNNER_TEMP/source-boundary.json"
   build:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}

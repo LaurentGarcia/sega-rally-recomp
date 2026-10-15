@@ -42,7 +42,7 @@ class MacLauncher(unittest.TestCase):
         self.data = b"# exact bytes, including CRLF\r\nsegarally-input-v1\r\n"
         self.replay.write_bytes(self.data)
         (self.build / "licenses").mkdir()
-        for name in ("Project-BSD-3-Clause.txt", "THIRD_PARTY.md", "SDL.txt", "ImGui.txt", "Source-notices.txt"):
+        for name in ("Project-BSD-3-Clause.txt", "THIRD_PARTY.md", "SDL.txt", "ImGui.txt", "ImGui-embedded-fonts.txt", "Source-notices.txt"):
             (self.build / "licenses" / name).write_text("synthetic notice " + name)
         self.calls = []
         self.sign_checks = None
@@ -117,6 +117,13 @@ class MacLauncher(unittest.TestCase):
 
     def test_missing_required_notice_rejected_before_mutation(self):
         (self.build / "licenses/Source-notices.txt").unlink()
+        before = self.tree()
+        self.assertEqual(self.run_launcher("--no-launch"), 2)
+        self.assertEqual(self.tree(), before)
+        self.assertEqual([c[0][0] for c in self.calls], ["pgrep"])
+
+    def test_missing_embedded_font_notice_rejected_before_mutation(self):
+        (self.build / "licenses/ImGui-embedded-fonts.txt").unlink()
         before = self.tree()
         self.assertEqual(self.run_launcher("--no-launch"), 2)
         self.assertEqual(self.tree(), before)

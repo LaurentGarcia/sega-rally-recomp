@@ -1,5 +1,46 @@
 # Handoff
 
+## Public source prerelease preparation (2026-10-15)
+
+The public target is the personal `LaurentGarcia/sega-rally-recomp` repository,
+with `v0.1.0-rc.1` scoped as an experimental Mac source prerelease. The README,
+getting-started guide, architecture, manual and build reference now lead with
+fresh-checkout instructions and the exact SDL3, ImGui and 7-Zip pins. Detailed
+historical evidence remains below and in the status reference. CONTRIBUTING and
+release notes state the content boundary and remaining full-game/MAME/PCB work.
+The governing Reference & validation and Platform layer & build sections retain
+their fidelity criteria; this prerelease does not declare M6 complete.
+
+Notice packaging now includes ImGui's two embedded font comment notices with
+complete MIT terms. The division timing helpers retain the pinned MAME copyright
+in a collectable source preamble; executable statements are unchanged. The
+launcher requires the font notice before repackaging. SHA-256 documentation now
+correctly records its use in the recording-enabled Rally host. All 35 focused
+notice/launcher tests pass and real pinned-source collection produces eight
+notice files. The first collector attempt matched ImGui's table-of-contents
+label as well as its actual section; the corrected extractor requires the
+fenced section and a regression fixture covers the duplicate heading.
+
+A source-release gate checks one committed Git tree and optional exported files
+or archive against a hashed file manifest. It rejects recognized game/build/
+capture paths, unreviewed binary content and high-confidence credential markers;
+the reviewed Gradle wrapper and project HLSL shader header are explicit classes.
+All eleven ROM-free gate fixtures pass, including expanded path-byte limits,
+ZIP special files and encrypted private-key markers. A separate ROM-free CI job
+checks the gate and Git archive. This is a bounded
+artifact check, not a legal/security certificate or historical audit. A separate
+read-only scan of the existing 317-commit/308-tree history found no obvious ROMs,
+game-generated code, captures or high-confidence credentials. Its ignored report
+is `build/publication-review-001/report.json`; limitations remain explicit.
+
+Publication uses a separate clone. Maintainer author/committer metadata will use
+the personal GitHub noreply address; upstream authors, notices and commit trees
+are retained. A revision map will relate historical local evidence IDs to public
+IDs. The original checkout and recorded apps remain preserved. Before tagging,
+run the documented Mac pipeline from the final publication checkout, inspect its
+source archive and retain the final reports. No personal ROM, firmware, generated
+game C++, app, capture or recording is a release upload.
+
 ## Reference firmware imported and ROM inventory audited (2026-10-15)
 
 The additional personal Desktop archives are now moved to ignored
