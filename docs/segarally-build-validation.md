@@ -378,6 +378,37 @@ million instructions, two million observations, two seconds of board time,
 run's 118 source/image inputs map exactly to the integrated sources and
 preserved external inputs; its ten preparation artifacts remain frozen.
 
+The authentic UART fixture reuses an already measured sound/hook-enabled host
+build and its original evidence. It checks source/object/image bindings before
+linking a forwarding observer; it does not regenerate game code. Use the same
+preserved v14 generation accepted by the initialization fixture:
+
+```sh
+python3 tests/test_segarally_sound_uart_capture.py --prepare \
+    --generation /path/to/preserved/native-generation \
+    --host-build /path/to/preserved/mac-host-build \
+    --host-evidence /path/to/preserved/host-evidence \
+    --reference-dir build/validation/mame-reference \
+    --output build/validation/sound-uart-prepared
+python3 tests/test_segarally_sound_uart_capture.py --capture \
+    --output build/validation/sound-uart-prepared \
+    --run-dir build/validation/sound-uart-capture
+python3 tests/test_segarally_sound_uart_capture.py --recapture \
+    --output build/validation/sound-uart-prepared \
+    --capture-dir build/validation/sound-uart-capture \
+    --run-dir build/validation/sound-uart-recapture
+```
+
+Preparation compiles only. Capture permits at most 20 million main instructions,
+two seconds of board time and 4,096 UART accesses; each execution has a
+90-second watchdog. The transcript is limited to 16 MiB and authenticated in
+full before recapture executes. The retained capture passes in 2.112635 seconds
+and recapture in 0.660414 seconds: seven real writes, 163 exact state cuts,
+63,722 silent stereo frames and genuine first-byte receive/IRQ-clear evidence.
+Side-effecting read support is implemented but not exercised by these seven
+writes. This is native-to-native recapture with shared devices, not independent
+CPU, chip, nonzero-music or whole-recording validation.
+
 ## Optional sound experiment
 
 Sound requires both audited generated sound inputs and an explicit build option:

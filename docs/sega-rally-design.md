@@ -427,6 +427,15 @@ no main-board UART commands enter this fixture. Its reference provider admits
 the authenticated 2,663 program addresses and 660 opcode words through an
 explicit test-only limit; the ordinary provider's default bound stays 64.
 Actual command traffic and nonzero music remain the next comparison scope.
+A forwarding main-bus observer now captures the real UART startup sequence
+without changing compiled instructions or injecting bytes. Seven writes and
+163 cuts recapture exactly on a separate native sound/UART instance, including
+the first `ff` byte's physical transfer and its SCSP MIDI read/IRQ clear.
+Full sound architecture, RAM, ordered transfers and 63,722 stereo PCM frames
+match. The PCM is silent. Register operations occur after draining all queued
+events through their timestamps; UART construction and equal-time access
+ordering are preserved. This establishes native recapture for that prefix;
+the independent sound CPU and nonzero music remain separate gates.
 The diagnostic
 is disabled by default, including in the Metal frontend. Daytona's measured
 instruction-rate shortcut is specific to its different Model 1 board and is

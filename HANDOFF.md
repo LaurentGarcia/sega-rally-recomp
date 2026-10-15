@@ -1,5 +1,65 @@
 # Handoff
 
+## Authentic main-to-sound UART prefix recaptures exactly (2026-10-14)
+
+A test-only forwarding observer now captures real main-program UART accesses
+from the preserved audited native build. Its first bounded run records seven
+writes and 163 sound-state cuts. The first data byte is observed as `ff` at
+1,442,891,360 ns; the actual sound program reads it from SCSP MIDI at
+1,443,240,416 ns, boundary cycle 16,293,607, clearing IRQ level 3 to zero.
+The normal budget stop reaches 14,412,000 main instructions and board time
+1,444,941,000 ns. Sound reaches 1,260,947 instructions, 16,312,806 cycles and
+660 IRQ entries. No command value is invented or injected past the UART.
+
+Replaying that immutable transcript into a separate native sound/UART instance
+matches every captured architecture, cycle-statistics, RAM, IRQ, ordered data
+and PCM cut. Both paths preserve UART reset/first clock token before sound
+construction, physical MIDI wiring and register accesses after fully draining
+the clock through their timestamp. Same-time accesses keep recorded order.
+The fixture supports side-effecting reads, but this captured prefix contains
+only writes. Data counters are cumulative; transfer hashes cover each interval
+between cuts. Constructor-reset bus transfers remain outside the observer.
+The omitted main/control/screen events do not change this measured prefix's
+sound observations; that does not prove every longer projection equivalent.
+
+This follows **Audio** and **Reference & validation**. Capture passes in
+2.112635 seconds and native recapture in 0.660414 seconds, each on its first
+execution with unchanged inputs and empty stderr. All 63,722 stereo frames
+are silent: their interval hashes independently equal positive-zero float32
+bytes. This validates authentic command transport and native recapture, not
+independent sound CPU/chip behavior, nonzero music or the title-screen symptom.
+Independent sound-on recording consumption remains unsupported. No production
+runtime, generated body or live app changes are included.
+
+Evidence under `build/worktrees/sound-init-reference/build/`:
+`uart-native-capture-001/result.json` SHA-256
+`ebe3f63303ba5eafacbba12ecd9cbdc4a4c5624f8d493e78524e001cf7a49c12`;
+`uart-native-recapture-001/result.json`
+`fc7fbb3bfb76225c72cfd573add35a990ec2ffbc30a35a3f7fcb63657a210022`.
+The 68,885-byte transcript SHA-256 is
+`215804ec9b993026eeec668b36127c27522411d58bb0d89f486c060006dbabd2`.
+Independent review verifies all 926 measured inputs and six prepared artifacts:
+`build/validation/sound-uart-native-independent-review/result.json`, SHA-256
+`f8557cd913ece1a8939e1d9018eed2fb5e0d133a5a51f5bbb4eb651a72e4560e`.
+All 111 worktree-relative source inputs map exactly to MAIN; remaining inputs
+retain their original external/build identities. This is the original
+worktree run, not a second MAIN execution. Integration record:
+`build/validation/sound-uart-native-integration/result.json`, SHA-256
+`3510a658bc2d1e134519bb8d7c5a62a3fcd95d4401784e1fbb59056fcfc33abe`.
+Next compare this authentic transcript with the persistent independent sound
+CPU, then extend observed traffic to nonzero playback.
+
+The fourth v16 session closes normally at frame 6,406, with 4,911,133 stereo
+frames and zero chip/host drops or positive SDL demands. Its recording and
+`build/validation/mac-controller-v16/play-004/live.log` remain preserved and
+have not been replayed. The reciprocal candidate's 447 synthetic cases and
+three complete CPU-image comparisons pass. Its six-render scene gate had
+already been submitted when the next live-play hold arrived and completed
+after tool approval, possibly overlapping that session. No timing inference
+is made from it. Future pending device gates must be collected or cancelled
+before declaring a new live session free of background device work. Candidate
+cost measurement and production integration remain pending.
+
 ## Actual sound initialization and interrupts match independent CPU (2026-10-14)
 
 The unchanged audited sound program now matches continuous pinned MAME CPU
