@@ -147,6 +147,33 @@ device and do not establish listening quality, performance, full-course manual
 coverage or independent CPU/sound parity. Evidence remains ignored under
 `build/validation/recording-v13/`.
 
+The later signed v13 session records a missing return at `0x005ae800` after
+12,785 frames. Exact-executable offline replay reproduces all 25,581 rows and
+the frontier. An input audit proves this session's pins match the canonical
+selection replay throughout, with no additional manual changes. After adding
+the observed return seed, the v14 continuation repeats that frame input stream
+and matches all fields of the 25,580 completed normal resume/PCM rows, then
+reaches frame 14,001 without a frontier. All 28,013 new PCM observation hashes
+match the sequential WAV bytes. A separate artifact review confirms these
+comparisons and unchanged original inputs, images and initial saves.
+
+The old partial frontier row is excluded from CPU equality: shortening a new
+budget to its 81,380 executed instructions would return at a different
+synchronization phase. Its 622-scalar audio prefix separately matches the new
+drain, which establishes those audio bytes only. This cross-generation check
+uses a fresh capture; the production same-executable replay guard is unchanged.
+No v14 same-executable offline replay has been run. Evidence is under
+`build/validation/frontier-005ae800-v14/continuation-001/` and
+`build/validation/frontier-005ae800-v14/independent-review.json`.
+
+The subsequent v14 windowed recording captures actual manual controls after
+selection handoff: 409 snapshot transitions involving throttle, steering,
+brake, view and handbrake. Its 18,689 rows end in normal quit at frame 9,344.
+The read-only audit verifies signature/manifest/assets, initial/final save
+bytes and recording completion; same-executable offline replay is still
+pending. Preserve this signed app with
+`build/recordings/mac-v14-20261014-001` for that check.
+
 Preserve the exact captured executable/app and staged assets. Rebuilding,
 re-signing or repackaging can change their bytes; changed identities are
 rejected. The new raw-executable checkpoint and the signed app have

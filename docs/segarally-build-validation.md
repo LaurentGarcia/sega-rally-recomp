@@ -50,7 +50,7 @@ python3 scripts/segarally_video.py --roms /path/to/srallyc.zip \
 profile is smaller. Indexed dispatch is opt-in; omit its flag to reproduce
 the original routing. Record the checkout revision and resulting import,
 coverage and source hashes: fresh generation from a newer checkout is not
-automatically the frozen v13 checkpoint.
+automatically either frozen v13 or v14 checkpoint.
 
 Staging now records those actual artifact identities under `assets.json`'s
 versioned `provenance` object. Hook generation retains its boundary-contract
@@ -211,10 +211,18 @@ instruction boundary hook enabled, the same checkpoint completes in 48.519993
 seconds including startup and shutdown, with zero extra input requests and
 zero chip/host drops. These counters estimate SDL input demand, not exact
 hardware output samples. The user confirmed hearing a separate ten-second native
-PCM sample through the Mac speakers. The subsequent windowed session exits
+PCM sample through the Mac speakers. The earlier windowed session exits
 normally after 9,347 frames and supplies 7,165,805 stereo frames with no drops
 or estimated input shortages. Live-game listening feedback and full-game sound
 parity remain pending.
+
+The current v14 app's recorded windowed session closes normally at 9,344
+frames, supplying 7,163,505 stereo frames with zero chip/host drops and one
+estimated SDL input-shortfall request for 552 bytes. Separately, its hidden
+sound-enabled continuation passes the old missing return through frame 14,001
+with exact prior normal execution/PCM observations. That unthrottled test
+opens no playback device. See the [manual](mac-player-manual.md) for the
+prepared app path and [status](segarally-status.md) for precise evidence limits.
 
 Full MAME reference work is separately blocked by three files absent from the
 supplied archive: `epr-17891.ic12`, `epr-16726.bin` and `epr-18022.ic2`.

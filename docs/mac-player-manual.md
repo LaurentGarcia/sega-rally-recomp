@@ -27,16 +27,17 @@ resources before signing. Startup reads the bundled copy. Missing files,
 directories and replays larger than 1 MiB are rejected before packaging.
 
 The latest prepared recording-enabled sound app is in
-`build/worktrees/mac-recording-v13/build/mac-recording-v13/Sega Rally Native.app`.
+`build/worktrees/observed-frontier-005ae800/build/mac-recording-v14/Sega Rally Native.app`.
 It has launched in a normal window with sound, the instruction boundary hook,
-selection replay and input recording enabled. That session reached missing
-native target `0x005ae800` after 12,785 frames; its frontier recording is
-preserved while coverage is extended. Listening feedback remains pending.
+selection replay and input recording enabled, then closed normally after
+9,344 frames. A separate automated sound-enabled run passes the earlier
+`0x005ae800` missing return and reaches frame 14,001. The old v13 app and its
+frontier recording remain preserved. Listening feedback remains pending.
 To start a fresh recorded session:
 
 ```sh
 python3 platform/segarally/macos/launch.py \
-    --build-dir build/worktrees/mac-recording-v13/build/mac-recording-v13 \
+    --build-dir build/worktrees/observed-frontier-005ae800/build/mac-recording-v14 \
     --sound --instruction-boundary-hook \
     --input-replay config/segarally_lancia_select.inputs \
     --record-inputs build/recordings/drive-001
@@ -114,9 +115,9 @@ startup and shutdown, with no reported audio input shortfalls or sample drops.
 The [build guide](segarally-build-validation.md) explains both build options
 and the runtime switches `--sound --instruction-boundary-hook`. The older
 sound-off speed app remains silent by design. The user has heard a ten-second
-native PCM sample on the Mac speakers. The completed windowed session supplies
-7,165,805 stereo frames with no drops or input shortages; live listening feedback
-remains pending.
+native PCM sample on the Mac speakers. The latest v14 windowed session supplies
+7,163,505 stereo frames with no chip/host drops and one estimated SDL input
+shortfall request for 552 bytes; live listening feedback remains pending.
 
 Other paths and machines may run more slowly. `--unthrottled` disables waiting
 for diagnostic runs and does not guarantee arcade speed. Avoid additional builds

@@ -95,7 +95,8 @@ call site and clobber set is retained in provenance. This recovers two known
 constructor registrations without an assumed callee-save ABI. Unknown calls,
 nested control flow and conditional paths remain outside this proof. The frozen first-car profile reaches its
 first geometry at rendered frame 1,357 and a visible textured car/course scene
-by frame 1,634; this is CPU-renderer evidence, pending Metal and race validation.
+by frame 1,634; this is CPU-renderer evidence. Metal and race validation were
+still pending at that checkpoint; later comparisons are recorded below.
 
 Daytona's unchanged TGP generator and TgpBoard compile Rally's own 1,665-word
 upload, not Daytona's microcode. A bus-level upload/startup probe returns `8`
@@ -187,7 +188,13 @@ differences fall from 969 to 844; these counts exclude tile/character RAM and
 cannot be compared directly with the complete-scene counts above. The one
 newly worsened pixel at (95,31) is a measured repeated-addition versus direct-
 offset rounding difference; an ignored diagnostic loop restores the CPU bits,
-with unmeasured cost. Residual texture precision remains open. No new
+with unmeasured cost. Extending that diagnostic to four-or-more-vertex polygons
+confirms GPU cutout ownership changes caused by accumulated rounding. Combined
+repeated stepping leaves three differing pixels in the same 3D-only snapshot,
+including one slightly worsened pixel; all 447 synthetic cases and the exact
+disabled-mode image guard pass. The initial candidate failed that guard and is
+excluded. This remains ignored experimental source with unmeasured loop cost
+and no broader-scene validation. Residual texture precision remains open. No new
 performance result or whole-game fidelity claim follows;
 the option stays off by default. See [the evidence table](segarally-status.md#graphics-evidence).
 The host also accepts the bounded cabinet replay and holds its final snapshot
@@ -225,6 +232,14 @@ device frontier. A separate fresh-save stable-host check subsequently accepts
 two more coins and Start and reaches Car Select at frame 11,160, with all 27
 scripted inputs applied. The Game Over overlay, beginning that second race
 and completion of the remaining courses still require validation.
+A later sound-enabled v13 recording reaches a missing return at `0x005ae800`
+after 12,785 frames. Adding that observed target and its canonical ROM alias
+extends the v14 graph to 75,207 instructions without changing prior addresses
+or compiler heuristics. A new capture matches all 25,580 completed normal
+resume/PCM rows, excludes the old partial frontier CPU outcome, and continues
+normally through frame 14,001 and 2,675,194,732 instructions. This same-Machine
+comparison across generations does not replace independent CPU or hardware
+validation, and production recording identity checks remain strict.
 Independent v6 driving comparison matches 600 million instructions, all nineteen
 input events, 19,641,024 ordered writes and 3,142 renders against the reference
 CPU with shared board implementations. It is not complete MAME-machine parity.
@@ -262,7 +277,7 @@ input shortfalls or chip/host sample drops. The old sound path recorded 3,222
 estimated input-demand requests at that checkpoint. Hidden presentation and
 SDL counters do not establish user hearing, every course or physical audio
 fidelity. The user has separately heard a ten-second native PCM excerpt on the
-Mac speakers. A later windowed session supplies 7,165,805 stereo frames and exits
+Mac speakers. An earlier v13 windowed session supplies 7,165,805 stereo frames and exits
 normally after 9,347 rendered frames with no drops or estimated SDL input
 shortages. Live-game listening feedback and physical fidelity remain open.
 The host now opens its physical audio device after window/Metal initialization,

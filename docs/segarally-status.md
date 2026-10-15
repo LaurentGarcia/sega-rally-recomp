@@ -7,14 +7,14 @@ The [design](sega-rally-design.md) records interpretation and hardware limits.
 
 | Area | Established evidence | Limit |
 | --- | --- | --- |
-| Main native coverage | Frozen v13: 75,205 instructions, 52 native objects, no missing templates | Coverage is a reached graph, not a remaining-work percentage |
-| Interactive Mac | New sound app records 12,785 frames and a missing-target frontier; prior sound session exits normally after 9,347 frames | Target `0x005ae800` needs generation coverage; live listening feedback pending |
+| Main native coverage | Frozen v14: 75,207 instructions, 52 native objects, no missing templates | Coverage is a reached graph, not a remaining-work percentage |
+| Interactive Mac | v14 windowed sound session exits normally after 9,344 frames; separate continuation passes the old frontier through frame 14,001 | Second race and remaining courses still need validation; live listening feedback pending |
 | Driving parity | Two billion held-gas instructions, 86,328,770 ordered writes, 4,650,936,033 cycles, 113,101 IRQs and 10,701 renders; nineteen replay events match | Sound off; independent CPU with shared boards and final-frame comparison; no full MAME race |
 | Later game paths | Held-gas v13 returns to attract; a fresh two-coin/Start sequence reaches Car Select at frame 11,160 without a frontier | Second race and Game Over overlay not separately validated |
 | Course progress | Desert clear/results show 1:12.15; forested second course enters, times out, then attract returns | Centered steering does not complete second-course bends; remaining courses unvalidated |
-| Metal fidelity | Optional polygon scanlines reduce error in three real scenes; triangle coverage further improves the saved 3D layer; 447 synthetic cases pass | Still off by default; exact racing-scene raster parity and updated performance remain open |
+| Metal fidelity | Optional polygon scanlines improve three scenes; experimental repeated stepping reduces one 3D-only scene from 844 differing pixels to 3; 447 synthetic cases pass | Repeated stepping is diagnostic only, with one worsened pixel; broader scenes and cost remain open |
 | Sound generation | Native linked board captures 2,409,170 stereo frames: 54.6297052 seconds including nonzero 44.1 kHz PCM; shared-core drains agree | Whole-game audio parity unvalidated |
-| Audio output | New windowed session supplies 9,802,212 stereo frames with zero drops or estimated input shortfalls; user heard a separate ten-second native PCM sample | Session ends at a native-code frontier; live listening feedback and physical fidelity remain open |
+| Audio output | v14 windowed session supplies 7,163,505 stereo frames with zero chip/host drops and one estimated SDL input-shortfall request; user heard a separate ten-second native PCM sample | Live listening feedback and physical fidelity remain open |
 | Exact host recording | Actual v13 sound-on drive: 5,603 exact resumes replay; recorded and unrecorded 2,801-frame runs match counters, all 20 input boundaries, WAV, final Metal image and saves | Same-Machine reproducibility; full-course manual recordings and independent sound parity remain open |
 | Hardware fidelity | Isolated device/reference tests and instruction-timed diagnostics | PCB timing, extF80 precision and full-machine behavior remain open |
 
@@ -84,11 +84,29 @@ Offline replay runs inside the sandbox without SDL/GPU/audio output or live-save
 writes. The capture runs are hidden and unthrottled without a physical audio
 device; these results do not establish listening quality or gameplay speed.
 
-The later signed-app playtest records 25,581 resumes before reaching missing
+The v13 signed-app playtest records 25,581 resumes before reaching missing
 native target `0x005ae800` at 2,437,360,267 instructions and 12,785 frames.
 Normal close seals the frontier recording. It supplies 9,802,212 stereo frames
 with zero chip/host drops or estimated SDL shortages. This path is beyond the
-two-billion checkpoint; generation extension and prefix validation are pending.
+two-billion checkpoint. A single observed return seed extends v14 coverage by
+two addresses, including the canonical ROM alias. The fresh sound-enabled
+continuation matches all 25,580 completed normal resumes and PCM observations
+before the old partial frontier row, then exits normally at frame 14,001:
+2,675,194,732 instructions and 6,084,875,601 cycles. Its 28,013 PCM observations
+match the complete 10,733,721-stereo-frame WAV. The old partial CPU outcome is
+excluded from the equality claim. This is a same-Machine comparison across
+generations, not an independent hardware test or a v14 offline replay.
+
+The v14 windowed app subsequently applies all ten selection events, hands over
+at frame 1,851 and closes normally after 9,344 frames. It supplies 7,163,505
+stereo frames, with zero chip/host drops and one SDL input-shortfall request
+for 552 extra input bytes. There is no WAV or separate speed measurement for
+this session. The automated continuation, rather than this shorter live
+session, establishes progress beyond the former missing return.
+The live bundle contains 18,689 resumes and actual post-handoff accelerator,
+steering, brake, view and handbrake changes. Its signature, assets, initial/
+final saves and completion record pass read-only audit; offline execution of
+this manual capture remains pending.
 See the [input guide](segarally-input-replay.md#exact-host-resume-transcripts).
 
 ## Graphics evidence
@@ -114,7 +132,7 @@ measurements below precede the triangle extension.
 
 Each image is 496×384; error is the mean absolute RGB channel difference on a
 0–255 scale. These frozen scenes use the earlier sound-off generations. They
-do not measure current v13 gameplay speed. The option remains off by default;
+do not measure current v14 gameplay speed. The option remains off by default;
 disabled captures match the committed stable renderer. The expanded synthetic
 Metal fixture passes 447 native-resolution cases, including rounded edges,
 clipping, crossed chains, triangle subpixel/empty spans, checker pixels and
@@ -145,9 +163,26 @@ lacks tile/character RAM, so its counts are separate from the complete-scene
 table above. Default-off output remains byte-identical in this comparison.
 The CPU's repeated floating-point additions are not reproduced exactly by
 the per-fragment formula. Broader scenes, continuous flicker and performance
-remain to test before enabling this path for play. CPU-side evaluation of the
-largest residual errors points to similar rounding crossing textured-polygon
-cutout thresholds; GPU ownership measurements for those pixels are pending.
+remain to test before enabling this path for play.
+
+The next diagnostic confirms that four-or-more-vertex interpolation rounding
+crosses texture cutout thresholds at three large-error examples. Actual GPU
+ownership measurements agree with the CPU prediction. Repeated stepping for
+those polygons reduces the same frozen 3D scene to eight differing pixels;
+combining it with triangle repeated stepping leaves three, with mean channel
+error 0.000042002688/255 and maximum channel error 4. Of 843 changed pixels,
+842 become exact; one previously exact pixel at (434,94) worsens slightly.
+The remaining differences are at (294,94), (434,94) and (98,331), all owned by
+opaque quads in the CPU reference. Their GPU interpolation/depth attribution
+is still pending.
+
+The first instrumented candidate changed one baseline pixel even with its
+diagnostic mode disabled and was rejected. The second separates the new
+branch from baseline polygon shading: its disabled output matches all 190,464
+RGBA pixels and all 447 synthetic cases pass. No production shader change
+has been made; this loop's cost and behavior in broader composed scenes are
+unmeasured. Three residual pixels in one snapshot do not establish whole-game
+or hardware fidelity, or resolve continuous flicker.
 
 ## Next validation work
 

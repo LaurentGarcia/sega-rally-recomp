@@ -1,5 +1,121 @@
 # Handoff
 
+## v14 continuation and completed windowed session (2026-10-14)
+
+The single observed return seed is built and validated. Isolated worktree
+`build/worktrees/observed-frontier-005ae800` preserves the audited generation
+path, adds only canonical `0x0000f800` and runtime `0x005ae800`, and builds all
+host objects freshly from source. Full main boundary and timed sound contracts
+pass; all eight payloads and the sound/TGP/video generation inputs retain their
+old bytes. The 75,207-instruction graph has no missing templates and retains
+all previous addresses. Raw v14 executable SHA-256:
+`81b1d88f34f74d13d40ed637dfeb35a1bb1c7868c3e9d7c994988c66bef4c0d1`.
+Generation/build provenance is in the worktree's
+`build/frontier-005ae800-evidence/completion.json`.
+
+The bounded sound/hook continuation passes all 25,580 completed normal old
+resume and observation rows exactly, including budgets, pins, witnesses,
+return/fault details and PCM hashes. It excludes the old partial CPU frontier
+row. A separate comparison matches that row's first 622 scalar audio samples;
+this is audio-byte evidence only, not equality of terminal CPU phases. The
+new run reaches its normal frame limit at 14,001 frames, 2,675,194,732
+instructions, 6,084,875,601 reference cycles, board time 243,395,024,040 ns
+and PC `0x005c7160`, without a missing-code frontier. All eleven input events
+apply, including the neutral sentinel which keeps physical controls excluded.
+
+All 28,013 PCM observations match sequential float WAV bytes: 10,733,721
+stereo frames at 44.1 kHz, 19,665,219 nonzero scalar samples, zero chip/host
+drops. This hidden unthrottled check uses no physical audio device. Evidence:
+`build/validation/frontier-005ae800-v14/continuation-001/result.json`, SHA-256
+`cb27113fd873150e223a74f3c4d137d89a892d25d1265970ba391a3b39316c39`;
+WAV SHA-256
+`78302323fb65322fd6003e9d3331d03a3d156dc9bd4f73ee21800d32b270fc02`.
+Independent read-only review confirms all comparisons, valid seal/final saves,
+matching initial seeds/options/images, the unchanged original capture and
+current raw executable/assets:
+`build/validation/frontier-005ae800-v14/independent-review.json`,
+SHA-256 `2f87c5865b2524eb2eb7a78a58e9f84d75345b3dfe525e59ee3cd832d358a6ef`.
+The frozen runner's initial text-header parsing error was caught and corrected
+before execution; both independent reviews used real sealed bundles. No game
+run is discarded on that account. This is same-Machine cross-generation
+prefix/continuation evidence, not independent CPU/hardware or speed proof.
+No v14 same-executable offline replay has been run.
+
+The signed app at
+`build/worktrees/observed-frontier-005ae800/build/mac-recording-v14/Sega Rally Native.app`
+opens in a normal window with Metal Apple M5, sound, instruction hook, selection
+replay and capture `build/recordings/mac-v14-20261014-001`. Its log confirms all
+ten events and manual takeover at frame 1,851. The session subsequently closes
+normally (`quit`) at 9,344 frames, 1,720,524,703 instructions, 4,060,943,401
+cycles and PC `0x005ca570`, native result 0. It supplies 7,163,505 stereo frames
+with 12,886,297 nonzero scalar samples, zero chip/host drops and one estimated
+SDL input-shortfall request for 552 extra input bytes; 995 frames remain queued.
+No WAV, listening-quality verdict or quiet speed measurement accompanies this
+live session. No game process remains at the status check. The longer automated
+continuation establishes passage beyond the former frontier. Preserve both
+signed apps, their captures and original logs before any relaunch.
+
+The read-only live audit passes strict/deep signature verification, manifest
+identity, all eight packaged/raw/generation images, assets report, selection
+bytes, all-FF initial seeds, final live-save equality and the seal/context/
+continuity of 18,689 rows. After handoff there are 409 input snapshot
+transitions, nine distinct nonneutral snapshots and 12,939 nonneutral resume
+rows. Accelerator, both steering directions, brake, view and handbrake change;
+no gear change is captured. The first deviation from the neutral selection
+tail is row 4,069 before frame 2,034, at instruction 397,840,727 and cycle
+884,017,400, with accelerator fully pressed. This is a manual-input capture,
+not the neutral continuation stream. With no live WAV, its PCM digests have
+not been independently recomputed, and offline execution remains pending.
+Signed executable SHA-256:
+`6ac1c2cf576d636efde6e02255c7c7caacbe731ac4d340e45c50bc097466dde9`.
+Audit: `build/validation/frontier-005ae800-v14/live-launch-001.json`, SHA-256
+`a93b78ce4dbf98a71494ba70dbaa2dfb450d7b22c45bc3d103d6e3498911e35d`.
+Audited files remain unchanged.
+
+## Polygon repeated stepping diagnostic (2026-10-14)
+
+Actual GPU owner measurements now confirm the three large-error cutout examples
+from the earlier CPU review. The direct-offset path selects polygons 654, 795
+and 650 at (398,226), (415,199) and (439,230); repeated four-or-more-vertex
+stepping restores CPU owners 650, 658 and 795. The shader remains a diagnostic
+using the common HLSL generation path. No production source changes or default
+option changes accompany this evidence.
+
+The first candidate is invalidated: disabled diagnostic mode changes one pixel
+at (243,322), from RGB (81,48,32) to (78,45,29). Generated MSL shares a product
+temporary where the old expression was separate; precision perturbation is
+plausible, but the exact cause is not established. Preserve this failed source,
+binary, log and raw frames. The second candidate isolates the repeated branch
+from unchanged baseline polygon shading and passes the full 190,464-RGBA-pixel
+disabled-mode guard and all 447 synthetic cases (85,137,408 pixels).
+
+In the frozen 496x384 3D-only reconstruction, current optional scanlines have
+844 differing pixels, absolute RGB error sum 10,754 and maximum channel error
+168. Repeated four-or-more-vertex stepping leaves eight differences, error sum
+54 and maximum 4. Combined triangle/polygon repeated stepping leaves three,
+error sum 24 and maximum 4. Of 843 changed pixels, 842 become exact; one at
+(434,94) worsens from the CPU/current RGB (105,65,46) to (101,62,44).
+The remaining pixels are (294,94), (434,94) and (98,331). CPU ownership is
+opaque quads 827, 827 and 784 respectively, so these owners do not involve a
+cutout decision. GPU oz/reciprocal-z attribution remains pending.
+
+Evidence under `build/worktrees/mac-triangle-fidelity/build/validation/`:
+`polygon-repeat-diagnostic/report.json`, SHA-256
+`d21800f440ce8952edf8bb467cc81157ff2aaa8284224253405550a811b72650`;
+`polygon-repeat-diagnostic/ownership.json`, SHA-256
+`866ddaaf854283e27c77e92df11e0864a057f67f81c655bb207467979d46691e`;
+`final-three-cpu-review/evidence.json`, SHA-256
+`98f8eff577f097847cd82a6fc09f7c44b0086be241ebff36dd97f911eaa4abcd`.
+The source-only GPU follow-up has not been compiled or executed. Loop cost,
+broader composed scenes and continuous flicker remain unmeasured. Do not
+promote this single-scene result to full-game accuracy or enable it for play.
+
+Next: replay the preserved v14 manual capture offline; measure the final three GPU
+interpolants before changing arithmetic; validate second-race/remaining-course
+paths and broader composed graphics before any production renderer change.
+Keep heavy builds and GPU captures quiet during future live playtests. Phone
+work remains deferred. Production recording identity checks stay strict.
+
 ## Recorded live frontier at attract return (2026-10-14)
 
 The signed recording-enabled v13 app reaches missing native target
@@ -31,8 +147,9 @@ predecessor but omits the return. One actual-observation seed is added in
 executable. The isolated standard generation now contains 75,207 instructions:
 only canonical `0x0000f800` and runtime `0x005ae800` are added, all 75,205 old
 addresses remain, and indirect sites/invalid stops remain 419/13. No compiler
-heuristic or game instruction changes. Full host build and continuation checks
-are pending. Production recording identity checks stay strict.
+heuristic or game instruction changes. The subsequent full host build and
+continuation checks pass as recorded above. Production recording identity
+checks stay strict.
 
 An input audit proves every captured twelve-pin snapshot matches the canonical
 ten-event selection replay, including neutral manual handoff. No additional

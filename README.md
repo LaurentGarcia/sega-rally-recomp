@@ -25,13 +25,18 @@ The [design](docs/sega-rally-design.md), [project rules](rules.md) and
 
 ## Current checkpoint
 
-The frozen v13 graph contains 75,205 native i960 instructions in 52 compiled
-objects. It runs the actual Lancia race, Desert finish/results and entry into
-the forested second course. A two-billion-instruction held-gas replay reaches
+The frozen v14 graph contains 75,207 native i960 instructions in 52 compiled
+objects. Prior v13 checks run the actual Lancia race, Desert finish/results and
+entry into the forested second course. A two-billion-instruction held-gas replay reaches
 time-over and returns to attract mode without a missing-code or device error.
 A fresh-credit check then accepts two coins and Start, returning to Car Select
 at frame 11,160. Starting that second race, other courses and alternate paths
 still need tests.
+
+The latest observed missing return is now included. A sound-enabled v14 check
+matches the previous 25,580 normal execution/audio steps exactly and continues
+past the old frontier through frame 14,001. This comparison uses the same native
+Machine implementation; it does not establish independent hardware parity.
 
 Independent CPU comparison now passes the two-billion-instruction held-gas
 path: all nineteen input events, 86,328,770 ordered writes, 4,650,936,033
@@ -52,11 +57,16 @@ The hook matches the old Machine through 600 million driving instructions,
 every compared frame and every captured PCM sample. This hidden-window result
 does not establish every course or visible presentation. A ten-second native
 PCM sample has been heard on the Mac speakers. Opening audio after window/Metal
-setup fixes the observed startup failure. The subsequent windowed session exits
-normally after 9,347 frames with zero audio drops or estimated input shortages;
-live-game listening feedback remains pending.
+setup fixes the observed startup failure. The latest v14 windowed session exits
+normally after 9,344 frames with zero chip/host drops and one estimated SDL
+input-shortfall request; live-game listening feedback remains pending.
 Sound requires both the build option and runtime `--sound`.
 See the [sound instructions](docs/segarally-build-validation.md#optional-sound-experiment).
+
+Experimental Metal interpolation reduces one frozen 3D scene from 844 differing
+pixels to three against the CPU renderer. It remains outside production while
+broader scenes, the remaining errors and execution cost are checked. This is
+not a whole-game graphics-fidelity result.
 
 ## Personal inputs and repository boundaries
 
