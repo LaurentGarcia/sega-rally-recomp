@@ -159,6 +159,11 @@ def stage(source: Path, destination: Path, sound_source: Path | None = None,
         if not target.exists() or hashlib.sha256(target.read_bytes()).hexdigest() != digest:
             shutil.copyfile(path, target)
         report["images"][output] = {"file": target.name, "size": target.stat().st_size, "sha256": digest}
+    # A sound-enabled directory may later be reused with sound disabled.
+    # Remove only our known optional outputs; unrelated caller files are not ours.
+    for name in ("sound_program", "sound_samples"):
+        if name not in report["images"]:
+            (destination / f"{name}.bin").unlink(missing_ok=True)
     report_path = destination / "assets.json"
     content = json.dumps(report, indent=2) + "\n"
     if not report_path.exists() or report_path.read_text() != content:

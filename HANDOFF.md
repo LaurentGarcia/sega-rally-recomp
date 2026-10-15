@@ -1,5 +1,54 @@
 # Handoff
 
+## v17 manual replay passes; Mac candidate pipeline prepared (2026-10-15)
+
+The latest v17 session closed normally at 4,729 frames, 890,065,301 main
+instructions and 2,055,264,421 cycles, PC `005d662c`. Its 3,625,487 stereo PCM
+frames have zero logged chip/host drops or SDL shortfall requests. One bounded
+offline replay using the original signed executable passes all 9,459 resumes,
+PCM hashes and final saves in 38.943 seconds. It opens no output devices and
+preserves the app, recording and live saves. The captured input contains 350
+post-handoff analog transitions, including 112 within a render frame; this
+demonstrates manual input, not course completion or its physical source.
+
+Evidence: `build/validation/mac-reciprocal-v17-playtest-001/`;
+`offline-replay-001/result.json` SHA-256
+`d2bdb9e1cd13a2a58e2409674b0f76ec3b4cf01178213afe361c1df33cf83c5c`.
+Independent file/seal/output audit:
+`build/validation/mac-release-audit/v17-replay-review.json`, SHA-256
+`6217eb5b5aea3e0f75b7e7df32adc674a1cb72ccff8d4ee2edbababd83bc44c3`.
+Scope remains same-Machine reproducibility, without a listening or full-course
+verdict. The former live-session hold on heavy tests is lifted.
+
+Platform layer & build and Reference & validation govern the new Mac packaging
+work. The launcher now copies only audited image filenames and replaces its
+owned asset directory, preventing old sound images or unrelated build files
+from entering a repackaged app. Staging removes only its known optional sound
+outputs when sound is disabled. Source asset symlinks are rejected. Packaging
+requires retained project/dependency licenses and original source notices;
+the collector copies existing text, including selected recording sources'
+public-domain declarations, without generated game bodies. Dedicated Mac CTest
+now includes launcher, staging, notice and pipeline regressions.
+
+The isolated packaging patch passes 61 Python tests plus five configured
+CTest entries using synthetic native inputs. Actual pinned dependencies yield
+seven notice files and 80 source preambles. Patch evidence is under
+`build/worktrees/mac-release-audit/build/release-review/`; patch SHA-256
+`ee5d5c3269b93934864d54cdd8f82f57f6e186522077b0cc325dd8054fa9170b`.
+No existing game app or runtime source was changed by these checks.
+
+`scripts/segarally_mac.py` prepares a fresh sound/hook/recording-enabled Metal
+candidate from a personal archive, builds the host tests, packages without
+launching, and verifies the signature. It requires existing pinned dependencies,
+rejects an existing output, records each command/failure and terminates a failed
+build's process group. A discovered sound frontier cannot pass its startup gate.
+Eight synthetic pipeline tests pass. The first test attempt compared macOS's
+unresolved `/var` temporary path with canonical `/private/var`; normalizing the
+fixture root fixes that assertion without changing production path behavior.
+Actual end-to-end fresh build and package validation remain next; no release
+milestone is claimed. The supplied archive is now at the neighboring prototype's
+`ROMS/srallyc.zip`, rather than its old Downloads path.
+
 ## v17 Metal host checks pass; windowed playtest launched (2026-10-15)
 
 Execution permission was granted. The frozen host002 OFF and ON gates each

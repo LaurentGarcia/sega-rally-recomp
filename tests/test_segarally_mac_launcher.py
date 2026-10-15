@@ -41,6 +41,9 @@ class MacLauncher(unittest.TestCase):
         self.replay = self.build / "authorized replay.inputs"
         self.data = b"# exact bytes, including CRLF\r\nsegarally-input-v1\r\n"
         self.replay.write_bytes(self.data)
+        (self.build / "licenses").mkdir()
+        for name in ("Project-BSD-3-Clause.txt", "THIRD_PARTY.md", "SDL.txt", "ImGui.txt", "Source-notices.txt"):
+            (self.build / "licenses" / name).write_text("synthetic notice " + name)
         self.calls = []
         self.sign_checks = None
 
@@ -83,6 +86,53 @@ class MacLauncher(unittest.TestCase):
             except SystemExit as exit:
                 return exit.code
         return 0
+
+    def test_packages_only_declared_images_and_replaces_stale_resources(self):
+        old_assets = self.resources / "assets"
+        old_assets.mkdir(parents=True)
+        (old_assets / "obsolete.bin").write_bytes(b"stale")
+        (self.build / "assets" / "private-diagnostic.bin").write_bytes(b"not declared")
+        (self.resources / "licenses").mkdir()
+        (self.resources / "licenses" / "obsolete.txt").write_bytes(b"stale notice")
+        def check_package():
+            expected = {"assets.json"} | {name.name for name in (self.build / "assets").glob("*.bin")
+                                        if name.name != "private-diagnostic.bin"}
+            self.assertEqual({p.name for p in old_assets.iterdir()}, expected)
+            self.assertEqual({p.name for p in (self.resources / "licenses").iterdir()},
+                             {p.name for p in (self.build / "licenses").iterdir()})
+            for p in (self.build / "licenses").iterdir():
+                self.assertEqual((self.resources / "licenses" / p.name).read_bytes(), p.read_bytes())
+        self.sign_checks = check_package
+        self.assertEqual(self.run_launcher("--no-launch"), 0)
+
+    def test_symlink_image_rejected_before_mutation(self):
+        image = self.build / "assets/program.bin"
+        target = self.build / "outside.bin"
+        image.rename(target)
+        image.symlink_to(target)
+        before = self.tree()
+        self.assertEqual(self.run_launcher("--no-launch"), 2)
+        self.assertEqual(self.tree(), before)
+        self.assertFalse(self.calls)
+
+    def test_missing_required_notice_rejected_before_mutation(self):
+        (self.build / "licenses/Source-notices.txt").unlink()
+        before = self.tree()
+        self.assertEqual(self.run_launcher("--no-launch"), 2)
+        self.assertEqual(self.tree(), before)
+        self.assertEqual([c[0][0] for c in self.calls], ["pgrep"])
+
+    def test_no_sound_package_omits_old_sound_files(self):
+        audit_path = self.build / "assets/assets.json"
+        audit = json.loads(audit_path.read_text())
+        audit.pop("sound")
+        for name in ("sound_program", "sound_samples"):
+            audit["images"].pop(name)
+        audit_path.write_text(json.dumps(audit))
+        self.assertEqual(self.run_launcher("--no-launch"), 0)
+        self.assertFalse((self.resources / "assets/sound_program.bin").exists())
+        self.assertFalse((self.resources / "assets/sound_samples.bin").exists())
+        self.assertTrue((self.build / "assets/sound_program.bin").exists())
 
     def test_replay_is_exact_and_inside_bundle_before_signing(self):
         self.sign_checks = lambda: self.assertEqual(self.bundled.read_bytes(), self.data)

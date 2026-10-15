@@ -41,8 +41,11 @@ git clone https://github.com/ocornut/imgui.git extern/imgui
 git -C extern/imgui checkout --detach f1cc2ae15e53a861a874c3034aae6798fde194ab
 ```
 
-CMake checks the revision and packages the ImGui MIT notice with the app.
-Vendored sources remain ignored.
+CMake checks the revision and retains the project BSD license, dependency record,
+SDL and ImGui licenses, and original runtime source notices with the app. Recording
+builds also retain the selected 7-Zip sources' public-domain declarations and
+upstream license file. Missing required notices stop packaging. Vendored sources
+remain ignored.
 
 Mac input recording support is enabled by default, even when no recording is
 requested at runtime. It also requires the pinned public-domain 7-Zip sources
@@ -56,6 +59,47 @@ git -C extern/lzma checkout --detach 0766b733fe3e06dd2a7f9a3cfbf2108ac73abd17
 Preserve local changes in an existing checkout before changing its revision.
 Alternatively, configure with `-DSEGARALLY_INPUT_RECORDING=OFF` to build without
 recording/replay support and this dependency. SDL3 and ImGui are still required.
+
+## Build the Mac candidate in one command
+
+With the pinned dependencies above installed, build from your personal archive
+into a new directory:
+
+```sh
+python3 scripts/segarally_mac.py --roms /path/to/srallyc.zip \
+    --output build/mac-candidate-001 --jobs 4
+```
+
+This verifies and generates the main CPU, TGP, graphics and timed sound inputs,
+builds the Release Metal host with indexed dispatch and the instruction boundary
+hook, runs its host regression tests, packages the app and verifies its signature.
+It includes controller/Settings support and input recording. Display enhancements
+retain their off-by-default settings. It never downloads dependencies or launches
+the game; the final output prints the windowed launch command with sound and the
+execution hook enabled, using the bundled Lancia selection replay.
+Use pristine pinned dependency checkouts for this entrypoint. It refuses tracked
+dependency modifications, including the optional Vulkan patch applied by the
+inherited general setup script; the explicit clone/checkouts above are sufficient
+for Metal. Preserve any existing dependency changes before preparing a clean copy.
+
+`--plan` prints the exact argument lists without creating files or running tools.
+An existing output directory is rejected to preserve earlier apps, recordings and
+saves. Failure stops the pipeline; inspect `build-result.json` and `logs/` in its
+output before choosing a new directory. The report records commands, timings,
+source and input identities, and the packaged executable hash. It establishes a
+build and regression checkpoint, not complete gameplay or hardware fidelity.
+The commands below expose each stage separately for development.
+
+The dedicated Mac CTest suite includes audio, controls, display preferences,
+asset staging, launcher, notice packaging and pipeline checks. The three C++
+test executables are excluded from the default build; the command above builds
+them explicitly. For a manually configured host, build them before running CTest:
+
+```sh
+cmake --build build/segarally-docs-mac --target test_segarally_audio \
+    test_segarally_controls test_segarally_display_preferences -j 4
+ctest --test-dir build/segarally-docs-mac --output-on-failure
+```
 
 ## Verify, import and recompile
 

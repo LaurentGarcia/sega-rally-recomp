@@ -46,8 +46,10 @@ try:
         raise ValueError("--sound requires a host built with SEGARALLY_SOUND=ON and verified sound assets")
     if args.instruction_boundary_hook and audit.get("instruction_boundary_hook",{}).get("version")!=1:
         raise ValueError("--instruction-boundary-hook requires an audited hook-enabled host")
+    if assets.is_symlink() or (assets/"assets.json").is_symlink():
+        raise ValueError("verified assets must be regular files, not symbolic links")
     for name,entry in audit["images"].items():
-        if entry["file"]!=name+".bin" or hashlib.sha256((assets/entry["file"]).read_bytes()).hexdigest()!=entry["sha256"]:
+        if entry["file"]!=name+".bin" or (assets/entry["file"]).is_symlink() or hashlib.sha256((assets/entry["file"]).read_bytes()).hexdigest()!=entry["sha256"]:
             raise ValueError(f"{name} differs from the verified host package")
     app=build/"Sega Rally Native.app"
     binary=app/"Contents/MacOS"
@@ -60,6 +62,11 @@ try:
         subprocess.run(["open",str(app)],check=True)
         print(f"Activated existing native app, PID(s) {active.stdout.strip()}")
         raise SystemExit(0)
+    license_source=build/"licenses"
+    required_notices={"Project-BSD-3-Clause.txt", "THIRD_PARTY.md", "SDL.txt", "ImGui.txt", "Source-notices.txt"}
+    if license_source.is_symlink() or any(not (license_source/name).is_file() or
+            (license_source/name).is_symlink() for name in required_notices):
+        raise ValueError("rebuild the host to retain required distribution notices before packaging")
     recording_path=None
     if args.record_inputs:
         recording_path=args.record_inputs.resolve()
@@ -75,9 +82,19 @@ try:
     shutil.copy2(executable,binary/"segarally_native")
     # SDL_GetBasePath points at Contents/Resources for a macOS app bundle.
     resources=app/"Contents/Resources";resources.mkdir(parents=True,exist_ok=True)
-    shutil.copytree(assets,resources/"assets",dirs_exist_ok=True)
+    # Only the audited manifest and declared images belong in the package.
+    # A reused host directory can contain stale sound images or diagnostic files.
+    packaged_assets=resources/"assets"
+    if packaged_assets.is_symlink():packaged_assets.unlink()
+    elif packaged_assets.exists():shutil.rmtree(packaged_assets)
+    packaged_assets.mkdir()
+    for name in ("assets.json", *(entry["file"] for entry in audit["images"].values())):
+        shutil.copy2(assets/name,packaged_assets/name)
+    packaged_licenses=resources/"licenses"
+    if packaged_licenses.is_symlink():packaged_licenses.unlink()
+    elif packaged_licenses.exists():shutil.rmtree(packaged_licenses)
     if (build/"licenses").is_dir():
-        shutil.copytree(build/"licenses",resources/"licenses",dirs_exist_ok=True)
+        shutil.copytree(build/"licenses",packaged_licenses)
     # LaunchServices apps read their own signed resources at startup. Do not
     # depend on a separate workspace file being accessible before SDL starts.
     bundled_replay=resources/"input-replay.inputs"

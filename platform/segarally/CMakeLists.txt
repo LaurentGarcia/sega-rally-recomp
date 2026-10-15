@@ -38,7 +38,6 @@ add_library(segarally_imgui STATIC
     "${SEGARALLY_IMGUI_SOURCE}/backends/imgui_impl_sdlgpu3.cpp")
 target_include_directories(segarally_imgui SYSTEM PUBLIC "${SEGARALLY_IMGUI_SOURCE}")
 target_link_libraries(segarally_imgui PUBLIC SDL3::SDL3-static)
-configure_file("${SEGARALLY_IMGUI_SOURCE}/LICENSE.txt" "${CMAKE_BINARY_DIR}/licenses/ImGui.txt" COPYONLY)
 file(GLOB GENERATED CONFIGURE_DEPENDS "${SEGARALLY_NATIVE_BUILD}/gen/*.cpp")
 if(NOT GENERATED OR NOT EXISTS "${SEGARALLY_NATIVE_BUILD}/tgp/program.cpp")
     message(FATAL_ERROR "Generate the audited native main/TGP code before configuring the host")
@@ -163,8 +162,28 @@ if(SEGARALLY_INPUT_RECORDING AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     target_compile_definitions(segarally_native PRIVATE SEGARALLY_INPUT_RECORDING=1)
     target_link_libraries(segarally_native PRIVATE segarally_recording)
 endif()
+# Retain actual existing notices, including optional recording's public-domain
+# SHA sources. Refuse packaging when an expected dependency notice is absent.
+set(LICENSE_ARGS --output "${CMAKE_BINARY_DIR}/licenses"
+    --sdl-source "${SEGARALLY_SDL_SOURCE}" --imgui-source "${SEGARALLY_IMGUI_SOURCE}")
+if(SEGARALLY_INPUT_RECORDING AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    list(APPEND LICENSE_ARGS --lzma-source "${SEGARALLY_LZMA_SOURCE}")
+endif()
+execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/package_licenses.py" ${LICENSE_ARGS}
+    RESULT_VARIABLE LICENSE_RESULT)
+if(NOT LICENSE_RESULT EQUAL 0)
+    message(FATAL_ERROR "Required distribution notices could not be retained")
+endif()
+add_custom_target(segarally_licenses
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/package_licenses.py" ${LICENSE_ARGS}
+    VERBATIM COMMENT "Retain project and dependency distribution notices")
+add_dependencies(segarally_native segarally_licenses)
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     enable_testing()
+    foreach(TEST_NAME mac_launcher recording_launcher host_assets staging_provenance package_licenses mac_pipeline)
+        add_test(NAME segarally_${TEST_NAME}
+            COMMAND "${Python3_EXECUTABLE}" "${ROOT}/tests/test_segarally_${TEST_NAME}.py")
+    endforeach()
     add_executable(test_segarally_audio EXCLUDE_FROM_ALL "${ROOT}/tests/test_segarally_audio.cpp")
     target_include_directories(test_segarally_audio PRIVATE "${ROOT}/src")
     target_link_libraries(test_segarally_audio PRIVATE SDL3::SDL3-static)

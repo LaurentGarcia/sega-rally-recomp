@@ -740,6 +740,12 @@ endif()
 if(Python3_FOUND)
     add_test(NAME segarally_mac_launcher
         COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tests/test_segarally_mac_launcher.py)
+    add_test(NAME segarally_mac_pipeline
+        COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tests/test_segarally_mac_pipeline.py)
+    add_test(NAME segarally_package_licenses
+        COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tests/test_segarally_package_licenses.py)
+    add_test(NAME segarally_host_assets
+        COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tests/test_segarally_host_assets.py)
     add_test(NAME segarally_recording_launcher
         COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tests/test_segarally_recording_launcher.py)
     add_test(NAME segarally_staging_provenance

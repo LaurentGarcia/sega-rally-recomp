@@ -44,6 +44,15 @@ class HostAssets(unittest.TestCase):
         self.assertEqual((self.target/"tgp_tables.bin").read_bytes(),b"copro_tgp_tables")
         report=json.loads((self.target/"assets.json").read_text())
         self.assertEqual(len(report["images"]),6);self.assertTrue(report["native_coverage_is_partial"])
+    def test_reused_sound_directory_removes_optional_outputs(self):
+        self.target.mkdir()
+        for name in ("sound_program.bin", "sound_samples.bin", "unrelated.txt"):
+            (self.target/name).write_bytes(b"old")
+        stage_data.stage(self.source,self.target)
+        self.assertFalse((self.target/"sound_program.bin").exists())
+        self.assertFalse((self.target/"sound_samples.bin").exists())
+        self.assertEqual((self.target/"unrelated.txt").read_bytes(),b"old")
+
     def test_tampered_image(self):
         (self.source/"program.bin").write_bytes(b"changed");self.rejects()
     def test_escaped_image(self):

@@ -8,7 +8,7 @@ The [design](sega-rally-design.md) records interpretation and hardware limits.
 | Area | Established evidence | Limit |
 | --- | --- | --- |
 | Main native coverage | Frozen v14: 75,207 instructions, 52 native objects, no missing templates | Coverage is a reached graph, not a remaining-work percentage |
-| Interactive Mac | v16 controller/sound/CRT session exits normally after 12,974 frames; earlier v15 feedback reports excellent image and near-perfect-feeling motion | Qualitative feedback and bounded session evidence; complete courses and hardware fidelity remain open |
+| Interactive Mac | Latest v17 sound/CRT/Accurate-textures session exits normally after 4,729 frames and replays exactly; v16 also exits normally after 12,974 frames | Qualitative feedback and bounded session evidence; complete courses and hardware fidelity remain open |
 | Driving parity | Two billion held-gas instructions, 86,328,770 ordered writes, 4,650,936,033 cycles, 113,101 IRQs and 10,701 renders; nineteen replay events match | Sound off; independent CPU with shared boards and final-frame comparison; no full MAME race |
 | Later game paths | Fresh credit/start after attract reaches a second race; sound-on frame 12,800 shows 118 km/h in fourth gear, 15.83 seconds elapsed | Complete second race and Game Over overlay not separately validated |
 | Course progress | Desert clear/results show 1:12.15; forested second course enters, times out, then attract returns | Centered steering does not complete second-course bends; remaining courses unvalidated |
@@ -18,9 +18,18 @@ The [design](sega-rally-design.md) records interpretation and hardware limits.
 | Authentic sound commands | Corrected independent MAME CPU comparison passes 14,947,325 instructions, 14,614 IRQ entries and all 1,929 cuts through 55 actual UART accesses; 728,884 PCM frames match, including nonzero audio. The native payload also matches the preserved neutral host WAV prefix | Shared device models and instruction-start MMIO; no independent chip, physical bus-phase, title-music or whole sound-on recording claim. The earlier observer failure remains preserved |
 | Audio output | Earlier v15 playtest has four SDL estimated demands; later v16 manual test and fresh 7,200-frame neutral capture have zero demands/drops; all 5,519,841 neutral-capture PCM frames match recorded hashes | User reports title-screen glitches; clean later telemetry does not establish audible quality or resolve the cause |
 | Controller input | Xbox One Elite 2 detected; 329 mapping/virtual-device checks, normal build, menu Metal checks and actual-host input isolation pass; live recording contains intermediate steering, throttle and brake values | Recorded cabinet inputs do not identify their physical source; Y/navigation feedback remains open; wheels/force feedback remain outside this implementation |
-| Exact host recording | Actual analog-input v16 session replays all 25,953 resumes, PCM hashes covering 9,946,388 stereo frames and final saves through frame 12,974; earlier v14 and scripted checks also match | Same-Machine reproducibility; full-course and independent CPU/sound parity remain open |
+| Exact host recording | v17 matches all 9,459 resumes, PCM hashes covering 3,625,487 stereo frames and final saves; v16 matches 25,953 resumes and 9,946,388 PCM frames | Same-Machine reproducibility; full-course and independent CPU/sound parity remain open |
 | Independent host recording | Actual sound-off driving bundle passes 5,201 resumes, 500,035,460 instructions, 15,156,607 ordered writes, 1,130,001,001 cycles and 2,600 frames after immutable preflight | Independent i960 with shared boards; longer/manual captures, sound-on and hardware parity remain open; fault rows rejected |
 | Hardware fidelity | Isolated device/reference tests and instruction-timed diagnostics | PCB timing, extF80 precision and full-machine behavior remain open |
+
+The latest v17 playtest closed normally at frame 4,729 after 890,065,301 main
+instructions and 2,055,264,421 cycles, with zero logged audio shortfalls or drops.
+Its exact signed-executable offline replay passes all 9,459 resumes, PCM hashes
+covering 3,625,487 stereo frames and final saves in 38.943 seconds. This is a
+replay duration, not a gameplay-speed measurement. The app, original recording
+and live saves remain unchanged. There are 350 manual analog-input transitions
+after scripted selection, including 112 within a render frame. No course-result
+evidence or listening verdict accompanies this session.
 
 The separate v16 controller app exited normally after a 12,974-frame windowed
 test with sound, CRT and queue diagnostics. It supplied 9,946,388 stereo frames
@@ -323,9 +332,9 @@ behavior at frame 1,200, so the reported cover-screen glitch remains open.
 
 ## Next validation work
 
-- Collect and replay the completed v17 interactive session. Both 2,600-frame
-  host checks now pass; the windowed candidate has launched with sound, CRT,
-  Accurate textures, fresh saves and input/audio diagnostics.
+- The completed v17 interactive session now replays exactly. Extend valid-input
+  driving coverage beyond the known Desert clear and Forest timeout, with
+  explicit course/result evidence and matching recorded inputs.
 - Localize the reported title-screen audio glitches with paced telemetry and
   native PCM. The corrected independent sound comparison now reaches the first
   nonzero output; extend beyond that bounded interval and keep listening quality
