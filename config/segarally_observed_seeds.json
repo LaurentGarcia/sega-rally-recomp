@@ -421,6 +421,36 @@
       "input_recording_complete_sha256": "35abf7ab4f916e6a7fe8b362ffef7e208677f84fc252e8c613f9e5e50a020f32",
       "observed_executable_sha256": "aa1aeb4a70795bf568b5a8c4f8f0bf70dfdb054a358c26173e0e57c7ffcb5efe",
       "provenance": "Actual missing-code frontier in the sealed sound-enabled manual host recording, with all resume inputs and PCM witnesses retained. Canonical ROM PC is runtime minus 0x59f000 under the verified reset copy. Decoder confirms a single RET at this observed entry. Static context only: already compiled comm_attract_inner_8 at 0x005ae7d0 loads this target into g14 then g0 and branches through g0 at 0x005ae7fc; no register trace establishes the immediate caller. No adjacent return or generic continuation heuristic is added; no game state or instruction is patched."
+    },
+    {
+      "address": "0x00021fa0",
+      "observed_runtime_address": "0x005c0fa0",
+      "name": "observed_practice_mountain_callback_005c0fa0",
+      "evidence": "build/worktrees/course-driving/build/course-driving/frontier-005c0fa0-001/evidence.json",
+      "observed_after_instructions": 476442790,
+      "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+      "source_baseline_commit": "54f1e03877b45e5acb362091c8bfcf03c303fc8f",
+      "execution_variant": "hardware_input_replay_practice_sound_off_hook",
+      "input_replay": "build/worktrees/course-driving/build/course-driving/practice-mountain-select.inputs",
+      "input_replay_sha256": "a4aa31bb847e92a7deba576135844eb47a8ef5e51cc81c22cbf493e3e5f45253",
+      "observed_executable_sha256": "74234b400de6b13da76300107448e5f191b9c041c664c8b3fba0ea21d2993a6b",
+      "provenance": "Actual missing-code frontier after original front-end Practice selection, Lancia AT and direct Mountain selection from fresh constructor saves. Screenshot shows Mountain countdown, position 1/2 and timer 50; no race completion claimed. Canonical ROM PC is runtime minus 0x59f000 under the verified reset copy; decoder confirms an executable function entry. Static context only: compiled 0x005c1798 materializes this Practice callback and 0x005c17a0 stores it in 0x20afa0 and 0x005c17e0 calls that cell; the first-failure helper did not capture the immediate caller or exact frame/cycle witness. Only this observed entry is added; no adjacent target, game state, timing or instruction is patched."
+    },
+    {
+      "address": "0x00020e70",
+      "observed_runtime_address": "0x005bfe70",
+      "name": "observed_practice_mountain_callback_005bfe70",
+      "evidence": "build/worktrees/course-driving/build/course-driving/frontier-005bfe70-001/evidence.json",
+      "observed_after_instructions": 1883400392,
+      "observed_reference_cycles": 4341713718,
+      "observed_rendered_frames": 9990,
+      "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+      "source_baseline_commit": "54f1e03877b45e5acb362091c8bfcf03c303fc8f",
+      "execution_variant": "hardware_input_replay_practice_sound_off_hook_route_controller",
+      "input_replay": "build/worktrees/course-driving/build/course-driving/practice-mountain-drive-attempt-002/guest/cabinet.inputs",
+      "input_replay_sha256": "60956542c57dd231c04baeb00600e8c440ef37bf6e5c2142457d19bad476862a",
+      "observed_executable_sha256": "8e242491a575b40c3c1dc6cc34bcce099f7c887283b73006092f7d7a70e8bd24",
+      "provenance": "Actual missing-code frontier after legitimate Practice Mountain selection and unchanged measured route-following steering through one complete Mountain lap. Captured image shows lap 1:16.23, second lap 42.93, total 1:59.17 and position 2/2; no completed Practice race is claimed. Canonical ROM PC is runtime minus 0x59f000 in the verified reset copy; decoder confirms executable entry. Only this observed target is added, without adjacent speculative seeds, game-state edits or timing changes."
     }
   ]
 }

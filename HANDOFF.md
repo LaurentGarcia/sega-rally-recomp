@@ -1,5 +1,68 @@
 # Handoff
 
+## Practice course coverage and two observed callbacks (2026-10-15)
+
+The i960 static recompiler, Inputs and Reference & validation sections govern
+this extension. Ordinary cabinet controls reach Practice, Lancia AT and Mountain.
+The first navigation probe steered after the short mode-selection window and
+remained in Championship; measured screenshots corrected that timing. The
+successful Mountain selection then reaches missing native target `0x005c0fa0`
+at 476,442,790 instructions. Its helper did not log exact frontier frame/cycles;
+only completed periodic cuts bound that point. The original failure is preserved.
+Canonical ROM `0x00021fa0` is now an observed seed, without generated-code edits.
+Independent provenance review passes at
+`build/worktrees/audio-device-headroom/build/validation/frontier-005c0fa0-review-001/result.json`,
+SHA-256 `3234bc67646b0603f3af59795c28c67893843be1050516c68a7daf922504dff9`.
+
+Fresh generation reaches a complete Mountain lap in 1:16.23, then finds missing
+Practice callback `0x005bfe70` at frame 9,990 / 1,883,400,392 instructions /
+4,341,713,718 cycles. That first failure and its actual inputs/save witnesses
+are preserved separately. Canonical `0x00020e70` is the second observed seed.
+Independent review passes at
+`build/worktrees/audio-device-headroom/build/validation/frontier-005bfe70-review-001/result.json`,
+SHA-256 `29b6893d34f3dd673100f1a1279464198d568ead55385e64048ac301cea92d14`.
+The consolidated manifest SHA-256 is
+`c99275da17c5ae3c3ad1c91c81d9e18b7dada4c31cd0cb58cc15c254fc629b49`.
+
+The v19 generation has 76,097 reached instructions, 52 native objects and no
+missing templates; imported images exactly match the prior generation.
+The unchanged route controller passes 14,000 Practice Mountain frames /
+2,657,203,072 instructions / 6,084,441,003 cycles, returning through normal
+retirement/attract without another frontier. The first lap completes; the
+second retires. This is not a completed two-lap Practice race. All 335 prior
+telemetry rows, 334 menu rows, 55 selected images through frame 9,600 and the
+old cabinet-input prefix match exactly. Evidence:
+`build/worktrees/course-driving/build/course-driving/practice-mountain-v19-frozen/evidence.json`;
+run result SHA-256 `7f35282fd08862e9bbf046c96eea6add441844496ffbf181fcc0736f42c369d7`.
+The 2,946-event full drive SHA-256 is
+`193ff85fd8609709f30efde3ffc82eb1b375e828a674911582bba23a94d6d591`.
+An inherited helper guard rejected the first driving invocation before Machine
+construction; the failed invocation remains preserved, followed by a distinct
+helper version and actual guest run. Runtime and physics were unchanged.
+
+Lakeside also has a built-in course-menu entry independent of Championship
+finishing rank. The actual gear/brake sequence changes course 2 to 3 at frame
+2,080 and reaches the Lakeside grid through 3,000 frames without a frontier.
+Static address/hash audit:
+`build/worktrees/audio-device-headroom/build/validation/lakeside-access-001/report.json`,
+SHA-256 `98a3a9da7e0bde697902cc70a11b83db7d9003130afaf189299e0b110b3a4ee1`.
+The two committed `config/segarally_practice_*_select.inputs` scripts use only
+cabinet pins and release everything for manual control at frames 2,100
+(Mountain) and 2,160 (Lakeside). They assume fresh default cabinet settings.
+Both are verified in CPU-only native probes; the next Mac build must verify
+these new paths with sound. No first-place Championship or Lakeside finish is
+claimed by menu entry.
+
+Operator findings: NORMAL/SHORT/LONG use the same one-lap Championship tables;
+LONGEST changes it to five laps, so it is not a simple timer extension. EASY
+really changes per-course allowance tables, but its gains/losses cancel across
+the unchanged measured Championship drive, producing the same Mountain timeout.
+It must not be described as ignored. SHORT Practice uses a different legitimate
+one-lap configuration; its finish/results path is the next bounded investigation.
+An independent sound-off CPU comparison through both callbacks is also pending.
+The preserved candidate 003 remains unchanged. Next: fresh candidate 004, NORMAL
+regression, sound-enabled new-course captures and exact recording replay.
+
 ## Candidate 003 visible playback passes (2026-10-15)
 
 The fresh pipeline at clean `7beefcf315e8f60614b334eaec6fcc500836c528` passes all
