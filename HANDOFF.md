@@ -1,5 +1,50 @@
 # Handoff
 
+## Authentic sound capture reaches nonzero PCM (2026-10-14)
+
+The separate first-nonzero fixture captures 55 actual UART accesses and 1,929
+complete sound cuts, then reproduces every cut in a fresh native sound board.
+The old seven-access, 163-cut prefix remains byte-exact. Capture stops after
+186,212,000 main instructions at 16,527,970,040 ns; sound has executed
+14,947,325 instructions, 186,594,177 cycles and 14,614 IRQ entries. Physical
+UART transmission is empty at both the old prefix boundary and the final cut.
+All 25 observed MIDI consumption/IRQ-clear events are actual program accesses.
+
+The raw payload contains 728,884 stereo frames, including 22,784 nonzero scalar
+samples. The first nonzero scalar is index 1,434,978, stereo frame 717,489,
+bits `b8000000`, matching the previously retained neutral WAV. Its sample
+deadline, derived from the verified sample scheduler, is 16,269,591,837 ns;
+the first drain that observes it occurs at 16,279,520,560 ns. These timestamps
+are distinct. Peak is 0.0402297974 and RMS is 0.00130185756 over the complete
+payload, including startup silence. Every interval PCM hash is independently
+recomputed from the raw bytes. This follows **Audio** and **Reference &
+validation**; it establishes native reproducibility through nonzero output,
+not independent CPU/chip fidelity, title-music identity or a glitch fix.
+
+The first capture and conditional recapture pass in 9.703119 and 4.455683
+seconds with no source fixes or retries. Bounds remain 250 million main
+instructions, 20 seconds of board time and 180 seconds per execution, stopping
+at a normal budget boundary after the first nonzero sample plus 250 ms.
+Evidence under `build/worktrees/sound-init-reference/build/`:
+`uart-nonzero-capture-001/result.json`, SHA-256
+`6de64ac568dfeae917fa16209ae8176359dfc6928cee1a7e3f55e30e28bae719`;
+`uart-nonzero-recapture-001/result.json`, SHA-256
+`ef006ba586fe75f71df379413e3b7c4b4fef2fefd168bc1615713c5149f5e651`.
+Raw PCM SHA-256:
+`b7126acd4336b0ee036696f9c1ccd8d7171720affb8b76910e9fad2e94c5619e`.
+Independent review verifies all 930 inputs, six prepared artifacts, all cuts,
+metrics and output identities:
+`build/validation/sound-uart-nonzero-independent-review/result.json`, SHA-256
+`c5b960a8bc7cd3ad303e01bed7435bcfc8a0b78fa0d649ac9537b84b5c3ba018`.
+All 113 local source inputs map exactly to MAIN; integration record
+`build/validation/sound-uart-nonzero-integration/result.json`, SHA-256
+`b9e45435c3455f64dee54382848bc70b1b7616a61ac24651dea9fce536b86786`.
+
+Next compare this immutable nonzero transcript with the independent sound CPU
+under separately reviewed longer bounds. The title-screen audio symptom and
+independent sound-enabled recording consumer remain open. The separate v17
+Mac Release build and three CTests pass; gameplay OFF/ON checks are prepared.
+
 ## Independent sound CPU matches authentic UART prefix (2026-10-14)
 
 The first real UART transcript now passes persistent pinned-MAME sound CPU

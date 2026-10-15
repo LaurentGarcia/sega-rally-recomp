@@ -433,6 +433,39 @@ internal reference bus-phase stamps remain distinct from native boundary
 stamps. The 90-second watchdog and four-million-observation limit apply only
 to this fixed short transcript. It does not accept arbitrary longer recordings.
 
+The first-nonzero native fixture uses separate outputs and requires that accepted
+short capture. Its complete header and all 170 access/cut rows are preserved
+before extending to the first nonzero sample plus a 250 ms tail:
+
+```sh
+python3 tests/test_segarally_sound_uart_nonzero.py --prepare \
+    --generation /path/to/preserved/native-generation \
+    --host-build /path/to/preserved/mac-host-build \
+    --host-evidence /path/to/preserved/host-evidence \
+    --reference-dir build/validation/mame-reference \
+    --short-capture build/validation/sound-uart-capture \
+    --output build/validation/sound-nonzero-prepared
+python3 tests/test_segarally_sound_uart_nonzero.py --capture \
+    --output build/validation/sound-nonzero-prepared \
+    --run-dir build/validation/sound-nonzero-capture
+python3 tests/test_segarally_sound_uart_nonzero.py --recapture \
+    --output build/validation/sound-nonzero-prepared \
+    --capture-dir build/validation/sound-nonzero-capture \
+    --run-dir build/validation/sound-nonzero-recapture
+```
+
+Bounds are 250 million main instructions, 20 seconds of board time, 180 seconds
+per execution, 4,096 UART accesses and 12,000 transcript rows. The retained
+capture/recapture pass in 9.703119/4.455683 seconds: 55 actual UART accesses,
+1,929 exact cuts and 728,884 stereo frames, including 22,784 nonzero scalar
+samples. The raw float32 little-endian payload is retained under ignored build
+output; every interval hash and aggregate metric is independently checked.
+First nonzero is stereo frame 717,489, raw scalar bits `b8000000`. Its derived
+sample deadline is 16,269,591,837 ns, distinct from the first observed drain
+at 16,279,520,560 ns. These checks establish native recapture through nonzero
+PCM, not independent sound CPU/chip parity or resolution of the reported glitch.
+The short independent fixture above does not accept this longer transcript.
+
 ## Optional sound experiment
 
 Sound requires both audited generated sound inputs and an explicit build option:
