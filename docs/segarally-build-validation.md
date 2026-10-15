@@ -697,10 +697,11 @@ with exact prior normal execution/PCM observations. That unthrottled test
 opens no playback device. See the [manual](mac-player-manual.md) for the
 prepared app path and [status](segarally-status.md) for precise evidence limits.
 
-## Missing reference firmware
+## Reference firmware
 
-Full MAME reference work is separately blocked by three files absent from the
-supplied archive:
+The initial personal archive lacked three files needed by the MAME reference.
+Additional personal archives now supply all three, verified by size, CRC32 and
+SHA1:
 
 | File | Device | Bytes | CRC32 |
 | --- | --- | ---: | --- |
@@ -711,15 +712,28 @@ supplied archive:
 The first two identities match the retained pinned MAME `model2.cpp`. The
 billboard identity is confirmed separately by installed MAME 0.289 metadata
 and upstream [segabill.cpp](https://github.com/mamedev/mame/blob/master/src/mame/sega/segabill.cpp);
-this does not establish the installed binary's source revision. A targeted local
-search checked 64 ZIP entries and 31 matching-size loose files, including renamed
-CRC candidates, without finding any of the three. Its report is
+this does not establish the installed binary's source revision. The earlier
+negative local search remains recorded in
 `build/validation/firmware-local-search-001/result.json`.
 
-Supply a personal backup containing these images for checksum verification;
-keep it outside Git. MAME's public source contains the expected identities,
-not the firmware bytes, and its [authorized ROM collection](https://www.mamedev.org/roms/)
-does not list Sega Rally. No official public download was found in this search.
-The missing images block full reference comparison, not the existing native
-Mac build. Obtaining them would enable further validation rather than certify
-complete arcade fidelity by itself.
+The local setup is under ignored `roms/reference/`: `srallyc.7z` provides the
+Revision C parent/shared files, `segabill.zip` provides the billboard device,
+and `srallycb/` contains the two verified Revision B main program files copied
+from the original personal archive. `firmware/` holds the three verified loose
+images for analysis. Both new archives were moved from Desktop with unchanged
+SHA-256 values. The original Revision B archive and native app are unchanged.
+
+Audit this ROM inventory without starting the game:
+
+```sh
+mame -rompath "$PWD/roms/reference" -verifyroms srallycb
+```
+
+Installed MAME 0.289 reports `srallycb [srallyc] is good`, exit zero and empty
+stderr. Evidence: `build/validation/firmware-import-001/result.json`, SHA-256
+`755afa1dc1b34ed78078393616a8c516c886c0f8e7a303f04fb7ff34092f2f6c`.
+This establishes input readiness only. Full reference execution, input/timing
+alignment and comparison still need validation against a recorded MAME source
+and build identity; the installed executable is not automatically that oracle.
+The inherited `scripts/run_trace.sh` defaults to Daytona and replaces its output
+directory, so it is not a ready-made Rally validation command.

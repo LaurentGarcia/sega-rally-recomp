@@ -1,5 +1,54 @@
 # Handoff
 
+## Reference firmware imported and ROM inventory audited (2026-10-15)
+
+The additional personal Desktop archives are now moved to ignored
+`roms/reference/srallyc.7z` and `roms/reference/segabill.zip`. The former is
+12,092,851 bytes, SHA-256
+`08b74986f6601d5cc909c7c0249ce35593ccf5a8c654f60f2fbe329c9b6f91c7`;
+the latter is 3,117 bytes, SHA-256
+`c3d6c3e3b16df85724e6767d1b99c92103c964053628db5722fef5c28521f713`.
+The originals no longer remain on Desktop and destination hashes match.
+
+All three formerly missing firmware images pass expected size/CRC32/SHA1.
+Loose verified copies are in `roms/reference/firmware/`. The billboard images
+from both new archives are byte-identical. The 7z archive contains the Revision
+C parent files, not Revision B's main program pair or a complete merged family.
+The two Revision B files are copied from the unchanged original personal ZIP
+to `roms/reference/srallycb/` and checked against the committed program manifest.
+The native app is not rebuilt or modified. MAME's B/C definitions change the
+two main program ROMs while sharing the other ROM data; no reliable Sega
+gameplay changelog was found, so specific physics/graphics fixes are not inferred.
+
+macOS `bsdtar -xOf` selective extraction first failed with a truncated-body
+diagnostic. This was not evidence of a corrupt download: the complete 7z header
+range and CRC checked, installed MAME audited the archive successfully, and
+full `bsdtar -xf` extraction succeeded with empty stderr. Both extractor results
+and the full 33-file extraction remain under `build/validation/firmware-import-001`.
+The independent parent audit is retained under
+`build/validation/firmware-import-diagnostics-001/result.json`, SHA-256
+`8f400910c296643e8f071fb9d09735a84610f9e96b53f233d141300345789f6f`.
+
+Installed MAME 0.289 then audits the final reference folder with
+`-rompath <checkout>/roms/reference -verifyroms srallycb`: exit zero,
+`romset srallycb [srallyc] is good`, one set OK, empty stderr, 0.687 seconds.
+The command has a 30-second watchdog; no guest or device executes. Final report:
+`build/validation/firmware-import-001/result.json`, SHA-256
+`755afa1dc1b34ed78078393616a8c516c886c0f8e7a303f04fb7ff34092f2f6c`.
+All seven final archive/ROM paths are confirmed ignored by Git.
+
+The missing-ROM prerequisite is resolved; full-machine fidelity is not.
+Next reference work must establish its source/build identity and review Rally
+input/timing capture, including the current Lua input list's missing IN2
+handbrake. Installed MAME 0.289 is not automatically the pinned source/build
+oracle. Do not invoke inherited `scripts/run_trace.sh` as a ready-made Rally
+check: it replaces its output directory, defaults to Daytona and expects the
+absent `extern/mame/m2`. README, status and build guide now reflect the available
+firmware while retaining the remaining comparison limits.
+Independent file-only review confirms destination/input hashes, all five staged
+ROM files and Desktop source absence without repeating the MAME audit. All
+36 local documentation links/anchors and `git diff --check` pass.
+
 ## Candidate 006 and complete SHORT Practice lifecycle (2026-10-15)
 
 Clean source `0b9ba0eba47d6effa3378f9a2b7fae9010a1c11e` passes all ten build

@@ -17,10 +17,13 @@ reproduces import, generation, sound-enabled Release build, tests and packaging;
 see the [build guide](segarally-build-validation.md). This remains a local
 development/test candidate, not a certified full-fidelity or public release.
 
-Full MAME tracing still requires the missing drive `epr-17891.ic12`,
-communication `epr-16726.bin` and billboard `epr-18022.ic2` firmware; see the
-[firmware requirements](segarally-build-validation.md#missing-reference-firmware).
-These native checks do not execute those missing programs or establish PCB fidelity.
+The previously missing drive `epr-17891.ic12`, communication `epr-16726.bin`
+and billboard `epr-18022.ic2` firmware now pass size, CRC32 and SHA1 checks from
+additional personal archives. The staged Revision B reference set passes
+installed MAME 0.289's `-verifyroms srallycb` audit; see the
+[reference setup](segarally-build-validation.md#reference-firmware). No game ran
+in that audit. Full-machine tracing/comparison and PCB fidelity remain open;
+the installed MAME binary's source revision is not established.
 
 The preserved candidate 003 visible 7,200-frame neutral check enables CRT and
 Accurate textures and reports zero audio demands, chip/host drops or capture failures.

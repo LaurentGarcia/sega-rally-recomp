@@ -105,9 +105,11 @@ are not skipped or replaced with invented game behavior. The earlier lifted-C
 phone prototype lives separately in `../segarally95-recomp`; its captures and
 Daytona's results do not establish this runtime's fidelity.
 
-Full MAME tracing currently needs three files absent from the supplied archive:
-`epr-17891.ic12` (drive), `epr-16726.bin` (communication) and `epr-18022.ic2`
-(billboard). Native bring-up does not claim to execute those missing firmwares.
+The three previously missing drive, communication and billboard firmware images
+are now verified from additional personal archives. The local reference set
+passes MAME's Revision B ROM audit; see the
+[reference setup](docs/segarally-build-validation.md#reference-firmware).
+This clears the missing-file prerequisite, not full-machine or PCB validation.
 
 ## Source base
 
