@@ -8,13 +8,13 @@ The [design](sega-rally-design.md) records interpretation and hardware limits.
 | Area | Established evidence | Limit |
 | --- | --- | --- |
 | Main native coverage | Frozen v14: 75,207 instructions, 52 native objects, no missing templates | Coverage is a reached graph, not a remaining-work percentage |
-| Interactive Mac | v14 windowed sound session exits normally after 9,344 frames; separate continuation passes the old frontier through frame 14,001 | Full-course and live listening validation remain open |
+| Interactive Mac | v15 sound/CRT session exits normally after 30,328 frames; user reports excellent image and near-perfect-feeling motion | Qualitative feedback; complete courses and hardware fidelity remain open |
 | Driving parity | Two billion held-gas instructions, 86,328,770 ordered writes, 4,650,936,033 cycles, 113,101 IRQs and 10,701 renders; nineteen replay events match | Sound off; independent CPU with shared boards and final-frame comparison; no full MAME race |
 | Later game paths | Fresh credit/start after attract reaches a second race; sound-on frame 12,800 shows 118 km/h in fourth gear, 15.83 seconds elapsed | Complete second race and Game Over overlay not separately validated |
 | Course progress | Desert clear/results show 1:12.15; forested second course enters, times out, then attract returns | Centered steering does not complete second-course bends; remaining courses unvalidated |
-| Metal fidelity | Optional native repeated stepping is integrated; three complete scenes fall from 2,519 differing pixels to 5, and 447 synthetic cases pass | Default OFF; clean app/live cost/continuous flicker/whole-game fidelity remain open |
+| Metal fidelity | Optional native repeated stepping is integrated into v15; three complete scenes fall from 2,519 differing pixels to 5, and 447 synthetic cases pass | Default OFF; sustained cost, continuous flicker and whole-game fidelity remain open |
 | Sound generation | Native linked board captures 2,409,170 stereo frames: 54.6297052 seconds including nonzero 44.1 kHz PCM; shared-core drains agree | Whole-game audio parity unvalidated |
-| Audio output | v14 windowed session supplies 7,163,505 stereo frames with zero chip/host drops and one estimated SDL input-shortfall request; user heard a separate ten-second native PCM sample | Live listening feedback and physical fidelity remain open |
+| Audio output | v15 supplies 23,250,561 stereo frames with zero chip/host drops and four SDL estimated shortfall requests totaling 25,248 input bytes | User reports title-screen glitches; location/cause and physical fidelity remain open |
 | Exact host recording | Actual manual v14 drive replays all 18,689 resumes, PCM hashes and final saves through frame 9,344; earlier scripted recorded/unrecorded checks also match | Same-Machine reproducibility; full-course and independent CPU/sound parity remain open |
 | Independent host recording | One actual sound-off bundle passes six resumes, 563,041 instructions, 283,375 ordered writes, 910,200 cycles and two frames after immutable preflight | Short neutral-input check with shared board implementations; longer/manual captures, sound-on and hardware parity remain open; fault rows rejected |
 | Hardware fidelity | Isolated device/reference tests and instruction-timed diagnostics | PCB timing, extF80 precision and full-machine behavior remain open |
@@ -269,10 +269,18 @@ launched windowed with sound, and its log confirms CRT swapchain initialization.
 Sustained effect cost, monitor accuracy and whole-game parity remain open.
 Keep effects disabled for baseline image comparisons.
 
+The final host's separate held-key test passes eight guest resumes across
+12 host iterations, including three paused iterations. Keys held on F1 panel
+close remain neutral until released; fresh presses then control the cabinet.
+This checks the actual host transition, not ImGui Resume-button activation.
+The user subsequently reported a good image and near-perfect-feeling motion;
+the 30,328-frame session ended normally, with title-screen audio glitches and
+four SDL estimated input shortfalls. Queue/timing localization is next.
+
 ## Next validation work
 
-Confirm visible-window gameplay sound, then measure
-longer game paths with sound enabled. Preserve exact instruction guards, timing
+Localize the reported title-screen audio glitches with paced queue/timing
+telemetry and native PCM, then measure longer game paths with sound enabled. Preserve exact instruction guards, timing
 and IRQ boundaries in further speed work. Validate
 the complete second race and remaining courses, then extend independent replay
 comparison to those paths and coupled sound. Real-race graphics

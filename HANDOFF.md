@@ -1,5 +1,36 @@
 # Handoff
 
+## Display input isolation and live sound feedback (2026-10-14)
+
+The final v15 host passes a bounded input-isolation regression using only
+validation-call substitutions for SDL polling and keyboard state. Twelve
+scripted host iterations include three paused iterations and exactly eight
+guest resumes. Return/S/right/Z held across F1 panel close stay neutral until
+release; a new press then supplies Start, gear 1, steering and gas. All 197
+measured inputs and the final host source remain unchanged. This tests the
+actual close transition through F1, not ImGui Resume-button activation. Evidence:
+`build/worktrees/mac-triangle-fidelity/build/validation/host-keygate/run-01/result.json`,
+SHA-256 `12b0b71d2b2d493353abdbc439b4f888e9e48c69c0efc2bdd0dd1bc15003241e`.
+The initial validation shim used a variable name conflicting with `log()`;
+renaming only that shim variable fixed compilation. The failed log is retained.
+
+The user then closed the window normally after 30,328 frames and 5,738,008,246
+instructions. Feedback is positive for the image and near-perfect-feeling
+motion, with audible glitches on the title/cover screen. The completed log
+contains 23,250,561 stereo frames, zero chip/host drops, four SDL estimated
+shortfall requests totaling 25,248 input bytes, and 1,658 queued frames at exit.
+These estimates are not exact missing device samples and have no frame/time
+localization. They support checking playback interruption, not declaring its
+cause or ruling out generated-audio errors. Final log SHA-256:
+`47aeed451474ef661d4b33fb1fbd797703cbc928eb763b1309e0246cc66a2474`, retained with
+`build/validation/mac-display-v15/preview-final-result.json`.
+
+Next add opt-in queue/timing diagnostics and reproduce a quiet paced title
+sequence before changing audio buffering or board semantics. Long independent
+sound-off drive preparation and residual texture arithmetic analysis continue
+separately; heavy execution waits for that quiet audio check. The v15 app and
+its saves stay preserved. Mac remains the active target.
+
 ## Short independent whole-recording validation (2026-10-14)
 
 A separate test-only sound-off consumer now reuses canonical immutable bundle
@@ -40,9 +71,8 @@ The panel pauses guest execution and replay application, clears audio backlog
 at transitions, and resets host pacing on resume. A review found that Return
 held while activating Resume could also become guest Start. Cabinet key
 mapping now suppresses keys held on panel close until their release; global
-F1/F6 navigation remains available. A bounded validation-host regression for
-that held-key transition is prepared separately; its execution result is still
-pending at this checkpoint. Native captures precede display effects,
+F1/F6 navigation remains available. The subsequent bounded held-key
+regression passes, as recorded above. Native captures precede display effects,
 and offline recording replay still returns before SDL/preferences startup.
 
 Metal checks pass 18 synthetic draws plus two saved Lancia scene previews;
