@@ -1,5 +1,48 @@
 # Handoff
 
+## Observed one-lap Practice finish callback (2026-10-15)
+
+Candidate 004 at clean `b168631e3824cc287d327005cb9b17daed7ad37d` passes the
+fresh ten-step pipeline and all eleven Mac CTests. Signed executable SHA-256
+`e3d6767193f89bab03598b9b3f33a0f43d1a827093e8351cc8462c38f9bd7fb8`.
+Independent package audit passes:
+`build/validation/mac-release-audit/fresh-candidate-004-review.json`, SHA-256
+`47757d27b6b286140c002dcf38262d7b9e95f300a51d67ade3a0192d79466331`.
+All 51 instruction chunks equal v19. The dispatch table differs because the
+production pipeline enables indexed dispatch; all 76,097 valid address/chunk
+mappings and alignment/page/missing-target guards agree. Reachability differs
+only in that option. The first audit expected an explicit false flag which v19
+omits; its failure is retained separately from the corrected passing audit.
+All twenty bundle files, eight asset images, notices and 26 raw/signed Mach-O
+sections pass. Candidate 003 and its captured evidence remain unchanged.
+
+The new Lakeside NORMAL Practice drive also reaches 14,000 frames without a
+frontier: 2,676,028,109 instructions / 6,084,441,002 cycles. It retires near the
+end of lap one and returns to attract; no completed Lakeside lap is claimed.
+Its 2,168-event frozen replay SHA-256 is
+`d2283f4f7ddfcbfdb1237f65f869b4a8ce964ea7306f7f226b2257ac315c1728` under
+`build/worktrees/course-driving/build/course-driving/practice-lakeside-v19-frozen/`.
+
+Ordinary Test/Service inputs select NORMAL difficulty / SHORT game mode, with
+actual guest EEPROM saves and option bytes verified. SHORT Practice has one
+Mountain lap. The unchanged controller reaches its finish line with time
+remaining, then stops at observed missing target `0x005bfcf0`, frame 10,025 /
+1,921,603,185 instructions / 4,356,939,910 cycles. The image shows 1:15.17 and
+two seconds remaining; results have not executed, so this is not yet a completed
+race. Canonical ROM `0x00020cf0` is the sole additional observed seed.
+Independent provenance review passes at
+`build/worktrees/audio-device-headroom/build/validation/frontier-005bfcf0-review-001/result.json`,
+SHA-256 `47d14aec44cfab96269454d3f60b874bf345875d36cce7b1ada67077249a4c4d`.
+
+The first v20 generation monitor encountered a temporary compiler object
+renamed between directory listing and stat; it stopped before guest execution.
+That failed attempt and partial output are preserved. A new bounded wrapper
+tolerates vanished temporary files and regenerates into a separate directory;
+ROMs, source and the three observed seeds are unchanged. Finish continuation,
+independent CPU comparison and sound-enabled Mac course checks remain pending.
+Candidate 004 gameplay gates were held to test the final build containing this
+finish entry instead. No recorded replay identity requirement is weakened.
+
 ## Practice course coverage and two observed callbacks (2026-10-15)
 
 The i960 static recompiler, Inputs and Reference & validation sections govern

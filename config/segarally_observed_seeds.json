@@ -451,6 +451,22 @@
       "input_replay_sha256": "60956542c57dd231c04baeb00600e8c440ef37bf6e5c2142457d19bad476862a",
       "observed_executable_sha256": "8e242491a575b40c3c1dc6cc34bcce099f7c887283b73006092f7d7a70e8bd24",
       "provenance": "Actual missing-code frontier after legitimate Practice Mountain selection and unchanged measured route-following steering through one complete Mountain lap. Captured image shows lap 1:16.23, second lap 42.93, total 1:59.17 and position 2/2; no completed Practice race is claimed. Canonical ROM PC is runtime minus 0x59f000 in the verified reset copy; decoder confirms executable entry. Only this observed target is added, without adjacent speculative seeds, game-state edits or timing changes."
+    },
+    {
+      "address": "0x00020cf0",
+      "observed_runtime_address": "0x005bfcf0",
+      "name": "observed_practice_mountain_finish_callback_005bfcf0",
+      "evidence": "build/worktrees/course-driving/build/course-driving/frontier-005bfcf0-001/evidence.json",
+      "observed_after_instructions": 1921603185,
+      "observed_reference_cycles": 4356939910,
+      "observed_rendered_frames": 10025,
+      "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+      "source_baseline_commit": "54f1e03877b45e5acb362091c8bfcf03c303fc8f",
+      "execution_variant": "hardware_input_replay_short_practice_sound_off_hook_route_controller",
+      "input_replay": "build/worktrees/course-driving/build/course-driving/short-practice-mountain-attempt-001/guest/cabinet.inputs",
+      "input_replay_sha256": "3537b2e435f8c5a3f3a5fe0bd421ef810f04d4130b248e75ce7fef4581255b5d",
+      "observed_executable_sha256": "ab6bef9928fae444eb000a80886df0ec46ad8b7005516738bb720b33f8ccd222",
+      "provenance": "Actual missing-code frontier at the finish-line path of one-lap Practice Mountain after original Service/Test inputs selected NORMAL difficulty and SHORT game mode. Fresh constructor seeds, actual guest EEPROM save and unchanged measured route-following controls are retained. Captured image shows 1:15.17, timer 2 and FINISH banner; results have not yet executed, so no completed-race claim is made here. Canonical ROM PC is runtime minus 0x59f000 in the verified reset copy. Only this actual target is added; no game-state, physics, timer or instruction patch."
     }
   ]
 }
