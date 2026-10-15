@@ -1,5 +1,18 @@
 # Handoff
 
+## Compiler-bootstrap releases withdrawn (2026-10-15)
+
+The requested deliverable is now explicitly a prebuilt game app, with local
+ROM import and no installed Python, CMake or Xcode for the player. The previous
+83 KiB builder download did not meet that requirement. Both public releases
+`v0.1.0-mac-builder.1` and `.2`, including their six download assets, have been
+deleted as requested. A fresh API listing confirms only the source prerelease
+remains. Source tags/history and local build evidence remain available.
+README download links no longer point at those withdrawn releases, and the
+old bootstrap workflow is manual-only. Windows/Linux bootstrap work is archived
+locally rather than published. Runtime ZIP verification/import and actual game
+binary packaging now take priority over renderer prototypes.
+
 ## Mac preview 2 published and opened for testing (2026-10-15)
 
 Tag `v0.1.0-mac-builder.2` is public at a18ed52 under the personal account.

@@ -1,15 +1,17 @@
 # App packages and platform status
 
 [Source prerelease v0.1.0-rc.1](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-rc.1)
-contains source archives. The separate [Mac local builder preview](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-mac-builder.2)
-now supplies an empty arm64 DMG with a byte manifest and checksums. There are not
-yet four playable game binaries.
+contains source archives. Both compiler-bootstrap preview releases have been
+withdrawn: they required installed development tools and were not the requested
+prebuilt game apps. There are not yet public playable game binaries. The target
+is a precompiled app that imports the player's own ROM locally, without a
+compiler or developer-tool installation.
 
 The distribution work targets these four platforms:
 
 | Platform | Graphics | Package | Current validation |
 | --- | --- | --- | --- |
-| Mac, Apple Silicon | Metal | Personal game DMG; separate empty local-builder DMG | Personal package built, signed ad hoc and checksum verified. Empty builder has 20 coordinator tests and a successful fresh download/generation/build/test/package/verification run. GUI interaction remains untested. |
+| Mac, Apple Silicon | Metal | Personal game DMG; prebuilt app with ROM import in development | Personal package built, signed ad hoc and checksum verified; CRT and audio defaults checked. Public compiler-bootstrap previews withdrawn. |
 | iPhone, arm64 | Metal | Locally generated app, signed for its destination | Unsigned iOS 15+ build passed with sound and new touch controls; assets/notices verified. Signing, installation and physical testing remain pending. |
 | Windows, x86-64 | Vulkan through SDL3 GPU | Local builder and personal native game package | Desktop build portability and real-host compilation CI in progress; no validated game binary yet. |
 | Linux, x86-64 | Vulkan through SDL3 GPU | Local builder and personal native game package | Desktop build portability and real-host compilation CI in progress; no validated game binary yet. |

@@ -12,7 +12,7 @@ Generated C++ game code · Native board devices · SDL3 + Metal
 [![Build](https://github.com/LaurentGarcia/sega-rally-recomp/actions/workflows/build.yml/badge.svg)](https://github.com/LaurentGarcia/sega-rally-recomp/actions/workflows/build.yml)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-2e8b57?style=flat-square)](LICENSE)
 
-**[Download the Mac local builder](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-mac-builder.2) · [Build guide](docs/getting-started.md) · [Player manual](docs/mac-player-manual.md) · [Architecture](docs/segarally-architecture.md)**
+**[Downloads and platform status](docs/release-platforms.md) · [Build guide](docs/getting-started.md) · [Player manual](docs/mac-player-manual.md) · [Architecture](docs/segarally-architecture.md)**
 
 <img src="docs/images/crt.png" alt="Actual Metal CRT presentation: Martini Lancia in Desert with scanlines, phosphor mask and curved screen" width="960">
 
@@ -38,8 +38,8 @@ ROMs, generated game code or a ready-to-play app. Mac/iPhone packaging and
 Windows/Linux Vulkan bring-up are active; see the **[four-platform package
 status](docs/release-platforms.md)** for actual availability and requirements.
 Current source builds enable Arcade CRT on fresh player preferences; existing
-choices are retained. The first published local builder still uses the earlier
-game revision. Full availability is tracked in the package status.
+choices are retained. The compiler-bootstrap previews have been withdrawn.
+Prebuilt game packages with local ROM import are the current distribution target.
 
 ## On the stages
 

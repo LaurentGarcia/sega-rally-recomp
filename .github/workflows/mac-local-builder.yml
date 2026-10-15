@@ -1,9 +1,6 @@
-name: Mac local builder
+name: Archived Mac builder (manual only)
 
 on:
-  push:
-    branches: [main]
-  pull_request:
   workflow_dispatch:
 
 permissions:
