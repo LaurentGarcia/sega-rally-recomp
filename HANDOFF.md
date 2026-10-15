@@ -1,5 +1,17 @@
 # Handoff
 
+## Direct Vulkan validation target (2026-10-15)
+
+A standalone SDL-free Vulkan fixture creates native device resources, descriptors,
+render pass and pipeline from the unchanged production CRT SPIR-V. Two invented
+image cases check identity and phosphor-mask output over 24,576 channels; a
+Python reader independently checks the saved pixels. The native source passes
+strict syntax compilation. There is no local Vulkan loader, so actual linking,
+shader execution and readback await the new Linux CI job using Mesa lavapipe.
+That software-driver result will establish functional API/shader behavior only,
+not hardware performance, Windows support, a playable game or a complete renderer.
+The runner retains failure logs and kills/reaps timed-out process trees.
+
 ## First importer completion and SDL-free direction (2026-10-15)
 
 The real empty Mac builder completes all ten pinned pipeline stages in its new
