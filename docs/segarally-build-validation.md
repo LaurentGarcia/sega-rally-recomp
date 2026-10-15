@@ -303,6 +303,31 @@ This explicitly enabled path builds SDL without requiring the inherited launcher
 The fixture tests native-resolution coverage and layered cutouts against the
 CPU rasterizer; it is not a whole-game texture or performance benchmark.
 
+## Synthetic sound-board reference test
+
+With the four pinned M68000 reference sources listed in `THIRD_PARTY.md`
+available locally, run this ROM-free comparison in a fresh output directory:
+
+```sh
+python3 tests/test_model2a_sound_reference.py \
+    --reference-dir build/validation/mame-reference \
+    --output build/validation/model2a-sound-reference
+```
+
+It generates a synthetic program with the production emitter, then compares
+it with persistent MAME CPU execution on separate board instances. Both
+2 ms event-order cases pass: 305,780 checks, including two UART echoes and
+IRQ/RTE sequences per case, complete RAM/state, queue ordering and 89 stereo
+frames per case (87 nonzero). Generation, compilation and execution take
+5.738680 seconds on the development Mac. The ordinary instruction matrix also
+passes 11,551 instruction cases, 280 IRQ entries and two resets with unchanged
+generated fixture hashes after the wrapper extension.
+
+The board's SCSP/UART/memory/queue models and instruction-start MMIO contract
+are shared. This is a bounded synthetic CPU/board comparison; it does not
+validate actual game audio, speakers, physical bus phases or sound-enabled
+recordings in the independent consumer. No playback device is opened.
+
 ## Optional sound experiment
 
 Sound requires both audited generated sound inputs and an explicit build option:

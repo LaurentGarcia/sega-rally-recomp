@@ -16,6 +16,7 @@ parser.add_argument('--reference-dir',type=Path,default=ROOT/'build/validation/m
 parser.add_argument('--output',type=Path,default=ROOT/'build/validation/m68000-timing-reference')
 parser.add_argument('--sanitize',action='store_true')
 parser.add_argument('--division-only',action='store_true',help='exhaustive divisor/boundary matrix using independent microcode and emitted native instructions')
+parser.add_argument('--board-opcodes',type=Path,help='test-only live-bus provider header for these public opcode words; generate only')
 args=parser.parse_args()
 refs=args.reference_dir.resolve()
 out=args.output.resolve()
@@ -36,6 +37,10 @@ mode=g['GEN'].direct|g['GEN'].full
 # Public instruction patterns only: no game ROM or generated game source.
 ops={op | (2 if mask==0xff00 else 0) for op,mask,_ in g['instructions']}
 if args.division_only: ops={0x80c1,0x81c1}
+if args.board_opcodes:
+ if args.division_only: raise ValueError('board provider and division matrix are separate modes')
+ ops={int(line,16) for line in args.board_opcodes.read_text().splitlines()}
+ if not ops or len(ops)>64 or any(op<0 or op>65535 for op in ops): raise ValueError('bounded public opcode list required')
 head=(refs/'m68000.h').read_text()
 helpers=head[head.index('\t// movem step'):head.rindex('\n};')].replace('\tvoid set_ftu_const();','')
 source=(refs/'m68000.cpp').read_text()
@@ -99,6 +104,13 @@ struct MicroOracle {
  template<class...T>void debugger_exception_hook(T...){ }
  void debugger_wait_hook(){ }
 '''
+if args.board_opcodes:
+ # Only this harness-owned scaffold changes. Pinned generated microcode,
+ # helper arithmetic and all its cycle deductions remain untouched. Default
+ # generation below is byte-identical to the ordinary state/timing fixture.
+ pre=pre.replace('#include <algorithm>','#include <algorithm>\n#include <functional>')
+ pre=pre.replace('std::vector<Access> accesses;', 'std::vector<Access> accesses;\n std::function<u16(char,u32,u16,u16,bool)> mapped_access;')
+ pre=pre.replace("if(kind=='i')return u16(24+(m_next_state>>24));", "if(kind=='i'){if(mapped_access)mapped_access(kind,address,data,mask,write);return u16(24+(m_next_state>>24));}\n  if(mapped_access)return mapped_access(kind,address,data,mask,write);")
 parts=[pre,helpers,ftu]
 for opcode in sorted(ops):
  code=g['generate_intermediate_code_from_instruction'](opcode,0xffff,'test',mode)
@@ -108,7 +120,11 @@ for state in (g['states'][0],g['states'][4]):
  parts.append('void state_%s(){\n'%state[1]+'\n'.join(g['generate_source_from_code'](code,mode))+'\n}\n')
 parts.append('void run(u16 opcode){switch(opcode){\n'+''.join('case 0x%04x:op_%04x();break;\n'%(op,op)for op in sorted(ops))+'default:throw std::runtime_error("oracle opcode missing");}}\n};\n')
 parts.append('inline constexpr uint16_t reference_opcodes[]={'+','.join(hex(op)for op in sorted(ops))+'};')
-(out/'m68000-timing-reference.h').write_text('// Generated from pinned public BSD-3-Clause M68000 microcode; Olivier Galibert.\n'+'\n'.join(parts))
+header=out/('m68000-board-reference.h' if args.board_opcodes else 'm68000-timing-reference.h')
+header.write_text('// Generated from pinned public BSD-3-Clause M68000 microcode; Olivier Galibert.\n'+'\n'.join(parts))
+if args.board_opcodes:
+ print(len(ops),'live-bus microcode handlers generated; no compilation/execution')
+ raise SystemExit(0)
 compiler=shlex.split(os.environ.get('CXX','c++'))
 flags=['-std=c++20','-O1','-g','-Isrc','-I'+str(out)]
 if args.sanitize: flags+=['-fsanitize=address,undefined','-fno-omit-frame-pointer']

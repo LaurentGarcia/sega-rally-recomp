@@ -134,8 +134,13 @@ The cycle-only DIVU/DIVS helpers in `src/runtime/snd_cpu.cpp` adapt the same
 microcode's bounded subtraction/restore/sign paths and retain its attribution.
 The independent test generates public microcode handlers separately from the
 production emitter; generated reference code remains ignored. Instruction
-totals and ordered writes are compared, while bus-phase MMIO and prefetch
-values remain outside this diagnostic. Source hashes at the same revision:
+totals, architectural state and ordered writes are compared. The separate
+synthetic sound-board test retains the same pinned CPU's continuous register,
+prefetch, reset and IRQ state, with a harness-owned mapped-bus callback. Its
+generated microcode and arithmetic helpers are unchanged. Devices run on
+separate instances of the shared board models under instruction-start MMIO;
+physical bus-phase timing and independent chip parity remain outside this
+test. Source hashes at the same revision:
 
 | Reference file | SHA-256 |
 | --- | --- |

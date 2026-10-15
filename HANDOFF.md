@@ -1,5 +1,52 @@
 # Handoff
 
+## Continuous sound CPU/board reference fixture passes (2026-10-14)
+
+The test-only provider now runs pinned public MAME M68000 microcode with its
+own persistent registers, flags, prefetch, reset, IRQ and cycle state against
+a freshly production-emitted synthetic program. Each side has separate RAM,
+SCSP, UART, queue and RNG instances. Two 2 ms cases reverse the insertion
+order of a UART send and the first CPU deadline. Each executes 3,158
+instructions, 22,586 cycles, two IRQ-only entries and RTEs, and 2,000 UART
+clock edges. All 5,265 sampled boundaries per case match CPU state, complete
+512 KiB RAM, queue order, UART snapshots/pin timestamps and sample drains.
+The actual serial bytes `a5` and `5a` echo back; each case produces 89 stereo
+frames, including 87 nonzero. The final fixture passes 305,780 checks in
+5.738680 seconds including generation and compilation.
+
+This follows **Audio** and **Reference & validation**. The reference executes
+no native CPU instruction/reset/IRQ helper. Device implementations and the
+instruction-start MMIO contract remain shared; recorded source cycle phases
+do not move the board clock inside an instruction. The authenticated immutable
+synthetic ROM profile rejects unsupported execution. This is not full MAME
+board scheduling, independent chip, actual sound-program, speaker or hardware
+parity. The production runtime and independent recording consumer are unchanged;
+the latter still rejects sound-enabled input. Next assess a bounded actual
+sound-program reset/SCSP checkpoint before extending to recordings. The
+reported title-screen glitch remains unresolved.
+
+The first attempt failed before CPU execution: zero-filled unsupported vectors
+seeded address zero and accidental RAM-code reachability. Only the synthetic
+image was repaired, marking those vectors unsupported and initializing D1
+explicitly. The first coupled pass is preserved. Review then corrected the
+reference IACK evidence field from zero to the actual autovector 25; CPU
+semantics were already correct. The final fixture asserts the returned vector
+and mask. The ordinary default matrix subsequently passes 11,551 instruction
+cases, 280 IRQ entries and two resets with zero errors in 20.880636 seconds.
+Both generated headers remain byte-identical to the accepted fresh matrix
+(`53bf9dfb...` reference and `9a90675b...` native).
+
+Evidence: `build/worktrees/sound-board-reference/build/sound-reference-evidence/`.
+`final-001/result.json` SHA-256 is
+`149546365b3fff683c20de7e1408823feee42bf23818edb6cbfafbba6e2707a2`;
+`default-001/result.json` is
+`bc10ea14bb974bb31a624cdc94011f46860033c6986db797a4044b70da77d7a7`.
+The four integrated test files and all 102 recorded input files match both
+tested source closures. Integration report:
+`build/validation/sound-board-reference-integration/result.json`, SHA-256
+`45b36add2fccbcd4d4fbd5266f8f5f8b161f0383887b5aee6969973da10ad57f`.
+No generated code, game assets, captures or playtest-app changes are committed.
+
 ## Complete v16 manual session replays exactly (2026-10-14)
 
 The original signed v16 executable now replays the completed controller session

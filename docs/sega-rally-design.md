@@ -402,9 +402,16 @@ Independent public microcode tests also compare architectural registers,
 stack banks, PC, defined SR and complete synthetic memory: 11,551 completed
 instruction cases, 280 IRQ entries and two resets pass with fresh generated
 fixtures. Undefined division-overflow flags, reset state and unsupported
-exceptions remain explicit exclusions. These cases do not validate coupled
-sound-board sequencing; whole-game audio parity and physical timing remain
-unverified. The diagnostic
+exceptions remain explicit exclusions. A separate ROM-free test now runs the
+production emitter's synthetic program against continuous pinned MAME CPU
+execution on separate board instances. Two 2 ms cases compare every event
+boundary, including full RAM, CPU state, queue order, physical UART echo,
+IRQ/RTE and nonzero PCM: 305,780 checks pass in 5.738680 seconds including
+generation and compilation. The reference retains its own prefetch state;
+native execution still uses live instruction guards. SCSP, UART, memory-map
+and queue implementations and the instruction-start MMIO contract are shared.
+This validates the tested coupling, not independent chip, whole-game audio or
+physical bus-phase timing. The diagnostic
 is disabled by default, including in the Metal frontend. Daytona's measured
 instruction-rate shortcut is specific to its different Model 1 board and is
 not reused for Rally.
