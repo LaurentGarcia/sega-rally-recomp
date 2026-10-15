@@ -1,5 +1,22 @@
 # Handoff
 
+## CRT stage gallery (2026-10-15)
+
+The requested On the stages gallery now uses the same real production Metal CRT
+pass as the hero. Forest, Mountain and the SHORT Practice Stage Clear each run
+through the existing 20-draw fixture and pass. Their original native captures
+remain linked for comparison. All settings, native frame identities and new
+1152x896 PNG hashes are recorded in `docs/images/README.md`. The exact-hash
+source boundary now contains eight reviewed documentation images. No runtime,
+shader, build or game-generation input changed; final Mac build/CI validation at
+`2d101a43a439091c4ee842fa036b6b7a1eab42b6` remains the code checkpoint.
+
+The next requested deliverables are local installable Mac packaging and an
+iPhone frontend with improved touch controls. They are separate from the public
+source release. Public binary distribution must not silently include the local
+ROM-bearing app; distribution/signing scope is being established. Keep the
+original public source/release work progressing while preparing those targets.
+
 ## Portable CI fixtures and final release rebuild (2026-10-15)
 
 The first public CI run passes macOS and the source boundary but exposes three

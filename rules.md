@@ -38,7 +38,7 @@ legal problem, or hours re-deriving something already established.
    importer checks it against the CRC/SHA1 manifest and refuses anything else.
    This is the rule that keeps the project distributable.
    The expressly requested README showcase has one narrow documentation
-   exception: the five reviewed screenshots under `docs/images/`, identified
+   exception: the eight reviewed screenshots under `docs/images/`, identified
    by exact paths and hashes in the source-release gate and image provenance.
    Their game imagery is not covered by the project source license. No other
    capture, extracted asset, ROM or generated game code is authorized for export.
@@ -46,7 +46,7 @@ legal problem, or hours re-deriving something already established.
    sizes, function names, jump-table targets, hashes, run logs and
    `seeds.toml` are our own work and are committed. Decompiled pseudo-C,
    Ghidra projects, MAME trace files and display-list dumps contain or
-   reproduce game data and are not — tests refer to them by hash. The five
+   reproduce game data and are not — tests refer to them by hash. The eight
    documented README screenshots are the sole reviewed capture exception.
 8. **Never use leaked source.** No leaked Sega source, SDK or internal
    documentation — not read, not consulted, not used to check an answer. If a

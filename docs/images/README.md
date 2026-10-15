@@ -1,21 +1,22 @@
 # README screenshot provenance
 
-These five selected screenshots document actual native output from local
+These eight selected screenshots document actual native output from local
 validation runs on macOS. They are the explicitly requested documentation
 exception to the source repository's exclusion of raw game captures. They are
 not extracted textures, ROM files, generated game code or a playable game.
 Game imagery and trademarks remain the property of their respective owners;
 the project's BSD source license does not grant rights to those game assets.
 
-The four original-output images retain the original 496 × 384 pixels. The CRT
-image below is the real production Metal presentation of the same Desert frame.
+The four original-output images retain the original 496 × 384 pixels. The four CRT
+images below are real production Metal presentations of those same frames.
 PPM captures were converted
 losslessly to PNG; conversion metadata was removed without changing the
 compressed pixel payload. The original-output images have no retouching or invented
 screen content. The CRT image applies the documented renderer settings. GitHub may scale the display to fit the page.
 These captures precede the public prerelease build and do not constitute a
 new RC validation run. The Metal hero is captured before CRT/UI effects;
-the gallery uses the native CPU renderer. See the
+the original gallery scenes use the native CPU renderer, with the separate CRT
+versions presented through the real Metal shader. See the
 [current evidence and limits](../segarally-status.md).
 
 ## hero.png
@@ -51,7 +52,7 @@ SHORT Practice Mountain Stage Clear, native CPU renderer, frame 10200.
 - Local source SHA-256: `7cc3f11cf43021a69f3e6847bee571c05b756fa6c76443ebe508ac54d2838b96`.
 
 The local source files and their broader capture bundles stay ignored. Only the
-five exact reviewed PNG paths/hashes are allowed by the source-release gate.
+eight exact reviewed PNG paths/hashes are allowed by the source-release gate.
 Other captures, changed images, recordings, assets, personal ROMs and packaged
 apps remain excluded. New documentation images require an explicit review and
 updated provenance; the allowlist is not a general image-export permission.
@@ -73,3 +74,15 @@ public source. This verifies the presentation example, not additional gameplay.
 - Local output: `build/validation/readme-crt-001/render/crt-default.ppm`.
 - Scene: the same `hero.png` input described above.
 - Fixture executable SHA-256: `d2cc7c174369ffedc1abc8251dffed946334ce6f8036e875d39e4d50305a7824`.
+
+## Stage gallery CRT images
+
+`forest-crt.png`, `mountain-crt.png` and `finish-crt.png` use exactly the same
+production renderer, preset, viewport and 20-draw fixture described for `crt.png`.
+Their inputs are the original Forest, Mountain and Stage Clear frames documented
+above. These are real offscreen Metal readbacks, with no new game execution or
+retouching. The original images stay available for comparison. Each is 1152 × 896.
+
+- `forest-crt.png`: PNG SHA-256 `0458aac88b0f4c47d92df770e8431b10a6fb5ebf08843eb798b3ff215adfb011`; local output `build/validation/readme-crt-stages-001/forest/crt-default.ppm`, SHA-256 `cb9c8ce7ea1d566d6b7b141bf54df90ab227d533b7b9d16e7d81927f2097c30e`.
+- `mountain-crt.png`: PNG SHA-256 `1fbe1b1a716f6ff9e1e9b0ab07cc89f03b38961c9c6107aca108644a8f4f39a7`; local output `build/validation/readme-crt-stages-001/mountain/crt-default.ppm`, SHA-256 `4c5a6ead7eebdc57b051312773708f14ce768caae31db441142a1df9463b6ab7`.
+- `finish-crt.png`: PNG SHA-256 `d7abff05bdb2d454afd4b9420c99909e87fcd3e67dcb923bc22da3327b1e2834`; local output `build/validation/readme-crt-stages-001/finish/crt-default.ppm`, SHA-256 `01de5d6235f9a96f5bd57356f8a81667457903d6814e01607d5db3ccc4062b13`.

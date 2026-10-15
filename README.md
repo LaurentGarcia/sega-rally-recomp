@@ -41,9 +41,9 @@ phone work is deferred. Display enhancements start off on fresh preferences.
 
 <table>
 <tr>
-<td width="33%"><img src="docs/images/forest.png" alt="CPU-rendered Championship Forest: yellow car on the brown road" width="100%"></td>
-<td width="33%"><img src="docs/images/mountain.png" alt="CPU-rendered Championship Mountain: tarmac stage" width="100%"></td>
-<td width="33%"><img src="docs/images/finish.png" alt="CPU-rendered SHORT Practice Mountain result: Stage Clear, rank 2, 1:16.23" width="100%"></td>
+<td width="33%"><img src="docs/images/forest-crt.png" alt="Forest with real Metal CRT scanlines and curvature" width="100%"></td>
+<td width="33%"><img src="docs/images/mountain-crt.png" alt="Mountain tarmac with real Metal CRT scanlines and curvature" width="100%"></td>
+<td width="33%"><img src="docs/images/finish-crt.png" alt="Lancia Stage Clear with real Metal CRT scanlines and curvature" width="100%"></td>
 </tr>
 <tr>
 <td align="center"><b>Forest</b></td>
@@ -55,8 +55,9 @@ phone work is deferred. Display enhancements start off on fresh preferences.
 The hero demonstrates the optional Arcade CRT preset: scanlines, phosphor mask,
 glow, curvature and subtle color fringing. It uses the production shader on Metal
 with a preserved Accurate textures frame. Effects remain adjustable and off by
-default. The gallery uses the native CPU renderer; its preserved validation
-captures predate this source prerelease.
+default. The stage gallery applies the same Metal CRT pass to preserved native CPU
+renders. Its gameplay captures predate this source prerelease.
+[Original Forest](docs/images/forest.png) · [Original Mountain](docs/images/mountain.png) · [Original Stage Clear](docs/images/finish.png).
 
 <details>
 <summary><b>Compare original pixels and Arcade CRT — the same frame</b></summary>
