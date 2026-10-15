@@ -6,6 +6,8 @@ Use the [project wiki](../../docs/README.md), [Mac player manual](../../docs/mac
 
 SDL3 is pinned to Daytona's revision `fa2c02bb6e21974a89ea9824bc53c9932abe5f9c` (3.4.16). Clone that revision into ignored `extern/sdl3`. Generate the main CPU, TGP, and verified video imports into `build/segarally-timed` using the project pipeline first. The standalone frontend project does not require ImGui or the Daytona launcher.
 
+Mac builds enable `SEGARALLY_INPUT_RECORDING=ON` by default. This builds optional runtime recording/replay support and requires the public-domain 7-Zip sources at `0766b733fe3e06dd2a7f9a3cfbf2108ac73abd17` in ignored `extern/lzma`, fetched by `python3 scripts/setup.py`. Set `SEGARALLY_INPUT_RECORDING=OFF` when configuring to retain the minimal host build without this dependency. Runtime recording remains opt-in.
+
 ```sh
 bash platform/segarally/build.sh mac
 python3 platform/segarally/macos/launch.py
@@ -23,6 +25,17 @@ Pass `--fullscreen` to the host or Mac launcher to use desktop fullscreen. Escap
 The Mac launcher builds an ignored `.app` from the verified executable/assets and uses LaunchServices to leave the window open independently of a shell session. Its diagnostic output is `live-app.log` in the build directory. Pass `--build-dir build/segarally-mac-v3` to launch a different prepared generation.
 
 Interactive launches use normal board-time pacing; `--unthrottled` is an explicit diagnostic option. The host and launcher accept `--input-replay FILE`, reusing the boot tool's `segarally-input-v1` parser and completed-render boundary semantics. Replayed cabinet snapshots remain unchanged between events. The final snapshot is held for one completed frame, then keyboard/touch take over with neutral inputs where no control is held. This interactive handoff intentionally differs from the headless boot tool, which retains its final snapshot indefinitely. Parsing failures stop before native execution. A paired software capture receives the identical inputs at every resumed step, including handoff.
+
+For a fresh recorded session, add `--record-inputs build/recordings/drive-001` to the Mac launcher. The directory must be new; an already running app must be closed before recording can capture startup. `--input-replay FILE` may still supply menu selection before manual takeover. The recording stores the final twelve cabinet bytes at every actual instruction-bounded host resume, including changes between rendered frames. It preserves initial EEPROM/backup bytes, all ten Machine options, actual loaded image hashes, raw assets-report identity, executable identity, PCM bit hashes and fault/final-save evidence. Source-generation identities in the assets report remain `identity_only` evidence rather than independent authentication.
+
+Replay with the exact captured executable, for example:
+
+```sh
+"build/segarally-mac/Sega Rally Native.app/Contents/MacOS/segarally_native" \
+    --replay-recording build/recordings/drive-001
+```
+
+The early replay mode initializes no SDL, GPU or audio device and does not write live saves. It validates the complete bundle before executing any instruction, then compares exact resumes, return/fault details, PCM counts/bits and final save bytes. Signed and unsigned copies, repackaging and rebuilt executables have different identities and are rejected. Preserve the complete recorded `.app` and matching staged assets; changing resources and re-signing can change the executable identity. A completion marker distinguishes quit, frame limit, instruction limit, native frontier and runtime fault. A crash or failed capture leaves an incomplete bundle that replay rejects. A complete recording or matching same-Machine replay does not establish a completed course, independent CPU parity, MAME fidelity or PCB fidelity. Recordings contain private state and remain in ignored build directories.
 
 `SEGARALLY_NATIVE_BUILD` overrides the generation directory. Packaging verifies every bundled image against its import audit. Personal ROM-derived images, generated code, SDL source, and build products remain in ignored directories.
 

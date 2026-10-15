@@ -180,11 +180,15 @@ solid and textured polygons. It preserves the common shader, ordering, scissor
 and tile composition. First-car differences fall to 822 pixels and mean channel
 error 0.019426/255; two driving captures also improve. The candidate with the
 option disabled matches the committed stable renderer in those captures.
-The native-resolution synthetic coverage/cutout fixture passes 243 cases.
-This is a diagnostic correction: triangle coverage, repeated floating-point
-addition in the CPU texture span, and residual cutout/texture differences remain.
-One first-car pixel worsens versus the earlier prototype and its exact ownership
-is unresolved. No new performance result or whole-game fidelity claim follows;
+The extension to triangles follows their separate CPU slope/plane setup and
+raises the native-resolution synthetic fixture to 447 cases. It repairs the
+previously omitted triangle at (147,20). In a saved 3D-only reconstruction,
+differences fall from 969 to 844; these counts exclude tile/character RAM and
+cannot be compared directly with the complete-scene counts above. The one
+newly worsened pixel at (95,31) is a measured repeated-addition versus direct-
+offset rounding difference; an ignored diagnostic loop restores the CPU bits,
+with unmeasured cost. Residual texture precision remains open. No new
+performance result or whole-game fidelity claim follows;
 the option stays off by default. See [the evidence table](segarally-status.md#graphics-evidence).
 The host also accepts the bounded cabinet replay and holds its final snapshot
 through one complete frame before handing control to keyboard/touch. Both
@@ -194,9 +198,11 @@ Manual capture needs a separate host-resume transcript because controls are
 sampled between bounded execution calls, including mid-frame. An IRQ can also
 complete a frame at an unchanged instruction count. The tested transcript core
 preserves each requested budget, all cabinet pins, before/after witnesses and
-return reason; it does not yet add player capture controls. Actual startup
-save bytes, image/build/configuration provenance and sound drain boundaries
-remain required integration work. See [the input reference](segarally-input-replay.md#exact-host-resume-transcripts).
+return reason. The Mac host now adds opt-in recording and early same-executable
+offline replay, binding loaded images/options and initial saves, per-resume PCM,
+detailed faults and final saves. Its synthetic bundle/launcher tests pass;
+actual v13 capture/replay validation remains pending. See
+[the input reference](segarally-input-replay.md#exact-host-resume-transcripts).
 The frozen v6 generation now executes the actual Lancia race with recorded
 cabinet throttle, steering, view and brake events. A bounded 600-million main
 instruction run renders 3,142 frames without an unsupported frontier; matched

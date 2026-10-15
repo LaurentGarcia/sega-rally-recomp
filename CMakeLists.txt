@@ -482,6 +482,18 @@ if(TARGET sha256_digest)
     add_executable(test_sha256 tests/test_sha256.cpp)
     target_link_libraries(test_sha256 PRIVATE sha256_digest)
     add_test(NAME sha256 COMMAND test_sha256)
+    add_executable(test_segarally_recording_bundle tests/test_segarally_recording_bundle.cpp tools/srally_boot/recording_bundle.cpp
+        src/runtime/model2a_machine.cpp src/runtime/model2a_bus.cpp src/runtime/model2a_clock.cpp
+        src/runtime/model2a_control.cpp src/runtime/cpu.cpp src/runtime/lockstep.cpp
+        src/runtime/model2_io.cpp src/runtime/model2a_io.cpp src/runtime/model2_eeprom.cpp
+        src/runtime/tgp.cpp src/runtime/m2_tgp_board.cpp src/runtime/model2a_video.cpp src/runtime/video.cpp src/runtime/raster.cpp src/runtime/geo.cpp
+        src/runtime/model2_uart.cpp src/runtime/model2a_uart.cpp src/runtime/model2a_sound.cpp src/runtime/model2a_sound_bus.cpp
+        src/runtime/snd_cpu.cpp src/runtime/model2_scsp.cpp src/runtime/model2_scsp_dsp.cpp)
+    target_include_directories(test_segarally_recording_bundle PRIVATE src .)
+    target_compile_definitions(test_segarally_recording_bundle PRIVATE M2_INSTRUCTION_BOUNDARY_HOOK M2_SRALLY_CONTROL M2_SRALLY_SCREEN
+        M2_SRALLY_VIDEO M2_SRALLY_TGP M2_SRALLY_IO M2_SRALLY_UART M2_SRALLY_SOUND)
+    target_link_libraries(test_segarally_recording_bundle PRIVATE sha256_digest)
+    add_test(NAME segarally_recording_bundle COMMAND test_segarally_recording_bundle)
 endif()
 
 add_executable(test_segarally_host_input_machine tests/test_segarally_host_input_machine.cpp
@@ -685,6 +697,8 @@ add_test(NAME trace COMMAND test_trace ${CMAKE_CURRENT_BINARY_DIR})
 # The MAME plugin's Lua core against the C++ trace library (needs lupa).
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_FOUND)
+    add_test(NAME segarally_recording_launcher
+        COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tests/test_segarally_recording_launcher.py)
     add_test(NAME segarally_staging_provenance
         COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tests/test_segarally_staging_provenance.py)
     add_test(NAME segarally_boundary_contract

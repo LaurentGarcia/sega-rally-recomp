@@ -6,6 +6,11 @@
 #include "app/segarally_audio.h"
 #include "app/segarally_audio_capture.h"
 #include "../../tools/srally_boot/input_replay.h"
+#ifdef SEGARALLY_INPUT_RECORDING
+#include "../../tools/srally_boot/recording_bundle.h"
+#include <mach-o/dyld.h>
+#include <optional>
+#endif
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <algorithm>
@@ -22,6 +27,19 @@
 
 namespace {
 using Machine=rt::Model2AMachine;
+#ifdef SEGARALLY_INPUT_RECORDING
+namespace record=srally::recording;
+std::filesystem::path actual_executable() {
+    std::array<char,4096> path{};uint32_t size=uint32_t(path.size());
+    if(_NSGetExecutablePath(path.data(),&size)!=0)throw std::runtime_error("Cannot identify actual host executable");
+    return std::filesystem::canonical(path.data());
+}
+std::filesystem::path replay_default_data(const std::filesystem::path &exe) {
+    const auto parent=exe.parent_path();
+    if(parent.filename()=="MacOS"&&parent.parent_path().filename()=="Contents")return parent.parent_path()/"Resources/assets";
+    return parent/"assets";
+}
+#endif
 std::vector<uint8_t> read_file(const std::filesystem::path &path, bool optional=false) {
     std::ifstream file(path,std::ios::binary);
     if(!file) {if(optional) return {};throw std::runtime_error("Cannot read "+path.string());}
@@ -76,12 +94,21 @@ int segarally_host_main(int argc,char **argv) {
     uint64_t frame_limit=0,instruction_limit=0;
     bool touch_visible=false,unthrottled=false,hidden=false,fullscreen=false,sound=false;
     bool instruction_boundary_hook=false;
+#ifdef SEGARALLY_INPUT_RECORDING
+    std::filesystem::path record_path,recording_replay_path;
+    bool recording_replay_conflict=false;
+#endif
     if(const char *env=std::getenv("SEGARALLY_DATA_DIR")) data=env;
     if(const char *env=std::getenv("SEGARALLY_SAVE_DIR")) saves=env;
     for(int i=1;i<argc;++i) {
         const std::string arg=argv[i];
+#ifdef SEGARALLY_INPUT_RECORDING
+        if(arg!="--data"&&arg!="--replay-recording")recording_replay_conflict=true;
+#endif
         auto value=[&](){if(++i>=argc) throw std::runtime_error("Missing argument for "+arg);return std::string(argv[i]);};
-        if(arg=="--data") data=value();else if(arg=="--save-dir") saves=value();
+        if(arg=="--data") data=value();else if(arg=="--save-dir") {
+            saves=value();
+        }
         else if(arg=="--frames") frame_limit=std::stoull(value());else if(arg=="--instructions") instruction_limit=std::stoull(value());
         else if(arg=="--capture") capture_path=value();else if(arg=="--touch") touch_visible=true;
         else if(arg=="--reference-capture") reference_path=value();
@@ -90,12 +117,32 @@ int segarally_host_main(int argc,char **argv) {
         else if(arg=="--fullscreen") fullscreen=true;
         else if(arg=="--log") log_path=value();
         else if(arg=="--input-replay") replay_path=value();
+#ifdef SEGARALLY_INPUT_RECORDING
+        else if(arg=="--record-inputs") record_path=value();
+        else if(arg=="--replay-recording") recording_replay_path=value();
+#endif
         else if(arg=="--sound") sound=true;
         else if(arg=="--instruction-boundary-hook") instruction_boundary_hook=true;
         else if(arg=="--audio-capture") audio_path=value();
-        else if(arg=="--help") {puts("Sega Rally native: --data DIR --save-dir DIR --frames N --instructions N --capture FILE.ppm --reference-capture FILE.ppm --touch --unthrottled --hidden --fullscreen --log FILE --input-replay FILE --sound --audio-capture FILE.wav --instruction-boundary-hook\nSound is opt-in and uses diagnostic instruction-boundary timing. Unthrottled runs capture/drain audio without device playback.\nKeys: arrows steer, Z gas, X brake, C coin, Return start, V view, A/S gear down/up, Space handbrake, F2 service, F3 test, Escape quit.");return 0;}
+        else if(arg=="--help") {puts("Sega Rally native: --data DIR --save-dir DIR --frames N --instructions N --capture FILE.ppm --reference-capture FILE.ppm --touch --unthrottled --hidden --fullscreen --log FILE --input-replay FILE --sound --audio-capture FILE.wav --instruction-boundary-hook\nSound is opt-in and uses diagnostic instruction-boundary timing. Unthrottled runs capture/drain audio without device playback.\nKeys: arrows steer, Z gas, X brake, C coin, Return start, V view, A/S gear down/up, Space handbrake, F2 service, F3 test, Escape quit.");
+#ifdef SEGARALLY_INPUT_RECORDING
+            puts("--record-inputs DIR creates a new bounded recording bundle. --replay-recording DIR [--data DIR] replays it offline with this exact executable; no window/audio device/live-save writes.");
+#endif
+            return 0;}
         else throw std::runtime_error("Unknown argument "+arg);
     }
+#ifdef SEGARALLY_INPUT_RECORDING
+    if(!recording_replay_path.empty()) {
+        if(recording_replay_conflict)
+            throw std::runtime_error("--replay-recording accepts only --data; it uses the recorded Machine options and startup saves");
+        const auto exe=actual_executable();if(data.empty())data=replay_default_data(exe);
+        const auto replay=record::replay_bundle(recording_replay_path,data,exe);
+        printf("Same-Machine replay matched: resumes=%llu instructions=%llu cycles=%llu frames=%llu terminal=%s\n",
+            static_cast<unsigned long long>(replay.records),static_cast<unsigned long long>(replay.terminal.instructions),
+            static_cast<unsigned long long>(replay.terminal.cycles),static_cast<unsigned long long>(replay.terminal.frames),record::terminal_name(replay.kind));
+        return 0;
+    }
+#endif
     if(!audio_path.empty() && !sound) throw std::runtime_error("--audio-capture requires --sound");
 #ifndef M2_SRALLY_SOUND
     if(sound) throw std::runtime_error("Build with SEGARALLY_SOUND=ON before using --sound");
@@ -127,6 +174,10 @@ int segarally_host_main(int argc,char **argv) {
     uint64_t audio_frames=0,audio_nonzero=0;
     double audio_energy=0;float audio_peak=0;
     int result=0;
+#ifdef SEGARALLY_INPUT_RECORDING
+    std::unique_ptr<record::Recorder> recording;
+    record::TerminalKind terminal_kind=record::TerminalKind::Quit;
+#endif
     try {
         std::filesystem::create_directories(saves);
         Machine::Images images;
@@ -136,6 +187,11 @@ int segarally_host_main(int argc,char **argv) {
         if(sound) {images.sound_program=read_file(data/"sound_program.bin");images.sound_samples=read_file(data/"sound_samples.bin");}
         Machine::Options options;options.external_video=true;options.sound=sound;
         options.instruction_boundary_hook=instruction_boundary_hook;
+#ifdef SEGARALLY_INPUT_RECORDING
+        std::optional<record::StartupIdentity> recording_identity;
+        if(!record_path.empty())recording_identity=record::identify_startup(images,options,
+            record::read_bounded(data/"assets.json",1024*1024),actual_executable());
+#endif
         if(!reference_path.empty()) {Machine::Options ref_options;ref_options.sound=sound;reference=std::make_unique<Machine>(images,ref_options);}
         machine=std::make_unique<Machine>(std::move(images),options);
 #ifdef M2_INSTRUCTION_BOUNDARY_HOOK
@@ -146,6 +202,9 @@ int segarally_host_main(int argc,char **argv) {
         const auto eeprom=read_file(saves/"eeprom.bin",true),backup=read_file(saves/"backup.bin",true);
         if(!eeprom.empty()) machine->load_eeprom(eeprom);if(!backup.empty()) machine->load_backup(backup);
         if(reference) {if(!eeprom.empty()) reference->load_eeprom(eeprom);if(!backup.empty()) reference->load_backup(backup);}
+#ifdef SEGARALLY_INPUT_RECORDING
+        if(recording_identity)recording=std::make_unique<record::Recorder>(record_path,*recording_identity,*machine);
+#endif
         SDL_WindowFlags flags=SDL_WINDOW_RESIZABLE|SDL_WINDOW_HIGH_PIXEL_DENSITY;
         if(hidden) flags|=SDL_WINDOW_HIDDEN;
         if(fullscreen) flags|=SDL_WINDOW_FULLSCREEN;
@@ -171,6 +230,10 @@ int segarally_host_main(int argc,char **argv) {
         uint64_t replay_release_frame=0;bool replay_manual_takeover=false;
         Uint64 start=SDL_GetTicksNS();uint64_t displayed=0,last_frames=0;
         while(!quit) {
+#ifdef SEGARALLY_INPUT_RECORDING
+            std::optional<srally::host_input::Resume> recorded_resume;
+            Machine::RunResult recorded_result;
+#endif
             SDL_Event event;
             while(SDL_PollEvent(&event)) {
                 if(event.type==SDL_EVENT_QUIT || event.type==SDL_EVENT_TERMINATING) quit=true;
@@ -214,9 +277,21 @@ int segarally_host_main(int argc,char **argv) {
             bool new_frame=false;
             if(!stopped && !quit) {
                 const uint64_t completed=machine->stats().instructions;
-                if(instruction_limit && completed>=instruction_limit) break;
+                if(instruction_limit && completed>=instruction_limit) {
+#ifdef SEGARALLY_INPUT_RECORDING
+                    terminal_kind=record::TerminalKind::InstructionLimit;
+#endif
+                    break;
+                }
                 const uint64_t budget=instruction_limit?std::min(uint64_t(100000),instruction_limit-completed):100000;
+#ifdef SEGARALLY_INPUT_RECORDING
+                if(recording){srally::host_input::Resume row;row.index=recording->records();row.budget=budget;
+                    row.before=srally::host_input::Witness::of(machine->stats());row.inputs=in;recorded_resume=row;}
+#endif
                 const auto outcome=machine->run_until_frame(budget);
+#ifdef SEGARALLY_INPUT_RECORDING
+                if(recorded_resume){recorded_resume->after=srally::host_input::Witness::of(machine->stats());recorded_resume->reason=outcome.reason;recorded_result=outcome;}
+#endif
                 if(reference) {
                     reference->inputs()=in;
                     const auto expected=reference->run_until_frame(budget);
@@ -228,6 +303,9 @@ int segarally_host_main(int argc,char **argv) {
                 if(outcome.reason==Machine::Reason::Frame) new_frame=true;
                 else if(outcome.reason!=Machine::Reason::Budget) {
                     stopped=true;result=3;audio.clear();
+#ifdef SEGARALLY_INPUT_RECORDING
+                    terminal_kind=outcome.reason==Machine::Reason::RuntimeError?record::TerminalKind::Fault:record::TerminalKind::Frontier;
+#endif
                     fprintf(stderr,"Native frontier: pc=%08x instructions=%llu %s\n",outcome.pc,
                             static_cast<unsigned long long>(outcome.instructions),outcome.message.c_str());
                     SDL_SetWindowTitle(window,("Sega Rally Native - frontier: "+outcome.message).c_str());
@@ -246,8 +324,19 @@ int segarally_host_main(int argc,char **argv) {
                 }
                 if(audio_capture) audio_capture->push(samples);
                 if(!unthrottled && !stopped) audio.push(samples);
+#ifdef SEGARALLY_INPUT_RECORDING
+                if(recorded_resume)recording->append(*recorded_resume,recorded_result,samples);
+#endif
             }
-            if(instruction_limit && machine->stats().instructions>=instruction_limit) quit=true;
+#ifdef SEGARALLY_INPUT_RECORDING
+            if(recorded_resume&&!sound)recording->append(*recorded_resume,recorded_result,{});
+#endif
+            if(instruction_limit && machine->stats().instructions>=instruction_limit) {
+                quit=true;
+#ifdef SEGARALLY_INPUT_RECORDING
+                if(!stopped)terminal_kind=record::TerminalKind::InstructionLimit;
+#endif
+            }
             if(quit && !new_frame) break;
             if(!new_frame && !stopped) continue;
             auto *cmd=SDL_AcquireGPUCommandBuffer(device);if(!cmd) throw std::runtime_error(SDL_GetError());
@@ -267,7 +356,12 @@ int segarally_host_main(int argc,char **argv) {
                 static_cast<unsigned long long>(displayed),static_cast<unsigned long long>(stats.instructions),
                 static_cast<unsigned long long>(stats.reference_cycles),stats.pc);
             last_frames=displayed;
-            if((frame_limit&&displayed>=frame_limit)||(instruction_limit&&stats.instructions>=instruction_limit)) quit=true;
+            if((frame_limit&&displayed>=frame_limit)||(instruction_limit&&stats.instructions>=instruction_limit)) {
+                quit=true;
+#ifdef SEGARALLY_INPUT_RECORDING
+                if(!stopped)terminal_kind=(frame_limit&&displayed>=frame_limit)?record::TerminalKind::FrameLimit:record::TerminalKind::InstructionLimit;
+#endif
+            }
             if(!unthrottled && new_frame) {
                 // Pace the host to the machine's exact board time, without changing device clocks.
                 const Uint64 deadline=start+stats.board_time_ns,now=SDL_GetTicksNS();
@@ -279,6 +373,9 @@ int segarally_host_main(int argc,char **argv) {
         if(reference && displayed) capture_reference(reference->video(),reference_path);
         save(*machine,saves);
         if(audio_capture) audio_capture->finish();
+#ifdef SEGARALLY_INPUT_RECORDING
+        if(recording){recording->finish(*machine,terminal_kind);fprintf(stderr,"Recording complete: %s terminal=%s; same-Machine reproducibility only\n",record_path.string().c_str(),record::terminal_name(terminal_kind));}
+#endif
         if(replay) fprintf(stderr,"Input replay exit: events=%zu applied=%zu pending=%zu manual_takeover=%d\n",
             replay->size(),replay->applied(),replay->size()-replay->applied(),int(replay_manual_takeover));
         const auto stats=machine->stats();

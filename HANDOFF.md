@@ -1,5 +1,48 @@
 # Handoff
 
+## Mac recording and offline replay integration (2026-10-14)
+
+`--record-inputs DIR` now creates an exclusive new recording bundle around the
+existing host resume/drain calls. It binds the actual executable (resolved by
+`_NSGetExecutablePath`), loaded images, raw staged-assets report, all ten Machine
+options and post-load initial EEPROM/backup bytes. Each resume retains the
+budget, twelve final cabinet inputs, before/after witnesses, full return/fault
+details and raw float PCM count/hash. Explicit completion seals final saves and
+quit/frame-limit/instruction-limit/frontier/fault; failed writes, presentation
+errors or abandoned captures remain incomplete. Default game and audio-drain
+ordering is unchanged.
+
+`--replay-recording DIR [--data DIR]` runs before SDL, log or save-directory
+initialization. It preflights the entire bundle and exact executable/assets,
+then executes the same budgets/inputs/options/seeds in the same Machine without
+GPU, device audio, pacing or live-save writes. Both passes use immutable bounded
+text snapshots. An initial implementation reopened paths after preflight; review
+replaced that with the verified bytes. Limit terminals cannot masquerade as a
+zero-instruction startup quit: frame limits require a Frame return, instruction
+limits require executed instructions. The same-executable check deliberately
+rejects rebuilt, re-signed or repackaged binaries; preserve the recorded app and
+its matching staged assets.
+
+Both MAIN CTest registrations pass: 165 bundle checks and four launcher checks.
+The ten existing Mac packaging/launcher tests also pass.
+They cover nonzero coupled SCSP PCM, equal-instruction frame returns, changed
+final backup, detailed device/runtime faults, actual byte identities, resealed
+false observations and partial/failed captures. Strict standalone compilation
+and host syntax checks pass with recording absent, recording only and
+recording+sound+hook. The integrated build reports only the existing unused
+`gpu_front_hud_` field warning. Mac build support defaults ON and requires the
+pinned public-domain 7-Zip checkout; `SEGARALLY_INPUT_RECORDING=OFF` removes that
+dependency/capability. Runtime recording remains opt-in; iOS is unchanged.
+
+Evidence: `build/mac-input-recording.patch`, source identity list and standalone
+commands; MAIN integration metadata/logs under
+`build/validation/mac-input-recording/`. MAIN adds the zero-instruction terminal
+regression to the frozen candidate's 160 checks, reaching 165. Source-generation
+hashes remain identities, not an independent provenance or full-course proof.
+Next is a fresh audited v13 host build and actual sound-enabled capture/replay.
+No generated game build, new play session or preserved-app replacement has been
+validated by this commit; the tests above use synthetic programs.
+
 ## Fresh credit/start after attract (2026-10-14)
 
 `config/segarally_credit_restart.inputs` preserves all nineteen held-gas rows,

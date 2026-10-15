@@ -14,6 +14,7 @@ parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--build-dir",type=Path,default=ROOT/"build/segarally-mac")
 parser.add_argument("--unthrottled",action="store_true",help="Disable board-time pacing for diagnostics")
 parser.add_argument("--input-replay",type=Path,help="Optional cabinet input replay, then manual control")
+parser.add_argument("--record-inputs",type=Path,help="Create a new recording bundle for exact same-executable offline replay")
 parser.add_argument("--fullscreen",action="store_true",help="Launch in desktop fullscreen")
 parser.add_argument("--sound",action="store_true",help="Enable the audited diagnostic SCSP sound board")
 parser.add_argument("--instruction-boundary-hook",action="store_true",help="Enable audited exact resident-chunk execution")
@@ -41,9 +42,15 @@ try:
     binary=app/"Contents/MacOS"
     active=subprocess.run(["pgrep","-f",re.escape(str(binary/"segarally_native"))],capture_output=True,text=True)
     if active.returncode==0:
+        if args.record_inputs:raise ValueError("close the active app before starting a new recorded session; recording requires startup input and saves")
         subprocess.run(["open",str(app)],check=True)
         print(f"Activated existing native app, PID(s) {active.stdout.strip()}")
         raise SystemExit(0)
+    recording_path=None
+    if args.record_inputs:
+        recording_path=args.record_inputs.resolve()
+        if not recording_path.is_relative_to(ROOT/"build") or recording_path.exists():
+            raise ValueError("recording directory must be new and inside ignored build/")
     replay_bytes=None
     if args.input_replay:
         replay_path=args.input_replay.resolve()
@@ -73,6 +80,7 @@ try:
     if args.sound:startup.append("--sound")
     if args.instruction_boundary_hook:startup.append("--instruction-boundary-hook")
     if replay_bytes is not None:startup += ["--input-replay",str(bundled_replay)]
+    if recording_path is not None:startup += ["--record-inputs",str(recording_path)]
     subprocess.run(["open","-n",str(app),"--args",*startup],check=True)
     print(f"Opened {app}; startup log {build/'live-app.log'}")
 except (OSError,ValueError,KeyError,subprocess.SubprocessError) as error:

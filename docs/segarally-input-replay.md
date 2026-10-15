@@ -119,9 +119,12 @@ cannot reach these late inputs. Preserve normal player saves separately.
 ## Exact host resume transcripts
 
 `tools/srally_boot/host_input_transcript.h` provides a separate diagnostic
-format, `segarally-host-resume-v1`. It is a tested core API; the player has no
-capture or playback flag for it yet. The existing frame replay above is
-unchanged.
+format, `segarally-host-resume-v1`. The Mac host now wraps it in a recording
+bundle through `--record-inputs DIR` and early offline `--replay-recording DIR`.
+See the [Mac frontend instructions](../platform/segarally/README.md) for the
+hashing dependency, launch command and exact-executable preservation requirement.
+The existing frame replay above is unchanged. Actual v13 game capture/replay
+validation is still pending; the new fixture evidence below is synthetic.
 
 The interactive host samples controls before each call to
 `run_until_frame`, with a budget of at most 100,000 instructions. Several
@@ -153,8 +156,16 @@ a supplied digest or callback does not verify those external facts. The bounded
 the pinned public-domain SDK, with 179 known-answer and I/O checks. Staged
 assets also carry versioned main/TGP/video identities, with ordinary
 generated-source hashes explicitly labeled as identities rather than authenticated
-generation. Host integration, manifest validation, PCM evidence and detailed
-terminal faults remain work to implement. The independent CPU harness must reject unsupported startup
+generation. The host bundle now binds these actual loaded bytes, all ten Machine
+options, actual executable identity and post-load startup saves before the first
+opcode. It records per-resume raw PCM hashes/counts and complete fault details,
+then seals final saves and the explicit exit cause. Quit, frame limit,
+instruction limit, frontier and fault remain distinct; failed capture never
+gets a completion marker. Both replay passes consume the same immutable,
+bounded transcript/observation bytes after preflight. Offline playback creates
+no SDL/window/audio device and writes no live saves.
+
+The independent CPU harness must reject unsupported startup
 seeds, resume phases or configurations, and currently rejects coupled sound.
 
 The ROM-free tests cover 98 stream/contract checks and 84 Machine checks in
@@ -163,6 +174,12 @@ frame at the same instruction count, then the next opcode reads the newly
 recorded input. Captured, untouched and replayed Machines agree on CPU state,
 frame output and saves. This follows the inherited design's **Inputs** and
 **Reference & validation** contracts; it is not a MAME or full-course result.
+The integrated bundle fixture adds 165 checks covering actual save seeds,
+executable/images/configuration, nonzero SCSP PCM, equal-instruction frame
+returns, precise device/runtime faults, incomplete bundles and edited evidence.
+Four launcher tests cover new paths, existing captures and active-app refusal.
+Successful same-Machine replay establishes only the captured observations;
+it does not upgrade this evidence to an independent CPU or hardware oracle.
 
 ```sh
 cmake -S . -B build/host-tests-resume -DM2_BUILD_WINDOWED_APP=OFF
