@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <exception>
+#include <vector>
 #include <unistd.h>
 
 extern int segarally_host_main(int argc, char **argv);
@@ -31,7 +32,20 @@ static int app_main(int argc, char **argv)
         UIApplication.sharedApplication.idleTimerDisabled = YES;
         fprintf(stderr, "Native scene callback: assets=%s saves=%s\n", assets.fileSystemRepresentation,
                 work.path.fileSystemRepresentation);
-        try { return segarally_host_main(argc, argv); }
+        // iOS launches have no terminal arguments. Request only capabilities actually
+        // compiled into this target; Mac and explicit diagnostic defaults stay separate.
+        std::vector<char *> arguments;
+        for (int i = 0; i < argc; ++i) arguments.push_back(argv[i]);
+        arguments.push_back(const_cast<char *>("--player"));
+#ifdef M2_SRALLY_SOUND
+        arguments.push_back(const_cast<char *>("--sound"));
+#endif
+#ifdef M2_INSTRUCTION_BOUNDARY_HOOK
+        arguments.push_back(const_cast<char *>("--instruction-boundary-hook"));
+#endif
+        const int argument_count = static_cast<int>(arguments.size());
+        arguments.push_back(nullptr);
+        try { return segarally_host_main(argument_count, arguments.data()); }
         catch (const std::exception &failure) {
             fprintf(stderr, "Native host startup failed: %s\n", failure.what());
             return 1;

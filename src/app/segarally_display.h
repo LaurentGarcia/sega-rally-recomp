@@ -3,6 +3,7 @@
 #include "app/gpu/crt_settings.h"
 #include <SDL3/SDL.h>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -36,8 +37,10 @@ public:
     // host Escape handling. Returns true only for explicit capture/isolation,
     // not ordinary ImGui handling. Host owns pause and F1/Y toggles.
     bool process_event(const SDL_Event &, bool controls_consumed=false);
-    // Closed returns true without backend/frame/GPU work. Open initializes lazily.
-    bool new_frame(DisplaySettings &);
+    // Closed with no overlay does no backend/frame/GPU work. An optional
+    // presentation-only overlay lazily shares the Settings context and frame.
+    // Callback runs only when Settings is closed, with that context current.
+    bool new_frame(DisplaySettings &, const std::function<void()> &overlay = {});
     // Prepare before opening the render pass, then render last in that pass.
     // Both are no-ops without current draw data.
     void prepare(SDL_GPUCommandBuffer *);

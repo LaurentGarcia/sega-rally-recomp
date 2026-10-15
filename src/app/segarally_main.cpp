@@ -6,12 +6,13 @@
 #include "app/segarally_display.h"
 #include "app/segarally_controls.h"
 #include "app/segarally_touch.h"
+#include "app/segarally_touch_overlay.h"
 #include "app/segarally_audio.h"
 #include "app/segarally_audio_capture.h"
+#include "app/segarally_platform_files.h"
 #include "../../tools/srally_boot/input_replay.h"
 #ifdef SEGARALLY_INPUT_RECORDING
 #include "../../tools/srally_boot/recording_bundle.h"
-#include <mach-o/dyld.h>
 #include <optional>
 #endif
 #include <SDL3/SDL.h>
@@ -34,11 +35,7 @@ namespace {
 using Machine=rt::Model2AMachine;
 #ifdef SEGARALLY_INPUT_RECORDING
 namespace record=srally::recording;
-std::filesystem::path actual_executable() {
-    std::array<char,4096> path{};uint32_t size=uint32_t(path.size());
-    if(_NSGetExecutablePath(path.data(),&size)!=0)throw std::runtime_error("Cannot identify actual host executable");
-    return std::filesystem::canonical(path.data());
-}
+using app::actual_executable;
 std::filesystem::path replay_default_data(const std::filesystem::path &exe) {
     const auto parent=exe.parent_path();
     if(parent.filename()=="MacOS"&&parent.parent_path().filename()=="Contents")return parent.parent_path()/"Resources/assets";
@@ -54,7 +51,7 @@ void write_file(const std::filesystem::path &path,const std::vector<uint8_t> &by
     const auto temporary=path.string()+".tmp";
     {std::ofstream file(temporary,std::ios::binary|std::ios::trunc);file.write(reinterpret_cast<const char *>(bytes.data()),std::streamsize(bytes.size()));
      if(!file) throw std::runtime_error("Cannot save "+path.string());}
-    std::filesystem::rename(temporary,path);
+    app::replace_save_file(temporary,path);
 }
 void save(Machine &machine,const std::filesystem::path &directory) {
     write_file(directory/"eeprom.bin",machine.save_eeprom());write_file(directory/"backup.bin",machine.save_backup());
@@ -81,7 +78,7 @@ void capture(SDL_GPUDevice *device,SDL_GPUTexture *texture,const std::filesystem
     for(size_t i=0;i<w*h;++i) {const char rgb[]={char(pixels[4*i+2]),char(pixels[4*i+1]),char(pixels[4*i])};file.write(rgb,3);}
     SDL_UnmapGPUTransferBuffer(device,buffer);SDL_ReleaseGPUFence(device,fence);SDL_ReleaseGPUTransferBuffer(device,buffer);
     if(!file) throw std::runtime_error("Cannot write GPU capture");
-    fprintf(stderr,"Metal frame capture: %s BGRA hash=%016llx\n",path.string().c_str(),static_cast<unsigned long long>(hash));
+    fprintf(stderr,"GPU frame capture: %s BGRA hash=%016llx\n",path.string().c_str(),static_cast<unsigned long long>(hash));
 }
 void capture_reference(const rt::Video &video,const std::filesystem::path &path) {
     std::ofstream file(path,std::ios::binary|std::ios::trunc);file<<"P6\n496 384\n255\n";
@@ -100,18 +97,9 @@ int segarally_host_main(int argc,char **argv) {
     bool touch_visible=false,unthrottled=false,hidden=false,fullscreen=false,sound=false;
     bool crt_requested=false,original_display=false,accurate_textures=false,show_display_controls=false;
     bool instruction_boundary_hook=false,audio_diagnostics=false;
-#if defined(__APPLE__) && !defined(SEGARALLY_IOS)
-    // Finder starts the dedicated app without arguments. Explicit diagnostic
-    // commands retain their opt-in defaults, including offline replay.
-    if(argc==1) {
-#ifdef M2_SRALLY_SOUND
-        sound=true;
-#endif
-#ifdef M2_INSTRUCTION_BOUNDARY_HOOK
-        instruction_boundary_hook=true;
-#endif
-    }
-#endif
+    // A player launcher can pass paths without losing interactive defaults.
+    // Explicit diagnostics remain opt-in; replay restores its recorded options.
+    bool player_defaults=argc==1,sound_disabled=false;
 #ifdef SEGARALLY_INPUT_RECORDING
     std::filesystem::path record_path,recording_replay_path;
     bool recording_replay_conflict=false;
@@ -143,12 +131,14 @@ int segarally_host_main(int argc,char **argv) {
         else if(arg=="--record-inputs") record_path=value();
         else if(arg=="--replay-recording") recording_replay_path=value();
 #endif
+        else if(arg=="--player") player_defaults=true;
         else if(arg=="--sound") sound=true;
+        else if(arg=="--no-sound") sound_disabled=true;
         else if(arg=="--audio-diagnostics") audio_diagnostics=true;
         else if(arg=="--instruction-boundary-hook") instruction_boundary_hook=true;
         else if(arg=="--audio-capture") audio_path=value();
         else if(arg=="--audio-output-capture") audio_output_path=value();
-        else if(arg=="--help") {puts("Sega Rally native: --data DIR --save-dir DIR --frames N --instructions N --capture FILE.ppm --reference-capture FILE.ppm --touch --unthrottled --hidden --fullscreen --log FILE --input-replay FILE --sound --audio-capture FILE.wav --audio-diagnostics --instruction-boundary-hook\nNo-argument Mac startup enables compiled sound and exact instruction-boundary execution. Explicit commands keep sound opt-in with diagnostic instruction-boundary timing. Unthrottled runs capture/drain audio without device playback.\nKeys: arrows steer, Z gas, X brake, C coin, Return start, V view, A/S gear down/up, Space handbrake, F2 test, F3 service, Escape quit.");
+        else if(arg=="--help") {puts("Sega Rally native: --data DIR --save-dir DIR --frames N --instructions N --capture FILE.ppm --reference-capture FILE.ppm --touch --unthrottled --hidden --fullscreen --log FILE --input-replay FILE --player --sound --no-sound --audio-capture FILE.wav --audio-diagnostics --instruction-boundary-hook\nNo-argument startup or --player enables compiled sound, exact instruction-boundary execution and CRT for fresh player preferences. --no-sound mutes the native sound board. Explicit commands keep sound opt-in with diagnostic instruction-boundary timing. Unthrottled runs capture/drain audio without device playback.\nKeys: arrows steer, Z gas, X brake, C coin, Return start, V view, A/S gear down/up, Space handbrake, F2 test, F3 service, Escape quit.");
             puts("Display: F1 opens controls and pauses; F6 toggles CRT effects. --crt enables the Arcade CRT preset; --original-display uses display defaults; --accurate-textures enables optional native interpolation; --display-controls opens the panel. Native --capture remains before display effects.");
             puts("Controls: F1 or Xbox Y opens Settings. Configure keyboard/controller bindings and optional controller input in Controls. Xbox defaults: left stick steer, RT gas, LT brake, LB/RB shift, A view, X handbrake, Back coin, Start start.");
             puts("--audio-output-capture FILE.wav records only this app's logical SDL mix before the physical backend, plus FILE.wav.events.txt. Requires paced --sound --audio-diagnostics --audio-capture with a distinct path; format changes/overflow fail the capture.");
@@ -158,6 +148,15 @@ int segarally_host_main(int argc,char **argv) {
             return 0;}
         else throw std::runtime_error("Unknown argument "+arg);
     }
+    if(player_defaults) {
+#ifdef M2_SRALLY_SOUND
+        sound=true;
+#endif
+#ifdef M2_INSTRUCTION_BOUNDARY_HOOK
+        instruction_boundary_hook=true;
+#endif
+    }
+    if(sound_disabled) sound=false;
 #ifdef SEGARALLY_INPUT_RECORDING
     if(!recording_replay_path.empty()) {
         if(recording_replay_conflict)
@@ -201,7 +200,7 @@ int segarally_host_main(int argc,char **argv) {
         replay=std::make_unique<srally::InputReplay>(stream);
         fprintf(stderr,"Input replay loaded: %zu events, completed-render frame boundaries\n",replay->size());
     }
-    SDL_SetMainReady();SDL_SetHint(SDL_HINT_GPU_DRIVER,"metal");
+    SDL_SetMainReady();
     if(hidden) SDL_SetHint(SDL_HINT_MAC_BACKGROUND_APP,"1");
     if(!SDL_Init(SDL_INIT_VIDEO)) {fprintf(stderr,"SDL_Init: %s\n",SDL_GetError());return 1;}
     if(data.empty()) data=std::filesystem::path(SDL_GetBasePath())/"assets";
@@ -209,6 +208,9 @@ int segarally_host_main(int argc,char **argv) {
     SDL_Window *window=nullptr;SDL_GPUDevice *device=nullptr;SDL_GPUTexture *screen=nullptr;
     app::GpuRenderer gpu;rally::TouchControls touch;std::unique_ptr<Machine> machine,reference;
     app::CrtRenderer crt;app::DisplayPanel display;app::DisplaySettings display_settings;
+    // Fresh player preferences start with Arcade CRT. Loading a saved choice
+    // below takes precedence; --original-display remains the explicit bypass.
+    display_settings.crt.enabled=player_defaults;
     app::segarally::Controls controls;
     bool crt_ready=false;
     rally::AudioOutput audio;
@@ -254,9 +256,23 @@ int segarally_host_main(int argc,char **argv) {
         flags|=SDL_WINDOW_FULLSCREEN;touch_visible=true;
 #endif
         window=SDL_CreateWindow("Sega Rally Native | F1 / Y Settings | F6 CRT",992,768,flags);
-        device=app::create_gpu_device();
-        if(!window || !device || strcmp(SDL_GetGPUDeviceDriver(device),"metal") || !SDL_ClaimWindowForGPUDevice(device,window))
-            throw std::runtime_error(std::string("Metal initialization: ")+SDL_GetError());
+        if(!window) throw std::runtime_error(std::string("SDL window: ")+SDL_GetError());
+        const char *requested_gpu=SDL_GetHint(SDL_HINT_GPU_DRIVER);
+        if(!requested_gpu)requested_gpu=app::default_gpu_driver();
+        if(!app::supported_gpu_driver(requested_gpu))
+            throw std::runtime_error(std::string("Unsupported SDL_GPU_DRIVER '")+requested_gpu+
+                "'; this platform uses "+app::default_gpu_driver()+" (Metal on Apple, Vulkan on Windows/Linux)");
+        fprintf(stderr,"GPU request=%s\n",requested_gpu);
+        device=app::create_gpu_device(app::default_gpu_driver());
+        if(!device) throw std::runtime_error(std::string("SDL_GPU initialization [")+requested_gpu+"]: "+SDL_GetError());
+        if(!app::supported_gpu_driver(SDL_GetGPUDeviceDriver(device)))
+            throw std::runtime_error("SDL selected a GPU backend outside the supported platform contract");
+        const auto shader_formats=SDL_GetGPUShaderFormats(device);
+        fprintf(stderr,"GPU selected=%s shader_formats=0x%x\n",SDL_GetGPUDeviceDriver(device),unsigned(shader_formats));
+        if(!(shader_formats&(SDL_GPU_SHADERFORMAT_SPIRV|SDL_GPU_SHADERFORMAT_DXIL|SDL_GPU_SHADERFORMAT_MSL)))
+            throw std::runtime_error("Selected GPU backend cannot consume the bundled SPIR-V, DXIL or MSL game shaders");
+        if(!SDL_ClaimWindowForGPUDevice(device,window))
+            throw std::runtime_error(std::string("SDL_GPU claim window: ")+SDL_GetError());
         SDL_SetGPUSwapchainParameters(device,window,SDL_GPU_SWAPCHAINCOMPOSITION_SDR,SDL_GPU_PRESENTMODE_VSYNC);
         fprintf(stderr,"GPU driver=%s device=%s native Model2A core, SCSP=%s playback=%d\n",SDL_GetGPUDeviceDriver(device),
             SDL_GetStringProperty(SDL_GetGPUDeviceProperties(device),SDL_PROP_GPU_DEVICE_NAME_STRING,"unknown"),
@@ -264,9 +280,16 @@ int segarally_host_main(int argc,char **argv) {
         SDL_GPUTextureCreateInfo ti{};ti.type=SDL_GPU_TEXTURETYPE_2D;ti.format=SDL_GPU_TEXTUREFORMAT_B8G8R8A8_UNORM;
         ti.usage=SDL_GPU_TEXTUREUSAGE_SAMPLER|SDL_GPU_TEXTUREUSAGE_COLOR_TARGET;ti.width=496;ti.height=384;ti.layer_count_or_depth=1;ti.num_levels=1;
         screen=SDL_CreateGPUTexture(device,&ti);
-        if(!screen || !gpu.init(device,ti.format) || !touch.init(device,SDL_GetGPUSwapchainTextureFormat(device,window)))
-            throw std::runtime_error(std::string("Metal pipelines: ")+gpu.error()+" "+SDL_GetError());
-        touch.visible=touch_visible;touch.layout(window);
+        if(!screen || !gpu.init(device,ti.format))
+            throw std::runtime_error(std::string("SDL_GPU pipelines: ")+gpu.error()+" "+SDL_GetError());
+        touch.visible=touch_visible;
+        int touch_width=1,touch_height=1;
+        const auto touch_layout=[&] {
+            SDL_Rect safe{};SDL_GetWindowSize(window,&touch_width,&touch_height);
+            SDL_GetWindowSafeArea(window,&safe);
+            touch.layout(float(touch_width),float(touch_height),{float(safe.x),float(safe.y),float(safe.w),float(safe.h)});
+        };
+        touch_layout();
         if(!display.init(window,device,SDL_GetGPUSwapchainTextureFormat(device,window),saves,display_settings))
             throw std::runtime_error(display.error());
         if(!display.error().empty()) fprintf(stderr,"Display preferences: %s\n",display.error().c_str());
@@ -324,7 +347,28 @@ int segarally_host_main(int argc,char **argv) {
             bool input_transition=false;
             while(SDL_PollEvent(&event)) {
                 const bool controls_consumed=controls.process_event(event);
-                display.process_event(event,controls_consumed);
+                bool touch_consumed=false;
+                // Game touches own their original target until UP; never feed a
+                // held pedal or the Settings-opening finger into ImGui's mouse.
+                const bool blocked_pointer=touch.blocked_contacts();
+                if(event.type==SDL_EVENT_FINGER_DOWN) {
+                    if(!display.open() && focused && !background) {
+                        touch.visible=true;
+                        touch_consumed=touch.down(event.tfinger.touchID,event.tfinger.fingerID,
+                            event.tfinger.x*touch_width,event.tfinger.y*touch_height,
+                            !replay || replay_manual_takeover);
+                        if(touch.take_settings_request()) display.set_open(true);
+                    }
+                } else if(event.type==SDL_EVENT_FINGER_MOTION) {
+                    touch.move(event.tfinger.touchID,event.tfinger.fingerID,
+                        event.tfinger.x*touch_width,event.tfinger.y*touch_height);
+                } else if(event.type==SDL_EVENT_FINGER_UP || event.type==SDL_EVENT_FINGER_CANCELED) {
+                    touch.up(event.tfinger.touchID,event.tfinger.fingerID,event.type==SDL_EVENT_FINGER_CANCELED);
+                }
+                const bool touch_mouse=(event.type==SDL_EVENT_MOUSE_MOTION && event.motion.which==SDL_TOUCH_MOUSEID) ||
+                    ((event.type==SDL_EVENT_MOUSE_BUTTON_DOWN || event.type==SDL_EVENT_MOUSE_BUTTON_UP) && event.button.which==SDL_TOUCH_MOUSEID);
+                display.process_event(event,controls_consumed || touch_consumed ||
+                    (touch_mouse && (blocked_pointer || touch.blocked_contacts())));
                 if(event.type==SDL_EVENT_QUIT || event.type==SDL_EVENT_TERMINATING) quit=true;
                 if(!controls_consumed && event.type==SDL_EVENT_KEY_DOWN && !event.key.repeat) {
                     if(event.key.scancode==SDL_SCANCODE_F1) display.set_open(!display.open());
@@ -335,15 +379,14 @@ int segarally_host_main(int argc,char **argv) {
                         if(display.open()) display.set_open(false);else quit=true;
                     }
                 }
-                if(event.type==SDL_EVENT_WILL_ENTER_BACKGROUND) {background=true;input_transition=true;touch.clear();audio.clear();save(*machine,saves);}
+                if(event.type==SDL_EVENT_WILL_ENTER_BACKGROUND) {background=true;input_transition=true;touch.cancel_all();audio.clear();save(*machine,saves);}
                 if(event.type==SDL_EVENT_DID_ENTER_FOREGROUND) {background=false;input_transition=true;audio.clear();start=SDL_GetTicksNS()-machine->stats().board_time_ns;}
-                if(event.type==SDL_EVENT_WINDOW_FOCUS_LOST) {focused=false;input_transition=true;touch.clear();}
+                if(event.type==SDL_EVENT_WINDOW_FOCUS_LOST) {focused=false;input_transition=true;touch.cancel_all();}
                 if(event.type==SDL_EVENT_WINDOW_FOCUS_GAINED) {focused=true;input_transition=true;}
-                if(event.type==SDL_EVENT_WINDOW_RESIZED || event.type==SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED || event.type==SDL_EVENT_WINDOW_SAFE_AREA_CHANGED) touch.layout(window);
-                if(!display.open() && focused && !background) touch.event(event);
+                if(event.type==SDL_EVENT_WINDOW_RESIZED || event.type==SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED || event.type==SDL_EVENT_WINDOW_SAFE_AREA_CHANGED) touch_layout();
             }
             controls.poll();
-            if(input_transition) controls.suppress_held();
+            if(input_transition) {controls.suppress_held();touch.clear();}
             if(controls.take_menu_request() && focused && !background) display.set_open(!display.open());
             if(background) {controls.sample({},false);producer_at=0;SDL_Delay(20);continue;}
             if(display_paused!=display.open()) {
@@ -354,12 +397,12 @@ int segarally_host_main(int argc,char **argv) {
             }
             std::array<bool,app::segarally::action_count> touch_actions{};
             using Action=app::segarally::Action;
-            for(const auto &[action,button]:std::array<std::pair<Action,rally::Button>,10>{{
-                {Action::Left,rally::Left},{Action::Right,rally::Right},{Action::Gas,rally::Gas},
+            for(const auto &[action,button]:std::array<std::pair<Action,rally::Button>,8>{{
+                {Action::Gas,rally::Gas},
                 {Action::Brake,rally::Brake},{Action::Coin,rally::Coin},{Action::Start,rally::Start},
                 {Action::View,rally::View},{Action::GearDown,rally::GearDown},
                 {Action::GearUp,rally::GearUp},{Action::Handbrake,rally::Handbrake}}})
-                touch_actions[size_t(action)]=touch.held[size_t(button)];
+                touch_actions[size_t(action)]=touch.pressed(button);
             auto &in=machine->inputs();
             const auto before=machine->stats();
             // Display navigation cannot advance replay events or change the
@@ -373,13 +416,15 @@ int segarally_host_main(int argc,char **argv) {
             }
             const bool replay_active=replay && (replay->applied()<replay->size() || before.frames_rendered<replay_release_frame);
             if(replay && !replay_active && !replay_manual_takeover) {
-                replay_manual_takeover=true;
+                replay_manual_takeover=true;touch.clear();touch_actions.fill(false);
                 fprintf(stderr,"Input replay complete: manual takeover at frame=%llu\n",static_cast<unsigned long long>(before.frames_rendered));
             }
             if(!replay_active) {
                 in=controls.sample(touch_actions,focused);
-            } else controls.sample(touch_actions,false);
-            } else controls.sample(touch_actions,false);
+                if(focused && !controls.binding() && touch.steering_active()) in.analog[0]=touch.steering_adc();
+                if(!stopped && !quit) touch.consume();
+            } else {controls.sample(touch_actions,false);touch.clear();}
+            } else {controls.sample(touch_actions,false);touch.clear();}
             bool new_frame=false;
             if(!stopped && !quit && !display_paused) {
                 const uint64_t completed=machine->stats().instructions;
@@ -406,7 +451,7 @@ int segarally_host_main(int argc,char **argv) {
                     const auto a=machine->stats(),b=reference->stats();
                     if(outcome.reason!=expected.reason || a.instructions!=b.instructions || a.pc!=b.pc ||
                        a.reference_cycles!=b.reference_cycles || a.frames_rendered!=b.frames_rendered)
-                        throw std::runtime_error("Native software/Metal machines diverged before presentation");
+                        throw std::runtime_error("Native software/GPU machines diverged before presentation");
                 }
                 if(outcome.reason==Machine::Reason::Frame) new_frame=true;
                 else if(outcome.reason!=Machine::Reason::Budget) {
@@ -423,7 +468,7 @@ int segarally_host_main(int argc,char **argv) {
             if(sound && !display_paused) {
                 const auto samples=machine->take_audio();
                 if(reference && reference->take_audio()!=samples)
-                    throw std::runtime_error("Native software/Metal machines produced different SCSP samples");
+                    throw std::runtime_error("Native software/GPU machines produced different SCSP samples");
                 audio_frames+=samples.size()/2;
                 for(const float sample:samples) {
                     if(!std::isfinite(sample)) throw std::runtime_error("Non-finite SCSP output sample");
@@ -456,7 +501,10 @@ int segarally_host_main(int argc,char **argv) {
             if(!new_frame && !stopped && !display_paused) {diagnostic_log();continue;}
             const Uint64 presentation_start=audio_diagnostics?SDL_GetTicksNS():0;
             if(show_display_controls && new_frame) {display.set_open(true);show_display_controls=false;}
-            if(!display.new_frame(display_settings)) throw std::runtime_error(display.error());
+            const bool touch_overlay=touch.visible && focused && !background && !display.open();
+            std::function<void()> overlay;
+            if(touch_overlay) overlay=[&] {rally::draw_touch_overlay(touch,controls.mapper.gear());};
+            if(!display.new_frame(display_settings,overlay)) throw std::runtime_error(display.error());
             auto *cmd=SDL_AcquireGPUCommandBuffer(device);if(!cmd) throw std::runtime_error(SDL_GetError());
             display.prepare(cmd);
             SDL_GPUTexture *swapchain=nullptr;Uint32 sw=0,sh=0;
@@ -491,9 +539,8 @@ int segarally_host_main(int argc,char **argv) {
                     blit.filter=display_settings.linear_filter?SDL_GPU_FILTER_LINEAR:SDL_GPU_FILTER_NEAREST;
                     SDL_BlitGPUTexture(cmd,&blit);
                 }
-                touch.draw(cmd,swapchain);
             }
-            if(swapchain && display.open()) {
+            if(swapchain && (display.open() || touch_overlay)) {
                 SDL_GPUColorTargetInfo target{};target.texture=swapchain;
                 target.load_op=displayed?SDL_GPU_LOADOP_LOAD:SDL_GPU_LOADOP_CLEAR;
                 target.store_op=SDL_GPU_STOREOP_STORE;target.clear_color={0,0,0,1};
@@ -546,7 +593,7 @@ int segarally_host_main(int argc,char **argv) {
             static_cast<unsigned long long>(stats.reference_cycles),stats.pc,result);
     } catch(const std::exception &error) {fprintf(stderr,"Sega Rally native: %s\n",error.what());result=1;}
     audio.close();
-    if(device) {SDL_WaitForGPUIdle(device);display.shutdown();crt.shutdown();touch.shutdown();gpu.shutdown();if(screen) SDL_ReleaseGPUTexture(device,screen);
+    if(device) {SDL_WaitForGPUIdle(device);display.shutdown();crt.shutdown();gpu.shutdown();if(screen) SDL_ReleaseGPUTexture(device,screen);
         if(window) SDL_ReleaseWindowFromGPUDevice(device,window);SDL_DestroyGPUDevice(device);}
     controls.shutdown();
     if(window) SDL_DestroyWindow(window);SDL_Quit();return result;
@@ -554,6 +601,11 @@ int segarally_host_main(int argc,char **argv) {
 
 #ifndef SEGARALLY_IOS
 int main(int argc,char **argv) {
+#ifdef SEGARALLY_FRONTEND_COMPILE_ONLY
+    (void)argc; (void)argv;
+    fprintf(stderr,"ROM-free frontend compilation fixture only; no game code or assets.\n");
+    return 2;
+#endif
     try {return segarally_host_main(argc,argv);}catch(const std::exception &error) {fprintf(stderr,"Sega Rally native: %s\n",error.what());return 1;}
 }
 #endif

@@ -1,8 +1,15 @@
 // Small bounded presentation-only preference file; game saves are not accessed.
 #pragma once
+#include "app/segarally_platform_files.h"
 #include "app/segarally_display.h"
 #include <array>
 #include <charconv>
+#include <cerrno>
+#include <cstdlib>
+#include <locale.h>
+#if defined(__APPLE__)
+#include <xlocale.h>
+#endif
 #include <cmath>
 #include <fstream>
 #include <iomanip>
@@ -10,8 +17,43 @@
 #include <locale>
 #include <sstream>
 #include <system_error>
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
 
 namespace app::display_preferences {
+inline bool parse_float(const std::string &text, float &value) {
+#if defined(SEGARALLY_LEGACY_FLOAT_PARSE) || (defined(__APPLE__) && TARGET_OS_IPHONE)
+    // libc++ floating from_chars is unavailable before iOS 26. Keep a bounded,
+    // classic-locale parser here; a leading plus is also rejected by from_chars.
+    size_t pos=0;
+    if(pos<text.size() && text[pos]=='-') ++pos;
+    const auto digits=[&] {const auto start=pos;while(pos<text.size() && text[pos]>='0' && text[pos]<='9') ++pos;return pos!=start;};
+    bool mantissa=digits();
+    if(pos<text.size() && text[pos]=='.') {++pos;mantissa=digits() || mantissa;}
+    if(!mantissa) return false;
+    if(pos<text.size() && (text[pos]=='e' || text[pos]=='E')) {
+        ++pos;if(pos<text.size() && (text[pos]=='+' || text[pos]=='-')) ++pos;
+        if(!digits()) return false;
+    }
+    if(pos!=text.size()) return false;
+    const int prior_errno=errno;
+    const auto numeric=newlocale(LC_NUMERIC_MASK,"C",nullptr);
+    if(!numeric) {errno=prior_errno;return false;}
+    char *end=nullptr;errno=0;
+    const float next=strtof_l(text.c_str(),&end,numeric);
+    const int error=errno;freelocale(numeric);errno=prior_errno;
+    // A representable subnormal can set ERANGE; a nonzero value rounded all
+    // the way to zero is the out-of-range case rejected by from_chars.
+    if(end!=text.data()+text.size() || !std::isfinite(next) || (error==ERANGE && next==0)) return false;
+    value=next;return true;
+#else
+    float next=0;const auto result=std::from_chars(text.data(),text.data()+text.size(),next);
+    if(result.ec!=std::errc{} || result.ptr!=text.data()+text.size() || !std::isfinite(next)) return false;
+    value=next;return true;
+#endif
+}
+
 inline bool equal(const DisplaySettings &a, const DisplaySettings &b) {
     return a.crt.enabled == b.crt.enabled && a.crt.scanlines == b.crt.scanlines &&
         a.crt.mask == b.crt.mask && a.crt.glow == b.crt.glow &&
@@ -41,8 +83,7 @@ inline bool decode(const std::string &text, DisplaySettings &settings) {
             if (i==7) next.integer_scale=b;
             if (i==8) next.accurate_textures=b;
         } else {
-            float v=0; const auto result=std::from_chars(value.data(),value.data()+value.size(),v);
-            if (result.ec!=std::errc{} || result.ptr!=value.data()+value.size()) return false;
+            float v=0;if(!parse_float(value,v)) return false;
             switch(i) {case 1:next.crt.scanlines=v;break;case 2:next.crt.mask=v;break;case 3:next.crt.glow=v;break;case 4:next.crt.curvature=v;break;case 5:next.crt.chromatic=v;break;default:break;}
         }
     }
@@ -79,7 +120,7 @@ inline bool store(const std::filesystem::path &path, const DisplaySettings &sett
     std::ofstream out(temporary,std::ios::binary|std::ios::trunc);
     const auto text=encode(settings);out.write(text.data(),std::streamsize(text.size()));out.close();
     if (!out) {error="Cannot write display preferences.";std::filesystem::remove(temporary,ec);return false;}
-    std::filesystem::rename(temporary,path,ec);
+    app::replace_save_file(temporary,path,ec);
     if (ec) {error="Cannot replace display preferences.";std::filesystem::remove(temporary,ec);return false;}
     error.clear();return true;
 }

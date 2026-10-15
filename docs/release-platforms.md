@@ -1,14 +1,16 @@
 # App packages and platform status
 
 [Source prerelease v0.1.0-rc.1](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-rc.1)
-contains source archives. It does not contain four playable game binaries.
+contains source archives. The separate [Mac local builder preview](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-mac-builder.1)
+now supplies an empty arm64 DMG with a byte manifest and checksums. There are not
+yet four playable game binaries.
 
 The distribution work targets these four platforms:
 
 | Platform | Graphics | Package | Current validation |
 | --- | --- | --- | --- |
 | Mac, Apple Silicon | Metal | Personal game DMG; separate empty local-builder DMG | Personal package built, signed ad hoc and checksum verified. Empty builder has 20 coordinator tests and a successful fresh download/generation/build/test/package/verification run. GUI interaction remains untested. |
-| iPhone, arm64 | Metal | Locally generated app, signed for its destination | Native platform build and touch integration in progress. No installable public IPA or TestFlight build yet. |
+| iPhone, arm64 | Metal | Locally generated app, signed for its destination | Unsigned iOS 15+ build passed with sound and new touch controls; assets/notices verified. Signing, installation and physical testing remain pending. |
 | Windows, x86-64 | Vulkan through SDL3 GPU | Local builder and personal native game package | Desktop build portability and real-host compilation CI in progress; no validated game binary yet. |
 | Linux, x86-64 | Vulkan through SDL3 GPU | Local builder and personal native game package | Desktop build portability and real-host compilation CI in progress; no validated game binary yet. |
 

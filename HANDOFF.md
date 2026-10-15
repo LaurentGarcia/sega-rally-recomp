@@ -1,5 +1,52 @@
 # Handoff
 
+## Shared frame packets, portable host and player startup (2026-10-15)
+
+The dedicated host now selects Metal on Apple and Vulkan on Windows/Linux.
+Platform CMake enables Objective-C/frameworks only on Apple and uses compiler-
+appropriate strict FP flags. Actual executable identity and atomic save
+replacement handle Windows/Linux explicitly. A separate ROM-free link fixture
+compiles the real frontend/runtime/UI/sound/recording ABI and exits before
+SDL/game startup; CI never packages it as a playable app. Integrated Mac build
+and all thirteen host CTests pass. Windows/Linux execution awaits the new CI
+stage. The local desktop pipeline can plan/build/package personal inputs, but
+its complete Windows/Linux game generation run is not yet established.
+
+Projection, priority, polygon edges and scissor packets move into SDL-free
+`Model2Frame`. Shared resource helpers preserve gamma, color-translation and
+tile packing. The projection body is unchanged from 9c969c1 apart from class
+and rectangle names. Both old-body and new builds pass 144 invented cases with
+packet fingerprint `f4d290e762fc3523`. Initial fixture use of a temporary polygon
+vector failed: Video retains its reference. Keeping the vector alive corrects
+the fixture; production geometry is unchanged. This prepares direct backends
+without duplicating Model 2 behavior.
+
+The new touch overlay shares the existing lazy Settings context. Its stable
+finger ownership, steering, safe-area layout and pause/focus suppression pass
+511 pure checks and the earlier sanitizer run. The unsigned iOS 15+ sound/hook
+app builds with these controls and eight verified assets/notices. The original
+float from_chars availability failure is fixed by a strict locale-independent
+iOS fallback: 8,217 new parser checks pass plus the existing 250-case checks.
+An initial stream fallback mishandled hex/subnormals and was replaced before
+the successful build. Signing and physical phone testing remain pending.
+
+Player startup (no arguments or explicit `--player`) now enables compiled sound,
+exact execution and CRT on fresh preferences. Saved display choices still load;
+explicit diagnostics retain opt-in defaults, `--original-display` bypasses
+effects and `--no-sound` disables sound. The first public builder still pins
+9c969c1 and must be advanced after a verified new game build. The reported silent
+personal app is not yet diagnosed: its exact unchanged signed binary produced
+nonzero native and logical-device PCM during a 2,100-frame paced isolated check,
+with peaks 0.04023/0.04020. This does not establish audibility on the user's output.
+
+The empty Mac installer is public at tag `v0.1.0-mac-builder.1`, source34aa798.
+Its CI DMG SHA-256 is
+`ab7ea01170e70ee576070d6c73fb8f237861595eae5bb0785a7ee1f74537b0bb`;
+remote digests match the downloaded/verified file and manifest. The first direct
+Vulkan CI compiles/links but fails before device creation because the workflow
+guessed the lavapipe manifest filename. The corrected job discovers and records
+the actually installed ICD; shader/native code is unchanged, execution pending.
+
 ## Direct Vulkan validation target (2026-10-15)
 
 A standalone SDL-free Vulkan fixture creates native device resources, descriptors,

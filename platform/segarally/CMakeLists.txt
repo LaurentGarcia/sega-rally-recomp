@@ -1,7 +1,17 @@
 cmake_minimum_required(VERSION 3.25)
-project(SegaRallyNative LANGUAGES C CXX OBJC OBJCXX)
-if(NOT APPLE)
-    message(FATAL_ERROR "This dedicated frontend requires the native Metal backend on macOS or iOS")
+project(SegaRallyNative LANGUAGES C CXX)
+if(APPLE)
+    enable_language(OBJC)
+    enable_language(OBJCXX)
+endif()
+option(SEGARALLY_FRONTEND_COMPILE_ONLY "ROM-free real-host compile/link fixture; NEVER a playable build" OFF)
+if(SEGARALLY_FRONTEND_COMPILE_ONLY AND CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    message(FATAL_ERROR "The ROM-free frontend compile fixture is desktop-only")
+endif()
+set(HOST_TARGET segarally_native)
+if(SEGARALLY_FRONTEND_COMPILE_ONLY)
+    set(HOST_TARGET segarally_frontend_compile)
+    message(STATUS "ROM-free frontend compile/link check: no guest program, assets, or playable executable")
 endif()
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -39,15 +49,20 @@ add_library(segarally_imgui STATIC
 target_include_directories(segarally_imgui SYSTEM PUBLIC "${SEGARALLY_IMGUI_SOURCE}")
 target_link_libraries(segarally_imgui PUBLIC SDL3::SDL3-static)
 file(GLOB GENERATED CONFIGURE_DEPENDS "${SEGARALLY_NATIVE_BUILD}/gen/*.cpp")
-if(NOT GENERATED OR NOT EXISTS "${SEGARALLY_NATIVE_BUILD}/tgp/program.cpp")
+if(NOT SEGARALLY_FRONTEND_COMPILE_ONLY AND (NOT GENERATED OR NOT EXISTS "${SEGARALLY_NATIVE_BUILD}/tgp/program.cpp"))
     message(FATAL_ERROR "Generate the audited native main/TGP code before configuring the host")
 endif()
 set(RUNTIME cpu lockstep model2a_bus model2a_clock model2a_machine model2a_control model2_io model2_eeprom
     model2a_io model2a_comm comm_board model2_uart model2a_uart tgp m2_tgp_board model2a_video video raster geo)
-set(SOURCES "${ROOT}/src/app/segarally_main.cpp" "${ROOT}/src/app/gpu/gpu_renderer.cpp"
+set(SOURCES "${ROOT}/src/app/segarally_main.cpp" "${ROOT}/src/app/gpu/gpu_renderer.cpp" "${ROOT}/src/app/gpu/model2_frame.cpp"
     "${ROOT}/src/app/gpu/crt_renderer.cpp" "${ROOT}/src/app/segarally_display.cpp"
     "${ROOT}/src/app/segarally_controls.cpp"
-    ${GENERATED} "${SEGARALLY_NATIVE_BUILD}/tgp/program.cpp")
+)
+if(SEGARALLY_FRONTEND_COMPILE_ONLY)
+    list(APPEND SOURCES "${ROOT}/tests/fixtures/segarally_frontend_link.cpp")
+else()
+    list(APPEND SOURCES ${GENERATED} "${SEGARALLY_NATIVE_BUILD}/tgp/program.cpp")
+endif()
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 set(STAGE_ARGS)
 if(SEGARALLY_INSTRUCTION_BOUNDARY_HOOK)
@@ -56,10 +71,13 @@ endif()
 if(SEGARALLY_SOUND)
     list(APPEND STAGE_ARGS --sound-build "${SEGARALLY_SOUND_BUILD}")
     list(APPEND RUNTIME model2a_sound model2a_sound_bus snd_cpu model2_scsp model2_scsp_dsp)
-    list(APPEND SOURCES "${SEGARALLY_SOUND_BUILD}/sound/native-timed/snd_gen.cpp")
+    if(NOT SEGARALLY_FRONTEND_COMPILE_ONLY)
+        list(APPEND SOURCES "${SEGARALLY_SOUND_BUILD}/sound/native-timed/snd_gen.cpp")
+    endif()
 endif()
 # Refuse capability/macro mismatches before compiling. This also checks the
 # generated source/header inventory before the host rebuilds all native chunks.
+if(NOT SEGARALLY_FRONTEND_COMPILE_ONLY)
 file(READ "${SEGARALLY_NATIVE_BUILD}/coverage.json" NATIVE_AUDIT)
 string(JSON GENERATED_BOUNDARY_HOOK ERROR_VARIABLE BOUNDARY_JSON_ERROR GET "${NATIVE_AUDIT}" reachability instruction_boundary_hook)
 if(BOUNDARY_JSON_ERROR)
@@ -77,10 +95,16 @@ if(SEGARALLY_SOUND OR SEGARALLY_INSTRUCTION_BOUNDARY_HOOK)
         message(FATAL_ERROR "Verified optional native generation/assets required")
     endif()
 endif()
+endif()
 foreach(NAME IN LISTS RUNTIME)
     list(APPEND SOURCES "${ROOT}/src/runtime/${NAME}.cpp")
 endforeach()
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    set(SEGARALLY_IOS_TEAM "" CACHE STRING "Personal Apple development team identifier")
+    set(SEGARALLY_IOS_BUNDLE_ID "com.lgarciacarro.segarally.native" CACHE STRING "Personal iOS bundle identifier")
+    set(SEGARALLY_IOS_VERSION "0.1.0" CACHE STRING "iOS marketing version")
+    set(SEGARALLY_IOS_BUILD_NUMBER "1" CACHE STRING "iOS build number")
+    option(SEGARALLY_IOS_SIGNING "Sign the personal iOS app with Xcode" OFF)
     # Actual Xcode resource inputs establish copy/sign dependencies, including
     # incremental builds where imported data changes without a relink.
     set(ASSET_STAGE "${CMAKE_BINARY_DIR}/assets")
@@ -100,36 +124,49 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     list(APPEND ASSETS "${ASSET_STAGE}/assets.json")
     set_source_files_properties(${ASSETS} PROPERTIES MACOSX_PACKAGE_LOCATION assets)
     list(APPEND SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/ios/bootstrap.mm")
-    add_executable(segarally_native MACOSX_BUNDLE ${SOURCES} ${ASSETS})
+    add_executable(${HOST_TARGET} MACOSX_BUNDLE ${SOURCES} ${ASSETS})
     add_custom_target(segarally_assets
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/stage_data.py"
             --native-build "${SEGARALLY_NATIVE_BUILD}" --output "${ASSET_STAGE}" ${STAGE_ARGS}
         BYPRODUCTS ${ASSETS} VERBATIM COMMENT "Verify personally imported Sega Rally assets")
-    add_dependencies(segarally_native segarally_assets)
-    target_compile_definitions(segarally_native PRIVATE SEGARALLY_IOS=1)
-    set_target_properties(segarally_native PROPERTIES MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/ios/Info.plist.in"
-        XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.lgarciacarro.segarally.native"
+    add_dependencies(${HOST_TARGET} segarally_assets)
+    target_compile_definitions(${HOST_TARGET} PRIVATE SEGARALLY_IOS=1)
+    set_target_properties(${HOST_TARGET} PROPERTIES MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/ios/Info.plist.in"
+        XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${SEGARALLY_IOS_BUNDLE_ID}"
         XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
+        XCODE_ATTRIBUTE_SKIP_INSTALL "NO"
+        XCODE_ATTRIBUTE_INSTALL_PATH "$(LOCAL_APPS_DIR)"
         XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Automatic"
-        XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "3VJB3669V5"
         XCODE_ATTRIBUTE_ENABLE_BITCODE "NO"
         XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC "YES")
-    target_link_libraries(segarally_native PRIVATE "-framework UIKit" "-framework Foundation")
+    if(SEGARALLY_IOS_SIGNING)
+        if(NOT SEGARALLY_IOS_TEAM)
+            message(FATAL_ERROR "Set SEGARALLY_IOS_TEAM for a signed personal iOS build")
+        endif()
+        set_target_properties(${HOST_TARGET} PROPERTIES
+            XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "${SEGARALLY_IOS_TEAM}")
+    else()
+        set_target_properties(${HOST_TARGET} PROPERTIES
+            XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED "NO"
+            XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED "NO"
+            XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "")
+    endif()
+    target_link_libraries(${HOST_TARGET} PRIVATE "-framework UIKit" "-framework Foundation")
 else()
-    add_executable(segarally_native ${SOURCES})
-    set(ASSET_DEST "$<TARGET_FILE_DIR:segarally_native>/assets")
+    add_executable(${HOST_TARGET} ${SOURCES})
+    set(ASSET_DEST "$<TARGET_FILE_DIR:${HOST_TARGET}>/assets")
 endif()
-target_include_directories(segarally_native PRIVATE "${ROOT}/src" "${ROOT}/src/app")
-target_compile_definitions(segarally_native PRIVATE M2_SRALLY_TGP=1 M2_SRALLY_IO=1
+target_include_directories(${HOST_TARGET} PRIVATE "${ROOT}/src" "${ROOT}/src/app")
+target_compile_definitions(${HOST_TARGET} PRIVATE M2_SRALLY_TGP=1 M2_SRALLY_IO=1
     M2_SRALLY_COMM=1 M2_SRALLY_CONTROL=1 M2_SRALLY_VIDEO=1 M2_SRALLY_SCREEN=1 M2_SRALLY_UART=1 SDL_MAIN_HANDLED)
 if(SEGARALLY_SOUND)
-    target_compile_definitions(segarally_native PRIVATE M2_SRALLY_SOUND=1)
+    target_compile_definitions(${HOST_TARGET} PRIVATE M2_SRALLY_SOUND=1)
 endif()
 if(SEGARALLY_INSTRUCTION_BOUNDARY_HOOK)
     # One target owns runtime AND generated C++: no stale prebuilt main objects.
-    target_compile_definitions(segarally_native PRIVATE M2_INSTRUCTION_BOUNDARY_HOOK=1)
+    target_compile_definitions(${HOST_TARGET} PRIVATE M2_INSTRUCTION_BOUNDARY_HOOK=1)
 endif()
-if(SEGARALLY_SOUND OR SEGARALLY_INSTRUCTION_BOUNDARY_HOOK)
+if(NOT SEGARALLY_FRONTEND_COMPILE_ONLY AND (SEGARALLY_SOUND OR SEGARALLY_INSTRUCTION_BOUNDARY_HOOK))
     # Repeat provenance checks for incremental builds, before linking changed
     # native code. A successful older configure is insufficient evidence.
     if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
@@ -137,12 +174,23 @@ if(SEGARALLY_SOUND OR SEGARALLY_INSTRUCTION_BOUNDARY_HOOK)
             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/stage_data.py"
                 --native-build "${SEGARALLY_NATIVE_BUILD}" --output "${CMAKE_BINARY_DIR}/assets" ${STAGE_ARGS}
             VERBATIM)
-        add_dependencies(segarally_native segarally_native_verify)
+        add_dependencies(${HOST_TARGET} segarally_native_verify)
     endif()
 endif()
-target_compile_options(segarally_native PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fno-fast-math;-ffp-contract=off>
-    $<$<AND:$<CONFIG:Release>,$<COMPILE_LANGUAGE:CXX>>:-O3>)
-target_link_libraries(segarally_native PRIVATE SDL3::SDL3-static segarally_imgui "-framework Metal" "-framework QuartzCore")
+if(MSVC)
+    target_compile_options(${HOST_TARGET} PRIVATE /fp:strict /bigobj /utf-8)
+    target_compile_definitions(${HOST_TARGET} PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+else()
+    target_compile_options(${HOST_TARGET} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fno-fast-math;-ffp-contract=off>
+        $<$<AND:$<CONFIG:Release>,$<COMPILE_LANGUAGE:CXX>>:-O3>)
+endif()
+target_link_libraries(${HOST_TARGET} PRIVATE SDL3::SDL3-static segarally_imgui)
+if(APPLE)
+    target_link_libraries(${HOST_TARGET} PRIVATE "-framework Metal" "-framework QuartzCore")
+endif()
+if(SEGARALLY_FRONTEND_COMPILE_ONLY)
+    target_compile_definitions(${HOST_TARGET} PRIVATE SEGARALLY_FRONTEND_COMPILE_ONLY=1)
+endif()
 if(SEGARALLY_INPUT_RECORDING AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(SEGARALLY_LZMA_SOURCE "${ROOT}/extern/lzma" CACHE PATH "Pinned public-domain 7-Zip SHA-256 sources")
     execute_process(COMMAND git -C "${SEGARALLY_LZMA_SOURCE}" rev-parse HEAD
@@ -154,19 +202,27 @@ if(SEGARALLY_INPUT_RECORDING AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         "${SEGARALLY_LZMA_SOURCE}/C/Sha256.c" "${SEGARALLY_LZMA_SOURCE}/C/Sha256Opt.c" "${SEGARALLY_LZMA_SOURCE}/C/CpuArch.c")
     target_include_directories(segarally_recording PUBLIC "${ROOT}/src")
     target_include_directories(segarally_recording SYSTEM PUBLIC "${SEGARALLY_LZMA_SOURCE}/C")
-    target_compile_options(segarally_recording PRIVATE -fno-fast-math -ffp-contract=off)
+    if(MSVC)
+        target_compile_options(segarally_recording PRIVATE /fp:strict /utf-8)
+    else()
+        target_compile_options(segarally_recording PRIVATE -fno-fast-math -ffp-contract=off)
+    endif()
     set_target_properties(segarally_recording PROPERTIES C_STANDARD 11)
     if(SEGARALLY_INSTRUCTION_BOUNDARY_HOOK)
         target_compile_definitions(segarally_recording PRIVATE M2_INSTRUCTION_BOUNDARY_HOOK=1)
     endif()
-    target_compile_definitions(segarally_native PRIVATE SEGARALLY_INPUT_RECORDING=1)
-    target_link_libraries(segarally_native PRIVATE segarally_recording)
+    target_compile_definitions(${HOST_TARGET} PRIVATE SEGARALLY_INPUT_RECORDING=1)
+    target_link_libraries(${HOST_TARGET} PRIVATE segarally_recording)
 endif()
 # Retain actual existing notices, including optional recording's public-domain
 # SHA sources. Refuse packaging when an expected dependency notice is absent.
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    # Retain the same eight reviewed notices as the personal Mac package.
+    set(SEGARALLY_LZMA_SOURCE "${ROOT}/extern/lzma" CACHE PATH "Pinned public-domain 7-Zip notice sources")
+endif()
 set(LICENSE_ARGS --output "${CMAKE_BINARY_DIR}/licenses"
     --sdl-source "${SEGARALLY_SDL_SOURCE}" --imgui-source "${SEGARALLY_IMGUI_SOURCE}")
-if(SEGARALLY_INPUT_RECORDING AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS" OR SEGARALLY_INPUT_RECORDING)
     list(APPEND LICENSE_ARGS --lzma-source "${SEGARALLY_LZMA_SOURCE}")
 endif()
 execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/package_licenses.py" ${LICENSE_ARGS}
@@ -177,9 +233,23 @@ endif()
 add_custom_target(segarally_licenses
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/package_licenses.py" ${LICENSE_ARGS}
     VERBATIM COMMENT "Retain project and dependency distribution notices")
-add_dependencies(segarally_native segarally_licenses)
+add_dependencies(${HOST_TARGET} segarally_licenses)
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    set(IOS_NOTICES)
+    foreach(NAME Project-BSD-3-Clause.txt THIRD_PARTY.md SDL.txt ImGui.txt
+                 ImGui-embedded-fonts.txt Source-notices.txt
+                 7-Zip-License.txt 7-Zip-selected-sources.txt)
+        list(APPEND IOS_NOTICES "${CMAKE_BINARY_DIR}/licenses/${NAME}")
+    endforeach()
+    # Copy resources as signed Xcode inputs; never modify the app after signing.
+    set_source_files_properties(${IOS_NOTICES} PROPERTIES MACOSX_PACKAGE_LOCATION licenses)
+    target_sources(${HOST_TARGET} PRIVATE ${IOS_NOTICES})
+endif()
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     enable_testing()
+    add_executable(test_segarally_platform_files EXCLUDE_FROM_ALL "${ROOT}/tests/test_segarally_platform_files.cpp")
+    target_include_directories(test_segarally_platform_files PRIVATE "${ROOT}/src")
+    add_test(NAME segarally_platform_files COMMAND test_segarally_platform_files "${CMAKE_CURRENT_BINARY_DIR}/platform-files-fixture")
     add_executable(test_segarally_input_replay EXCLUDE_FROM_ALL "${ROOT}/tests/test_segarally_input_replay.cpp")
     target_include_directories(test_segarally_input_replay PRIVATE "${ROOT}" "${ROOT}/src")
     add_test(NAME segarally_input_replay COMMAND test_segarally_input_replay)
@@ -191,25 +261,36 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     target_include_directories(test_segarally_audio PRIVATE "${ROOT}/src")
     target_link_libraries(test_segarally_audio PRIVATE SDL3::SDL3-static)
     # Keep assert-based fixtures active even when the actual host is Release.
-    target_compile_options(test_segarally_audio PRIVATE -UNDEBUG)
+    if(MSVC)
+        set(ASSERT_FLAGS /UNDEBUG)
+    else()
+        set(ASSERT_FLAGS -UNDEBUG)
+    endif()
+    target_compile_options(test_segarally_audio PRIVATE ${ASSERT_FLAGS})
     add_test(NAME segarally_audio COMMAND test_segarally_audio "${CMAKE_CURRENT_BINARY_DIR}/audio-fixture.wav")
     add_executable(test_segarally_audio_output_capture EXCLUDE_FROM_ALL "${ROOT}/tests/test_segarally_audio_output_capture.cpp")
     target_include_directories(test_segarally_audio_output_capture PRIVATE "${ROOT}/src")
     target_link_libraries(test_segarally_audio_output_capture PRIVATE SDL3::SDL3-static)
-    target_compile_options(test_segarally_audio_output_capture PRIVATE -UNDEBUG)
+    target_compile_options(test_segarally_audio_output_capture PRIVATE ${ASSERT_FLAGS})
     add_test(NAME segarally_audio_output_capture COMMAND test_segarally_audio_output_capture "${CMAKE_CURRENT_BINARY_DIR}/audio-output-fixture")
     add_executable(test_segarally_controls EXCLUDE_FROM_ALL
         "${ROOT}/tests/test_segarally_controls.cpp" "${ROOT}/src/app/segarally_controls.cpp")
     target_include_directories(test_segarally_controls PRIVATE "${ROOT}/src")
     target_link_libraries(test_segarally_controls PRIVATE SDL3::SDL3-static)
-    target_compile_options(test_segarally_controls PRIVATE -UNDEBUG)
+    target_compile_options(test_segarally_controls PRIVATE ${ASSERT_FLAGS})
     add_test(NAME segarally_controls COMMAND test_segarally_controls)
     add_executable(test_segarally_display_preferences EXCLUDE_FROM_ALL "${ROOT}/tests/test_segarally_display_preferences.cpp")
     target_include_directories(test_segarally_display_preferences PRIVATE "${ROOT}/src")
     target_link_libraries(test_segarally_display_preferences PRIVATE SDL3::SDL3-static)
     add_test(NAME segarally_display_preferences COMMAND test_segarally_display_preferences)
-    add_custom_command(TARGET segarally_native POST_BUILD
+    if(NOT SEGARALLY_FRONTEND_COMPILE_ONLY)
+    add_custom_command(TARGET ${HOST_TARGET} POST_BUILD
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/stage_data.py"
             --native-build "${SEGARALLY_NATIVE_BUILD}" --output "${ASSET_DEST}" ${STAGE_ARGS}
         VERBATIM COMMENT "Verify and package personally imported Sega Rally assets")
+    endif()
+endif()
+if(SEGARALLY_FRONTEND_COMPILE_ONLY)
+    add_test(NAME segarally_frontend_fixture_refuses_game
+        COMMAND "${Python3_EXECUTABLE}" "${ROOT}/tests/test_segarally_frontend_fixture.py" "$<TARGET_FILE:${HOST_TARGET}>")
 endif()

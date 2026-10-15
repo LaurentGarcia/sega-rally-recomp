@@ -149,8 +149,11 @@ reproduce a particular arcade monitor.
 when CRT effects are off. **Integer scale** uses whole-number scaling when
 there is enough space. **Accurate textures** is a separate native rendering
 option that improves measured texture edges and interpolation but can reduce
-performance. It does not add CRT scanlines. All effects and Accurate textures
-start off on a fresh setup; Smooth remains the default.
+performance. It does not add CRT scanlines. Current source builds start Arcade
+CRT enabled for fresh player preferences. Accurate textures remains opt-in;
+Smooth remains the scaling default. Saved preferences take precedence. Explicit
+diagnostic commands retain their existing opt-in defaults, and
+`--original-display` disables the effects for that run.
 
 Changed presentation preferences are saved in `display.settings` inside the
 supplied save directory (`live-app-save` beside a launcher build). They are
@@ -197,7 +200,7 @@ Keep existing saves when testing a fresh configuration.
 If the window stops with a `frontier` title, preserve the log, build path,
 replay name and visible game state. This means a native-code or hardware path
 still needs implementation. If controls appear inactive, check window focus
-and whether the selection replay has handed over. Phone testing remains deferred.
+and whether the selection replay has handed over. Physical phone testing remains pending; the unsigned build has passed.
 
 ## Record and replay a drive
 

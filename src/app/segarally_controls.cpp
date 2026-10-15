@@ -1,4 +1,5 @@
 #include "app/segarally_controls.h"
+#include "app/segarally_platform_files.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -125,13 +126,17 @@ bool store_settings(const std::filesystem::path &path,const Settings &s,std::str
     std::ostringstream out;out.imbue(std::locale::classic());out<<"rally-controls 1\noptions "<<int(s.gamepad_enabled)<<' '<<int(s.steer_invert)<<' '
         <<std::setprecision(9)<<s.stick_deadzone<<' '<<s.trigger_deadzone<<' '<<s.steering_exponent<<'\n';
     for(size_t i=0;i<action_count;++i) {const auto &b=s.bindings[i];out<<"bind "<<i<<' '<<int(b.key)<<' '<<int(b.pad.kind)<<' '<<b.pad.index<<' '<<b.pad.dir<<'\n';}
-    const auto bytes=out.str();const auto temp=path.string()+".tmp";
+    const auto bytes=out.str();auto temp=path;temp += ".tmp";
+#ifdef _WIN32
+    FILE *file=_wfopen(temp.c_str(),L"wbx");
+#else
     FILE *file=std::fopen(temp.c_str(),"wbx");
+#endif
     if(!file) {error="Cannot create controls preferences temporary file.";return false;}
     bool ok=std::fwrite(bytes.data(),1,bytes.size(),file)==bytes.size();
     if(std::fclose(file)!=0) ok=false;
-    if(ok) {std::error_code ec;std::filesystem::rename(temp,path,ec);ok=!ec;}
-    if(!ok) {std::remove(temp.c_str());error="Cannot write controls preferences.";}
+    if(ok) {std::error_code ec;app::replace_save_file(temp,path,ec);ok=!ec;}
+    if(!ok) {std::error_code ec;std::filesystem::remove(temp,ec);error="Cannot write controls preferences.";}
     return ok;
 }
 void Mapper::suppress(const Snapshot &s) {

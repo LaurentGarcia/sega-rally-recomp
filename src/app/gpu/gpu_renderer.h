@@ -18,6 +18,7 @@
 #pragma once
 
 #include "runtime/video.h"
+#include "app/gpu/model2_frame.h"
 
 #include <SDL3/SDL.h>
 
@@ -26,7 +27,7 @@
 
 namespace app {
 
-class GpuRenderer {
+class GpuRenderer : private Model2Frame {
 public:
     // Creates the pipelines for drawing into textures of `format`. False (with
     // error()) if the GPU or its shader format is not usable.
@@ -49,21 +50,8 @@ public:
     void render(SDL_GPUCommandBuffer *cmd, SDL_GPUTexture *target, int w, int h, const rt::Video &video, int scale = 1);
 
 private:
-    struct PolyVertex {
-        float x, y, depth;
-        float ooz, uoz, voz; // render_one's p[0..2]: 1/z, u/z, v/z
-        float r, g, b, a;
-        uint32_t info[4], more[2]; // texture state (m2.hlsl PolyIn)
-        uint32_t edges[2]; // storage offset; polygon counts or triangle bit 7, and scale
-    };
-    struct PolyEdge { float origin[4], step[4], tail[4]; };
-    static_assert(sizeof(PolyEdge) == 48); // HLSL StructuredBuffer stride
     struct QuadVertex {
         float x, y, u, v;
-    };
-    struct Batch { // consecutive polygons sharing one clip rectangle
-        uint32_t first, count;
-        SDL_Rect clip;
     };
 
     SDL_GPUDevice *dev_ = nullptr;
@@ -77,8 +65,6 @@ private:
     SDL_GPUBuffer *texram_ = nullptr, *luma_ = nullptr, *xlat_ = nullptr;
     SDL_GPUBuffer *edges_ = nullptr;
     uint32_t edges_size_ = 0;
-    bool polygon_scanlines_ = false;
-    std::vector<PolyEdge> poly_edges_;
     uint64_t texram_generation_ = ~0ull; // the texture RAM generation texram_ holds
     // the tilemaps: pixmaps (4 x 512 x 512 u16), header + pens + tile words
     SDL_GPUBuffer *tilepix_ = nullptr, *tiledata_ = nullptr;
@@ -90,17 +76,12 @@ private:
     uint32_t vbuf_size_ = 0;
     SDL_GPUTransferBuffer *upload_ = nullptr;
     uint32_t upload_size_ = 0;
-    std::vector<PolyVertex> verts_;
-    std::vector<Batch> batches_;
-    std::vector<size_t> order_;
-    uint8_t gamma_[256];
     std::string error_;
 
     SDL_GPUShader *shader(const unsigned char *spv, size_t spv_len, const unsigned char *dxil, size_t dxil_len,
                           const char *msl, const char *dxil_entry, SDL_GPUShaderStage stage, int uniforms, int samplers,
                           int storage_buffers = 0);
     bool ensure(int w, int h, int scale, uint32_t vert_bytes, uint32_t edge_bytes);
-    void build(const rt::Video &video, int w, int h, int scale);
 };
 
 } // namespace app

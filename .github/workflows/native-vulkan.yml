@@ -18,9 +18,24 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends libvulkan-dev mesa-vulkan-drivers
+      - name: Select the installed lavapipe ICD
+        run: |
+          dpkg-query -W libvulkan1 libvulkan-dev mesa-vulkan-drivers
+          python3 - <<'PYCODE'
+          import json, os
+          from pathlib import Path
+          candidates = sorted(Path('/usr/share/vulkan/icd.d').glob('lvp_icd*.json'))
+          if len(candidates) != 1:
+              raise SystemExit(f'Expected one installed lavapipe ICD, found {candidates}')
+          path = candidates[0].resolve()
+          info = json.loads(path.read_text())
+          if 'lvp' not in info['ICD']['library_path']:
+              raise SystemExit('Selected manifest is not the lavapipe ICD')
+          print(f'Lavapipe manifest: {path}\n{path.read_text()}')
+          with open(os.environ['GITHUB_ENV'], 'a') as env:
+              env.write(f'VK_DRIVER_FILES={path}\n')
+          PYCODE
       - name: Execute common CRT SPIR-V through native Vulkan without SDL
-        env:
-          VK_DRIVER_FILES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
         run: python3 tests/test_native_vulkan_crt.py --output build/native-vulkan-ci --require-software
       - name: Show gate outcome
         if: always()

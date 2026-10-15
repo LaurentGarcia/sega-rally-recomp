@@ -64,7 +64,7 @@ def build_plan(roms: Path, output: Path, jobs: int) -> list[dict]:
         step("compile", ["cmake", "--build", str(host), "--parallel", str(jobs), "--target",
              "segarally_native", "test_segarally_audio", "test_segarally_controls",
              "test_segarally_display_preferences", "test_segarally_audio_output_capture",
-             "test_segarally_input_replay"]),
+             "test_segarally_input_replay", "test_segarally_platform_files"]),
         step("tests", ["ctest", "--test-dir", str(host), "--output-on-failure"], 300),
         step("package", script("platform/segarally/macos/launch.py", "--build-dir", host,
              "--no-launch", "--sound", "--instruction-boundary-hook",

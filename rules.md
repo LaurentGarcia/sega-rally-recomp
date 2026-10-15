@@ -134,6 +134,9 @@ legal problem, or hours re-deriving something already established.
 - **TGP results returned to the i960 must be bit-identical to MAME's.** Game
   logic depends on them.
 - **Enhancements are off by default, and may change game logic when on.**
+  The requested Rally player presentation is the sole default exception:
+  Arcade CRT starts enabled for fresh interactive preferences. Saved choices
+  and the explicit original-display diagnostic bypass take precedence.
   Widescreen or a longer draw distance can need the game's own culling
   changed. With every enhancement off the build is the game as MAME runs it,
   and all parity and lockstep checks run that way. Logic runs at native rate;

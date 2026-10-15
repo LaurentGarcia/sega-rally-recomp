@@ -3,11 +3,11 @@
 <plist version="1.0"><dict>
     <key>CFBundleExecutable</key><string>${MACOSX_BUNDLE_EXECUTABLE_NAME}</string>
     <key>CFBundlePackageType</key><string>APPL</string>
-    <key>CFBundleIdentifier</key><string>com.lgarciacarro.segarally.native</string>
+    <key>CFBundleIdentifier</key><string>${SEGARALLY_IOS_BUNDLE_ID}</string>
     <key>CFBundleName</key><string>Sega Rally Native</string>
     <key>CFBundleDisplayName</key><string>Sega Rally Native</string>
-    <key>CFBundleShortVersionString</key><string>0.1</string>
-    <key>CFBundleVersion</key><string>1</string>
+    <key>CFBundleShortVersionString</key><string>${SEGARALLY_IOS_VERSION}</string>
+    <key>CFBundleVersion</key><string>${SEGARALLY_IOS_BUILD_NUMBER}</string>
     <key>LSRequiresIPhoneOS</key><true/>
     <key>UISupportedInterfaceOrientations</key><array>
         <string>UIInterfaceOrientationLandscapeLeft</string>

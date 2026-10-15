@@ -12,7 +12,7 @@ Generated C++ game code · Native board devices · SDL3 + Metal
 [![Build](https://github.com/LaurentGarcia/sega-rally-recomp/actions/workflows/build.yml/badge.svg)](https://github.com/LaurentGarcia/sega-rally-recomp/actions/workflows/build.yml)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-2e8b57?style=flat-square)](LICENSE)
 
-**[Build your Mac app](docs/getting-started.md) · [Player manual](docs/mac-player-manual.md) · [Architecture](docs/segarally-architecture.md) · [Tested scope](docs/segarally-status.md)**
+**[Download the Mac local builder](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-mac-builder.1) · [Build guide](docs/getting-started.md) · [Player manual](docs/mac-player-manual.md) · [Architecture](docs/segarally-architecture.md)**
 
 <img src="docs/images/crt.png" alt="Actual Metal CRT presentation: Martini Lancia in Desert with scanlines, phosphor mask and curved screen" width="960">
 
@@ -37,7 +37,9 @@ SDL3 and Metal put the result on your Mac.
 ROMs, generated game code or a ready-to-play app. Mac/iPhone packaging and
 Windows/Linux Vulkan bring-up are active; see the **[four-platform package
 status](docs/release-platforms.md)** for actual availability and requirements.
-Display enhancements start off on fresh preferences.
+Current source builds enable Arcade CRT on fresh player preferences; existing
+choices are retained. The first published local builder still uses the earlier
+game revision. Full availability is tracked in the package status.
 
 ## On the stages
 
@@ -56,8 +58,8 @@ Display enhancements start off on fresh preferences.
 
 The hero demonstrates the optional Arcade CRT preset: scanlines, phosphor mask,
 glow, curvature and subtle color fringing. It uses the production shader on Metal
-with a preserved Accurate textures frame. Effects remain adjustable and off by
-default. The stage gallery applies the same Metal CRT pass to preserved native CPU
+with a preserved Accurate textures frame. Effects remain adjustable and start
+disabled in diagnostic runs. The stage gallery applies the same Metal CRT pass to preserved native CPU
 renders. Its gameplay captures predate this source prerelease.
 [Original Forest](docs/images/forest.png) · [Original Mountain](docs/images/mountain.png) · [Original Stage Clear](docs/images/finish.png).
 

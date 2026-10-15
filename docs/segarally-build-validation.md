@@ -2,7 +2,7 @@
 
 The experimental **v0.1.0-rc.1 source prerelease** builds a local Mac app from
 verified personal Revision B (`srallycb`) ROMs. For a fresh checkout, follow
-[getting started](getting-started.md) first. Phone builds and testing are deferred.
+[getting started](getting-started.md) first. See [platform status](release-platforms.md) for phone and Windows/Linux build readiness.
 Commands below run from the repository root.
 
 ## Inputs and tools
@@ -62,7 +62,7 @@ launch command. It never launches the game. Open
 `build/segarally-player/mac/Sega Rally Native.app` to play, or follow the printed
 launch command. Direct no-argument startup enables compiled sound and the exact
 instruction boundary hook; explicit diagnostic launches retain opt-in switches.
-Enhancements start off with fresh preferences.
+Current source builds enable CRT for fresh player preferences; other enhancements remain opt-in.
 
 The package is ad-hoc signed for local use, not notarized or universal. No Apple
 developer account is required for that local signature. Because it contains

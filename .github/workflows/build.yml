@@ -69,3 +69,9 @@ jobs:
         run: ./setup.sh
       - name: Tests
         run: ctest --test-dir build -C Release --output-on-failure
+
+      # Compile the dedicated Rally host, UI, GPU shaders, sound, recording and
+      # hook ABI with original ROM-free link symbols. This is NOT a game build,
+      # and the resulting fixture is never uploaded or packaged as a player.
+      - name: Compile Rally frontend with the same toolchain and check host fixtures
+        run: python scripts/segarally_frontend_ci.py

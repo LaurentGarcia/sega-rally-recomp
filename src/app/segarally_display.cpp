@@ -33,7 +33,7 @@ struct DisplayPanel::Impl {
         if (controls) held_keys=controls->snapshot().keys;
         if (context) {
             CurrentContext current(context);
-            ImGui::GetIO().ClearInputKeys();ImGui::GetIO().ClearEventsQueue();
+            ImGui::GetIO().ClearInputKeys();ImGui::GetIO().ClearInputMouse();ImGui::GetIO().ClearEventsQueue();
             if (platform) ImGui_ImplSDL3_SetGamepadMode(ImGui_ImplSDL3_GamepadMode_Manual,nullptr,0);
         }
     }
@@ -132,12 +132,14 @@ bool DisplayPanel::process_event(const SDL_Event &event,bool controls_consumed) 
     // This result describes explicit isolation, not ImGui's broad event types.
     return false;
 }
-bool DisplayPanel::new_frame(DisplaySettings &settings) {
-    auto &s=*impl_;s.draw=nullptr;if (!s.visible) return true;
+bool DisplayPanel::new_frame(DisplaySettings &settings,const std::function<void()> &overlay) {
+    auto &s=*impl_;s.draw=nullptr;if (!s.visible && !overlay) return true;
     if (!s.backend()) {s.visible=false;return false;}
     CurrentContext current(s.context);
-    s.navigation();
+    if(s.visible) s.navigation();
+    else ImGui_ImplSDL3_SetGamepadMode(ImGui_ImplSDL3_GamepadMode_Manual,nullptr,0);
     ImGui_ImplSDLGPU3_NewFrame();ImGui_ImplSDL3_NewFrame();ImGui::NewFrame();
+    if(!s.visible) {overlay();ImGui::Render();s.draw=ImGui::GetDrawData();return true;}
     const auto *viewport=ImGui::GetMainViewport();
     const ImVec2 available(std::max(1.0f,viewport->WorkSize.x-24.0f),
                            std::max(1.0f,viewport->WorkSize.y-24.0f));
@@ -251,11 +253,11 @@ bool DisplayPanel::new_frame(DisplaySettings &settings) {
     save(settings);if (s.controls) s.controls->save();return true;
 }
 void DisplayPanel::prepare(SDL_GPUCommandBuffer *command) {
-    auto &s=*impl_;if (!command || !s.visible || !s.draw || s.draw->DisplaySize.x<=0 || s.draw->DisplaySize.y<=0) return;
+    auto &s=*impl_;if (!command || !s.draw || s.draw->DisplaySize.x<=0 || s.draw->DisplaySize.y<=0) return;
     CurrentContext current(s.context);ImGui_ImplSDLGPU3_PrepareDrawData(s.draw,command);
 }
 void DisplayPanel::render(SDL_GPUCommandBuffer *command,SDL_GPURenderPass *pass) {
-    auto &s=*impl_;if (!command || !pass || !s.visible || !s.draw || s.draw->DisplaySize.x<=0 || s.draw->DisplaySize.y<=0) return;
+    auto &s=*impl_;if (!command || !pass || !s.draw || s.draw->DisplaySize.x<=0 || s.draw->DisplaySize.y<=0) return;
     CurrentContext current(s.context);ImGui_ImplSDLGPU3_RenderDrawData(s.draw,command,pass);
 }
 bool DisplayPanel::save(const DisplaySettings &settings) {

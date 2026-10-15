@@ -3,7 +3,7 @@
 This guide builds the experimental **v0.1.0-rc.1 source prerelease** into a local
 Mac app using your own verified Sega Rally Championship Revision B ROM archive.
 No downloadable game or game assets are supplied. The active target is macOS;
-phone work is deferred.
+phone and Windows/Linux work is tracked in [platform status](release-platforms.md).
 
 ## 1. Prepare the tools
 
@@ -84,7 +84,7 @@ compiled-in sound and the faster instruction boundary execution path. The game
 opens windowed with normal pacing; original reset checks run first. On a fresh
 cabinet, press and release **C twice**, then **Return**. Use **Left/Right** to
 steer, **Z** for gas and **X** for brake. **F1** opens paused Settings; **Escape**
-quits when Settings is closed. Enhancements start off on fresh preferences.
+quits when Settings is closed. Current source builds enable CRT for fresh player preferences; F6 toggles it. Other enhancements remain opt-in.
 
 For scripted coin/start/automatic-Lancia selection followed by manual takeover:
 
