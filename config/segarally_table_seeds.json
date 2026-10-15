@@ -3,7 +3,7 @@
   "romset": "srallycb",
   "board": "model2a",
   "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
-  "scope": "Only this individually audited seven-entry table. Addresses and hashes are metadata; no game bytes or game implementation are included. Static table derivation does not prove runtime execution or complete coverage.",
+  "scope": "Individually audited bounded tables only. Addresses and hashes are metadata; no game bytes or game implementation are included. Static candidates do not prove runtime execution, immutable live RAM tables or complete coverage.",
   "tables": [
     {
       "name": "startup_dispatch_005af85c",
@@ -996,6 +996,31 @@
       "destination_register": 20,
       "source_baseline_commit": "0cd0d07",
       "candidate_evidence": "build/validation/table-scout-classic.json; independently revalidated through table_seeds before import"
+    },
+    {
+      "name": "short_result_dispatch_005b7670",
+      "kind": "direct_mask_callback",
+      "relocation": "reset_workram_copy",
+      "program_offset": "0x00018670",
+      "runtime_address": "0x005b7670",
+      "entry_count": 4,
+      "table_sha256": "99c927a2a89df8795f9883e3bf3cb80bcf335daadaceedd7c76e56974047e859",
+      "targets": [
+        "0x005b87a0",
+        "0x005b8fb0",
+        "0x005b9210",
+        "0x005b9410"
+      ],
+      "code_evidence": [
+        {
+          "role": "body",
+          "program_offset": "0x00018698",
+          "runtime_address": "0x005b7698",
+          "size": 44,
+          "sha256": "6e42450903688b86c3e5e63221c4a7a1b51488fec8a0c7db0d3d8441413cb802"
+        }
+      ],
+      "proof": "Decoded AND literal3 bounds the same register used by an indexed scale4 load. A combined nonzero branch goes directly to callx through that loaded register; the null fallthrough permits only literal moves and absolute stores before RET immediately preceding the call. All targets are inside the verified reset copy. Live RAM table mutation is not excluded; target code retains existing live-word guards. Candidates are separate from execution observations."
     }
   ],
   "object_update_dispatcher": {

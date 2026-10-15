@@ -2,6 +2,8 @@
 """Synthetic ISA fixtures for bounded table seed provenance; no game bytes."""
 import copy
 import hashlib
+import os
+import shlex
 from pathlib import Path
 import struct
 import sys
@@ -9,7 +11,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-from segarally_recompile import table_seeds
+from segarally_recompile import table_seeds, build_continuation_tool
 
 
 class TableSeedTests(unittest.TestCase):
@@ -131,6 +133,124 @@ class TableSeedTests(unittest.TestCase):
                 config = copy.deepcopy(self.config)
                 config["tables"][0][field] = value
                 self.reject(config=config)
+
+
+class DirectMaskTableTests(unittest.TestCase):
+    """Invented four-entry layout, unrelated registers/data/addresses."""
+    @classmethod
+    def setUpClass(cls):
+        cls.tool = build_continuation_tool(shlex.split(os.environ.get("CXX", "c++")),
+                                          ROOT / "build/validation/direct-mask-tests")
+
+    @staticmethod
+    def reg(op, dst, first, second=0, m1=0):
+        return ((op & 0xff0) << 20) | ((op & 15) << 7) | dst << 19 | second << 14 | m1 << 11 | first
+
+    @staticmethod
+    def mem(op, dst, base=0, mode=4, index=0, scale=0):
+        return op << 24 | dst << 19 | base << 14 | mode << 10 | scale << 7 | index
+
+    def setUp(self):
+        self.program = bytearray(0x400)
+        self.words = [self.reg(0x581, 23, 3, 23, m1=1),
+                      self.mem(0x90, 23, mode=14, index=23, scale=2), 0x500300,
+                      0x3d << 24 | 23 << 14 | 1 << 13 | 0x1c,
+                      self.reg(0x5cc, 17, 5, m1=1),
+                      self.mem(0x92, 30, mode=12), 0x5002a0,
+                      self.mem(0x92, 17, mode=12), 0x5002a4,
+                      0x0a000000, self.mem(0x86, 0, 23)]
+        self.install(0x80, self.words)
+        targets = [0x500180, 0, 0x5001c0, 0x500180]
+        self.install(0x300, targets)
+        self.config = {"board": "model2a", "romset": "srallycb", "tables": [{
+            "name": "invented_direct", "kind": "direct_mask_callback", "relocation": "fixture",
+            "program_offset": "0x300", "runtime_address": "0x500300", "entry_count": 4,
+            "targets": [hex(t) for t in targets], "code_evidence": [{"role": "body",
+            "program_offset": "0x80", "runtime_address": "0x500080", "size": len(self.words)*4}]}]}
+        self.relocations = {"relocations": [{"name": "fixture", "program_offset": "0x0",
+                            "guest": "0x500000", "size": "0x400"}]}
+        self.refresh()
+
+    def install(self, where, words):
+        for n, word in enumerate(words): struct.pack_into("<I", self.program, where+n*4, word)
+
+    def refresh(self):
+        TableSeedTests.refresh_hashes(self.program, self.config)
+
+    def rows(self):
+        return table_seeds(self.program, self.config, self.relocations, self.tool)
+
+    def test_direct_candidates_unique_null_skipped_and_static_provenance(self):
+        rows = self.rows()
+        self.assertEqual([r["address"] for r in rows], ["0x00000180", "0x000001c0"])
+        self.assertEqual(rows[0]["table_indices"], [0, 3])
+        self.assertIn("direct four-entry", rows[0]["provenance"])
+        self.assertIn("runtime observation", rows[0]["provenance"])
+
+    def test_all_nonzero_entries(self):
+        targets = [0x500180, 0x5001c0, 0x500200, 0x500240]
+        self.install(0x300, targets)
+        self.config["tables"][0]["targets"] = [hex(t) for t in targets]
+        self.refresh()
+        self.assertEqual(len(self.rows()), 4)
+
+    def test_rehashed_operand_and_control_mutations(self):
+        mutations = {
+            "wrong_mask": (0x80, self.reg(0x581, 23, 7, 23, m1=1)),
+            "mask_SFR_quirk": (0x80, self.words[0] | 1 << 5),
+            "load_reserved_quirk": (0x84, self.words[1] | 1 << 5),
+            "guard_unaligned_quirk": (0x8c, self.words[3] | 2),
+            "call_reserved_quirk": (0xa8, self.words[10] | 1 << 6),
+            "mask_not_literal": (0x80, self.reg(0x581, 23, 3, 23)),
+            "mask_source": (0x80, self.reg(0x581, 23, 3, 22, m1=1)),
+            "mask_literal_destination": (0x80, self.words[0] | 1 << 13),
+            "load_index": (0x84, self.mem(0x90, 23, mode=14, index=22, scale=2)),
+            "load_scale": (0x84, self.mem(0x90, 23, mode=14, index=23, scale=1)),
+            "load_destination": (0x84, self.mem(0x90, 22, mode=14, index=23, scale=2)),
+            "load_base_alias": (0x84, self.mem(0x90, 23, base=23, mode=15, index=23, scale=2)),
+            "guard_equal": (0x8c, 0x3a << 24 | 23 << 14 | 1 << 13 | 0x1c),
+            "guard_nonzero_operand": (0x8c, self.words[3] | 1 << 19),
+            "guard_wrong_register": (0x8c, 0x3d << 24 | 22 << 14 | 1 << 13 | 0x1c),
+            "guard_not_literal": (0x8c, self.words[3] ^ 1 << 13),
+            "guard_extension_word": (0x8c, 0x3d << 24 | 23 << 14 | 1 << 13 | 0x14),
+            "guard_after_call": (0x8c, 0x3d << 24 | 23 << 14 | 1 << 13 | 0x20),
+            "live_register_clobber": (0x90, self.reg(0x5cc, 23, 1, m1=1)),
+            "unknown_register_op": (0x90, self.reg(0x590, 17, 1, 17, m1=1)),
+            "null_path_call": (0x90, 0x09000018),
+            "null_path_branch": (0xa4, 0x08000004),
+            "call_wrong_register": (0xa8, self.mem(0x86, 0, 22)),
+            "call_indexed": (0xa8, self.mem(0x86, 0, 23, mode=7, index=23)),
+            "call_bx": (0xa8, self.mem(0x84, 0, 23)),
+        }
+        for name, (where, word) in mutations.items():
+            with self.subTest(name=name):
+                self.setUp(); self.install(where, [word]); self.refresh()
+                with self.assertRaises(ValueError): self.rows()
+
+    def test_rehashed_count_alias_body_and_targets_rejected(self):
+        for kind in ("count", "alias", "body", "table_alias", "target_range", "target_alignment", "target_metadata"):
+            with self.subTest(kind=kind):
+                self.setUp(); t=self.config["tables"][0]
+                if kind=="count": t["entry_count"]=3
+                elif kind=="alias": self.relocations["relocations"][0]["guest"]="0x500004"
+                elif kind=="body": t["code_evidence"][0]["size"]-=4
+                elif kind=="table_alias": t["runtime_address"]="0x500304"
+                elif kind=="target_metadata": self.install(0x300, [0x500200])
+                else:
+                    target=0x500400 if kind=="target_range" else 0x500181
+                    self.install(0x300, [target]); t["targets"][0]=hex(target)
+                self.refresh()
+                with self.assertRaises(ValueError): self.rows()
+
+    def test_wrong_hashes_and_truncated_instruction_rejected(self):
+        for field in ("program", "table", "body", "truncated"):
+            with self.subTest(field=field):
+                self.setUp();t=self.config["tables"][0]
+                if field=="program":self.config["program_sha256"]="0"*64
+                elif field=="table":t["table_sha256"]="0"*64
+                elif field=="body":t["code_evidence"][0]["sha256"]="0"*64
+                else:self.relocations["relocations"][0]["size"]="0xa8"
+                with self.assertRaises(ValueError):self.rows()
 
 
 if __name__ == "__main__":

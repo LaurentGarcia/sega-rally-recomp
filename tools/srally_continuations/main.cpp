@@ -122,6 +122,43 @@ static std::optional<CallbackProof> callback_proof(uint32_t start,
     return {};
 }
 
+// Separate four-entry idiom: bounded index, exact load, combined nonzero
+// branch directly to callx. The null path is a short terminating whitelist;
+// no arbitrary CFG, call ABI or immutable live-RAM table is inferred.
+static std::optional<CallbackProof> direct_mask_proof(uint32_t start,
+    const std::function<i960::Insn(uint32_t)> &decode) {
+    using namespace i960;
+    auto mask=decode(start), load=decode(start+4), guard=decode(start+12);
+    if (!mask.valid() || mask.quirks || mask.op->code!=0x581 || !mask.m1 || mask.m2 || mask.m3 ||
+        mask.src1!=3 || mask.src2!=mask.dst || !load.valid() || load.quirks ||
+        load.op->code!=0x90 || load.ea!=EaMode::IndexDisp || load.length!=8 ||
+        load.index!=mask.dst || load.scale!=2 || load.src1!=mask.dst ||
+        !guard.valid() || guard.quirks || guard.op->code!=0x3d || !guard.m1 || guard.src1!=0 ||
+        guard.src2!=load.src1 || !guard.has_target || guard.target<start+20)
+        return {};
+    uint32_t p=start+16;
+    for (unsigned n=0;n<16;++n) {
+        auto in=decode(p); if (!in.valid() || in.quirks) return {};
+        if (in.op->code==0x0a) {
+            // The inspected null path terminates before the branch destination.
+            // This local proof makes no claim about other incoming entries.
+            if (p+4!=guard.target) return {};
+            auto call=decode(p+4);
+            if (!call.valid() || call.quirks || call.op->code!=0x86 || call.ea!=EaMode::Abase ||
+                call.src2!=load.src1) return {};
+            return CallbackProof{load.disp,4,p+8-start};
+        }
+        if (p>=guard.target || in.op->flow!=Flow::None) return {};
+        if (in.fmt==Format::Reg && in.op->code==0x5cc && in.m1 && !in.m3 &&
+            in.dst!=load.src1) { p+=in.length; continue; }
+        if (in.fmt==Format::Mem && in.op->code==0x92 && in.ea==EaMode::Disp) {
+            p+=in.length; continue;
+        }
+        return {}; // reject other stores, tracked-register writes or control
+    }
+    return {};
+}
+
 static std::set<uint32_t> addresses(const char *path) {
     std::ifstream f(path); if (!f) throw std::runtime_error("address file unavailable");
     std::set<uint32_t> result; std::string word;
@@ -133,7 +170,8 @@ int main(int argc, char **argv) {
         const bool updates=argc==10 && std::string(argv[1])=="--updates";
         const bool comparison=argc==7 && std::string(argv[1])=="--compare";
         const bool masked=argc==7 && std::string(argv[1])=="--masked";
-        const bool table_mode=masked || comparison;
+        const bool direct_mask=argc==7 && std::string(argv[1])=="--direct-mask";
+        const bool table_mode=masked || comparison || direct_mask;
         if (!table_mode && !updates && argc != 8) throw std::runtime_error("program trusted reachable entries source guest size required");
         std::ifstream f(argv[table_mode||updates?2:1], std::ios::binary); if (!f) throw std::runtime_error("program unavailable");
         const std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(f), {}};
@@ -157,7 +195,8 @@ int main(int argc, char **argv) {
         };
         if (table_mode) {
             const auto start=number(argv[3]);
-            const auto result=comparison?compare_proof(start,decode):callback_proof(start,decode);
+            const auto result=direct_mask?direct_mask_proof(start,decode):
+                comparison?compare_proof(start,decode):callback_proof(start,decode);
             if (!result) throw std::runtime_error("table operand/dataflow proof failed");
             std::cout<<"{\"table\":"<<result->table<<",\"count\":"<<result->count<<",\"size\":"<<result->size;
             if(comparison) {

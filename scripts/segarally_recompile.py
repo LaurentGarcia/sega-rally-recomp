@@ -422,7 +422,7 @@ def table_seeds(program: bytes, config: dict, relocations: dict, proof_tool: Pat
                 raise ValueError("table code/data evidence hash differs from supplied program")
             return data
 
-        if table.get("kind") in ("masked_callback", "compare_dispatch"):
+        if table.get("kind") in ("masked_callback", "compare_dispatch", "direct_mask_callback"):
             if proof_tool is None or len(table["code_evidence"]) != 1:
                 raise ValueError("masked callback requires the inherited-decoder proof tool and one body span")
             body = table["code_evidence"][0]
@@ -433,7 +433,8 @@ def table_seeds(program: bytes, config: dict, relocations: dict, proof_tool: Pat
             with tempfile.TemporaryDirectory(prefix="srally-table-") as directory:
                 image = Path(directory) / "program.bin"
                 image.write_bytes(program)
-                mode = "--masked" if table["kind"] == "masked_callback" else "--compare"
+                mode = {"masked_callback": "--masked", "compare_dispatch": "--compare",
+                        "direct_mask_callback": "--direct-mask"}[table["kind"]]
                 result = subprocess.run([str(proof_tool), mode, str(image), hex(start),
                     hex(source), hex(guest), hex(size)], capture_output=True, text=True)
             if result.returncode:
@@ -450,8 +451,8 @@ def table_seeds(program: bytes, config: dict, relocations: dict, proof_tool: Pat
             if targets != [number(target) for target in table["targets"]]:
                 raise ValueError("masked callback entries differ from audited metadata")
             for target in dict.fromkeys(targets):
-                if target == 0 and table["kind"] == "masked_callback":
-                    continue  # decoded cmpi/be skips null callbacks
+                if target == 0 and table["kind"] in ("masked_callback", "direct_mask_callback"):
+                    continue  # the decoded null guard skips null callbacks
                 if target & 3 or not guest <= target < guest + size:
                     raise ValueError("masked callback target lies outside aligned verified reset copy")
                 candidates.append({"address": f"0x{source + target - guest:08x}",
@@ -459,7 +460,8 @@ def table_seeds(program: bytes, config: dict, relocations: dict, proof_tool: Pat
                     "table_indices": [i for i, value in enumerate(targets) if value == target],
                     "name": f"verified_table_{table['name']}_target_{target:08x}",
                     "evidence": "config/segarally_table_seeds.json",
-                    "provenance": ("Verified masked callback table candidate with null guard and saved-pointer dataflow" if table["kind"] == "masked_callback" else
+                    "provenance": ("Verified direct four-entry masked callback candidate with combined nonzero guard" if table["kind"] == "direct_mask_callback" else
+                        "Verified masked callback table candidate with null guard and saved-pointer dataflow" if table["kind"] == "masked_callback" else
                         "Verified unsigned compare/branch dispatch candidate with preserved index/flags through frame spills") +
                         "; runtime observation, immutable live RAM tables and full coverage are not implied."})
             continue

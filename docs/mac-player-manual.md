@@ -40,6 +40,21 @@ or controller. Release held buttons and center the stick when control passes
 to you. The longer driving replays are for validation and keep scripted control
 for their entire sequence.
 
+New builds also provide two Practice selection scripts. Replace the
+`--input-replay` file above with one of these:
+
+| Practice course | Selection script |
+| --- | --- |
+| Mountain | [segarally_practice_mountain_select.inputs](../config/segarally_practice_mountain_select.inputs) |
+| Lakeside | [segarally_practice_lakeside_select.inputs](../config/segarally_practice_lakeside_select.inputs) |
+
+Both choose the automatic Lancia through the original game menus, then release
+all controls for manual driving. Lakeside uses the game's built-in gear/brake
+selection sequence. These timed scripts assume fresh default cabinet settings;
+saved settings or credits can change the menu sequence. Use a fresh build/save
+directory and preserve existing saves. Earlier captured apps, including
+candidate 003, predate the Practice callback fixes.
+
 The launcher verifies assets, packages and signs the app, then opens it through
 LaunchServices. It prints app and log paths. Add `--fullscreen` for desktop
 fullscreen. An already running copy is activated; quit it before changing

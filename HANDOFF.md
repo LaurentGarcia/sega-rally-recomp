@@ -1,5 +1,108 @@
 # Handoff
 
+## Practice results and name-entry continuation (2026-10-15)
+
+Candidate 005 at clean `fc24ef8a0d059f552c277a442289f9ed6c500034` passes
+the ten-step pipeline and eleven Mac CTests. Signed executable SHA-256 is
+`542c3cd5cf7a53b8615565764a2a96cf67da2a360eba7a448a972ceabda77a07`.
+Its independent package audit passes at
+`build/validation/mac-release-audit/fresh-candidate-005-review.json`, SHA-256
+`e2c928007cb3a1cafe1c5b2f07fe4ca57e51fd3b6a77590ca0a815ec86e2e3bf`.
+All 51 instruction chunks and 76,257 address/chunk mappings equal v20b;
+indexed dispatch is the sole generation-option difference. Candidate 005 is
+preserved as an intermediate package; its new gameplay checks were held for
+the remaining post-result callbacks.
+
+The ordinary NORMAL-difficulty / SHORT-mode Practice Mountain drive now reaches
+an actual **MOUNTAIN STAGE CLEAR!** result, rank 2nd, lap and total **1:16.23**
+at frame 10,200. The unchanged input prefix reaches further missing native
+entries during the post-result transition. Each first failure is retained and
+each added seed has a separate provenance audit; generated C++ is not edited.
+
+| Runtime entry | Canonical ROM | First-failure frame | Instructions | Reference cycles |
+| --- | --- | ---: | ---: | ---: |
+| `005b2820` | `00013820` | 10,506 | 2,011,354,615 | 4,566,355,705 |
+| `005b285c` | `0001385c` | 10,506 | 2,011,354,625 | 4,566,355,728 |
+| `005e7d30` | `00048d30` | 10,507 | 2,011,552,834 | 4,566,789,351 |
+| `005b7400` | `00018400` | 10,508 | 2,011,751,422 | 4,567,223,771 |
+| `005b7690` | `00018690` | 10,525 | 2,015,114,063 | 4,574,611,966 |
+| `005b87a0` | `000197a0` | 10,525 | 2,015,114,068 | 4,574,611,988 |
+| `005b8fb0` | `00019fb0` | 13,785 | 2,639,196,598 | 5,991,409,125 |
+
+The second row is an actual RET reached ten instructions and 23 reference
+cycles after the first; it was not inferred from an adjacent address. Audit
+reports live under
+`build/worktrees/audio-device-headroom/build/validation/frontier-<runtime>-review-001/result.json`.
+Their SHA-256 values, in table order, are
+`a250b30169cd5f79d0972faa8cdae0b2f27fb8c1a07d79b9d012ee2bda0976cb`,
+`a9550b5bd11b497eeccff6dbbccab5086335fb0196a9afa6fb6c160f549ccd63`,
+`2cd9bb050f7357d6ac4258be8612b2cc78c873b2426e94819ff290e27415d512`,
+`ee6f6008f8bd66fd278847784241a6379593029392ed4ef0e89f6bbae900fc1c`,
+`1d9edac4a6481ed56708f2ea11efe553b6af2f8c487750cac6243786dbfaed36`,
+`71fb942d924396bc496687277aa1033ecf5986fa2b4738a4409ffcf9d90f288b`,
+and `2bb025467af6e622baf221a30e0ea6c1cd07419a870618ccb215a9ab0eab5030`.
+The v23 generation contains 76,359 instructions in 52 native objects. The v24
+graph grows to 53 objects, so the ignored helper's inventory check now derives
+the main object list from the boundary contract and checks the 26 non-main
+objects separately instead of assuming the old total. There is no guest or
+runtime semantic change. All ten newly observed entries are integrated;
+continuation beyond the latest result callback and the final Mac package remain
+pending. The consolidated observed-manifest SHA-256 is
+`f0f332e28ecaf83377f6f4c54f63e3757e850ee7cfe7992c68e76c19f9f3220c`.
+
+The v26 continuation reaches a visibly confirmed NAME ENTRY screen and then
+stops at the second callback in a bounded four-entry table. This is a real
+discovery gap in the existing saved-object and unsigned-compare table patterns.
+The i960 static recompiler design's indirect-target step supports a separate
+decoded `direct_mask_callback` proof: literal AND3 bounds the index, a scale-four
+load uses and replaces that register, and a combined nonzero branch goes directly
+to CALLX through the loaded register. The null path has a short terminating
+whitelist. Operands, reserved encodings, branch destination, table/body hashes
+and reset-copy aliases are checked; the existing patterns are unchanged.
+
+The table at `005b7670` has four static candidates: `005b87a0`, `005b8fb0`,
+`005b9210`, `005b9410`. These stay separate from actual execution observations;
+live RAM table mutation, other entry paths and complete coverage are not ruled
+out. Existing generated-code guards remain in place. The new mode changes
+discovery only, with no emitter, runtime, timer or game-state change.
+Thirteen table tests, twenty-five continuation tests and ten bootstrap tests
+pass, including twenty-five rehashed operand/control mutations. All 120 current
+table candidates validate against the verified supplied program. Frozen report:
+`build/worktrees/direct-mask-proof/build/validation/direct-mask-proof-review-002/report.json`,
+SHA-256 `17edd011086c29c164beb4f949c68729f45a103d951fac22210da34b60665f36`.
+Independent patch/proof/test-source review passes at
+`build/validation/direct-mask-proof-independent-review/result.json`, SHA-256
+`7ac916cd7fa9f081d9494fa7525b422e2d0a634e9cd778ce9f184c50eb7b3952`.
+That review verifies the reported test scope and exact source identities; it
+does not claim a second test execution or retained raw unittest logs. The
+consolidated generated path and final Mac checks remain to be run.
+
+The proposed SHORT Lakeside shortcut is rejected by decoded, ROM-checked
+conditions: the finish test requires the event's segment-zero crossing before
+testing cumulative progress above 290. Reaching segment 297 is insufficient.
+The first allowance is also 75 seconds in SHORT versus 80 seconds in NORMAL.
+Read-only report `build/worktrees/audio-device-headroom/build/validation/lakeside-short-finish-001/report.json`,
+SHA-256 `fddc45fa4d2fc65051dbf302dbb7d7c309a21f562da9d1254bb011ba06a113c8`.
+No additional Lakeside drive or controller tuning follows this rejected theory.
+
+One independent comparison of the fixed SHORT prefix passes two billion
+instructions, 58,120,650 ordered writes, 4,539,611,659 reference cycles,
+110,449 interrupt entries and 10,445 renders, ending at PC `005a37a4`.
+All 1,877 original cabinet events apply, with none pending. The independently
+compared Practice start and finish entries execute 9,148 and 421 times.
+The first finish visit is before instruction 1,921,603,185 and after reference
+cycle 4,356,939,914 at frame 10,025; the four-cycle difference from the native
+frontier witness is that the comparison logs after executing the opcode.
+All 200 frozen inputs remain unchanged, and compile/guest stderr are empty.
+Compile time is 7.28 seconds and comparison time is 1,141.28 seconds; neither
+is a gameplay-speed benchmark. Result:
+`build/validation/practice-short-v20b-i960-reference/attempt-001/result.json`,
+SHA-256 `e4df250c8811ec7e8caa288a0712bc5496ed17a93ae67b670313d915d552a044`.
+This is generated i960 versus unchanged I960Ref with independently instantiated
+shared board implementations, sound off and a null Machine hook. Its fixed
+bound excludes the post-result entries above and the separate NORMAL retirement
+callback. It cannot establish full-machine, sound or hardware fidelity.
+
 ## Observed one-lap Practice finish callback (2026-10-15)
 
 Candidate 004 at clean `b168631e3824cc287d327005cb9b17daed7ad37d` passes the
