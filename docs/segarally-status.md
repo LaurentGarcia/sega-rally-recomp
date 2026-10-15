@@ -260,9 +260,14 @@ results and 131,072 seed/fallback cases match exact integer oracles, while
 174 excluded inputs preserve a separately compiled legacy shader's bits.
 Ordinary division differs on 13,317 sampled normals, at most one ULP. This
 is an arithmetic-only result; the helper is not integrated into production.
-Actual span-step measurement at the remaining first-car pixels, complete-scene
-guards and cost are the next gates. See `HANDOFF.md` for frozen inputs,
-readbacks and the independent artifact audit.
+The actual span steps at the two remaining first-car pixels are now measured:
+the same signed width produces a one-ULP-different reciprocal and three
+one-ULP-different steps. Repeated float32 addition from identical starts
+reconstructs the observed texture-coordinate and filtered-texel differences.
+The full accepted image remains exact under instrumentation. An isolated
+common-shader candidate, complete-scene/default-off/synthetic guards and cost
+are the next gates. See `HANDOFF.md` for frozen inputs, readbacks and
+independent artifact audits. Temporal flicker improvement remains untested.
 
 ### Optional CRT and Display controls
 

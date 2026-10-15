@@ -1,5 +1,45 @@
 # Handoff
 
+## Metal span-step discrepancy directly measured (2026-10-14)
+
+The remaining first-car pixels (294,94) and (434,94) now have direct GPU span
+evidence. Owner 827 has the same edge endpoints, parameters and signed width
+`4390d31a` on both paths. Its actual Metal reciprocal is `3b624288`, one ULP
+above the CPU's nearest-even `3b624287`. Float32 subtraction/multiplication
+reconstructs all three measured GPU steps: `37496822/bd5aed80/3aff150e`, versus
+CPU `37496821/bd5aed7f/3aff150d`. The earlier inference identified only U/z;
+the measurement shows all three step components differ. Starting values are
+identical. The actual 121 and 261 serial additions reproduce every measured
+GPU endpoint; using CPU steps reproduces the CPU endpoints. Only accumulated
+U/z remains different there because the other components round to matching
+final words. Fixed U changes from 73,026 to 73,025 and 11,616 to 11,615;
+the corresponding filtered texels change from 147 to 148 and 160 to 159.
+Final reciprocal depth is identical at these two pixels.
+
+This follows **Geometry (TGP) and rendering** and **Reference & validation**.
+One complete saved frame, including decoded tiles/characters, matches all
+761,856 accepted RGBA bytes before seven isolated owner-witness renders.
+The same fragment calculation supplies color and raw uint evidence; no
+reciprocal replacement is included. The original clipped-start screen pixel
+is occluded, so its valid start witness comes from the isolated owner passes.
+All 107 frozen inputs remain unchanged. Eight renders and sixteen readbacks
+complete normally in 0.688115 seconds with empty stderr; that elapsed time
+only establishes watchdog completion, not shader cost. An independent raw
+readback audit confirms the complete-color guard and arithmetic reconstruction.
+
+Evidence: `build/worktrees/mac-triangle-fidelity/build/validation/reciprocal-gpu-001/actual-span-001/`.
+`attribution.json` SHA-256 is
+`6300e034d959bd63a1be630f070a5bfdd4d3ab0658e66e6a99a2977856931655`;
+`run01/result.json` is
+`252d66bde560f4de92723c686e53664609ffd72b5867e59cb006fa84c35c2812`.
+Independent review: `build/validation/actual-span-independent-review/result.json`,
+SHA-256 `cb7e998668d48f6c999f132f8ff12ffdd82877892c7510c5b6ab45a0d44022dd`.
+Next evaluate the frozen reciprocal helper at the proven span-width and final-z
+sites in an isolated common-shader candidate. Require default-off, complete
+scene and synthetic guards, then measure cost before integration. No production
+edit, temporal-flicker improvement, precise compiler-lowering mechanism or
+hardware-parity claim follows from this attribution.
+
 ## Actual sound-program reset prefix matches independent CPU (2026-10-14)
 
 The authenticated real sound program now matches persistent pinned MAME CPU
