@@ -1,5 +1,128 @@
 # Handoff
 
+## Recorded live frontier at attract return (2026-10-14)
+
+The signed recording-enabled v13 app reaches missing native target
+`0x005ae800` at 2,437,360,267 instructions, 5,556,809,161 cycles and 12,785
+rendered frames. The previous two-billion held-gas checkpoint does not cover
+this later path. Normal close seals 25,581 resumes as `frontier`, with board
+time 222,272,366,440 ns and native result 3. All ten selection inputs applied;
+manual takeover occurred at frame 1,851. The live session supplied 9,802,212
+stereo frames, including 17,920,545 nonzero samples, with zero chip/host drops
+or SDL input-shortfall requests. There is no WAV capture or confirmation of
+live listening quality. These counters do not establish speaker fidelity.
+
+Recording: `build/recordings/mac-v13-20261014-001`. Transcript SHA-256
+`8bc8c8ad19397ebe3a4f36240460449b4362ab68dfc7e9f3df67f114eb7a813b`;
+observations SHA-256
+`c7842f9e6c7cf818c290f89d764696b73cdaa884f284d97667ba473ceded5c9e`.
+The signed executable and app resources remain preserved. Exact-executable
+offline replay inside the sandbox reproduces all 25,581 resumes, PCM hashes,
+fault details, final saves and the same frontier; bundle bytes remain unchanged.
+Evidence: `build/validation/live-recording-replay-001/audit.json`, SHA-256
+`dbe7a0d11aa827310f5e98890db797d73b2861b4c1d66c9dca62015ae9877932`.
+Its 107.897885-second cost is a diagnostic run, not a game-speed measurement.
+
+Read-only disassembly identifies a single RET at canonical ROM address
+`0x0000f800`. Seeded `comm_attract_inner_8` loads the target, performs
+bookkeeping and branches through g0 at `0x005ae7fc`; v13 includes that
+predecessor but omits the return. One actual-observation seed is added in
+`config/segarally_observed_seeds.json`, bound to the sealed recording and signed
+executable. The isolated standard generation now contains 75,207 instructions:
+only canonical `0x0000f800` and runtime `0x005ae800` are added, all 75,205 old
+addresses remain, and indirect sites/invalid stops remain 419/13. No compiler
+heuristic or game instruction changes. Full host build and continuation checks
+are pending. Production recording identity checks stay strict.
+
+An input audit proves every captured twelve-pin snapshot matches the canonical
+ten-event selection replay, including neutral manual handoff. No additional
+manual or mid-frame change occurred. A new bounded capture can therefore use
+that prefix plus a final neutral sentinel, compare all 25,580 completed normal
+rows exactly and then continue. The old final MissingCode row executed only
+81,380 of its 100,000-instruction budget; shortening the new budget is not an
+exact phase match because Budget and MissingCode have different synchronization
+points. Exclude that partial row from the normal-prefix claim. Proof:
+`build/validation/live-recording-replay-001/input-frame-representability.json`,
+SHA-256 `12fb56a3d403a1fe4ba28e7bdde3a122e63a600811289dd75e36f303127aa301`.
+
+## Actual v13 sound capture and offline replay pass (2026-10-14)
+
+Fresh detached worktree `build/worktrees/mac-recording-v13` at `9197003`
+clones the original sound/hook generation to its exact audited relative path.
+All 203 file inventories, sizes, SHA-256 values and bytes match before/after
+build. Release recompiles all 54 generated sources plus app/runtime under one
+host target; old pipeline objects are unused. Eight staged images match the
+original bytes. Build/object/command identities and logs are under the
+worktree's `build/recording-v13-evidence/`; source/audits and older apps remain
+preserved. Raw executable SHA-256:
+`4d1e4283faf35776c65c5501f7ae2602d3f9c23e8a16dd5934c7f122b739dabc`.
+
+All six bounded actual-game gates pass: boot capture/offline replay,
+unrecorded/recorded driving, driving offline replay and exact comparison.
+Boot matches 121 resumes, 10,923,622 instructions, 26,117,011 cycles and 60
+frames. Driving matches 5,603 resumes, 536,820,288 instructions,
+1,217,355,612 cycles, 2,801 frames and PC `0x005d08f0`. Recorded/unrecorded
+runs have identical twenty input boundary lines, final Metal PPM, EEPROM/backup
+and complete float WAV: 2,147,416 stereo frames at 44.1 kHz (48.69424036
+seconds), 2,857,178 nonzero float samples and zero chip/host drops.
+
+Evidence is under `build/validation/recording-v13/`: `boot-001`,
+`boot-replay-001`, `baseline-001`, `recorded-001`, `drive-replay-001` and
+`comparison-001`. Offline replay runs inside the sandbox with only
+`--replay-recording`/`--data`, leaves bundle/live saves unchanged and opens no
+SDL/GPU/audio device. Input identities match before/after every gate. Separate
+read-only `independent-review.json` and `independent-boot-review.json` check
+every observation's raw-float hash/count against sequential WAV bytes and
+confirm actual initial saves are all-FF constructor defaults (128/16,384 bytes).
+Captured final bytes match live saves. This is same-Machine/raw-PCM evidence,
+not independent CPU/sound, full-course, physical audio or speed validation;
+hidden unthrottled captures use no physical audio device.
+
+The new signed app launches normally at
+`build/worktrees/mac-recording-v13/build/mac-recording-v13/Sega Rally Native.app`
+with sound/hook, canonical selection replay and recording
+`build/recordings/mac-v13-20261014-001`. The live log reports Metal Apple M5,
+playback enabled and manual takeover at frame 1,851. The later frontier capture
+is recorded above; listening feedback remains pending. Signed executable SHA-256:
+`aa1aeb4a70795bf568b5a8c4f8f0bf70dfdb054a358c26173e0e57c7ffcb5efe`.
+Raw executable bytes remain unchanged; packaged assets/report and selection
+input match their source bytes. Replay must preserve the corresponding app
+identity. Packaging evidence: `build/validation/recording-v13/live-launch-001.json`.
+
+## Remaining interpolation and cutout precision (2026-10-14)
+
+The ignored repeated-add triangle diagnostic changes five pixels in the frozen
+496x384 3D-only scene, all to exact CPU matches with none worsened. Differing
+pixels fall from 844 to 839; mean absolute RGB channel error falls from
+0.018820704525 to 0.018768201165/255, with maximum channel error still 168.
+Mode-0 instrumentation changes no pixels. The checker audit includes the initial
+one-pixel alignment adjustment followed by doubled increments; all 447 synthetic
+cases (85,137,408 pixels) also pass in repeated mode. The shader loop remains
+diagnostic: no production change or measured speed benefit follows.
+
+The three largest residual examples point to accumulated interpolation changing
+the cutout decision in four-or-more-vertex polygons. CPU-only evaluation at
+(398,226) changes V 53023 to 53024 under a direct span offset, crossing alpha
+`0x004000e0` to `0x003f00e0`. At (415,199), U 2036 to 2037 crosses the same
+threshold. At (439,230), the opposite crossing predicts acceptance of polygon
+650 instead of the CPU's visible polygon 795. Host evaluation of the current
+shader equations predicts the saved GPU colors at these points, but actual
+GPU ownership/interpolant measurements remain pending. Do not present these
+predictions as measured GPU attribution or a continuous-flicker fix.
+
+Reports under `build/worktrees/mac-triangle-fidelity/build/validation/`:
+`repeated-triangle-snapshot/report.json`, SHA-256
+`462e1d1728bc25442f18413c885e0e5c1e1b206304a9e81ae6500dda4bf0f6a8`;
+`residual-cpu-review/evidence.json`, SHA-256
+`94bc72e0a3701514972b6943815125df235133e29d20560a6d0218220d59ac30`.
+The quiet performance protocol is prepared but unexecuted. A separate
+`polygon-repeat-diagnostic` source candidate preserves checker steps and
+clipped-left setup; shader generation, compilation and GPU execution are
+deferred during live play and the subsequent native-coverage build.
+Frozen production files remain
+unchanged. Next: measure these GPU owners, then broader error and cost before
+considering a production interpolation change.
+
 ## Mac recording and offline replay integration (2026-10-14)
 
 `--record-inputs DIR` now creates an exclusive new recording bundle around the
@@ -19,9 +142,9 @@ GPU, device audio, pacing or live-save writes. Both passes use immutable bounded
 text snapshots. An initial implementation reopened paths after preflight; review
 replaced that with the verified bytes. Limit terminals cannot masquerade as a
 zero-instruction startup quit: frame limits require a Frame return, instruction
-limits require executed instructions. The same-executable check deliberately
-rejects rebuilt, re-signed or repackaged binaries; preserve the recorded app and
-its matching staged assets.
+limits require executed instructions. The same-executable check rejects changed
+executable bytes; rebuilding, re-signing or repackaging can change that identity.
+Preserve the recorded app and its matching staged assets.
 
 Both MAIN CTest registrations pass: 165 bundle checks and four launcher checks.
 The ten existing Mac packaging/launcher tests also pass.

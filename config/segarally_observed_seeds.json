@@ -405,6 +405,22 @@
       "input_replay": "config/segarally_lancia_hold_gas.inputs",
       "input_replay_sha256": "c031b82a2c7b17a7fc33de2e86e7fe9f4afdfc423a65098bce6cf5507e9cab61",
       "provenance": "Actual native CALLX(g5) target0x5bfff0 at0x5c03b4 after load/null-guard of mutable global callback cell0x20ab50. Newly reached decoded LDA0x5bfff0,g0 at0x5bca4c immediately precedes CALL0x5c0370 setter. Captured large3D TIME IS UP over actual Lancia on forested second course. Game Over/restart remains unverified. Canonical ROM target=runtime-0x59f000 in verified reset copy; no game state or instruction patched."
+    },
+    {
+      "address": "0x0000f800",
+      "observed_runtime_address": "0x005ae800",
+      "name": "observed_live_return_frontier_005ae800",
+      "evidence": "build/recordings/mac-v13-20261014-001/complete.txt",
+      "observed_after_instructions": 2437360267,
+      "observed_reference_cycles": 5556809161,
+      "observed_rendered_frames": 12785,
+      "program_sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439",
+      "source_baseline_commit": "91970037cebe0e0df0d3a02ec5c361610617cefc",
+      "execution_variant": "native_host_resume_recording_sound_hook",
+      "input_recording": "build/recordings/mac-v13-20261014-001",
+      "input_recording_complete_sha256": "35abf7ab4f916e6a7fe8b362ffef7e208677f84fc252e8c613f9e5e50a020f32",
+      "observed_executable_sha256": "aa1aeb4a70795bf568b5a8c4f8f0bf70dfdb054a358c26173e0e57c7ffcb5efe",
+      "provenance": "Actual missing-code frontier in the sealed sound-enabled manual host recording, with all resume inputs and PCM witnesses retained. Canonical ROM PC is runtime minus 0x59f000 under the verified reset copy. Decoder confirms a single RET at this observed entry. Static context only: already compiled comm_attract_inner_8 at 0x005ae7d0 loads this target into g14 then g0 and branches through g0 at 0x005ae7fc; no register trace establishes the immediate caller. No adjacent return or generic continuation heuristic is added; no game state or instruction is patched."
     }
   ]
 }

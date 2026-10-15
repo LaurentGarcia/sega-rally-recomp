@@ -8,13 +8,14 @@ The [design](sega-rally-design.md) records interpretation and hardware limits.
 | Area | Established evidence | Limit |
 | --- | --- | --- |
 | Main native coverage | Frozen v13: 75,205 instructions, 52 native objects, no missing templates | Coverage is a reached graph, not a remaining-work percentage |
-| Interactive Mac | Stable SDL3/Metal host, manual control after selection handoff; sound-enabled windowed session exits normally after 9,347 frames | User feedback on live audio quality pending |
+| Interactive Mac | New sound app records 12,785 frames and a missing-target frontier; prior sound session exits normally after 9,347 frames | Target `0x005ae800` needs generation coverage; live listening feedback pending |
 | Driving parity | Two billion held-gas instructions, 86,328,770 ordered writes, 4,650,936,033 cycles, 113,101 IRQs and 10,701 renders; nineteen replay events match | Sound off; independent CPU with shared boards and final-frame comparison; no full MAME race |
 | Later game paths | Held-gas v13 returns to attract; a fresh two-coin/Start sequence reaches Car Select at frame 11,160 without a frontier | Second race and Game Over overlay not separately validated |
 | Course progress | Desert clear/results show 1:12.15; forested second course enters, times out, then attract returns | Centered steering does not complete second-course bends; remaining courses unvalidated |
 | Metal fidelity | Optional polygon scanlines reduce error in three real scenes; triangle coverage further improves the saved 3D layer; 447 synthetic cases pass | Still off by default; exact racing-scene raster parity and updated performance remain open |
 | Sound generation | Native linked board captures 2,409,170 stereo frames: 54.6297052 seconds including nonzero 44.1 kHz PCM; shared-core drains agree | Whole-game audio parity unvalidated |
-| Audio output | Windowed session supplies 7,165,805 stereo frames with zero drops or estimated input shortfalls; user heard a separate ten-second native PCM sample | Live-game listening feedback and physical fidelity remain open |
+| Audio output | New windowed session supplies 9,802,212 stereo frames with zero drops or estimated input shortfalls; user heard a separate ten-second native PCM sample | Session ends at a native-code frontier; live listening feedback and physical fidelity remain open |
+| Exact host recording | Actual v13 sound-on drive: 5,603 exact resumes replay; recorded and unrecorded 2,801-frame runs match counters, all 20 input boundaries, WAV, final Metal image and saves | Same-Machine reproducibility; full-course manual recordings and independent sound parity remain open |
 | Hardware fidelity | Isolated device/reference tests and instruction-timed diagnostics | PCB timing, extF80 precision and full-machine behavior remain open |
 
 ## Measured Mac speed
@@ -77,6 +78,19 @@ events, hands control to the keyboard at frame 1,851 and exits normally after
 estimated SDL input shortages and 2,255 frames queued at exit. This session has
 no separate wall-speed measurement. Live-game listening feedback is pending.
 
+The sound-on recording checks match a 60-frame boot and a 2,801-frame drive,
+including 5,603 exact driving resumes and the full 48.69424036-second float WAV.
+Offline replay runs inside the sandbox without SDL/GPU/audio output or live-save
+writes. The capture runs are hidden and unthrottled without a physical audio
+device; these results do not establish listening quality or gameplay speed.
+
+The later signed-app playtest records 25,581 resumes before reaching missing
+native target `0x005ae800` at 2,437,360,267 instructions and 12,785 frames.
+Normal close seals the frontier recording. It supplies 9,802,212 stereo frames
+with zero chip/host drops or estimated SDL shortages. This path is beyond the
+two-billion checkpoint; generation extension and prefix validation are pending.
+See the [input guide](segarally-input-replay.md#exact-host-resume-transcripts).
+
 ## Graphics evidence
 
 The first paired car frame differs in 15,830 of 190,464 RGB pixels (8.31%),
@@ -123,19 +137,23 @@ reconstruction, differing pixels fall from 969 to 844 and mean channel error
 from 0.0215019 to 0.0188207/255. Of 127 changed pixels, 126 become exact;
 one at (95,31) worsens slightly through accumulated interpolation rounding.
 Both paths select the same triangle and plane coefficients; an isolated
-repeated-addition shader restores the CPU result. That diagnostic loop is
-not in production and its cost is unmeasured. This snapshot
+repeated-addition shader restores the CPU result. Across the saved 3D layer,
+the diagnostic makes five pixels exact, reducing differences from 844 to 839
+without worsening another pixel. All 447 synthetic cases also pass in this
+mode. The loop is not in production and its cost is unmeasured. This snapshot
 lacks tile/character RAM, so its counts are separate from the complete-scene
 table above. Default-off output remains byte-identical in this comparison.
 The CPU's repeated floating-point additions are not reproduced exactly by
 the per-fragment formula. Broader scenes, continuous flicker and performance
-remain to test before enabling this path for play.
+remain to test before enabling this path for play. CPU-side evaluation of the
+largest residual errors points to similar rounding crossing textured-polygon
+cutout thresholds; GPU ownership measurements for those pixels are pending.
 
 ## Next validation work
 
 Confirm visible-window gameplay sound, then measure
 longer game paths with sound enabled. Preserve exact instruction guards, timing
-and IRQ boundaries in further speed work. Validate fresh
+and IRQ boundaries in further speed work. Validate
 the second race and remaining courses, then extend independent replay
 comparison to those paths and coupled sound. Real-race graphics
 comparison, full MAME-machine parity and PCB/precision validation remain required.

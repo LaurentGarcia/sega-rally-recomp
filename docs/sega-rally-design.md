@@ -200,8 +200,12 @@ complete a frame at an unchanged instruction count. The tested transcript core
 preserves each requested budget, all cabinet pins, before/after witnesses and
 return reason. The Mac host now adds opt-in recording and early same-executable
 offline replay, binding loaded images/options and initial saves, per-resume PCM,
-detailed faults and final saves. Its synthetic bundle/launcher tests pass;
-actual v13 capture/replay validation remains pending. See
+detailed faults and final saves. Its synthetic bundle/launcher tests pass.
+Actual sound/hook v13 boot and driving captures also replay exactly, with
+recorded/unrecorded input boundaries, complete PCM, final Metal image and saves
+matching through frame 2,801. Offline replay opens no SDL/GPU/audio device and
+changes no bundle/live saves. Full-course manual and independent CPU/sound
+validation remain open. See
 [the input reference](segarally-input-replay.md#exact-host-resume-transcripts).
 The frozen v6 generation now executes the actual Lancia race with recorded
 cabinet throttle, steering, view and brake events. A bounded 600-million main

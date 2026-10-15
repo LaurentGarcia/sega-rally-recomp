@@ -123,8 +123,35 @@ format, `segarally-host-resume-v1`. The Mac host now wraps it in a recording
 bundle through `--record-inputs DIR` and early offline `--replay-recording DIR`.
 See the [Mac frontend instructions](../platform/segarally/README.md) for the
 hashing dependency, launch command and exact-executable preservation requirement.
-The existing frame replay above is unchanged. Actual v13 game capture/replay
-validation is still pending; the new fixture evidence below is synthetic.
+The existing frame replay above is unchanged. Actual v13 sound/hook capture
+and exact-executable offline replay now pass both boot and scripted driving:
+
+| Check | Exact resumes | Instructions | Cycles | Rendered frames |
+| --- | ---: | ---: | ---: | ---: |
+| Boot | 121 | 10,923,622 | 26,117,011 | 60 |
+| Driving | 5,603 | 536,820,288 | 1,217,355,612 | 2,801 |
+
+Fresh recorded and unrecorded drive runs match all twenty scripted input
+instruction/cycle boundaries, terminal PC `0x005d08f0`, final Metal PPM,
+EEPROM/backup bytes and the complete float WAV. The WAV contains 2,147,416
+stereo frames at 44.1 kHz (48.69424036 seconds), with 2,857,178 nonzero float
+samples and zero chip/host drops. The script extends the canonical nineteen
+events with neutral input at frame 2,800, keeping physical controls excluded
+through the frame-2,801 stop. Offline replay repeats exact captured budgets,
+all twelve pins, witnesses, return/fault details and per-resume PCM; bundle
+and live-save hashes remain unchanged. It runs inside the sandbox without SDL,
+GPU or audio output. A separate read-only artifact audit checks every one of
+the 5,603 driving and 121 boot PCM observations against the sequential WAV
+float bytes. These hidden unthrottled checks use no physical audio
+device and do not establish listening quality, performance, full-course manual
+coverage or independent CPU/sound parity. Evidence remains ignored under
+`build/validation/recording-v13/`.
+
+Preserve the exact captured executable/app and staged assets. Rebuilding,
+re-signing or repackaging can change their bytes; changed identities are
+rejected. The new raw-executable checkpoint and the signed app have
+separate identities and recordings cannot be transferred between changed
+executable bytes. The fixture evidence below remains synthetic.
 
 The interactive host samples controls before each call to
 `run_until_frame`, with a budget of at most 100,000 instructions. Several

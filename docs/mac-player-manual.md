@@ -26,29 +26,35 @@ When `--input-replay` is supplied, the launcher copies that file into the app's
 resources before signing. Startup reads the bundled copy. Missing files,
 directories and replays larger than 1 MiB are rejected before packaging.
 
-The latest prepared sound playtest is in
-`build/worktrees/boundary-hook/build/mac-boundary-sound-v13-ordering/Sega Rally Native.app`.
-Launch it with its sound and execution options using:
+The latest prepared recording-enabled sound app is in
+`build/worktrees/mac-recording-v13/build/mac-recording-v13/Sega Rally Native.app`.
+It has launched in a normal window with sound, the instruction boundary hook,
+selection replay and input recording enabled. That session reached missing
+native target `0x005ae800` after 12,785 frames; its frontier recording is
+preserved while coverage is extended. Listening feedback remains pending.
+To start a fresh recorded session:
 
 ```sh
 python3 platform/segarally/macos/launch.py \
-    --build-dir build/worktrees/boundary-hook/build/mac-boundary-sound-v13-ordering \
+    --build-dir build/worktrees/mac-recording-v13/build/mac-recording-v13 \
     --sound --instruction-boundary-hook \
-    --input-replay config/segarally_lancia_select.inputs
+    --input-replay config/segarally_lancia_select.inputs \
+    --record-inputs build/recordings/drive-001
 ```
 
-These flags matter: opening the executable without them retains its default
-sound-off, original execution mode. Quit a running copy before relaunching with
-different options.
+Quit any running copy first and choose a new recording directory each time.
+These flags matter: launching without them retains the default sound-off,
+original execution mode. The live log confirms keyboard takeover
+at frame 1,851. Preserve the exact recorded app and assets for later replay;
+repackaging or re-signing can change their identity.
 
-The earlier sound app exited during CoreAudio startup with
-`AudioQueueStart: -66681`. The latest build opens audio after the window and Metal
-renderer and passes a 60-frame windowed startup check. The longer timing results
-below came from a separate direct-executable test. See
-[current evidence](segarally-status.md) for the test scope.
-The subsequent windowed launch applies the selection replay, hands control back
-at frame 1,851 and exits normally after 9,347 frames with sound enabled and zero
-reported audio drops or input shortages.
+The previous playable sound app remains preserved at
+`build/worktrees/boundary-hook/build/mac-boundary-sound-v13-ordering/Sega Rally Native.app`.
+It passes window-first audio startup after the earlier CoreAudio
+`AudioQueueStart: -66681` failure. Its completed windowed session applies the
+selection replay and exits normally after 9,347 frames with sound enabled and
+zero reported audio drops or input shortages. That session has no input
+recording. See [current evidence](segarally-status.md) for the test scope.
 
 The earlier sound-off v13 playtest is preserved in
 `build/worktrees/indexed-dispatch/build/mac-playtest-v13/Sega Rally Native.app`.
@@ -102,7 +108,7 @@ automatic transmission. Saved cabinet settings can change credit behavior.
 
 ## Sound, speed and saves
 
-The latest sound build uses the exact instruction boundary hook. Its normal-paced
+The preserved sound build uses the exact instruction boundary hook. Its normal-paced
 driving check completes 47.98 seconds of board time in 48.52 seconds including
 startup and shutdown, with no reported audio input shortfalls or sample drops.
 The [build guide](segarally-build-validation.md) explains both build options
@@ -127,3 +133,24 @@ or unsupported hardware. Preserve the log, build path, replay name and visible
 game state. Such a stop is an explicit incomplete path. If controls appear
 inactive, check focus and whether the selection replay has handed over. Phone
 builds and device testing are deferred.
+
+## Record and replay a drive
+
+A prepared host built with recording support accepts
+`--record-inputs build/recordings/drive-001` on its launch command. Quit any
+running copy first and choose a new recording directory. A selection replay
+can start the session before keyboard takeover; the recording retains the
+actual controls used between frames and initial saves, plus hashes that check
+whether replay generates the same sound.
+Quit normally to finish the bundle. A crash leaves an incomplete recording;
+frontier and fault endings remain explicitly identified.
+
+Replay with the exact captured executable using
+`--replay-recording DIR --data ASSETS`, where ASSETS is its matching staged
+assets directory. Offline replay opens no window or audio device and changes
+no live saves. Preserve the recorded app and assets: rebuilding, re-signing or
+repackaging can change their bytes, and changed identities are rejected.
+The sound-on scripted validation now matches recorded and unrecorded runs
+through frame 2,801, including their WAV, final image and saves. This establishes
+repeatability for that drive; remaining courses and live audio quality still
+need validation. See the [input guide](segarally-input-replay.md#exact-host-resume-transcripts).
