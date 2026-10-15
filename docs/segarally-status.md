@@ -12,7 +12,7 @@ The [design](sega-rally-design.md) records interpretation and hardware limits.
 | Driving parity | 600 million instructions, 19,641,024 ordered writes, 1,365,742,448 cycles, 32,576 IRQs and 3,142 renders; nineteen replay events match | Independent CPU with shared board implementations; no full MAME race |
 | Later game paths | Held-gas v13 runs two billion instructions and 10,701 renders without a code/device frontier; returns to attract | Game Over overlay and a new credit/start sequence not separately validated |
 | Course progress | Desert clear/results show 1:12.15; forested second course enters, times out, then attract returns | Centered steering does not complete second-course bends; remaining courses unvalidated |
-| Metal fidelity | Optional polygon scanlines reduce error in three real scenes; default-off captures match the stable renderer; 243 synthetic cases pass | Still off by default; exact racing-scene raster parity and updated performance remain open |
+| Metal fidelity | Optional polygon scanlines reduce error in three real scenes; triangle coverage further improves the saved 3D layer; 447 synthetic cases pass | Still off by default; exact racing-scene raster parity and updated performance remain open |
 | Sound generation | Native linked board captures 2,409,170 stereo frames: 54.6297052 seconds including nonzero 44.1 kHz PCM; shared-core drains agree | Whole-game audio parity unvalidated |
 | Audio output | Windowed session supplies 7,165,805 stereo frames with zero drops or estimated input shortfalls; user heard a separate ten-second native PCM sample | Live-game listening feedback and physical fidelity remain open |
 | Hardware fidelity | Isolated device/reference tests and instruction-timed diagnostics | PCB timing, extF80 precision and full-machine behavior remain open |
@@ -68,9 +68,11 @@ attributing 94.45% of mean error to interpolation. This diagnosis does not
 establish exact race rendering. A stable picture and correct polygon ordering
 remain distinct from pixel fidelity.
 
-The optional polygon scanline implementation now uses the CPU reference's two
-edge chains for 4–8 vertex solids and textures. Rounded spans control coverage
-over a conservative rectangle; texture shading remains on the GPU.
+The optional scanline implementation uses the CPU reference's two edge chains
+for 4–8 vertex solids and textures. Triangles use their separate edge slopes
+and parameter planes. Rounded spans control coverage over a conservative
+rectangle; texture shading remains on the GPU. The three complete-scene
+measurements below precede the triangle extension.
 
 | Captured frame | Stable differing RGB pixels | Candidate differing RGB pixels | Stable mean channel error | Candidate mean channel error |
 | --- | ---: | ---: | ---: | ---: |
@@ -81,14 +83,29 @@ over a conservative rectangle; texture shading remains on the GPU.
 Each image is 496×384; error is the mean absolute RGB channel difference on a
 0–255 scale. These frozen scenes use the earlier sound-off generations. They
 do not measure current v13 gameplay speed. The option remains off by default;
-disabled captures match the committed stable renderer. The synthetic Metal
-fixture passes 243 native-resolution cases, including rounded edges, clipping,
-crossed chains, checker pixels and layered transparent/opaque texels.
+disabled captures match the committed stable renderer. The expanded synthetic
+Metal fixture passes 447 native-resolution cases, including rounded edges,
+clipping, crossed chains, triangle subpixel/empty spans, checker pixels and
+layered transparent/opaque texels.
 
 The stray white pixel at (125,75), attributed to solid polygon 353, now matches
 the CPU's black pixel. Ten pixels improve to exact matches versus the previous
-prototype; one at (147,20) worsens and its cutout ownership remains unresolved.
-Other differences include the untouched triangle path and texture precision.
+prototype; one at (147,20) worsens, but its ownership is now attributed.
+The CPU's triangle 800 owns that pixel with RGB (74,84,6); both GPU paths omit
+its fragment before alpha shading. The old GPU instead fills it from polygon
+804 with RGB (38,44,0), although that polygon's CPU span is empty. Corrected
+4–8-vertex coverage rejects 804 and exposes polygon 850's black pixel.
+This polygon fix therefore does not exclude the legitimate CPU span. Exact
+hardware subpixel quantization is not established. Instrumentation matches both unmodified GPU
+outputs over all 190,464 RGBA pixels. An initial mixed shader/source fixture
+was invalidated before this attribution; see the handoff for evidence.
+
+The triangle extension now makes (147,20) exact. In the saved 3D-only
+reconstruction, differing pixels fall from 969 to 844 and mean channel error
+from 0.0215019 to 0.0188207/255. Of 127 changed pixels, 126 become exact;
+one at (95,31) worsens slightly and remains under investigation. This snapshot
+lacks tile/character RAM, so its counts are separate from the complete-scene
+table above. Default-off output remains byte-identical in this comparison.
 The CPU's repeated floating-point additions are not reproduced exactly by
 the per-fragment formula. Broader scenes, continuous flicker and performance
 remain to test before enabling this path for play.

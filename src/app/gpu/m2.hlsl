@@ -71,10 +71,45 @@ int round_coordinate(float value) {
     return int(ipart) + ((value - ipart > 0.5) ? 1 : 0);
 }
 
+// Raster::render_triangle uses direct edge slopes and determinant parameter
+// planes. Two PolyEdge records hold its sorted geometry and plane coefficients;
+// this is deliberately distinct from the 4–8-vertex polygon edge chains.
+float3 triangle_oz(PolyOut i) {
+    const PolyEdge geometry = polyedges[i.edges.x];
+    const PolyEdge plane = polyedges[i.edges.x + 1u];
+    const float scale = float(i.edges.y >> 8);
+    const float2 p = i.pos.xy / scale;
+    const int2 pixel = int2(i.pos.xy);
+    if (pixel.y < round_coordinate(geometry.origin.y * scale) ||
+        pixel.y >= round_coordinate(geometry.step.y * scale)) discard;
+    precise float topdy = p.y - geometry.origin.y;
+    precise float startx = geometry.origin.x + topdy * geometry.step.w;
+    precise float stopx;
+    // Equality selects the lower short edge in the CPU triangle path.
+    if (p.y < geometry.origin.w) stopx = geometry.origin.x + topdy * geometry.step.z;
+    else {
+        precise float middledy = p.y - geometry.origin.w;
+        stopx = geometry.origin.z + middledy * geometry.tail.x;
+    }
+    const int a = round_coordinate(startx * scale), b = round_coordinate(stopx * scale);
+    const int left = min(a, b), right = max(a, b);
+    if (pixel.x < left || pixel.x >= right) discard;
+    if ((i.info.x & 3u) < 2u) return i.oz;
+    const int clipped_left = max(left, int(plane.tail.w * scale));
+    precise float fullstartx = (float(clipped_left) + 0.5) / scale;
+    precise float3 start = plane.origin.xyz + fullstartx * plane.step.xyz + p.y * plane.tail.xyz;
+    // Preserve the clipped-start evaluation order. A direct offset still does
+    // not promise bit identity with the CPU's repeated per-pixel additions.
+    precise float offset = float(pixel.x - clipped_left) / scale;
+    precise float3 oz = start + offset * plane.step.xyz;
+    return oz;
+}
+
 // Diagnostic coverage/interpolation from Raster::render_polygon. A rectangle
 // supplies fragment candidates; both solid and textured polygons accept only
 // their rounded, left-inclusive/right-exclusive outer-edge span.
 float3 polygon_oz(PolyOut i) {
+    if ((i.edges.y & 0x80u) != 0u) return triangle_oz(i);
     const uint nl = i.edges.y & 15u, nr = (i.edges.y >> 4) & 15u;
     if (nl == 0u || nr == 0u) return i.oz;
     const float scale = float(i.edges.y >> 8);

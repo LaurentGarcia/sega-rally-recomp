@@ -360,7 +360,71 @@ void GpuRenderer::build(const rt::Video &video, int w, int h, int scale) {
                     ooz, g0.p[1] * ooz * (1.0f / 8.0f), g0.p[2] * ooz * (1.0f / 8.0f),
                     r, g, b, 1.0f, {info[0], info[1], info[2], info[3]}, {more[0], more[1]}, {0, 0}};
         }
-        if (polygon_scanlines_ && poly.num_vertices >= 4) {
+        auto emit_proxy = [&](float min_y, float max_y, uint32_t first, uint32_t counts) {
+            // Backend triangles cannot provide reference coverage at every
+            // subpixel boundary. Draw a conservative rectangle, then reject pixels
+            // outside the rounded CPU span in the common fragment shader.
+            // One extra native pixel keeps rasterizer subpixel snapping
+            // away from the actual boundary. The existing scissor still
+            // owns window clipping; depth/rank stays one per polygon.
+            float bx0 = v[0].x, bx1 = v[0].x;
+            for (int k = 1; k < poly.num_vertices; ++k) {
+                bx0 = std::min(bx0, v[k].x);
+                bx1 = std::max(bx1, v[k].x);
+            }
+            bx0 = std::max(std::floor(bx0) - 1.0f, float(x0));
+            bx1 = std::min(std::ceil(bx1) + 1.0f, float(x1 + 1));
+            const float by0 = std::max(std::floor(min_y) - 1.0f, float(y0));
+            const float by1 = std::min(std::ceil(max_y) + 1.0f, float(y1 + 1));
+            if (bx0 < bx1 && by0 < by1) {
+                PolyVertex rect[4] = {v[0], v[0], v[0], v[0]};
+                rect[0].x = rect[2].x = bx0;
+                rect[1].x = rect[3].x = bx1;
+                rect[0].y = rect[1].y = by0;
+                rect[2].y = rect[3].y = by1;
+                for (auto &vertex : rect) vertex.edges[0] = first, vertex.edges[1] = counts;
+                for (int k : {0, 1, 2, 1, 3, 2}) verts_.push_back(rect[k]);
+            }
+        };
+        if (polygon_scanlines_ && poly.num_vertices == 3) {
+            // Raster::render_triangle has a separate setup contract: stable
+            // y sorting, direct slope divisions, and determinant planes.
+            // It cannot use render_polygon's reciprocal-based edge chains.
+            const PolyVertex *v1 = &v[0], *v2 = &v[1], *v3 = &v[2];
+            if (v2->y < v1->y) std::swap(v1, v2);
+            if (v3->y < v2->y) {
+                std::swap(v2, v3);
+                if (v2->y < v1->y) std::swap(v1, v2);
+            }
+            const float dxdy12 = v2->y == v1->y ? 0.0f : (v2->x - v1->x) / (v2->y - v1->y);
+            const float dxdy13 = v3->y == v1->y ? 0.0f : (v3->x - v1->x) / (v3->y - v1->y);
+            const float dxdy23 = v3->y == v2->y ? 0.0f : (v3->x - v2->x) / (v3->y - v2->y);
+            const float a00 = v2->y - v3->y, a01 = v3->x - v2->x, a02 = v2->x * v3->y - v3->x * v2->y;
+            const float a10 = v3->y - v1->y, a11 = v1->x - v3->x, a12 = v3->x * v1->y - v1->x * v3->y;
+            const float a20 = v1->y - v2->y, a21 = v2->x - v1->x, a22 = v1->x * v2->y - v2->x * v1->y;
+            const float det = a02 + a12 + a22;
+            const float params[3][3] = {{v1->ooz, v1->uoz, v1->voz},
+                                       {v2->ooz, v2->uoz, v2->voz},
+                                       {v3->ooz, v3->uoz, v3->voz}};
+            PolyEdge plane{}; // origin.xyz = start, step.xyz = dpdx, tail.xyz = dpdy
+            plane.tail[3] = float(x0); // CPU plane evaluation starts at the clipped span
+            if (std::abs(det) < 0.00001f) {
+                for (int p = 0; p < 3; ++p) plane.origin[p] = params[0][p];
+            } else {
+                const float idet = 1.0f / det;
+                for (int p = 0; p < 3; ++p) {
+                    plane.step[p] = idet * (params[0][p] * a00 + params[1][p] * a10 + params[2][p] * a20);
+                    plane.tail[p] = idet * (params[0][p] * a01 + params[1][p] * a11 + params[2][p] * a21);
+                    plane.origin[p] = idet * (params[0][p] * a02 + params[1][p] * a12 + params[2][p] * a22);
+                }
+            }
+            const uint32_t first = uint32_t(poly_edges_.size());
+            poly_edges_.push_back({{v1->x, v1->y, v2->x, v2->y},
+                                   {v3->x, v3->y, dxdy12, dxdy13}, {dxdy23, 0, 0, 0}});
+            poly_edges_.push_back(plane);
+            // Bit 7 is unused by polygon right-edge counts (at most seven).
+            emit_proxy(v1->y, v3->y, first, 0x80u | uint32_t(scale) << 8);
+        } else if (polygon_scanlines_ && poly.num_vertices >= 4) {
             // Raster::render_polygon's two chains from minimum to maximum y.
             // Upload geometry and parameter gradients; texture shading stays GPU.
             int minv = 0, maxv = 0;
@@ -402,30 +466,7 @@ void GpuRenderer::build(const rt::Video &video, int w, int h, int scale) {
                 // bounds, even when a horizontal edge was skipped.
                 for (size_t k = first; k < poly_edges_.size(); ++k) poly_edges_[k].tail[3] = v[minv].y;
 
-                // A fan cannot provide render_polygon coverage for every
-                // outline. Draw a conservative rectangle, then reject pixels
-                // outside the rounded CPU span in the common fragment shader.
-                // One extra native pixel keeps rasterizer subpixel snapping
-                // away from the actual boundary. The existing scissor still
-                // owns window clipping; depth/rank stays one per polygon.
-                float bx0 = v[0].x, bx1 = v[0].x;
-                for (int k = 1; k < poly.num_vertices; ++k) {
-                    bx0 = std::min(bx0, v[k].x);
-                    bx1 = std::max(bx1, v[k].x);
-                }
-                bx0 = std::max(std::floor(bx0) - 1.0f, float(x0));
-                bx1 = std::min(std::ceil(bx1) + 1.0f, float(x1 + 1));
-                const float by0 = std::max(std::floor(v[minv].y) - 1.0f, float(y0));
-                const float by1 = std::min(std::ceil(v[maxv].y) + 1.0f, float(y1 + 1));
-                if (bx0 < bx1 && by0 < by1) {
-                    PolyVertex rect[4] = {v[0], v[0], v[0], v[0]};
-                    rect[0].x = rect[2].x = bx0;
-                    rect[1].x = rect[3].x = bx1;
-                    rect[0].y = rect[1].y = by0;
-                    rect[2].y = rect[3].y = by1;
-                    for (auto &vertex : rect) vertex.edges[0] = first, vertex.edges[1] = counts;
-                    for (int k : {0, 1, 2, 1, 3, 2}) verts_.push_back(rect[k]);
-                }
+                emit_proxy(v[minv].y, v[maxv].y, first, counts);
             }
         } else {
             for (int k = 1; k + 1 < poly.num_vertices; k++) {

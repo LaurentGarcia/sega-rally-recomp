@@ -1,5 +1,74 @@
 # Handoff
 
+## Optional Metal triangle coverage (2026-10-14)
+
+The optional scanline path now covers triangles as well as 4–8-vertex
+polygons. Following the design's **Geometry (TGP) and rendering** and
+**Reference & validation** sections, triangle setup follows the CPU reference:
+stable y sorting, direct edge-slope divisions, rounded half-open coverage and
+determinant parameter planes. It remains distinct from polygon edge chains.
+Conservative rectangles supply fragments; the common shader selects the span.
+All six shader entries were regenerated for SPIR-V, DXIL and MSL.
+`SEGARALLY_GPU_POLYGON_SCANLINES=1` is still required; the default and preserved
+playable executable are unchanged.
+
+Both the standalone and MAIN's registered Metal fixture pass 447 invented cases
+and 85,137,408 pixel comparisons. The fixture retains the prior 243 cases and adds triangle windings,
+near-subpixel edges, flat tops/bottoms, collinear/empty spans, clipped starts
+and varying-UV layered cutouts/checker patterns. Native scale 1 is tested;
+enhanced scales are not validated.
+
+On the frozen first-car **3D-only reconstruction**, differing RGB pixels fall
+from 969 to 844 and mean absolute channel error from 0.0215018761 to
+0.0188207045 on the 0–255 scale. Of 127 changed pixels, 126 become exact,
+including (147,20), now RGB (74,84,6). One at (95,31) worsens from matching
+CPU RGB (20,24,0) to (17,21,0); ownership/precision attribution is still open.
+The saved snapshot lacks tile/character RAM, so these counts must not be
+compared with the earlier fully composed 822-pixel result. Default-off output
+matches the previous candidate over all 190,464 RGBA pixels. No performance,
+continuous-flicker, new driving-scene or full raster parity claim follows.
+The shader still differs from CPU repeated-addition interpolation.
+
+Frozen source, exact compiler/link commands, shader/output identities and
+limits are in `build/worktrees/mac-triangle-fidelity/build/validation/report.json`,
+SHA-256 `ef465deffa36963a1c1c0eab200de8a6c68c384f0a951e28ce33dd05afd3a372`.
+The reviewed patch SHA-256 is
+`3f5860e4043736e68c5fdedb31e57d3e03ed08fbd2c966e70be31ba704070a31`.
+MAIN copies and integration evidence are under
+`build/validation/mac-triangle-fidelity/`, including the preserved registered
+CTest log and its linked executable identity. Next are the residual (95,31)
+attribution, broader composed driving scenes and a quiet performance comparison.
+
+## First-car pixel ownership diagnosis (2026-10-14)
+
+Pixel (147,20) is attributed from the frozen scene and authenticated old/new
+GPU instrumentation. The CPU winner is textured triangle 800, with RGB
+(74,84,6) and a passing cutout sample. Its rounded row span is `[138,148)`,
+which includes pixel 147. Both GPU paths produce no triangle-800 fragment
+even before alpha shading. The sample is very close to an edge; this supports
+a subpixel coverage discrepancy, not a claim about exact hardware quantization.
+
+The old GPU winner is polygon 804, RGB (38,44,0). Its reference span is
+`[148,148)`: empty, so the old fan erroneously owns the pixel. Corrected
+4–8-vertex coverage rejects 804 and lets polygon 850 shade black. The polygon
+fix did not discard the legitimate CPU owner; it exposed the separate triangle
+coverage error. Both instrumentation mode-0 outputs match their unmodified
+counterparts over all 190,464 RGBA pixels.
+
+An initial attribution fixture mixed a stable generated shader header with
+modified renderer C++/HLSL. Its results were invalidated. All four renderer
+files were restored and authenticated from the preserved prototype patch before
+the measurements above. The triangle extension described above follows this
+diagnosis. The default remains off and the preserved playable app is unchanged.
+
+Ignored evidence is under
+`build/worktrees/mac-raster-fidelity/build/validation/`. SHA-256 identities:
+
+- `pixel-147-20-gpu/probe-both.log`: `af50a1c5b88a0344cb9af3b7307e313cff678ee528b91c8bf60cb0d495a7063e`
+- `pixel-147-20-cpu-review/evidence.json`: `afa9fd8a48e1e773e58a4dc8e877cd59dbffac468ffa76ac740d0fc0f057a3e6`
+- `pixel-147-20-cpu-review/triangle-coverage.json`: `4015a5ce25891ddf8c216c0871db9ea68d916393a8e7969f7685204519e0483e`
+- `pixel-147-20-cpu-review/polygon-804-coverage.json`: `80f77a10d2676173afed4a4b3e16576c88ac14ca96883b1aa71611ee15d825af`
+
 ## Staged build identities for future recordings (2026-10-14)
 
 `stage_data.py` adds a versioned provenance object to `assets.json`: coverage

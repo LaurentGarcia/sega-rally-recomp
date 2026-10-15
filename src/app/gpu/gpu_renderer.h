@@ -34,7 +34,7 @@ public:
     void shutdown();
     bool ok() const { return poly_pipe_ != nullptr; }
     const std::string &error() const { return error_; }
-    // Diagnostic opt-in: 4–8 vertex polygons use CPU-reference scanline
+    // Diagnostic opt-in: 3–8 vertex polygons use CPU-reference scanline
     // coverage/interpolation and GPU shading. Default remains the fan path.
     void set_polygon_scanlines(bool enabled) { polygon_scanlines_ = enabled; }
 
@@ -52,7 +52,7 @@ private:
         float ooz, uoz, voz; // render_one's p[0..2]: 1/z, u/z, v/z
         float r, g, b, a;
         uint32_t info[4], more[2]; // texture state (m2.hlsl PolyIn)
-        uint32_t edges[2]; // storage offset; left/right edge counts and scale
+        uint32_t edges[2]; // storage offset; polygon counts or triangle bit 7, and scale
     };
     struct PolyEdge { float origin[4], step[4], tail[4]; };
     static_assert(sizeof(PolyEdge) == 48); // HLSL StructuredBuffer stride

@@ -55,7 +55,7 @@ int main() {
     rt::VideoMem mem{palette.data(), translation.data(), luma.data(), texture.data(), texture.data(), 0};
     rt::Video video(tiles.data(), chars.data()); video.xhout_w(uint16_t(-84)); video.xvout_w(uint16_t(-130));
     // Half-integer edges, negative clipping, crossed chains, plateaus, tips,
-    // strict edge-end equality, and 4–8 vertex counts. All coordinates invented.
+    // strict edge-end equality, and 3–8 vertex counts. All coordinates invented.
     const std::vector<std::vector<std::array<float, 2>>> outlines = {
         {{10.5f,10.5f},{70.5f,10.5f},{70.5f,70.5f},{10.5f,70.5f}},
         {{-4.5f,-2.5f},{45.5f,-2.5f},{45.5f,35.5f},{-4.5f,35.5f}},
@@ -66,7 +66,19 @@ int main() {
         {{200.5f,80.5f},{250.5f,80.5f},{260.5f,100.5f},{245.5f,110.5f},{260.5f,140.5f},{210.5f,140.5f},{190.5f,110.5f}},
         {{300.5f,80.5f},{320.5f,80.5f},{340.5f,100.5f},{340.5f,120.5f},{320.5f,140.5f},{300.5f,140.5f},{280.5f,120.5f},{280.5f,100.5f}},
         {{30.25f,170.25f},{30.375f,170.25f},{30.375f,190.75f},{30.25f,190.75f}},
-        {{60.0f,170.5f},{70.0f,170.5f},{80.0f,170.5f},{90.0f,170.5f}}
+        {{60.0f,170.5f},{70.0f,170.5f},{80.0f,170.5f},{90.0f,170.5f}},
+        // Flat top/bottom, and a middle vertex exactly on a scanline centre.
+        {{12.5f,12.5f},{76.5f,12.5f},{44.5f,76.5f}},
+        {{100.5f,12.5f},{132.5f,76.5f},{68.5f,76.5f}},
+        {{112.25f,10.25f},{172.75f,40.5f},{112.25f,80.75f}},
+        // At row 30, the sloped edge is just either side of x=40.5.
+        // CPU rounding and fixed subpixel triangle coverage can disagree here.
+        {{20.0f,10.0f},{60.001f,50.0f},{12.0f,72.0f}},
+        {{20.0f,10.0f},{59.999f,50.0f},{12.0f,72.0f}},
+        {{-8.5f,-3.5f},{55.5f,25.5f},{12.5f,90.5f}},
+        // Degenerate triangles have no rounded span, including determinant zero.
+        {{20.5f,180.5f},{40.5f,180.5f},{60.5f,180.5f}},
+        {{20.5f,120.5f},{40.5f,140.5f},{60.5f,160.5f}}
     };
     unsigned cases = 0, failures = 0;
     auto compare = [&](const std::string &label, const std::vector<rt::GeoPoly> &polys) {
@@ -123,6 +135,27 @@ int main() {
     compare("layered-cutout-reversed-submit-order", {lower, upper});
     upper.texheader[0] |= 0x8000;
     compare("layered-cutout-checker", {upper, lower});
+    // Triangles use the reference plane setup rather than polygon edge
+    // interpolation. Keep the same binary UV increments and assert visible
+    // contributions from BOTH layers, including checker holes, in each winding.
+    for (bool reversed : {false, true}) for (bool clipped_left : {false, true}) {
+        std::vector<std::array<float, 2>> triangle{{20.5f,200.5f},{84.5f,200.5f},{20.5f,264.5f}};
+        if (reversed) std::reverse(triangle.begin(), triangle.end());
+        auto triangle_lower = polygon(triangle, 0, false, false);
+        triangle_lower.z = 200; triangle_lower.texheader[3] = 64;
+        auto triangle_upper = polygon(triangle, 3, false, false);
+        if (clipped_left) triangle_lower.viewport[0] = triangle_upper.viewport[0] = 37;
+        for (auto &vertex : triangle_upper.v) {
+            vertex.p[1] = (vertex.x - 20.5f) * 4.0f;
+            vertex.p[2] = (-vertex.y - 200.5f) * 4.0f;
+        }
+        const std::string label = "layered-cutout-triangle-winding=" + std::to_string(reversed) +
+            "-clipped-left=" + std::to_string(clipped_left);
+        compare(label, {triangle_upper, triangle_lower});
+        compare(label + "-reversed-submit-order", {triangle_lower, triangle_upper});
+        triangle_upper.texheader[0] |= 0x8000;
+        compare(label + "-checker", {triangle_upper, triangle_lower});
+    }
     std::printf("synthetic polygon spans: cases=%u failures=%u pixels_compared=%llu\n", cases, failures,
                 static_cast<unsigned long long>(cases) * W * H);
     require(SDL_WaitForGPUIdle(device)); gpu.shutdown(); SDL_ReleaseGPUTexture(device, target); SDL_DestroyGPUDevice(device); SDL_Quit();
