@@ -1,9 +1,11 @@
 // Presentation only: the shared machine supplies already-clocked SCSP samples.
 #pragma once
+#include "app/segarally_audio_output_capture.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <atomic>
 #include <cstdint>
+#include <cstdio>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -35,10 +37,34 @@ public:
         if (!stream_) fail(); // SDL opens this device paused; prime before playback.
     }
     void close() {
+        if (output_capture_) {
+            try { finish_output_capture(); }
+            catch(const std::exception &error) {std::fprintf(stderr,"SDL output capture: %s\n",error.what());}
+        }
         if (stream_) SDL_DestroyAudioStream(stream_);
+        output_capture_.reset();
+        output_capture_attached_=false;
         stream_ = nullptr; started_ = false;
         if (initialized_) SDL_QuitSubSystem(SDL_INIT_AUDIO);
         initialized_ = false;
+    }
+    void start_output_capture(const std::filesystem::path &path) {
+        if(!stream_ || output_capture_) throw std::logic_error("Output audio capture requires an open, uncaptured stream");
+        const auto device=SDL_GetAudioStreamDevice(stream_);
+        SDL_AudioSpec spec{};int frames=0;
+        if(!device || !SDL_GetAudioDeviceFormat(device,&spec,&frames)) fail();
+        auto capture=std::make_unique<AudioOutputCapture>(path,spec,frames,SDL_GetCurrentAudioDriver(),SDL_GetAudioDeviceName(device));
+        if(!SDL_SetAudioPostmixCallback(device,AudioOutputCapture::callback,capture.get())) fail();
+        output_capture_=std::move(capture);output_capture_attached_=true;
+    }
+    void finish_output_capture() {
+        if(!output_capture_) return;
+        if(output_capture_attached_) {
+            if(!SDL_SetAudioPostmixCallback(SDL_GetAudioStreamDevice(stream_),nullptr,nullptr)) fail();
+            output_capture_attached_=false;
+            output_capture_->stopped(received_frames_,submitted_frames_,queued_frames());
+        }
+        output_capture_->finish();
     }
     void clear() {
         if (!stream_) return;
@@ -50,6 +76,7 @@ public:
         if (!stream_) throw std::logic_error("SCSP audio output is not open");
         if (samples.size() % kChannels) throw std::invalid_argument("SCSP audio requires complete stereo frames");
         if (samples.empty()) return;
+        if(output_capture_attached_) output_capture_->drain();
         const size_t frames = samples.size() / kChannels;
         received_frames_ += frames;
         const auto queued = queued_frames();
@@ -70,12 +97,15 @@ public:
             if (!SDL_ResumeAudioStreamDevice(stream_)) fail();
             started_ = true;
         }
+        float ratio=1.0f;
         if (started_) {
             // Match Daytona's bounded host-device drift trim. This changes
             // only presentation, never SCSP samples or the shared board clock.
             const float error = std::clamp((float(buffered) - kPrimeFrames) / kPrimeFrames, -1.0f, 1.0f);
-            if (!SDL_SetAudioStreamFrequencyRatio(stream_, 1.0f + 0.005f * error)) fail();
+            ratio=1.0f + 0.005f * error;
+            if (!SDL_SetAudioStreamFrequencyRatio(stream_, ratio)) fail();
         }
+        if(output_capture_attached_) output_capture_->producer(received_frames_,submitted_frames_,queued,buffered,ratio);
     }
     unsigned queued_frames() const {
         if (!stream_) return 0;
@@ -105,6 +135,8 @@ private:
     }
     [[noreturn]] static void fail() { throw std::runtime_error(std::string("SDL audio: ") + SDL_GetError()); }
     SDL_AudioStream *stream_ = nullptr;
+    std::unique_ptr<AudioOutputCapture> output_capture_;
+    bool output_capture_attached_=false;
     bool initialized_ = false, started_ = false;
     uint64_t received_frames_ = 0, submitted_frames_ = 0, dropped_frames_ = 0;
     std::atomic<bool> diagnostics_{false};

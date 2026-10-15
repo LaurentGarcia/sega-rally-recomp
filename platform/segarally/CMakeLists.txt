@@ -180,6 +180,9 @@ add_custom_target(segarally_licenses
 add_dependencies(segarally_native segarally_licenses)
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     enable_testing()
+    add_executable(test_segarally_input_replay EXCLUDE_FROM_ALL "${ROOT}/tests/test_segarally_input_replay.cpp")
+    target_include_directories(test_segarally_input_replay PRIVATE "${ROOT}" "${ROOT}/src")
+    add_test(NAME segarally_input_replay COMMAND test_segarally_input_replay)
     foreach(TEST_NAME mac_launcher recording_launcher host_assets staging_provenance package_licenses mac_pipeline)
         add_test(NAME segarally_${TEST_NAME}
             COMMAND "${Python3_EXECUTABLE}" "${ROOT}/tests/test_segarally_${TEST_NAME}.py")
@@ -190,6 +193,11 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     # Keep assert-based fixtures active even when the actual host is Release.
     target_compile_options(test_segarally_audio PRIVATE -UNDEBUG)
     add_test(NAME segarally_audio COMMAND test_segarally_audio "${CMAKE_CURRENT_BINARY_DIR}/audio-fixture.wav")
+    add_executable(test_segarally_audio_output_capture EXCLUDE_FROM_ALL "${ROOT}/tests/test_segarally_audio_output_capture.cpp")
+    target_include_directories(test_segarally_audio_output_capture PRIVATE "${ROOT}/src")
+    target_link_libraries(test_segarally_audio_output_capture PRIVATE SDL3::SDL3-static)
+    target_compile_options(test_segarally_audio_output_capture PRIVATE -UNDEBUG)
+    add_test(NAME segarally_audio_output_capture COMMAND test_segarally_audio_output_capture "${CMAKE_CURRENT_BINARY_DIR}/audio-output-fixture")
     add_executable(test_segarally_controls EXCLUDE_FROM_ALL
         "${ROOT}/tests/test_segarally_controls.cpp" "${ROOT}/src/app/segarally_controls.cpp")
     target_include_directories(test_segarally_controls PRIVATE "${ROOT}/src")

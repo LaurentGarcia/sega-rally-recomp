@@ -94,13 +94,14 @@ build and regression checkpoint, not complete gameplay or hardware fidelity.
 The commands below expose each stage separately for development.
 
 The dedicated Mac CTest suite includes audio, controls, display preferences,
-asset staging, launcher, notice packaging and pipeline checks. The three C++
+asset staging, launcher, notice packaging and pipeline checks. The five C++
 test executables are excluded from the default build; the command above builds
 them explicitly. For a manually configured host, build them before running CTest:
 
 ```sh
 cmake --build build/segarally-docs-mac --target test_segarally_audio \
-    test_segarally_controls test_segarally_display_preferences -j 4
+    test_segarally_controls test_segarally_display_preferences \
+    test_segarally_audio_output_capture test_segarally_input_replay -j 4
 ctest --test-dir build/segarally-docs-mac --output-on-failure
 ```
 
@@ -622,6 +623,16 @@ gaps, Machine execution, presentation wall time and pacing lateness every
 are opt-in. Extra input bytes are SDL estimates, not exact missing device
 samples; presentation wall time includes host waiting and is not GPU timing.
 No-sound, unthrottled and offline-recording combinations reject before SDL.
+For a paired playback diagnostic, the direct host also accepts
+`--audio-output-capture output.wav` alongside paced `--sound --audio-diagnostics
+--audio-capture native.wav`. Use fresh, distinct output paths. The extra WAV
+contains this app's logical-device float mix after SDL conversion; its
+`.events.txt` sidecar records device format, packet timestamps, producer ratios,
+overflow/format status and the queued tail when capture stops. A bounded callback
+buffer is drained on the main thread. This does not capture other applications
+or the physical speaker/backend, and resampled output is not expected to equal
+native 44.1 kHz samples bit for bit. Normal playback does not install this tap.
+
 One paced 2,600-frame CRT check preserves native WAV/image, saves and all ordered
 resumes exactly, with no shortfalls or drops. A separate fresh 7,200-frame
 neutral attract capture seals 14,404 resumes and verifies every recorded PCM

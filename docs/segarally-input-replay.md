@@ -10,7 +10,7 @@ The plain text format begins with `segarally-input-v1`. Each following row is
 a decimal count of completed rendered frames, then twelve two-digit hexadecimal
 bytes: `in0 in1 in2 switches analog0 analog1 ... analog7`. Blank lines and `#`
 comments are accepted. Frames must strictly increase, from 0 through 1,000,000;
-the file may contain at most 4,096 events. Every row is a complete snapshot.
+the file may contain at most 8,192 events. Every row is a complete snapshot.
 Default neutral inputs remain in effect before the first row, and each snapshot
 persists until the next row. Frame 0 applies before the first CPU instruction.
 Later events apply after that many frames have finished rendering and before

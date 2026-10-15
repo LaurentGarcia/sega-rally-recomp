@@ -61,9 +61,30 @@ int main() {
         rejects([&] { (void)parse("segarally-input-v1\n0 ff 8f 00 ff 80 00 00 ff ff ff ff ff 00\n"); });
         rejects([&] { (void)parse("segarally-input-v1\n" + std::string(513, ' ')); });
         std::string many = "segarally-input-v1\n";
-        for (unsigned n = 0; n < 4096; ++n) many += std::to_string(n) + neutral;
-        require(parse(many).size() == 4096, "event limit rejected valid input");
-        rejects([&] { (void)parse(many + "4096" + neutral); });
+        for (unsigned n = 0; n < 8191; ++n) many += std::to_string(n) + neutral;
+        const std::string last = "8191 01 23 45 67 89 ab cd ef 10 32 54 76\n";
+        auto full = parse(many + last);
+        require(full.size() == 8192, "event limit rejected valid input");
+        bool all_applied = true;
+        for (unsigned n = 0; n < 8192; ++n) {
+            const bool applied = full.apply(n, pins);
+            all_applied = applied && all_applied;
+        }
+        require(all_applied && full.applied() == 8192, "large replay missed an event");
+        require(pins.in0 == 0x01 && pins.in1 == 0x23 && pins.in2 == 0x45 && pins.switches == 0x67 &&
+            pins.analog == std::array<uint8_t, 8>{0x89, 0xab, 0xcd, 0xef, 0x10, 0x32, 0x54, 0x76},
+            "large replay altered final cabinet snapshot");
+        rejects([&] { (void)parse(many + last + "8192" + neutral); });
+        // Ordering remains strict within the newly admitted range, before the
+        // capacity check could explain either rejection.
+        for (const char *frame : {"8190", "8189"}) {
+            bool order_rejected = false;
+            try { (void)parse(many + frame + neutral); }
+            catch (const std::runtime_error &error) {
+                order_rejected = std::string(error.what()).find("frames must strictly increase") != std::string::npos;
+            }
+            require(order_rejected, "large replay accepted duplicate/backwards frame");
+        }
         require(parse("segarally-input-v1\n1000000" + neutral).size() == 1, "frame limit rejected");
         std::printf("Sega Rally input replay: %u checks passed\n", checks);
         return 0;

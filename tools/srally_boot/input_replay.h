@@ -45,7 +45,7 @@ public:
             for (auto *port : ports) *port = byte(fields, line_number);
             for (auto &axis : event.inputs.analog) axis = byte(fields, line_number);
             if (fields >> token) fail(line_number, "extra field");
-            if (events_.size() == 4096) fail(line_number, "too many input events");
+            if (events_.size() == 8192) fail(line_number, "too many input events");
             events_.push_back(event);
         }
         if (stream.bad()) throw std::runtime_error("cannot read input replay");

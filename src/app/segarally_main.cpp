@@ -95,7 +95,7 @@ void capture_reference(const rt::Video &video,const std::filesystem::path &path)
 } // namespace
 
 int segarally_host_main(int argc,char **argv) {
-    std::filesystem::path data,saves,capture_path,reference_path,log_path,replay_path,audio_path;
+    std::filesystem::path data,saves,capture_path,reference_path,log_path,replay_path,audio_path,audio_output_path;
     uint64_t frame_limit=0,instruction_limit=0;
     bool touch_visible=false,unthrottled=false,hidden=false,fullscreen=false,sound=false;
     bool crt_requested=false,original_display=false,accurate_textures=false,show_display_controls=false;
@@ -147,9 +147,11 @@ int segarally_host_main(int argc,char **argv) {
         else if(arg=="--audio-diagnostics") audio_diagnostics=true;
         else if(arg=="--instruction-boundary-hook") instruction_boundary_hook=true;
         else if(arg=="--audio-capture") audio_path=value();
+        else if(arg=="--audio-output-capture") audio_output_path=value();
         else if(arg=="--help") {puts("Sega Rally native: --data DIR --save-dir DIR --frames N --instructions N --capture FILE.ppm --reference-capture FILE.ppm --touch --unthrottled --hidden --fullscreen --log FILE --input-replay FILE --sound --audio-capture FILE.wav --audio-diagnostics --instruction-boundary-hook\nNo-argument Mac startup enables compiled sound and exact instruction-boundary execution. Explicit commands keep sound opt-in with diagnostic instruction-boundary timing. Unthrottled runs capture/drain audio without device playback.\nKeys: arrows steer, Z gas, X brake, C coin, Return start, V view, A/S gear down/up, Space handbrake, F2 test, F3 service, Escape quit.");
             puts("Display: F1 opens controls and pauses; F6 toggles CRT effects. --crt enables the Arcade CRT preset; --original-display uses display defaults; --accurate-textures enables optional native interpolation; --display-controls opens the panel. Native --capture remains before display effects.");
             puts("Controls: F1 or Xbox Y opens Settings. Configure keyboard/controller bindings and optional controller input in Controls. Xbox defaults: left stick steer, RT gas, LT brake, LB/RB shift, A view, X handbrake, Back coin, Start start.");
+            puts("--audio-output-capture FILE.wav records only this app's logical SDL mix before the physical backend, plus FILE.wav.events.txt. Requires paced --sound --audio-diagnostics --audio-capture with a distinct path; format changes/overflow fail the capture.");
 #ifdef SEGARALLY_INPUT_RECORDING
             puts("--record-inputs DIR creates a new bounded recording bundle. --replay-recording DIR [--data DIR] replays it offline with this exact executable; no window/audio device/live-save writes.");
 #endif
@@ -170,6 +172,15 @@ int segarally_host_main(int argc,char **argv) {
 #endif
     if(audio_diagnostics && (!sound || unthrottled))
         throw std::runtime_error("--audio-diagnostics requires paced --sound playback");
+    if(!audio_output_path.empty()) {
+        if(!sound || unthrottled || !audio_diagnostics || audio_path.empty())
+            throw std::runtime_error("--audio-output-capture requires paced --sound --audio-diagnostics --audio-capture");
+        if(std::filesystem::exists(audio_output_path) || std::filesystem::exists(audio_output_path.string()+".events.txt"))
+            throw std::runtime_error("Output audio capture WAV and events paths must be new");
+        if(std::filesystem::weakly_canonical(audio_output_path)==std::filesystem::weakly_canonical(audio_path) ||
+           std::filesystem::weakly_canonical(audio_output_path.string()+".events.txt")==std::filesystem::weakly_canonical(audio_path))
+            throw std::runtime_error("Native and output audio captures require distinct paths");
+    }
     if(crt_requested && original_display) throw std::runtime_error("--crt and --original-display cannot be combined");
     if(!audio_path.empty() && !sound) throw std::runtime_error("--audio-capture requires --sound");
 #ifndef M2_SRALLY_SOUND
@@ -274,6 +285,7 @@ int segarally_host_main(int argc,char **argv) {
             int(display_settings.crt.enabled),int(display_settings.accurate_textures));
         audio.enable_diagnostics(audio_diagnostics);
         if(sound && !unthrottled) audio.open();
+        if(!audio_output_path.empty()) audio.start_output_capture(audio_output_path);
         bool quit=false,background=false,stopped=false,display_paused=false,focused=true;
         uint64_t replay_release_frame=0;bool replay_manual_takeover=false;
         Uint64 start=SDL_GetTicksNS();uint64_t displayed=0,last_frames=0;
@@ -511,6 +523,7 @@ int segarally_host_main(int argc,char **argv) {
             diagnostic_log();
             if(stopped || display_paused) SDL_Delay(10);
         }
+        audio.finish_output_capture();
         diagnostic_log(true);
         if(!capture_path.empty() && displayed) capture(device,screen,capture_path);
         if(reference && displayed) capture_reference(reference->video(),reference_path);

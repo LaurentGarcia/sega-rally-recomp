@@ -1,5 +1,54 @@
 # Handoff
 
+## Bounded output-audio diagnostics and longer input replays (2026-10-15)
+
+Offline analysis of the preserved 125.166-second neutral-title capture found
+no nonfinite/full-scale samples or increased discontinuity at drain boundaries.
+Its two later silence gaps decay toward zero; the largest transients recur at
+the same musical position across repeated music. This does not resolve the
+reported audible issue. SCSP sample/loop/mix source matches the pinned reference
+apart from the documented RNG provider; playback counters do not observe all
+downstream CoreAudio buffering. Evidence:
+`build/worktrees/audio-title-diagnosis/build/validation/title-signal-001/report.json`,
+SHA-256 `221118d349648c0315b9f7aab63d8dba43196a1b235053c6bb48f508afd7b725`.
+
+Audio and Reference & validation govern a new optional diagnostic:
+`--audio-output-capture FILE.wav`, requiring paced sound, audio diagnostics and
+a distinct native capture. It records only this application's SDL logical-device
+float mix before the physical backend. A preallocated single-producer/consumer
+ring keeps file I/O and allocation off the audio callback; the main thread
+drains WAV data and packet/producer metadata. Overflow and format changes fail
+explicitly. Callback removal synchronizes shutdown; capture records the queued
+tail rather than waiting or changing playback. Native sample generation, normal
+buffering and default 44.1 kHz stereo WAV bytes are unchanged.
+
+The new fixture passes 24,389 checks covering ring wrap/limits, format errors,
+concurrent draining, two isolated SDL dummy logical devices and detach behavior.
+The original audio fixture and strict host syntax also pass. The first compile
+attempt used an incompatible enum initializer; that failure is preserved before
+the typed correction. Frozen source/tests:
+`build/worktrees/audio-output-capture/build/validation/postmix-001/`;
+patch SHA-256 `50f5fcafbbcb0b747eff9014dd719f38133120ce54743ad61ee4b01c8d4ea823`.
+Independent review reconciles all nine retained WAV packet/footer records:
+`build/validation/audio-postmix-independent-review/result.json`, SHA-256
+`148690ff9e72d740677473cfbaeb51dae9c85e1da797f507ba70abdeeb62aadd`.
+Actual physical-device paired capture is still next. Integration retains the
+separate no-argument Mac startup fix; overlapping help text was merged explicitly.
+
+The valid-input course experiment now clears Forest and drives Mountain, but
+the best bounded path still retires before Mountain finishes. Its exact frame
+input transcript has 4,398 events, exceeding the previous 4,096 parser bound.
+The bound is now 8,192, retaining exact bytes, strict frame ordering, frame and
+line limits, and the launcher's 1 MiB file limit. All 42 parser checks pass
+normally and under ASan/UBSan, including accepting/applying 8,192 and rejecting
+8,193 events. Evidence:
+`build/worktrees/replay-event-limit/build/event-limit-review/`, patch SHA-256
+`66f65bf04d8250fa3999cfb49a2b42c34f92d94aac8997aed92e212d67fa63fe`.
+The Mac pipeline now builds both new diagnostic and input test targets before
+CTest. The player manual uses the current build/launch workflow and keeps old
+checkpoint details in the handoff rather than instructing users to repackage
+preserved recording apps. Fresh candidate002 build/device gates follow.
+
 ## Fresh Mac build verified; direct startup defaults corrected (2026-10-15)
 
 The first fresh candidate is generated from the supplied archive at commit

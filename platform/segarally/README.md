@@ -32,6 +32,22 @@ stops packaging rather than assuming the app is closed.
 
 Interactive launches use normal board-time pacing; `--unthrottled` is an explicit diagnostic option. The host and launcher accept `--input-replay FILE`, reusing the boot tool's `segarally-input-v1` parser and completed-render boundary semantics. Replayed cabinet snapshots remain unchanged between events. The final snapshot is held for one completed frame, then keyboard/controller/touch take over after held inputs are released or centered. This interactive handoff intentionally differs from the headless boot tool, which retains its final snapshot indefinitely. Parsing failures stop before native execution. A paired software capture receives the identical inputs at every resumed step, including handoff.
 
+For an audio diagnosis, the raw host accepts `--audio-output-capture output.wav`
+alongside paced `--sound --audio-diagnostics --audio-capture native.wav`.
+The two capture paths must differ, and the output WAV and its `.events.txt`
+sidecar must be new. `native.wav` contains the original 44.1 kHz stereo SCSP
+samples. `output.wav` contains only this app's logical SDL device mix after
+resampling and stream/device gain, before the physical backend; it does not
+record other apps or prove what the speakers played. Its WAV header preserves
+the actual output rate and channel count. The sidecar records device format,
+callback timestamps/frame ranges, producer queue levels and exact requested
+rate-ratio bits. A bounded callback ring is drained to disk on the main thread;
+overflow or a format change makes the capture fail explicitly. Capture stops
+at the host loop's end without waiting for the remaining queued audio to play;
+the sidecar records that queued input tail. Without this flag no postmix tap or
+capture buffers are created. The ROM-free `segarally_audio_output_capture`
+CTest uses only SDL's dummy audio driver.
+
 For a fresh recorded session, add `--record-inputs build/recordings/drive-001` to the Mac launcher. The directory must be new; an already running app must be closed before recording can capture startup. `--input-replay FILE` may still supply menu selection before manual takeover. The recording stores the final twelve cabinet bytes at every actual instruction-bounded host resume, including changes between rendered frames. It preserves initial EEPROM/backup bytes, all ten Machine options, actual loaded image hashes, raw assets-report identity, executable identity, PCM bit hashes and fault/final-save evidence. Source-generation identities in the assets report remain `identity_only` evidence rather than independent authentication.
 
 Replay with the exact captured executable, for example:
