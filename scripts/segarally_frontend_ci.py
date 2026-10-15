@@ -68,7 +68,7 @@ def main():
     subprocess.run(['cmake','--build',str(out),'--config','Release','--parallel','2','--target',
                     'segarally_frontend_compile','test_segarally_audio','test_segarally_controls',
                     'test_segarally_display_preferences','test_segarally_audio_output_capture',
-                    'test_segarally_input_replay','test_segarally_platform_files'],cwd=ROOT,check=True,timeout=900)
+                    'test_segarally_input_replay','test_segarally_platform_files','test_segarally_rom_import'],cwd=ROOT,check=True,timeout=900)
     subprocess.run(['ctest','--test-dir',str(out),'-C','Release','--output-on-failure'],cwd=ROOT,check=True,timeout=300)
     (out/'frontend-ci-result.json').write_text(json.dumps({'status':'passed',
         'scope':'ROM-free real frontend compile/link and host tests only; not playable or Vulkan/device validation',

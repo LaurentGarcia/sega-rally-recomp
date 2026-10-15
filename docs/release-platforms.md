@@ -13,18 +13,17 @@ The distribution work targets these four platforms:
 | --- | --- | --- | --- |
 | Mac, Apple Silicon | Metal | Personal game DMG; prebuilt app with ROM import in development | Personal package built, signed ad hoc and checksum verified; CRT and audio defaults checked. Public compiler-bootstrap previews withdrawn. |
 | iPhone, arm64 | Metal | Locally generated app, signed for its destination | Unsigned iOS 15+ build passed with sound and new touch controls; assets/notices verified. Signing, installation and physical testing remain pending. |
-| Windows, x86-64 | Vulkan through SDL3 GPU | Local builder and personal native game package | Desktop build portability and real-host compilation CI in progress; no validated game binary yet. |
-| Linux, x86-64 | Vulkan through SDL3 GPU | Local builder and personal native game package | Desktop build portability and real-host compilation CI in progress; no validated game binary yet. |
+| Windows, x86-64 | Vulkan through SDL3 GPU | Prebuilt game ZIP and private data-inclusive edition | Real frontend and thirteen host tests pass; complete native game cross-build in progress. |
+| Linux, x86-64 | Vulkan through SDL3 GPU | Prebuilt game archive and private data-inclusive edition | Real frontend and thirteen host tests pass; complete native game cross-build in progress. |
 
 The personal game package contains the owner's local game data and generated
-game instructions. It stays local. Public local-builder packages contain only
-the importer and supporting project code. They ask each person for their own
-verified Revision B ZIP and generate/compile their game locally. An empty
-builder is not a ready-to-play game, and installed build tools are required.
-The Mac builder needs Python 3.10+, Git, CMake/CTest 3.25+ and Apple Command Line
-Tools. It downloads exact source/dependency revisions, preserves existing apps
-and saves, and records the local build result. See its
-[build instructions](../platform/segarally/macos/importer/README.md).
+game instructions. It stays local. The requested public player executable also
+contains statically recompiled game instructions, but no ROM archive or extracted
+game data. Its native importer asks for the owner's verified Revision B ZIP and
+prepares local game data without a compiler, Python or a network connection.
+The project source license does not license Sega game content. Compiled game
+instructions are a separate distribution exception; the source repository and
+source archives still exclude generated game code and ROM bytes.
 
 iPhone requires a desktop build and Apple signing after local game generation.
 A generic IPA cannot generate and compile the game's native instructions on an

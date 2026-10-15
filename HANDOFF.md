@@ -1,5 +1,34 @@
 # Handoff
 
+## Prebuilt player import and two package editions (2026-10-15)
+
+The native C++ importer verifies 23 required ZIP members by size, CRC32 and
+SHA1, constructs eight fixed SHA256-verified images, and atomically commits a
+new local asset directory. It never compiles, downloads or uploads. The actual
+owned ZIP produces eight byte-identical known-good images in under one second
+on this Mac. Import checks pass 4,276 cases; 4,263 ROM-free cases pass ASan/UBSan.
+Peer review caught a linked assets.json acceptance gap, corrected before freeze.
+The inherited deflate reader is not claimed fully format-strict; the fixed
+member and final-image identities remain mandatory. No ROM/image bytes enter Git.
+
+The player accepts `--rom` and CPU-only `--import-only`, or uses the native file
+picker when no bundled/imported data exists. Imports use separate unique cache
+folders with a bounded relative pointer; existing game saves remain intact.
+Twenty sanitizer-backed startup shim checks cover callback lifetime after quit,
+cancellation, retry, cache reuse, invalid pointer paths and save preservation.
+Actual picker interaction and integrated game startup still require validation.
+
+The Mac player packager now has import and private personal editions. Both
+contain the real precompiled executable; only the personal edition copies the
+eight verified game-data files. A peer review required fixed asset identities,
+manifest link rejection and copied-executable hash checking; all three are now
+included. The new digest target retains unchanged public-domain SHA1/SHA256
+sources even with recording disabled. Initial notice tests expected three source
+notices; the correct five-file expectation now passes. The source-only boundary
+remains; the requested prebuilt-executable exception is explicit in rules/design.
+Actual Mac packages, signed personal iOS output and Windows/Linux game builds
+remain in progress at this checkpoint.
+
 ## Desktop frontend compiler checks repaired (2026-10-15)
 
 Linux GCC and Clang compiled the real host and passed its thirteen tests.

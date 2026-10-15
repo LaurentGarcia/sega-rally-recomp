@@ -42,6 +42,13 @@ legal problem, or hours re-deriving something already established.
    by exact paths and hashes in the source-release gate and image provenance.
    Their game imagery is not covered by the project source license. No other
    capture, extracted asset, ROM or generated game code is authorized for export.
+   The subsequently requested prebuilt game releases have a separate narrow
+   binary exception: compiled, statically translated game instructions may be
+   present in the player executable. Public player packages still exclude ROM
+   archives and extracted game data; the player imports its owner's ZIP locally.
+   These executables are not described as free of game-derived content. Personal
+   ready-to-play packages may include the owner's data but stay private. Source
+   repositories/archives still exclude generated game source and ROM bytes.
 7. **Analysis evidence is committed; game-derived output is not.** Addresses,
    sizes, function names, jump-table targets, hashes, run logs and
    `seeds.toml` are our own work and are committed. Decompiled pseudo-C,

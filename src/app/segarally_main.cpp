@@ -10,6 +10,7 @@
 #include "app/segarally_audio.h"
 #include "app/segarally_audio_capture.h"
 #include "app/segarally_platform_files.h"
+#include "app/segarally_startup.h"
 #include "../../tools/srally_boot/input_replay.h"
 #ifdef SEGARALLY_INPUT_RECORDING
 #include "../../tools/srally_boot/recording_bundle.h"
@@ -92,7 +93,8 @@ void capture_reference(const rt::Video &video,const std::filesystem::path &path)
 } // namespace
 
 int segarally_host_main(int argc,char **argv) {
-    std::filesystem::path data,saves,capture_path,reference_path,log_path,replay_path,audio_path,audio_output_path;
+    std::filesystem::path data,saves,capture_path,reference_path,log_path,replay_path,audio_path,audio_output_path,rom_path;
+    bool import_only=false;
     uint64_t frame_limit=0,instruction_limit=0;
     bool touch_visible=false,unthrottled=false,hidden=false,fullscreen=false,sound=false;
     bool crt_requested=false,original_display=false,accurate_textures=false,show_display_controls=false;
@@ -112,7 +114,9 @@ int segarally_host_main(int argc,char **argv) {
         if(arg!="--data"&&arg!="--replay-recording")recording_replay_conflict=true;
 #endif
         auto value=[&](){if(++i>=argc) throw std::runtime_error("Missing argument for "+arg);return std::string(argv[i]);};
-        if(arg=="--data") data=value();else if(arg=="--save-dir") {
+        if(arg=="--rom") {rom_path=std::filesystem::u8path(value());player_defaults=true;}
+        else if(arg=="--import-only") import_only=true;
+        else if(arg=="--data") data=value();else if(arg=="--save-dir") {
             saves=value();
         }
         else if(arg=="--frames") frame_limit=std::stoull(value());else if(arg=="--instructions") instruction_limit=std::stoull(value());
@@ -141,6 +145,7 @@ int segarally_host_main(int argc,char **argv) {
         else if(arg=="--help") {puts("Sega Rally native: --data DIR --save-dir DIR --frames N --instructions N --capture FILE.ppm --reference-capture FILE.ppm --touch --unthrottled --hidden --fullscreen --log FILE --input-replay FILE --player --sound --no-sound --audio-capture FILE.wav --audio-diagnostics --instruction-boundary-hook\nNo-argument startup or --player enables compiled sound, exact instruction-boundary execution and CRT for fresh player preferences. --no-sound mutes the native sound board. Explicit commands keep sound opt-in with diagnostic instruction-boundary timing. Unthrottled runs capture/drain audio without device playback.\nKeys: arrows steer, Z gas, X brake, C coin, Return start, V view, A/S gear down/up, Space handbrake, F2 test, F3 service, Escape quit.");
             puts("Display: F1 opens controls and pauses; F6 toggles CRT effects. --crt enables the Arcade CRT preset; --original-display uses display defaults; --accurate-textures enables optional native interpolation; --display-controls opens the panel. Native --capture remains before display effects.");
             puts("Controls: F1 or Xbox Y opens Settings. Configure keyboard/controller bindings and optional controller input in Controls. Xbox defaults: left stick steer, RT gas, LT brake, LB/RB shift, A view, X handbrake, Back coin, Start start.");
+            puts("First launch: choose your Sega Rally Revision B ZIP when prompted; no compiler or network required. --rom FILE.zip imports it directly. --import-only with --rom verifies/imports without starting the game. Personal packages can include verified game data.");
             puts("--audio-output-capture FILE.wav records only this app's logical SDL mix before the physical backend, plus FILE.wav.events.txt. Requires paced --sound --audio-diagnostics --audio-capture with a distinct path; format changes/overflow fail the capture.");
 #ifdef SEGARALLY_INPUT_RECORDING
             puts("--record-inputs DIR creates a new bounded recording bundle. --replay-recording DIR [--data DIR] replays it offline with this exact executable; no window/audio device/live-save writes.");
@@ -157,6 +162,9 @@ int segarally_host_main(int argc,char **argv) {
 #endif
     }
     if(sound_disabled) sound=false;
+    const bool explicit_data=!data.empty();
+    if(!rom_path.empty() && explicit_data)throw std::runtime_error("Use either --rom or --data, not both");
+    if(import_only && rom_path.empty())throw std::runtime_error("--import-only requires --rom FILE.zip");
 #ifdef SEGARALLY_INPUT_RECORDING
     if(!recording_replay_path.empty()) {
         if(recording_replay_conflict)
@@ -202,9 +210,9 @@ int segarally_host_main(int argc,char **argv) {
     }
     SDL_SetMainReady();
     if(hidden) SDL_SetHint(SDL_HINT_MAC_BACKGROUND_APP,"1");
-    if(!SDL_Init(SDL_INIT_VIDEO)) {fprintf(stderr,"SDL_Init: %s\n",SDL_GetError());return 1;}
-    if(data.empty()) data=std::filesystem::path(SDL_GetBasePath())/"assets";
-    if(saves.empty()) {char *path=SDL_GetPrefPath("sega-rally-recomp","SegaRallyNative");if(path) {saves=path;SDL_free(path);}else saves="saves";}
+    if(!SDL_Init(import_only?0:SDL_INIT_VIDEO)) {fprintf(stderr,"SDL_Init: %s\n",SDL_GetError());return 1;}
+    if(data.empty()) data=std::filesystem::u8path(SDL_GetBasePath())/"assets";
+    if(saves.empty()) {char *path=SDL_GetPrefPath("sega-rally-recomp","SegaRallyNative");if(path) {saves=std::filesystem::u8path(path);SDL_free(path);}else saves="saves";}
     SDL_Window *window=nullptr;SDL_GPUDevice *device=nullptr;SDL_GPUTexture *screen=nullptr;
     app::GpuRenderer gpu;rally::TouchControls touch;std::unique_ptr<Machine> machine,reference;
     app::CrtRenderer crt;app::DisplayPanel display;app::DisplaySettings display_settings;
@@ -224,6 +232,10 @@ int segarally_host_main(int argc,char **argv) {
 #endif
     try {
         std::filesystem::create_directories(saves);
+        if(!explicit_data) {
+            data=app::segarally::prepare_player_data(data,saves,rom_path,player_defaults&&!hidden&&!import_only);
+            if(data.empty() || import_only) {SDL_Quit();return 0;}
+        }
         Machine::Images images;
         images.program=read_file(data/"program.bin");images.main_data=read_file(data/"main_data.bin");
         images.tgp_tables=read_file(data/"tgp_tables.bin");images.copro_data=read_file(data/"copro_data.bin");
@@ -591,7 +603,11 @@ int segarally_host_main(int argc,char **argv) {
         fprintf(stderr,"Native host exit: frames=%llu instructions=%llu cycles=%llu pc=%08x result=%d\n",
             static_cast<unsigned long long>(displayed),static_cast<unsigned long long>(stats.instructions),
             static_cast<unsigned long long>(stats.reference_cycles),stats.pc,result);
-    } catch(const std::exception &error) {fprintf(stderr,"Sega Rally native: %s\n",error.what());result=1;}
+    } catch(const std::exception &error) {
+        fprintf(stderr,"Sega Rally native: %s\n",error.what());result=1;
+        if(player_defaults && !hidden && !import_only)
+            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR,"Sega Rally",error.what(),window);
+    }
     audio.close();
     if(device) {SDL_WaitForGPUIdle(device);display.shutdown();crt.shutdown();gpu.shutdown();if(screen) SDL_ReleaseGPUTexture(device,screen);
         if(window) SDL_ReleaseWindowFromGPUDevice(device,window);SDL_DestroyGPUDevice(device);}

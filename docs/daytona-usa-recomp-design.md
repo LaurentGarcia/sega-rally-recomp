@@ -358,6 +358,18 @@ Correctness is proven by lockstep differential testing against MAME, frame by fr
 
 ## Platform layer & build
 
+**Rally distribution update, 15 October 2026.** The requested deliverable is a
+prebuilt game executable, rather than a compiler bootstrap requiring developer
+tools. Its original runtime importer verifies the player's ZIP and prepares
+local data without compilation or network access. This supersedes the earlier
+local-code-generation distribution assumption for the Rally binary releases.
+The executable contains statically translated game instructions; excluding ROM
+archives and extracted assets does not make it free of game-derived content.
+Public player packages omit those data files. Separately requested personal
+packages include the owner's game data and stay private. Generated C++ and ROM
+bytes remain excluded from source Git history and source archives. This is the
+package contract, not a legal clearance or a change to fidelity criteria.
+
 One CMake project, C++20, SDL3 for window, input, haptics, audio and GPU, so platform-specific code stays under a few hundred lines. The user runs a first-launch importer that verifies their ROMs and generates the game code locally.
 
 | Platform | Arch | Graphics | Toolchain | Package |

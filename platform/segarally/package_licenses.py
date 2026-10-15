@@ -57,7 +57,7 @@ def collect(root: Path, sdl: Path, imgui: Path, lzma: Path | None = None) -> dic
     notices['Source-notices.txt'] = ('\n'.join(retained)).encode()
     if lzma is not None:
         entries = []
-        for name in ('Sha256.c', 'Sha256Opt.c', 'CpuArch.c'):
+        for name in ('Sha256.c', 'Sha256Opt.c', 'CpuArch.c', 'Sha1.c', 'Sha1Opt.c'):
             preamble = leading_comments((lzma / 'C' / name).read_text())
             if 'Public domain' not in preamble:
                 raise ValueError(f'{name} no longer declares public-domain status')

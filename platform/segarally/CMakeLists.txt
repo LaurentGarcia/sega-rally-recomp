@@ -57,6 +57,8 @@ set(RUNTIME cpu lockstep model2a_bus model2a_clock model2a_machine model2a_contr
 set(SOURCES "${ROOT}/src/app/segarally_main.cpp" "${ROOT}/src/app/gpu/gpu_renderer.cpp" "${ROOT}/src/app/gpu/model2_frame.cpp"
     "${ROOT}/src/app/gpu/crt_renderer.cpp" "${ROOT}/src/app/segarally_display.cpp"
     "${ROOT}/src/app/segarally_controls.cpp"
+    "${ROOT}/src/app/segarally_startup.cpp" "${ROOT}/src/app/segarally_rom_import.cpp"
+    "${ROOT}/src/runtime/zip.cpp"
 )
 if(SEGARALLY_FRONTEND_COMPILE_ONLY)
     list(APPEND SOURCES "${ROOT}/tests/fixtures/segarally_frontend_link.cpp")
@@ -191,15 +193,22 @@ endif()
 if(SEGARALLY_FRONTEND_COMPILE_ONLY)
     target_compile_definitions(${HOST_TARGET} PRIVATE SEGARALLY_FRONTEND_COMPILE_ONLY=1)
 endif()
-if(SEGARALLY_INPUT_RECORDING AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    set(SEGARALLY_LZMA_SOURCE "${ROOT}/extern/lzma" CACHE PATH "Pinned public-domain 7-Zip SHA-256 sources")
+    set(SEGARALLY_LZMA_SOURCE "${ROOT}/extern/lzma" CACHE PATH "Pinned public-domain 7-Zip digest sources")
     execute_process(COMMAND git -C "${SEGARALLY_LZMA_SOURCE}" rev-parse HEAD
         OUTPUT_VARIABLE SHA_REVISION OUTPUT_STRIP_TRAILING_WHITESPACE RESULT_VARIABLE SHA_REVISION_STATUS)
     if(NOT SHA_REVISION_STATUS EQUAL 0 OR NOT SHA_REVISION STREQUAL "0766b733fe3e06dd2a7f9a3cfbf2108ac73abd17")
-        message(FATAL_ERROR "Input recording requires the pinned public-domain 7-Zip revision")
+        message(FATAL_ERROR "ROM import requires the pinned public-domain 7-Zip revision")
     endif()
-    add_library(segarally_recording STATIC "${ROOT}/tools/srally_boot/recording_bundle.cpp" "${ROOT}/src/runtime/sha256_digest.cpp"
-        "${SEGARALLY_LZMA_SOURCE}/C/Sha256.c" "${SEGARALLY_LZMA_SOURCE}/C/Sha256Opt.c" "${SEGARALLY_LZMA_SOURCE}/C/CpuArch.c")
+    add_library(segarally_digests STATIC "${ROOT}/src/runtime/sha256_digest.cpp"
+        "${SEGARALLY_LZMA_SOURCE}/C/Sha256.c" "${SEGARALLY_LZMA_SOURCE}/C/Sha256Opt.c" "${SEGARALLY_LZMA_SOURCE}/C/CpuArch.c"
+        "${SEGARALLY_LZMA_SOURCE}/C/Sha1.c" "${SEGARALLY_LZMA_SOURCE}/C/Sha1Opt.c")
+    target_include_directories(segarally_digests PUBLIC "${ROOT}/src")
+    target_include_directories(segarally_digests SYSTEM PUBLIC "${SEGARALLY_LZMA_SOURCE}/C")
+    set_target_properties(segarally_digests PROPERTIES C_STANDARD 11)
+    target_link_libraries(${HOST_TARGET} PRIVATE segarally_digests)
+if(SEGARALLY_INPUT_RECORDING AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    add_library(segarally_recording STATIC "${ROOT}/tools/srally_boot/recording_bundle.cpp")
+    target_link_libraries(segarally_recording PUBLIC segarally_digests)
     target_include_directories(segarally_recording PUBLIC "${ROOT}/src")
     target_include_directories(segarally_recording SYSTEM PUBLIC "${SEGARALLY_LZMA_SOURCE}/C")
     if(MSVC)
@@ -222,9 +231,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
 endif()
 set(LICENSE_ARGS --output "${CMAKE_BINARY_DIR}/licenses"
     --sdl-source "${SEGARALLY_SDL_SOURCE}" --imgui-source "${SEGARALLY_IMGUI_SOURCE}")
-if(CMAKE_SYSTEM_NAME STREQUAL "iOS" OR SEGARALLY_INPUT_RECORDING)
-    list(APPEND LICENSE_ARGS --lzma-source "${SEGARALLY_LZMA_SOURCE}")
-endif()
+list(APPEND LICENSE_ARGS --lzma-source "${SEGARALLY_LZMA_SOURCE}")
 execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/package_licenses.py" ${LICENSE_ARGS}
     RESULT_VARIABLE LICENSE_RESULT)
 if(NOT LICENSE_RESULT EQUAL 0)
@@ -247,6 +254,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
 endif()
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     enable_testing()
+    add_executable(test_segarally_rom_import EXCLUDE_FROM_ALL "${ROOT}/tests/test_segarally_rom_import.cpp" "${ROOT}/src/runtime/zip.cpp")
+    target_include_directories(test_segarally_rom_import PRIVATE "${ROOT}/src")
+    target_link_libraries(test_segarally_rom_import PRIVATE segarally_digests)
+    add_test(NAME segarally_rom_import COMMAND test_segarally_rom_import "${CMAKE_CURRENT_BINARY_DIR}/rom-import-fixtures")
     add_executable(test_segarally_platform_files EXCLUDE_FROM_ALL "${ROOT}/tests/test_segarally_platform_files.cpp")
     target_include_directories(test_segarally_platform_files PRIVATE "${ROOT}/src")
     add_test(NAME segarally_platform_files COMMAND test_segarally_platform_files "${CMAKE_CURRENT_BINARY_DIR}/platform-files-fixture")

@@ -27,7 +27,7 @@ DEPENDENCIES={
  'imgui':('https://github.com/ocornut/imgui.git','f1cc2ae15e53a861a874c3034aae6798fde194ab'),
  'lzma':('https://github.com/ip7z/7zip.git','0766b733fe3e06dd2a7f9a3cfbf2108ac73abd17')}
 TESTS=['test_segarally_audio','test_segarally_controls','test_segarally_display_preferences',
-       'test_segarally_audio_output_capture','test_segarally_input_replay','test_segarally_platform_files']
+       'test_segarally_audio_output_capture','test_segarally_input_replay','test_segarally_platform_files','test_segarally_rom_import']
 
 def digest(path):
  h=hashlib.sha256()

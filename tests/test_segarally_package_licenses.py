@@ -34,7 +34,7 @@ class PackageLicenses(unittest.TestCase):
             b'// synthetic upstream font container\n// [SECTION] Default font data (ProggyClean.ttf)\n\n' +
             b'\n#if FONT_ENABLED\nstatic unsigned char forbidden_font_payload[] = {1,2};\n#endif\n'.join(self.font_notices) +
             b'\n#if FONT_ENABLED\nvoid forbidden_font_implementation() {}\n#endif\n')
-        for name in ('Sha256.c', 'Sha256Opt.c', 'CpuArch.c'):
+        for name in ('Sha256.c', 'Sha256Opt.c', 'CpuArch.c', 'Sha1.c', 'Sha1Opt.c'):
             p = self.root / 'lzma/C' / name
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text('/* Example author: Public domain */\n#include "a.h"\nvoid code() {}')
@@ -58,7 +58,7 @@ class PackageLicenses(unittest.TestCase):
         self.assertNotIn(b'#if', fonts)
         self.assertNotIn(b'#include', got['Source-notices.txt'])
         self.assertNotIn(b'void code()', got['7-Zip-selected-sources.txt'])
-        self.assertEqual(got['7-Zip-selected-sources.txt'].count(b'Public domain'), 3)
+        self.assertEqual(got['7-Zip-selected-sources.txt'].count(b'Public domain'), 5)
 
     def test_no_recording_requires_no_lzma_dependency(self):
         (self.root/'lzma/DOC/License.txt').unlink()

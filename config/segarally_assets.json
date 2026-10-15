@@ -1,0 +1,45 @@
+{
+  "romset": "srallycb",
+  "images": {
+    "program": {
+      "file": "program.bin",
+      "size": 2097152,
+      "sha256": "bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439"
+    },
+    "main_data": {
+      "file": "main_data.bin",
+      "size": 37748736,
+      "sha256": "2c55fca2ed44c87a8886cfcfb0638ad8e25f5fac0e9fbe5d4cf990ba950cc8e1"
+    },
+    "tgp_tables": {
+      "file": "tgp_tables.bin",
+      "size": 262144,
+      "sha256": "3163343896150d46e3280f71eb276cfeabd9190602c0bfdd53a6cb18d91f0b04"
+    },
+    "copro_data": {
+      "file": "copro_data.bin",
+      "size": 8388608,
+      "sha256": "22d65f223f3b341088c013666c8f35b522ef9b4c0a383b36f7c0b683396c524f"
+    },
+    "polygons": {
+      "file": "polygons.bin",
+      "size": 33554432,
+      "sha256": "3fddc91c5b0ab9247d32518047066aa71a1db398a38d3d4f56ba3bc84c2ddfb7"
+    },
+    "textures": {
+      "file": "textures.bin",
+      "size": 16777216,
+      "sha256": "38c4c6619682366c8a9553dc686a8127f38ae2385abe7a8649c152273b23302e"
+    },
+    "sound_program": {
+      "file": "sound_program.bin",
+      "size": 524288,
+      "sha256": "6be2a7a6c9c08b55291ceaf7891f2d8418e38291ed00376cf0f569a8a083ad6f"
+    },
+    "sound_samples": {
+      "file": "sound_samples.bin",
+      "size": 8388608,
+      "sha256": "4a561c46de5400040ea21322040fbfef1c91e8dc4e9fc7a5123490187b7896ba"
+    }
+  }
+}
