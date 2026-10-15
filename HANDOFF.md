@@ -1,5 +1,52 @@
 # Handoff
 
+## Independent ordered-resume phase component (2026-10-14)
+
+`tools/srally_boot/reference_resume.h` adds a test-only sound-off interpreter
+stepper for ordered host resumes. It applies all twelve input bytes once per
+public call, preserves requested budgets and before/after witnesses, returns
+Frame before an exact Budget tie, and retains queued IRQ edges until the next
+preparation. An IRQ may complete a frame without executing another opcode.
+Initial EEPROM/backup sizes are both checked before either board is changed.
+The production Machine, raw reference harness and interpreter body are unchanged.
+This implements the inherited **Inputs** and **Reference & validation** contracts.
+
+A measured long absolute LDA leaves board time at 0 ns in Machine but 40 ns
+in the unmodified interpreter, despite identical N=1/cycle=1 and CPU state:
+the interpreter fetches its displacement after charging. The adapter validates
+and caches only proven decoder words at the original boundary phase. Relocated
+RAM live-word guards retain byte checks, access order and failures before
+charging; genuine data accesses/flags/writes retain their original bus clocks.
+ROM prefetch here is oracle byte validation, not a native/hardware fetch claim.
+Unknown lengths, executable ranges, live-word changes and fetch faults reject;
+an exception poisons the stepper. Captured DeviceAccess/RuntimeError rows are
+unsupported because operand decoding changes the interpreter fault IP phase.
+No phase is normalized silently. Coupled sound remains rejected intact.
+
+The registered ROM-free fixture passes 249 checks in both hook modes, including
+IRQ/cache state, ordered cycle-stamped IRQ writes, unchanged-count frame returns,
+changed next-resume pins, real data clocks and guard/data faults. Existing
+transcript and Machine fixtures pass 98 and 84 checks: all three focused CTests
+pass after a normal CMake build (9.4 seconds, parallelism two). New-source strict
+syntax/warnings and independent read-only review pass. The frozen integrated
+files exactly match those tested in the isolated worktree.
+
+Early synthetic probes guarded ROM code too; the formal fixture corrects that
+scope to native embedded ROM words versus relocated RAM guards and still
+reproduces the measured phase discrepancy. A data-fault fixture initially used
+0x10000000, which Machine video legitimately maps; 0x20000000 supplies the
+actual unmapped case. Whole-fixture warnings-as-errors encountered inherited
+reference/geometry warnings; only the new translation unit/header are claimed
+strict-clean. Original failed probes are preserved as ignored evidence.
+
+Evidence: `build/validation/ordered-resume-reference/result.json`, SHA-256
+`28ec789b02df84608b4aa400fa372376b59684fc43b247a78a1485faa89b48fc`.
+This is a low-level phase component, not a complete recording replay oracle.
+Next bind immutable bundle preflight, actual host/images/options/seed bytes,
+generated instruction profiles and a full independent board provider before
+running any real captured rows. Capability booleans are not provenance proof.
+No sound-on recording has been converted, accepted or independently validated.
+
 ## Repeated stepping across complete scenes (2026-10-14)
 
 The diagnostic now passes three historical complete scenes, including HUD/tile

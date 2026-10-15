@@ -238,6 +238,21 @@ no SDL/window/audio device and writes no live saves.
 The independent CPU harness must reject unsupported startup
 seeds, resume phases or configurations, and currently rejects coupled sound.
 
+A test-only ordered-resume stepper now covers the sound-off phase contract with
+249 ROM-free checks against actual Machine calls. It preserves unchanged-count
+IRQ/frame returns, Frame/Budget ties, queued edges and next-call input changes.
+Verified instruction-word caching handles the measured interpreter displacement
+fetch phase; real data/flags/writes keep their charged-cycle synchronization.
+Invalid profiles, changed live guards and fetch faults fail closed. Captured
+fault rows are rejected because the interpreter's fault IP phase is unproven.
+Neither the production Machine nor the raw reference harness changes.
+
+This component is not a whole-bundle replay command. Immutable preflight, actual
+host/images/options/seed binding, generated instruction-profile provenance and
+the full independent board provider still need integration before accepting a
+game capture. Capability flags alone do not verify those facts; sound-on bundles
+remain unsupported without altering their recorded configuration.
+
 The ROM-free tests cover 98 stream/contract checks and 84 Machine checks in
 both execution modes. A real timer IRQ in the synthetic fixture completes a
 frame at the same instruction count, then the next opcode reads the newly
@@ -254,7 +269,8 @@ it does not upgrade this evidence to an independent CPU or hardware oracle.
 ```sh
 cmake -S . -B build/host-tests-resume -DM2_BUILD_WINDOWED_APP=OFF
 cmake --build build/host-tests-resume --target \
+    test_segarally_reference_resume \
     test_segarally_host_input_transcript test_segarally_host_input_machine -j 2
 ctest --test-dir build/host-tests-resume --output-on-failure \
-    -R '^segarally_host_input_(transcript|machine)$'
+    -R '^segarally_(reference_resume|host_input_transcript|host_input_machine)$'
 ```

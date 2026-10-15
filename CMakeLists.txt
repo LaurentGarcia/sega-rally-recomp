@@ -478,6 +478,26 @@ add_executable(test_segarally_host_input_transcript tests/test_segarally_host_in
 target_include_directories(test_segarally_host_input_transcript PRIVATE src .)
 add_test(NAME segarally_host_input_transcript COMMAND test_segarally_host_input_transcript)
 
+# Shared ROM-free Machine fixture sources; no generated game code.
+set(SEGARALLY_INPUT_MACHINE_SOURCES
+    src/runtime/model2a_machine.cpp src/runtime/model2a_bus.cpp src/runtime/model2a_clock.cpp
+    src/runtime/model2a_control.cpp src/runtime/cpu.cpp src/runtime/lockstep.cpp
+    src/runtime/model2_io.cpp src/runtime/model2a_io.cpp src/runtime/model2_eeprom.cpp
+    src/runtime/tgp.cpp src/runtime/m2_tgp_board.cpp src/runtime/model2a_video.cpp
+    src/runtime/video.cpp src/runtime/raster.cpp src/runtime/geo.cpp)
+
+# Independent interpreter resume phases; ROM-free, no production host linkage.
+add_executable(test_segarally_reference_resume tests/test_segarally_reference_resume.cpp
+    src/refcore/i960_ref.cpp src/i960/decode.cpp src/i960/isa.cpp
+    ${SEGARALLY_INPUT_MACHINE_SOURCES})
+target_include_directories(test_segarally_reference_resume PRIVATE src .)
+target_compile_definitions(test_segarally_reference_resume PRIVATE M2_INSTRUCTION_BOUNDARY_HOOK
+    M2_SRALLY_CONTROL M2_SRALLY_SCREEN M2_SRALLY_VIDEO M2_SRALLY_TGP M2_SRALLY_IO)
+target_compile_options(test_segarally_reference_resume PRIVATE
+    $<IF:$<CXX_COMPILER_ID:MSVC>,/UNDEBUG,-UNDEBUG>
+    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-fno-fast-math;-ffp-contract=off>)
+add_test(NAME segarally_reference_resume COMMAND test_segarally_reference_resume)
+
 if(TARGET sha256_digest)
     add_executable(test_sha256 tests/test_sha256.cpp)
     target_link_libraries(test_sha256 PRIVATE sha256_digest)
@@ -497,11 +517,7 @@ if(TARGET sha256_digest)
 endif()
 
 add_executable(test_segarally_host_input_machine tests/test_segarally_host_input_machine.cpp
-    src/runtime/model2a_machine.cpp src/runtime/model2a_bus.cpp src/runtime/model2a_clock.cpp
-    src/runtime/model2a_control.cpp src/runtime/cpu.cpp src/runtime/lockstep.cpp
-    src/runtime/model2_io.cpp src/runtime/model2a_io.cpp src/runtime/model2_eeprom.cpp
-    src/runtime/tgp.cpp src/runtime/m2_tgp_board.cpp src/runtime/model2a_video.cpp
-    src/runtime/video.cpp src/runtime/raster.cpp src/runtime/geo.cpp)
+    ${SEGARALLY_INPUT_MACHINE_SOURCES})
 target_include_directories(test_segarally_host_input_machine PRIVATE src .)
 target_compile_definitions(test_segarally_host_input_machine PRIVATE M2_INSTRUCTION_BOUNDARY_HOOK
     M2_SRALLY_CONTROL M2_SRALLY_SCREEN M2_SRALLY_VIDEO M2_SRALLY_TGP M2_SRALLY_IO)
