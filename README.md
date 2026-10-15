@@ -37,11 +37,11 @@ automatic selection, display controls and saves.
 
 ## Current checkpoint
 
-Candidate 003 was built from the supplied archive at source revision `7beefcf`.
-All eleven dedicated Mac CTests pass. The current signed package is
-`build/mac-candidate-003/mac/Sega Rally Native.app`.
+Candidate 006 was built from the supplied archive at source revision `0b9ba0e`.
+All eleven dedicated Mac CTests pass. Its signed package is
+`build/mac-candidate-006/mac/Sega Rally Native.app`.
 
-**A measured audio-playback starvation bug is fixed.** The updated app passes a
+**A measured audio-playback starvation bug is fixed.** Preserved candidate 003 passes a
 7,200-frame visible check with CRT and Accurate textures, zero audio shortfalls
 or drops, and unchanged native PCM, game execution and final image. The complete
 captured SDL logical-device postmix also reproduces exactly offline, with no
@@ -54,10 +54,23 @@ events through 20,000 frames, clearing Desert in **1:00.38** and Forest in
 **1:21.37**, entering
 Mountain and retiring near its finish. Its exact signed-executable offline
 replay matches all 40,006 resumes, PCM hashes and final saves. This unthrottled
-run uses no playback device and is not a speed or listening check. **Full-game
+run uses no playback device and is not a speed or listening check. Candidate
+006 preserves that full execution/PCM/save result exactly. **Full-game
 completion is not established.** Earlier independent CPU comparison and the
 preserved v17 manual replay remain documented in the status reference; neither
 is full MAME-machine or PCB parity.
+
+Practice Mountain now clears through ordinary cabinet controls with the
+operator's SHORT mode, then reaches name entry, the Top 8 scoreboard and attract.
+Candidate 006's sound-on Metal capture matches the 18,000-frame CPU terminal
+and final image; its exact signed-executable replay matches all 36,014 resumes,
+PCM hashes and final saves. A separate independent CPU comparison covers two billion
+instructions, including the Practice start and finish callbacks. A narrowly
+verified four-entry callback table adds static candidates without treating
+neighboring ROM words as code. A separate sound-on Metal Practice Lakeside
+check matches its CPU terminal counters and final image, reaching the final
+route segments before retirement. Full Championship completion remains
+unverified.
 
 Optional Accurate textures matches all pixels in three saved complete scenes
 and passes 447 synthetic cases; its v17 host checks preserve audio, inputs and

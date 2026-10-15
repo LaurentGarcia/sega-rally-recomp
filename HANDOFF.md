@@ -1,5 +1,161 @@
 # Handoff
 
+## Candidate 006 and complete SHORT Practice lifecycle (2026-10-15)
+
+Clean source `0b9ba0eba47d6effa3378f9a2b7fae9010a1c11e` passes all ten build
+pipeline steps and eleven Mac CTests. Package:
+`build/mac-candidate-006/mac/Sega Rally Native.app`; signed executable SHA-256
+`9fef7f0ef4e6dde4ff7b47d44666a0b360de79a7e1e8034295df84d6e138753e`.
+The build report SHA-256 is
+`c48ed22164e506c48856ca022009ad1a8e384b8ef00135429678c03df6afd6d3`.
+Independent package audit passes at
+`build/validation/mac-release-audit/fresh-candidate-006-review.json`, SHA-256
+`92b72140dbb6637bbc7462adf63e9bb4f64d501349efb4b094e5aad125c50f05`.
+Its derived inventory has 54 instruction chunks plus dispatch table, 55 main
+objects and 79,783 instructions. Every instruction body and address/chunk mapping
+matches frozen v29; indexed dispatch layout is the only generation difference.
+The reviewed proof files, runtime, TGP, sound, assets, notices, 26 Mach-O sections
+and previous candidate/capture identities pass. The first audit expected a
+peer status label `PASS` instead of `PASS_NO_BLOCKER`; that checker failure is
+preserved separately from the corrected passing file audit.
+
+The unchanged SHORT Practice Mountain drive now completes the full observed
+cycle: Stage Clear, rank 2nd and 1:16.23; NAME ENTRY; Mountain Top 8 with
+1:16.23 DELTA AT; then attract with INSERT COIN(S), CREDIT 0/2. The first bounded
+run stops normally on the score table at 14,000 frames / 2,681,728,390 instructions
+/ 6,084,441,002 cycles / PC `005a37a4`; it does not by itself prove attract return.
+A separate authorized extension reuses the same prepared helper, source and
+binary, raising only the bound to 18,000 frames / 3.6 billion instructions /
+240 seconds. It passes at 3,456,982,099 instructions / 7,822,841,003 cycles /
+PC `005de474`, with no frontier. Attract is visibly present at frames 15,000
+and 18,000. Its 103.06-second wall duration includes a concurrent build and is
+not a gameplay benchmark.
+
+Final frozen report:
+`build/worktrees/course-driving/build/course-driving/short-practice-v29-18000-frozen/report.json`,
+SHA-256 `7bcd02faf5842621b1e1fd60c88161aaff96700cc42abd2401dbb513a9e395aa`.
+The 1,880-event full replay SHA-256 is
+`f3ea3829fd9aa4e6157beae1f1d25c07851a013a413716c15e2430759f1b8963`;
+its last event at frame 17,999 repeats the final pins to retain scripted control.
+All earlier 14k cabinet/telemetry prefixes, 188 shared images and initial/operator
+saves match exactly. Independent artifact review verifies 244 prepared inputs
+and 214 run artifacts at
+`build/validation/mac-release-audit/short-practice-v29-18000-review-001/result.json`,
+SHA-256 `02eb5ff52213cf78f5713f385a29b4a66487fa4547987cd0b2e441685d2c0591`.
+This CPU run uses sound-off native execution with shared board models. The final
+sound-enabled Mac course captures below now pass; their evidence is distinct
+from the independent two-billion-instruction CPU comparison.
+
+Before those captures, source inspection confirms atomic recording/save `.tmp`
+renames. The ignored monitor now tolerates only a vanished file during a live
+size scan and checks bounds again after child exit. Five focused monitor cases
+pass: ordinary files, atomic rename, total cap, text cap and propagated permission
+failure. Independent review confirms unchanged game/identity/PCM/save assertions
+and cleanup. No capture had yet run or been frozen. Previous helper versions
+are retained; current course runner SHA-256 is
+`b086b5d65a90ebfd8ce83e70b5bbf9dffd0e6b056bce363c7654cbb74cdf2a33`,
+and the exact replay wrapper, changing only its pinned runner hash, is
+`5faecd3866771d40f4f946064a996bcb5dbf4f755769ef94179a3c5e9012ded6`.
+
+### Final candidate 006 Metal captures
+
+All three frozen plans pass against the same signed candidate 006 with sound
+generation, the instruction-boundary hook and Accurate textures enabled. They
+run hidden and unthrottled, with CRT and playback devices off. Each verifies
+every applied cabinet event and pin, contiguous recording resumes, finite PCM
+interval hashes, the complete seal, initial/final saves, frozen app inputs and
+zero fault/drop rows. Wall times are 177.63, 162.68 and 125.19 seconds respectively;
+they are correctness-run durations, not paced gameplay benchmarks.
+
+| Capture | Frames | Instructions | Reference cycles | Final PC | Resumes | Stereo PCM frames |
+| --- | ---: | ---: | ---: | --- | ---: | ---: |
+| NORMAL Championship | 20,000 | 3,662,512,354 | 8,692,041,001 | `005ca464` | 40,006 | 15,332,761 |
+| SHORT Practice Mountain | 18,000 | 3,456,982,099 | 7,822,841,003 | `005de474` | 36,014 | 13,799,492 |
+| NORMAL Practice Lakeside | 14,000 | 2,676,028,109 | 6,084,441,002 | `005ca4b0` | 28,011 | 10,732,954 |
+
+Results are under
+`build/validation/mac-candidate-003-courses/candidate006-<name>-001/capture-001/result.json`,
+where names and SHA-256 values are:
+
+- `normal`: `9e61b629bfa287f8f727aea435ef4a36a73ee09773063483d64e6933f1a79df1`.
+- `short-mountain`: `e19040f8f5d95beec00193da3d1a691c6feef936bdfd3bbc0e805e5e6d192f66`.
+- `lakeside`: `6e5a57043df39d339f1f94817a78ca36a461798d6108f36fe028af08523c82f5`.
+
+NORMAL applies all 4,398 events and exactly preserves candidate 002's complete
+resume payload/footer, observations, native WAV and initial/final saves. Its
+executable and assets manifest identities are separately bound to the new app;
+the eight payload images and every other manifest field remain unchanged. The
+independent checker initially over-constrained those two deliberately different
+identity fields; that failure is preserved. The corrected file-only audit did
+not normalize headers, relax payload comparison or rerun the guest. No NORMAL
+image equality is claimed across the two rendering modes.
+
+SHORT applies all 1,880 events and reaches the complete finish/name-entry/score/
+attract lifecycle. Lakeside applies all 2,168 events and returns to attract
+after retirement near segment 297/300; it does not finish the course. Both full
+final 496×384 RGB images exactly match their frozen CPU images. All three match
+the explicit CPU terminal counters; the original Lakeside CPU run did not log
+PC, so `005ca4b0` is a new host observation, not an independently matched CPU PC.
+
+The independent combined artifact review passes at
+`build/validation/mac-release-audit/candidate006-courses-review-001/result.json`,
+SHA-256 `e3ca6adffb2f6b9bb69ecc4f0ccf1ef02413aa7806eb0cbc62db607f2b21b3a6`.
+Its NORMAL, SHORT and Lakeside subreview SHA-256 values are respectively
+`7fc4766c8bf44ab4d065b085161904d7ae96517e575b07b6824378dd81adda2d`,
+`78d12d53c929513936d9fc7e6651ee4df6659524948e339991a94525eab9f3bb`,
+and `5d34be914aafe30519797fd9a19e66d77e3b0301ffec160e2df3f9b82a377e86`.
+
+One exact signed-executable offline replay of the final SHORT capture also
+passes: 36,014 resumes, 13,799,492 stereo PCM frames, all cabinet pins, results,
+fault fields and final saves. It reaches the same 18,000-frame terminal above,
+including tick 312,913,640,120, with all frozen inputs unchanged. The production
+consumer's early offline branch opens no SDL/GPU/audio device and writes no live
+saves. The 153.83-second duration is not a gameplay benchmark. Preparation and
+execution use a separate 300-second watchdog; no retry or changed identity is
+used. Result:
+`build/validation/mac-release-audit/short-mountain-final-offline-001/result.json`,
+SHA-256 `c1b5827af4bed202159e3652e02163f787d424445346a20d76c475e342041fdb`.
+This completes the planned local candidate capture/replay gates, not independent
+full-machine validation or physical sound measurement.
+Independent file-only replay review passes at
+`build/validation/mac-release-audit/short-mountain-final-offline-review.json`,
+SHA-256 `0f31b9e7b22c0ed325e57d70886bac036433dc5b6c2aaf0cb6915cf6ec2b7b3f`.
+It verifies the exact command/output, empty stderr, exit zero and every bound
+before/after input, app, capture and save artifact. A checker-creation tool error
+and system Python 3.9's missing `hashlib.file_digest` preceded the successful
+read-only check under the existing Homebrew Python; no guest replay was repeated.
+
+README, player manual, build guide and status now identify candidate 006 and
+separate its sound-on course checks from candidate 003's earlier paced playback
+evidence. The two-file README/status patch was reviewed and frozen at SHA-256
+`f343669b0e920b692cca955f6d676160668e7c7cf978f006086a8efad1a85622` before
+integration; its 17 local links/anchors pass. No game/runtime changes accompany
+this documentation update, and candidate 006 is not repackaged or re-signed.
+The integrated four-document check passes all 35 local links/anchors, and
+`git diff --check` is clean. No runtime tests are repeated for these prose edits.
+
+### Reference firmware search
+
+A targeted local search checks 64 members of the supplied Rally and Daytona
+archives plus 31 matching-size loose files by name and size/CRC candidates.
+None contains `epr-17891.ic12`, `epr-16726.bin` or `epr-18022.ic2`; Downloads has
+no archives. Both archive SHA-256 values remain unchanged; no firmware was
+downloaded or extracted. Frozen result:
+`build/validation/firmware-local-search-001/result.json`, SHA-256
+`48d625e744af59940079d908b158d277fc102992a0fde5fd910e25afa7acf8d5`.
+The first two identities come from the retained pinned `model2.cpp`; the third
+is separately confirmed by installed MAME 0.289 metadata and upstream
+`segabill.cpp`, not the retained partial source. This does not establish the
+installed binary's source commit. No official public download was found, and
+MAME's authorized ROM collection does not list Sega Rally. The build guide now
+records filenames, sizes and CRCs for checking another personal backup.
+
+These images would unlock full MAME reference comparison; obtaining them alone
+would not certify arcade fidelity. Full-race MAME/PCB comparison, extended-
+precision floating point, whole-game graphics and all-course completion remain
+open. The local signed Mac package is a development/test candidate, not a
+notarized public release or a completed fidelity milestone.
+
 ## Practice results and name-entry continuation (2026-10-15)
 
 Candidate 005 at clean `fc24ef8a0d059f552c277a442289f9ed6c500034` passes

@@ -108,6 +108,25 @@ cmake --build build/segarally-docs-mac --target test_segarally_audio \
 ctest --test-dir build/segarally-docs-mac --output-on-failure
 ```
 
+Candidate 006 at source `0b9ba0e` passes the ten-step pipeline and all eleven
+dedicated Mac CTests. Three subsequent sound-enabled Metal captures pass:
+NORMAL Championship through 20,000 frames, SHORT Practice Mountain through
+18,000 frames and NORMAL Practice Lakeside through 14,000 frames. The first
+preserves the earlier Championship execution, native WAV and saves exactly;
+the Practice captures' final images match their frozen CPU images pixel for
+pixel. The SHORT run completes a one-lap finish, name entry, score table and
+return to attract. Lakeside retires near its finish; no course victory is
+claimed there. These hidden, unthrottled checks use Accurate textures with CRT
+and playback devices off. They validate the captured paths, not live sound
+quality, game speed or whole-machine arcade fidelity. See
+[current evidence](segarally-status.md) for retained reports and limitations.
+
+The complete 18,000-frame SHORT recording also passes the production offline
+consumer with the exact signed candidate 006: all 36,014 resumes, PCM hashes
+covering 13,799,492 stereo frames, fault fields and final saves match. This opens
+no window or playback device and writes no live saves. It proves repeatability
+of that capture, not independent hardware agreement.
+
 ## Verify, import and recompile
 
 Use the same `--build-dir` for every import and generated component:
@@ -678,6 +697,29 @@ with exact prior normal execution/PCM observations. That unthrottled test
 opens no playback device. See the [manual](mac-player-manual.md) for the
 prepared app path and [status](segarally-status.md) for precise evidence limits.
 
+## Missing reference firmware
+
 Full MAME reference work is separately blocked by three files absent from the
-supplied archive: `epr-17891.ic12`, `epr-16726.bin` and `epr-18022.ic2`.
-Native bring-up does not require pretending those firmwares have run.
+supplied archive:
+
+| File | Device | Bytes | CRC32 |
+| --- | --- | ---: | --- |
+| `epr-17891.ic12` | Drive board | 65,536 | `9a33b437` |
+| `epr-16726.bin` | Communication board | 131,072 | `c179b8c7` |
+| `epr-18022.ic2` | Billboard | 65,536 | `0ca70f80` |
+
+The first two identities match the retained pinned MAME `model2.cpp`. The
+billboard identity is confirmed separately by installed MAME 0.289 metadata
+and upstream [segabill.cpp](https://github.com/mamedev/mame/blob/master/src/mame/sega/segabill.cpp);
+this does not establish the installed binary's source revision. A targeted local
+search checked 64 ZIP entries and 31 matching-size loose files, including renamed
+CRC candidates, without finding any of the three. Its report is
+`build/validation/firmware-local-search-001/result.json`.
+
+Supply a personal backup containing these images for checksum verification;
+keep it outside Git. MAME's public source contains the expected identities,
+not the firmware bytes, and its [authorized ROM collection](https://www.mamedev.org/roms/)
+does not list Sega Rally. No official public download was found in this search.
+The missing images block full reference comparison, not the existing native
+Mac build. Obtaining them would enable further validation rather than certify
+complete arcade fidelity by itself.

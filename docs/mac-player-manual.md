@@ -3,7 +3,9 @@
 This is a development build of Sega Rally Championship, using the original
 game instructions recompiled from verified personal ROMs. The current Mac
 checkpoint has sound-enabled Metal replay evidence clearing Desert and Forest,
-then entering Mountain and retiring near its finish.
+then entering Mountain and retiring near its finish. A separate one-lap SHORT
+Practice Mountain drive finishes in 1:16.23, reaches name entry and the score
+table, then returns to attract mode.
 All-course completion, exact graphics and hardware fidelity remain unverified.
 See [current evidence](segarally-status.md).
 
@@ -17,10 +19,10 @@ python3 scripts/segarally_mac.py --roms /path/to/srallyc.zip \
 ```
 
 After the build succeeds, open `build/segarally-player/mac/Sega Rally Native.app`.
-The current candidate 003 package is
-`build/mac-candidate-003/mac/Sega Rally Native.app`, built at source `7beefcf`
-with all eleven dedicated Mac CTests passing. Its visible 7,200-frame check runs
-with CRT, Accurate textures and sound, with zero audio shortfalls or drops.
+The current candidate 006 package is
+`build/mac-candidate-006/mac/Sega Rally Native.app`, built at source `0b9ba0e`
+with all eleven dedicated Mac CTests passing. It includes the Practice finish
+and name-entry continuations and the earlier verified audio-buffer fix.
 New sound-enabled Mac builds start with sound and the faster native execution
 path when opened directly, without command-line arguments. The game opens in
 a window and uses normal pacing. Allow its original reset checks to finish,
@@ -52,8 +54,10 @@ Both choose the automatic Lancia through the original game menus, then release
 all controls for manual driving. Lakeside uses the game's built-in gear/brake
 selection sequence. These timed scripts assume fresh default cabinet settings;
 saved settings or credits can change the menu sequence. Use a fresh build/save
-directory and preserve existing saves. Earlier captured apps, including
-candidate 003, predate the Practice callback fixes.
+directory and preserve existing saves. These scripts retain the default NORMAL
+game mode; the separate one-lap finish validation uses the original cabinet
+Test menu's SHORT game-mode setting. Earlier captured apps, including candidate
+003, predate the Practice callback fixes.
 
 The launcher verifies assets, packages and signs the app, then opens it through
 LaunchServices. It prints app and log paths. Add `--fullscreen` for desktop
@@ -175,10 +179,11 @@ Performance depends on the Mac and scene. `--unthrottled` is a diagnostic option
 and does not guarantee arcade speed. Avoid additional builds or captures during
 a playtest.
 
-Candidate 003 includes a verified playback-buffer fix for a captured 6.53 ms
-audio gap. It adds one output-device period of headroom, about 23 ms on the
-tested Mac. A complete visible 7,200-frame capture has no shortfalls, drops or
-missing output samples while preserving the prior native PCM byte for byte.
+The current package retains candidate 003's verified playback-buffer fix for a
+captured 6.53 ms audio gap. It adds one output-device period of headroom, about
+23 ms on the tested Mac. A complete visible 7,200-frame candidate 003 capture
+has no shortfalls, drops or missing output samples while preserving the prior
+native PCM byte for byte.
 This resolves the captured starvation mechanism; broader listening feedback on
 the earlier title-screen report is still welcome. Device periods longer than
 60 ms are unsupported; see the [audio details](segarally-build-validation.md#optional-sound-experiment).
@@ -228,5 +233,10 @@ final saves match. The source run applies 4,398 input events and clears Desert
 and Forest before retiring near Mountain's finish. It is unthrottled and opens
 no playback device, so it does not measure live speed or sound quality. These
 checks establish repeatability
-for the captured drives; remaining courses and live audio quality still
-need validation. See the [input guide](segarally-input-replay.md#exact-host-resume-transcripts).
+for the captured drives. Candidate 006's separate SHORT Practice Mountain
+recording also replays exactly through all 18,000 frames: 36,014 resumes,
+13,799,492 stereo PCM frames and final saves match with the same signed app.
+That drive includes the one-lap finish, name entry, score table and attract
+return. It opens no playback device and does not measure live speed or listening
+quality. Remaining course finishes and full arcade comparison still need
+validation. See the [input guide](segarally-input-replay.md#exact-host-resume-transcripts).

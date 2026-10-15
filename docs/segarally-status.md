@@ -7,14 +7,23 @@ The [design](sega-rally-design.md) records interpretation and hardware limits.
 
 ## Current Mac candidate
 
-Candidate 003 is generated from the supplied ROM archive at source revision
-`7beefcf`, with all eleven dedicated Mac CTests passing. Its signed package is
-`build/mac-candidate-003/mac/Sega Rally Native.app`. The one-command pipeline
+Candidate 006 is generated from the supplied ROM archive at source revision
+`0b9ba0eba47d6effa3378f9a2b7fae9010a1c11e`, with all eleven dedicated Mac CTests
+passing. Its signed package is `build/mac-candidate-006/mac/Sega Rally Native.app`;
+the executable SHA-256 is
+`9fef7f0ef4e6dde4ff7b47d44666a0b360de79a7e1e8034295df84d6e138753e`.
+The one-command pipeline
 reproduces import, generation, sound-enabled Release build, tests and packaging;
-see the [build guide](segarally-build-validation.md).
+see the [build guide](segarally-build-validation.md). This remains a local
+development/test candidate, not a certified full-fidelity or public release.
 
-Candidate 003's visible 7,200-frame neutral check enables CRT and Accurate
-textures and reports zero audio demands, chip/host drops or capture failures.
+Full MAME tracing still requires the missing drive `epr-17891.ic12`,
+communication `epr-16726.bin` and billboard `epr-18022.ic2` firmware; see the
+[firmware requirements](segarally-build-validation.md#missing-reference-firmware).
+These native checks do not execute those missing programs or establish PCB fidelity.
+
+The preserved candidate 003 visible 7,200-frame neutral check enables CRT and
+Accurate textures and reports zero audio demands, chip/host drops or capture failures.
 All 14,404 input/execution records, observations and 5,519,841 native stereo PCM
 frames exactly preserve the earlier neutral capture; its final native image
 also equals candidate 002's Accurate-textures image. All 5,516,288 captured SDL
@@ -58,7 +67,8 @@ cycles, ending at PC `0x005ca464`. It supplies 15,332,761 stereo PCM frames with
 zero chip/host drops and no frontier or manual takeover. All 670 recorded
 frame/instruction/cycle checkpoints match the CPU-only sound-off path. Desert
 clears in 1:00.38 and Forest in 1:21.37; Mountain enters and retires near its
-finish. Mountain completion, Lakeside and full-game completion are not established.
+finish. That Championship replay does not establish Mountain completion, Lakeside or
+full-game completion; the separate Practice evidence below has a different scope.
 This is an unthrottled diagnostic without device playback, not a speed or
 listening measurement. Default-OFF Metal pixels are not claimed equal to the
 software renderer.
@@ -73,22 +83,116 @@ and `build/validation/mac-release-audit/championship002-offline-001/result.json`
 the latter SHA-256 is
 `9b89fd17a7185d1cb2e2e39301cb0db4fa18427e8c3d8d11bd41113f2f0b5024`.
 
+Candidate 006 also repeats the NORMAL 20,000-frame sound-on Metal path with
+Accurate textures enabled. All 40,006 resume payloads, observations, the whole
+native WAV and initial/final saves match candidate 002 exactly. Its N/C/frame/PC
+terminal is unchanged; a default-OFF versus Accurate-ON image comparison is not
+asserted. Report:
+`build/validation/mac-candidate-003-courses/candidate006-normal-001/capture-001/result.json`,
+SHA-256 `9e61b629bfa287f8f727aea435ef4a36a73ee09773063483d64e6933f1a79df1`.
+
+## Practice coverage and bounded callback discovery
+
+Sound-off CPU helpers use fresh FF cabinet seeds, actual frame-based inputs and
+the game's ordinary Test/Service settings. With normal difficulty and the
+operator's SHORT mode, Practice Mountain displays STAGE CLEAR, rank second,
+with lap and total time 1:16.23. This is the game's one-lap mode, not evidence of
+finishing the normal Championship Mountain race. A separate normal-mode Practice
+Lakeside run reaches route segment 297 of 300 before the 80-second retirement;
+its 14,000-frame terminal is 2,676,028,109 instructions / 6,084,441,002 cycles.
+The preserved CPU images are under
+`build/worktrees/course-driving/build/course-driving/short-practice-mountain-v20-attempt-001/guest/`
+(`frame-10200.ppm`), and the Lakeside terminal is under
+`build/worktrees/course-driving/build/course-driving/practice-lakeside-drive-attempt-001/guest/`.
+Lakeside completion remains unverified. The consolidated SHORT Mountain CPU
+path passes 18,000 frames / 3,456,982,099 instructions / 7,822,841,003 cycles,
+ending at PC `005de474`. The observed sequence reaches STAGE CLEAR, name entry,
+the MOUNTAIN STAGE TOP 8 scoreboard (DELTA AT first in 1:16.23), then attract at
+frames 15,000 and 18,000. The final screen reads INSERT COIN(S) / CREDIT 0/2.
+The 18,000-frame CPU report is
+`build/worktrees/course-driving/build/course-driving/short-practice-v29-18000-frozen/report.json`,
+SHA-256 `7bcd02faf5842621b1e1fd60c88161aaff96700cc42abd2401dbb513a9e395aa`.
+Independent artifact review is
+`build/validation/mac-release-audit/short-practice-v29-18000-review-001/result.json`,
+SHA-256 `02eb5ff52213cf78f5713f385a29b4a66487fa4547987cd0b2e441685d2c0591`.
+
+Candidate 006 repeats this complete SHORT path with sound, Metal and Accurate
+textures. All 1,880 events apply without manual takeover, the N/C/frame/PC
+terminal matches exactly, and the final 496×384 RGB image equals the CPU image.
+It records 36,014 resumes and 13,799,492 native stereo PCM frames with zero
+chip/host drops. This hidden unthrottled check has no device playback or CRT;
+it does not establish listening quality or independent sound/device fidelity.
+Report:
+`build/validation/mac-candidate-003-courses/candidate006-short-mountain-001/capture-001/result.json`,
+SHA-256 `e19040f8f5d95beec00193da3d1a691c6feef936bdfd3bbc0e805e5e6d192f66`.
+Its exact signed-executable offline replay also passes all 36,014 resumes,
+PCM hashes covering 13,799,492 stereo frames, results/fault fields and final
+saves. The 18,000-frame terminal matches, with the signed app, original capture
+and saves unchanged. It uses the early offline consumer without SDL, GPU or
+device playback. This is same-Machine reproducibility, not independent CPU or
+hardware validation. Its 153.832-second duration is not a gameplay benchmark.
+Report:
+`build/validation/mac-release-audit/short-mountain-final-offline-001/result.json`,
+SHA-256 `c1b5827af4bed202159e3652e02163f787d424445346a20d76c475e342041fdb`.
+
+The separate candidate 006 Lakeside gate also passes 14,000 frames, applying all
+2,168 events and recording 28,011 resumes / 10,732,954 native stereo PCM frames.
+The terminal instruction count (2,676,028,109), cycles (6,084,441,002) and frames
+match the sound-off CPU helper, and its final image equals the CPU image. Host
+PC is `005ca4b0`; the original CPU fixture did not record a terminal PC, so PC
+equality is not asserted. Zero chip/host drops and unchanged frozen inputs are
+verified, with no device playback. This reaches the previously observed
+retirement, not a Lakeside finish. Report:
+`build/validation/mac-candidate-003-courses/candidate006-lakeside-001/capture-001/result.json`,
+SHA-256 `6e5a57043df39d339f1f94817a78ca36a461798d6108f36fe028af08523c82f5`.
+Candidate 003's earlier visible audio check remains historical. Independent
+artifact review of all three candidate 006 course gates passes at
+`build/validation/mac-release-audit/candidate006-courses-review-001/result.json`,
+SHA-256 `e3ca6adffb2f6b9bb69ecc4f0ccf1ef02413aa7806eb0cbc62db607f2b21b3a6`.
+
+A single independent i960 comparison follows the SHORT Mountain input stream
+for exactly 2,000,000,000 instructions. It matches 58,120,650 ordered writes,
+4,539,611,659 reference cycles and 110,449 IRQ entries, ending at PC `005a37a4`
+after 10,445 renders. All 1,877 supplied events apply, with none pending.
+Read-only witnesses prove successful comparison at the new Practice start
+callback `005c0fa0` and finish callback `005bfcf0`. The two first execute at
+instruction counts 1,068,614,675 and 1,921,603,185, respectively. The comparison
+uses unchanged I960Ref execution with independently instantiated shared board
+models, sound off and idle UART receive. It does not test resident
+Model2AMachine scheduling, the separate retirement callback, later post-result
+callbacks, full MAME behavior or PCB fidelity. All 200 frozen inputs remain
+unchanged; no retry is used. Report:
+`build/validation/practice-short-v20b-i960-reference/attempt-001/result.json`,
+SHA-256 `e4df250c8811ec7e8caa288a0712bc5496ed17a93ae67b670313d915d552a044`.
+
+The subsequent dispatcher at `005b7690` exposes a specific static-discovery gap:
+a literal mask bounds a four-entry indexed load, and its combined nonzero test
+branches directly to the call through that loaded register. A separate decoded
+proof recognizes this layout without widening the existing saved-object callback
+proof. One hash-pinned manifest row derives four aligned, reset-copy targets;
+operand, mask, scale, branch, index and tracked-register mutations are rejected
+after recomputing evidence hashes. These remain table-derived candidates,
+separate from observed execution. Neither live RAM-table immutability nor
+exclusive incoming control flow is inferred. Existing live instruction-word
+guards are unchanged. No whole-ROM pointer scan or generated-code edit is used.
+
 ## Recorded evidence
 
 | Area | Established evidence | Limit |
 | --- | --- | --- |
-| Main native coverage | Frozen v14: 75,207 instructions, 52 native objects, no missing templates | Coverage is a reached graph, not a remaining-work percentage |
+| Main native coverage | Candidate 006: 79,783 instructions, 54 chunks plus the dispatch table, no missing templates | Coverage is a reached graph, not a remaining-work percentage |
 | Interactive Mac | Latest v17 sound/CRT/Accurate-textures session exits normally after 4,729 frames and replays exactly; v16 also exits normally after 12,974 frames | Qualitative feedback and bounded session evidence; complete courses and hardware fidelity remain open |
 | Driving parity | Two billion held-gas instructions, 86,328,770 ordered writes, 4,650,936,033 cycles, 113,101 IRQs and 10,701 renders; nineteen replay events match | Sound off; independent CPU with shared boards and final-frame comparison; no full MAME race |
+| Practice paths | SHORT Mountain Stage Clear, second in 1:16.23, name entry/Top 8 and attract; candidate 006 sound-on Metal matches the full 18k terminal/final CPU image; independent 2B comparison covers start/finish callbacks | Lakeside sound-on Metal also matches terminal N/C/frames and final CPU image, but retires; unthrottled/no device playback, no Lakeside finish or full Championship completion claim |
 | Later game paths | Fresh credit/start after attract reaches a second race; sound-on frame 12,800 shows 118 km/h in fourth gear, 15.83 seconds elapsed | Complete second race and Game Over overlay not separately validated |
-| Course progress | Candidate 002 sound-on Metal replay clears Desert 1:00.38 and Forest 1:21.37, enters Mountain and retires near its finish; all 670 CPU-only frame/instruction/cycle checkpoints match | Unthrottled, no device playback; Mountain completion, Lakeside and full-game completion unvalidated |
+| Course progress | Candidate 002 sound-on Metal replay clears Desert 1:00.38 and Forest 1:21.37, enters Mountain and retires near its finish; all 670 CPU-only frame/instruction/cycle checkpoints match | Unthrottled, no device playback; that Championship path does not establish Mountain completion or Lakeside; full-game completion remains open |
 | Metal fidelity | Optional native repeated stepping plus certified reciprocal matches all pixels in three saved scenes; 447 synthetic cases pass. Both v17 2,600-frame host checks pass: OFF matches v16; ON's final image matches software, with audio/inputs/saves preserved. v17 has launched windowed | Final-image comparison before CRT/UI, using the same runtime; no all-frame or independent CPU claim. Default OFF, continuous flicker and whole-game fidelity remain open |
 | Sound generation | Native linked board captures 2,409,170 stereo frames: 54.6297052 seconds including nonzero 44.1 kHz PCM; shared-core drains agree | Whole-game audio parity unvalidated |
 | Sound CPU/board comparison | Actual initialization matches persistent MAME CPU execution for 1,000,000 instructions, including 383 IRQ/RTE pairs and 35,955 SCSP writes; synthetic UART/nonzero-PCM cases also pass | The actual initialization's 51,158 PCM frames are silent; shared devices, instruction-start MMIO and idle serial do not establish music or independent sound-on recording parity |
 | Authentic sound commands | Corrected independent MAME CPU comparison passes 14,947,325 instructions, 14,614 IRQ entries and all 1,929 cuts through 55 actual UART accesses; 728,884 PCM frames match, including nonzero audio. The native payload also matches the preserved neutral host WAV prefix | Shared device models and instruction-start MMIO; no independent chip, physical bus-phase, title-music or whole sound-on recording claim. The earlier observer failure remains preserved |
 | Audio output | Candidate 003 fixes the reproduced 6.53 ms starvation gap; its visible 7,200-frame capture has zero demands/drops, exact native PCM and no missing SDL output frames in complete offline reproduction | One measured Mac/device run; broader listening confirmation, device changes and full sound fidelity remain open |
 | Controller input | Xbox One Elite 2 detected; 329 mapping/virtual-device checks, normal build, menu Metal checks and actual-host input isolation pass; live recording contains intermediate steering, throttle and brake values | Recorded cabinet inputs do not identify their physical source; Y/navigation feedback remains open; wheels/force feedback remain outside this implementation |
-| Exact host recording | Candidate 002 matches all 40,006 resumes, 15,332,761 PCM frames and final saves; preserved v17 matches 9,459 resumes and 3,625,487 PCM frames; v16 matches 25,953 resumes | Same-Machine reproducibility; full-course and independent CPU/sound parity remain open |
+| Exact host recording | Candidate 006 SHORT matches 36,014 resumes, 13,799,492 PCM frames and final saves; candidate 002 matches all 40,006 resumes, 15,332,761 PCM frames and final saves; preserved v17 matches 9,459 resumes and 3,625,487 PCM frames; v16 matches 25,953 resumes | Same-Machine reproducibility; full-course and independent CPU/sound parity remain open |
 | Independent host recording | Actual sound-off driving bundle passes 5,201 resumes, 500,035,460 instructions, 15,156,607 ordered writes, 1,130,001,001 cycles and 2,600 frames after immutable preflight | Independent i960 with shared boards; longer/manual captures, sound-on and hardware parity remain open; fault rows rejected |
 | Hardware fidelity | Isolated device/reference tests and instruction-timed diagnostics | PCB timing, extF80 precision and full-machine behavior remain open |
 
@@ -417,7 +521,7 @@ above; broader listening confirmation remains separate.
 - Check continuous real-race texture flicker and measure native/CRT cost in a
   quiet interval. Saved-scene equality and offscreen timings do not establish
   visible gameplay behavior or speed.
-- Complete Mountain and the remaining course paths with sound, then extend
+- Complete Lakeside and Championship Mountain paths, then extend
   independent replay to those paths and coupled sound. Full MAME-machine
   comparison, PCB timing and extended-precision validation remain open.
 
