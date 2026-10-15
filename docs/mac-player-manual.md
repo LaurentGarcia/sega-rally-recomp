@@ -73,7 +73,8 @@ It has launched in a normal window with sound, the instruction boundary hook,
 selection replay and input recording enabled, then closed normally after
 9,344 frames. A separate automated sound-enabled run passes the earlier
 `0x005ae800` missing return and reaches frame 14,001. The old v13 app and its
-frontier recording remain preserved. Listening feedback remains pending.
+frontier recording remain preserved. Later listening observations are described
+under [Sound, speed and saves](#sound-speed-and-saves).
 To start a fresh recorded session:
 
 ```sh
@@ -186,7 +187,8 @@ picture adjustments are on its **Display** tab. The game and
 scripted cabinet inputs pause while it is open. Choose **Resume**, press F1,
 or press Escape to return to play. Inputs held when closing the panel must be
 released before they can control the cabinet, so Return used for Resume cannot
-also press Start. The new v15 app has launched with sound and CRT presentation.
+also press Start. Both the v15 display preview and v16 controller preview have
+launched with sound and CRT presentation.
 Preserved v14 apps do not gain these controls from a source update.
 
 **Original** switches CRT effects off. **Arcade CRT** enables the preset;
@@ -224,13 +226,16 @@ startup and shutdown, with no reported audio input shortfalls or sample drops.
 The [build guide](segarally-build-validation.md) explains both build options
 and the runtime switches `--sound --instruction-boundary-hook`. The older
 sound-off speed app remains silent by design. The user has heard a ten-second
-native PCM sample on the Mac speakers. The latest v14 windowed session supplies
+native PCM sample on the Mac speakers. The earlier v14 windowed session supplies
 7,163,505 stereo frames with no chip/host drops and one estimated SDL input
-shortfall request for 552 bytes; live listening feedback remains pending.
+shortfall request for 552 bytes.
 
 The later v15 playtest received positive image/motion feedback but had audible
-title-screen glitches. A short paced diagnostic did not reproduce them; the
-sound issue remains under investigation. Add `--audio-diagnostics` to a paced
+title-screen glitches. The v16 controller session subsequently generated
+9,946,388 stereo frames through 12,974 rendered frames with no logged SDL
+shortfall requests or chip/host drops. A fresh neutral title capture also has
+clean telemetry; these checks do not establish audible quality or resolve the
+reported glitch. Add `--audio-diagnostics` to a paced
 launcher command with `--sound` to timestamp queue demand and host delays in the
 log. This option does not change sound generation or buffering.
 
@@ -269,6 +274,8 @@ repackaging can change their bytes, and changed identities are rejected.
 The sound-on scripted validation now matches recorded and unrecorded runs
 through frame 2,801, including their WAV, final image and saves. The later v14
 manual session also replays all 18,689 resumes, PCM hashes and final saves
-through frame 9,344 with the exact signed app. These establish repeatability
+through frame 9,344 with the exact signed app. The later v16 analog-input session
+replays all 25,953 resumes and PCM hashes through frame 12,974 with its original
+signed app and final saves unchanged. These establish repeatability
 for the captured drives; remaining courses and live audio quality still
 need validation. See the [input guide](segarally-input-replay.md#exact-host-resume-transcripts).

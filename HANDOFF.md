@@ -1,5 +1,60 @@
 # Handoff
 
+## Independent sound comparison reaches nonzero PCM (2026-10-14)
+
+The corrected reference observer completes the authentic UART transcript:
+14,947,325 sound instructions, 186,594,177 cycles, 14,614 IRQ entries and
+32,159,463 paired observations through 16,527,970,040 ns. All 55 actual UART
+accesses and 1,929 original state cuts remain unchanged. It compares 8,124,293
+ordered modeled-data transfers and independently checks 28,745,755 reference
+instruction-stream reads. Registers, full SR, stacks, RAM, queues, UART and RNG
+agree. This is independent MAME CPU execution using shared device models and
+instruction-start MMIO, as required by the Audio and Reference sections; it is
+not independent chip, physical bus-phase or full MAME-machine validation.
+
+All 728,884 stereo PCM frames match bit for bit, including 22,784 nonzero scalar
+samples. First nonzero frame is 717,489, raw bits `b8000000`; its derived sample
+deadline is 16,269,591,837 ns and its first observed drain is 16,279,520,560 ns.
+Peak is 0.04022979736328125 and RMS including startup silence is
+0.0013018575635227812. The complete native payload also matches the previously
+preserved neutral host WAV prefix. This does not identify a title-scene cue or
+resolve the user's audible glitch. Executed coverage is 1,413 ROM PCs / 470
+opcode words, distinct from the admitted 2,663 / 660 inventory.
+
+Integrated `tests/test_segarally_sound_uart_nonzero_reference.cpp/.py` with the
+exact passing source bytes. They consume archived prerequisite manifests,
+objects, tape and observer proof; a clean checkout alone cannot recreate these
+retained artifacts. Only the public reference provider is regenerated, with
+default full-660 output byte-identical to the original and stripped tagged
+output reconstructing that same CPU code. Native game/runtime code is unchanged.
+Actual compiler includes bind the corrected provider and explicit SDK metadata.
+
+The first new preparation compiled but rejected an unbound Xcode
+`SDKSettings.json` dependency. The separate repaired attempt binds it before
+and after compilation and requires it in the actual dependency list; no include
+checks were waived. Preparation compiled in 11.720 seconds; the single guest
+run passed in 310.080869 seconds. `nice` reported denied priority adjustment;
+no lowered-priority or gameplay-performance claim. All original semantic,
+diagnostic, compiler and SDK-metadata failures remain preserved.
+
+Evidence under `build/worktrees/sound-nonzero-purpose-reference/build/`:
+`sdk-bound-source-001/build/purpose-reference-prepared-002/prepared.json`
+SHA-256 `9d788b870c34020ce94f809edf2e7f54f2920edb6aca09cece8fd50208712154`;
+`sdk-bound-source-001/build/purpose-reference-run-002/result.json`
+SHA-256 `b355e443c3e66a1cd5c2eb8f1a14d34b3719d86189fd0c61776b5a92dd7e8857`;
+state `e7b5d7e5a2769bef52c3c523df0c5309a3042e70723d219fb26b1f6c2813fd6f`.
+All 1,006 inputs and 16 artifacts remained unchanged. Independent audit
+`build/validation/sound-purpose-nonzero-independent-review/result.json`
+SHA-256 `5722fee4fc32e1b1c262d44f008c1061f59db22f87b70aec9000d8d4cdcf15e2`
+recomputes original PCM/cut hashes and metrics, verifies final outputs, and
+retains distinct native/reference phase ledgers. No second reference PCM file
+was saved; equality is asserted per cut by the frozen comparator.
+
+Current docs now distinguish v16 interactive evidence from the unlaunched v17
+candidate and remove obsolete listening/graphics claims. Next: v17 OFF/ON host
+checks, reproduce/localize the title audio report, controller menu feedback,
+continuous flicker/cost and remaining full-course/independent/hardware checks.
+
 ## Mac packaging can stop before launch (2026-10-14)
 
 The tracked Mac launcher now supports `--no-launch`: verify assets, package and

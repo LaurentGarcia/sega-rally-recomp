@@ -523,6 +523,26 @@ at 16,279,520,560 ns. These checks establish native recapture through nonzero
 PCM, not independent sound CPU/chip parity or resolution of the reported glitch.
 The short independent fixture above does not accept this longer transcript.
 
+The corrected independent consumer is
+`tests/test_segarally_sound_uart_nonzero_reference.py`. It requires the archived
+original comparison preparation, full initialization provider, authentic tape,
+native objects and accepted observer proof. These manifests pin the retained
+artifact identities; a clean checkout without that archive cannot run this
+specific evidence consumer. `--help` lists its explicit prerequisite paths,
+including compiler SDK metadata. Preparation regenerates only public reference
+microcode, binds the actual compiler include list, and requires unchanged native
+inputs before the separate bounded `--run` step.
+
+Its single corrected run passes 14,947,325 instructions, 14,614 IRQ entries,
+32,159,463 paired observations and all 1,929 original cuts in 310.080869 seconds.
+All 728,884 stereo PCM frames match, including 22,784 nonzero scalar samples.
+The original observer failure and the later SDK-metadata preflight failure are
+preserved. Full-660 default and stripped tagged providers are byte-identical;
+all 1,006 inputs and 16 artifacts remain unchanged. This compares independent
+CPU execution with shared SCSP/UART models at instruction-start MMIO times.
+It does not validate physical bus phases, a full sound-on host recording or the
+reported audible glitch. Exact evidence identities are in HANDOFF.
+
 ## Optional sound experiment
 
 Sound requires both audited generated sound inputs and an explicit build option:

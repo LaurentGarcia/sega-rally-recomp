@@ -8,14 +8,14 @@ The [design](sega-rally-design.md) records interpretation and hardware limits.
 | Area | Established evidence | Limit |
 | --- | --- | --- |
 | Main native coverage | Frozen v14: 75,207 instructions, 52 native objects, no missing templates | Coverage is a reached graph, not a remaining-work percentage |
-| Interactive Mac | v15 sound/CRT session exits normally after 30,328 frames; user reports excellent image and near-perfect-feeling motion | Qualitative feedback; complete courses and hardware fidelity remain open |
+| Interactive Mac | v16 controller/sound/CRT session exits normally after 12,974 frames; earlier v15 feedback reports excellent image and near-perfect-feeling motion | Qualitative feedback and bounded session evidence; complete courses and hardware fidelity remain open |
 | Driving parity | Two billion held-gas instructions, 86,328,770 ordered writes, 4,650,936,033 cycles, 113,101 IRQs and 10,701 renders; nineteen replay events match | Sound off; independent CPU with shared boards and final-frame comparison; no full MAME race |
 | Later game paths | Fresh credit/start after attract reaches a second race; sound-on frame 12,800 shows 118 km/h in fourth gear, 15.83 seconds elapsed | Complete second race and Game Over overlay not separately validated |
 | Course progress | Desert clear/results show 1:12.15; forested second course enters, times out, then attract returns | Centered steering does not complete second-course bends; remaining courses unvalidated |
 | Metal fidelity | Optional native repeated stepping plus certified reciprocal matches all pixels in three saved scenes; 447 synthetic cases pass; v17 builds, passes three CTests and packages separately | Candidate not launched; OFF/ON host checks await execution approval. Default OFF, continuous flicker and whole-game fidelity remain open |
 | Sound generation | Native linked board captures 2,409,170 stereo frames: 54.6297052 seconds including nonzero 44.1 kHz PCM; shared-core drains agree | Whole-game audio parity unvalidated |
 | Sound CPU/board comparison | Actual initialization matches persistent MAME CPU execution for 1,000,000 instructions, including 383 IRQ/RTE pairs and 35,955 SCSP writes; synthetic UART/nonzero-PCM cases also pass | The actual initialization's 51,158 PCM frames are silent; shared devices, instruction-start MMIO and idle serial do not establish music or independent sound-on recording parity |
-| Authentic sound commands | Native recapture matches 55 actual UART accesses, 1,929 cuts and 728,884 PCM frames including nonzero audio; the entire payload matches the preserved neutral host WAV prefix. The observer correction passes 486 ROM-free checks | The earlier longer independent comparison stopped at instruction 14,803,284 because its observer misclassified a PC-relative operand as prefetch. Both CPUs reached matching state there; the complete corrected comparison remains pending |
+| Authentic sound commands | Corrected independent MAME CPU comparison passes 14,947,325 instructions, 14,614 IRQ entries and all 1,929 cuts through 55 actual UART accesses; 728,884 PCM frames match, including nonzero audio. The native payload also matches the preserved neutral host WAV prefix | Shared device models and instruction-start MMIO; no independent chip, physical bus-phase, title-music or whole sound-on recording claim. The earlier observer failure remains preserved |
 | Audio output | Earlier v15 playtest has four SDL estimated demands; later v16 manual test and fresh 7,200-frame neutral capture have zero demands/drops; all 5,519,841 neutral-capture PCM frames match recorded hashes | User reports title-screen glitches; clean later telemetry does not establish audible quality or resolve the cause |
 | Controller input | Xbox One Elite 2 detected; 329 mapping/virtual-device checks, normal build, menu Metal checks and actual-host input isolation pass; live recording contains intermediate steering, throttle and brake values | Recorded cabinet inputs do not identify their physical source; Y/navigation feedback remains open; wheels/force feedback remain outside this implementation |
 | Exact host recording | Actual analog-input v16 session replays all 25,953 resumes, PCM hashes covering 9,946,388 stereo frames and final saves through frame 12,974; earlier v14 and scripted checks also match | Same-Machine reproducibility; full-course and independent CPU/sound parity remain open |
@@ -101,7 +101,8 @@ PCM is silent. The signed windowed app subsequently applies all ten selection
 events, hands control to the keyboard at frame 1,851 and exits normally after
 9,347 frames. It supplies 7,165,805 stereo frames with zero chip/host drops or
 estimated SDL input shortages and 2,255 frames queued at exit. This session has
-no separate wall-speed measurement. Live-game listening feedback is pending.
+no separate wall-speed measurement or recorded listening verdict. Later v15
+feedback reports title-screen audio glitches, as described below.
 
 The sound-on recording checks match a 60-frame boot and a 2,801-frame drive,
 including 5,603 exact driving resumes and the full 48.69424036-second float WAV.
@@ -322,12 +323,23 @@ behavior at frame 1,200, so the reported cover-screen glitch remains open.
 
 ## Next validation work
 
-Localize the reported title-screen audio glitches with paced queue/timing
-telemetry and native PCM, then measure longer game paths with sound enabled. Preserve exact instruction guards, timing
-and IRQ boundaries in further speed work. Validate
-the complete second race and remaining courses, then extend independent replay
-comparison to those paths and coupled sound. Real-race graphics
-comparison, full MAME-machine parity and PCB/precision validation remain required.
+- Run the prepared v17 OFF host replay, then ON only after PASS. Compare
+  input/PCM/save payloads with v16, OFF's final image with v16, and ON's final
+  image with the same-runtime CPU renderer before an interactive candidate test.
+- Localize the reported title-screen audio glitches with paced telemetry and
+  native PCM. The corrected independent sound comparison now reaches the first
+  nonzero output; extend beyond that bounded interval and keep listening quality
+  separate from sample/CPU equality.
+- Confirm controller Y, menu navigation, remapping and neutral resume during
+  actual play. Recorded analog cabinet values do not identify their source.
+- Check continuous real-race texture flicker and measure native/CRT cost in a
+  quiet interval. Saved-scene equality and offscreen timings do not establish
+  visible gameplay behavior or speed.
+- Complete the second race and remaining courses with sound, then extend
+  independent replay to those paths and coupled sound. Full MAME-machine
+  comparison, PCB timing and extended-precision validation remain open.
+
+Preserve exact instruction guards, timing and IRQ boundaries in further speed work.
 
 Inherited Daytona results and the earlier lifted-C Rally prototype provide
 reference code and historical evidence. They do not satisfy these Rally exit

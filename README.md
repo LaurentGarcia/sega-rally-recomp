@@ -49,7 +49,7 @@ precision FP, exact racing-scene pixels and physical timing remain open.
 
 Indexed lookup and the opt-in instruction boundary hook reduce execution
 overhead while preserving instruction guards and timing. With native SCSP sound
-enabled, the latest quiet Mac check completes 2,760 frames and 47.98148 seconds
+enabled, a quiet paced driving check completes 2,760 frames and 47.98148 seconds
 of board time in 48.519993 seconds of wall time, including startup and shutdown.
 SDL reports zero audio input shortfalls and zero chip or host sample drops.
 The older execution path exhausted its queue during the same driving checkpoint.
@@ -58,16 +58,20 @@ The hook matches the old Machine through 600 million driving instructions,
 every compared frame and every captured PCM sample. This hidden-window result
 does not establish every course or visible presentation. A ten-second native
 PCM sample has been heard on the Mac speakers. Opening audio after window/Metal
-setup fixes the observed startup failure. The latest v14 windowed session exits
-normally after 9,344 frames with zero chip/host drops and one estimated SDL
-input-shortfall request; live-game listening feedback remains pending.
+setup fixes the observed startup failure. The later v16 controller preview
+exits normally after 12,974 frames with sound and CRT, with zero logged SDL
+shortfall requests or chip/host drops. Live feedback from v15 praised the image
+and motion but reported title-screen audio glitches. Clean later telemetry does
+not resolve that audible issue.
 Sound requires both the build option and runtime `--sound`.
 See the [sound instructions](docs/segarally-build-validation.md#optional-sound-experiment).
 
-Optional Accurate textures uses the measured Metal span stepping: three saved
-complete scenes differ from the CPU renderer at only 3, 1 and 1 pixels. It is
-available in the Display panel and remains off by default while live cost and
-remaining precision errors are checked. This is not whole-game graphics parity.
+Optional Accurate textures now combines measured Metal span stepping with a
+certified reciprocal correction. All pixels in three saved complete scenes
+match the CPU renderer, and 447 synthetic cases pass. The separate v17 candidate
+builds and packages, but has not launched; its OFF/ON host comparisons remain
+pending. The option stays off by default. Continuous flicker, live cost and
+whole-game graphics fidelity remain unverified.
 
 ## Display controls
 
@@ -76,7 +80,7 @@ optional CRT effects. Choose Original or Arcade CRT, then adjust scanlines,
 mask, glow, curvature and color fringing. Smooth/Sharp scaling, integer scale
 and Accurate textures are separate controls. Fresh defaults preserve the
 original display; changed preferences use a separate `display.settings` file.
-The v15 Mac preview is built and has launched with sound and CRT presentation.
+The v15 and controller-enabled v16 previews have launched with sound and CRT.
 A 2,600-frame off/on comparison preserves native frames, audio and game state.
 Monitor accuracy and sustained effect cost remain unverified.
 See [the player manual](docs/mac-player-manual.md#display-controls).
@@ -86,6 +90,9 @@ or **F1** for **Settings → Controls** to enable/disable controller input, rema
 keyboard/controller bindings, and adjust dead zones and steering response.
 Keyboard controls stay available; input preferences are separate from cabinet
 saves. See [controller defaults](docs/mac-player-manual.md#controls).
+The v16 live recording contains intermediate steering, accelerator and brake
+values and replays exactly; it does not identify the physical source of each
+input. Feedback on controller Y and menu navigation remains open.
 
 ## Personal inputs and repository boundaries
 
