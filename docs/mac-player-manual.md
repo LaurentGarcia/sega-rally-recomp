@@ -17,11 +17,10 @@ python3 scripts/segarally_mac.py --roms /path/to/srallyc.zip \
 ```
 
 After the build succeeds, open `build/segarally-player/mac/Sega Rally Native.app`.
-The preserved candidate 002 package is
-`build/mac-candidate-002/mac/Sega Rally Native.app`, built at source `481bf63`
-with all eleven dedicated Mac CTests passing. Its bounded 25-second no-argument
-startup reaches 1,293 frames with Metal, sound and the instruction boundary hook.
-This startup check does not establish full-course or audible-quality validation.
+The current candidate 003 package is
+`build/mac-candidate-003/mac/Sega Rally Native.app`, built at source `7beefcf`
+with all eleven dedicated Mac CTests passing. Its visible 7,200-frame check runs
+with CRT, Accurate textures and sound, with zero audio shortfalls or drops.
 New sound-enabled Mac builds start with sound and the faster native execution
 path when opened directly, without command-line arguments. The game opens in
 a window and uses normal pacing. Allow its original reset checks to finish,
@@ -161,13 +160,13 @@ Performance depends on the Mac and scene. `--unthrottled` is a diagnostic option
 and does not guarantee arcade speed. Avoid additional builds or captures during
 a playtest.
 
-Title-screen audio glitches were reported in an earlier preview. Later captures
-have clean queue telemetry, but the audible issue is not yet confirmed resolved.
-The fresh candidate's 7,200-frame paired capture preserves native PCM and has no
-capture drops, but logs one SDL input-shortfall request; it does not clear the
-reported title-screen issue. Analysis exposes a 6.53 ms silence gap in the SDL
-output that is absent from native PCM. A buffering remedy is still under
-development; the current packaged app does not include a validated fix.
+Candidate 003 includes a verified playback-buffer fix for a captured 6.53 ms
+audio gap. It adds one output-device period of headroom, about 23 ms on the
+tested Mac. A complete visible 7,200-frame capture has no shortfalls, drops or
+missing output samples while preserving the prior native PCM byte for byte.
+This resolves the captured starvation mechanism; broader listening feedback on
+the earlier title-screen report is still welcome. Device periods longer than
+60 ms are unsupported; see the [audio details](segarally-build-validation.md#optional-sound-experiment).
 Add `--audio-diagnostics` to a paced launcher command with `--sound` when
 investigating; it timestamps queue demand and host delays without changing audio
 generation or buffering. See [current evidence](segarally-status.md) for the

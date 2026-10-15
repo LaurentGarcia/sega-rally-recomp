@@ -7,19 +7,33 @@ The [design](sega-rally-design.md) records interpretation and hardware limits.
 
 ## Current Mac candidate
 
-Candidate 002 is generated from the supplied ROM archive at source revision
-`481bf63`, with all eleven dedicated Mac CTests passing. Its signed package is
-`build/mac-candidate-002/mac/Sega Rally Native.app`. The one-command pipeline
+Candidate 003 is generated from the supplied ROM archive at source revision
+`7beefcf`, with all eleven dedicated Mac CTests passing. Its signed package is
+`build/mac-candidate-003/mac/Sega Rally Native.app`. The one-command pipeline
 reproduces import, generation, sound-enabled Release build, tests and packaging;
 see the [build guide](segarally-build-validation.md).
 
-An actual no-argument startup runs 1,293 frames over a bounded 25-second check
+Candidate 003's visible 7,200-frame neutral check enables CRT and Accurate
+textures and reports zero audio demands, chip/host drops or capture failures.
+All 14,404 input/execution records, observations and 5,519,841 native stereo PCM
+frames exactly preserve the earlier neutral capture; its final native image
+also equals candidate 002's Accurate-textures image. All 5,516,288 captured SDL
+output frames reproduce bit for bit using the current buffer policy and measured
+delivery schedule, with zero short callbacks, missing frames or queue mismatches.
+This verifies the captured starvation fix on one visible Mac run. Listening
+confirmation, other devices and independent hardware fidelity remain separate.
+Its longest post-prime producer pause was 18.46 ms; the earlier 52.92 ms pause
+did not recur. The separate replay of the earlier delivery schedule establishes
+that the new buffering covers that specific longer pause.
+Integrity evidence: `build/validation/mac-release-audit/candidate003-audio-review.json`.
+
+The preserved candidate 002 no-argument startup runs 1,293 frames over a bounded 25-second check
 with Metal, native sound and the instruction boundary hook enabled. Enhancements
 are off. One SDL estimated input shortfall is logged. This validates the startup
-defaults, not listening quality: the reported title-screen audio issue remains
-unresolved. Earlier clean telemetry must not be read as resolving the audible issue.
+defaults, not listening quality. Earlier clean telemetry must not be read as
+resolving every reported audible issue.
 
-A fresh paced 7,200-frame paired capture preserves all 5,519,841 native stereo
+Candidate 002's paced 7,200-frame paired capture preserves all 5,519,841 native stereo
 PCM frames byte for byte against the earlier neutral WAV. Its SDL logical-device
 postmix footer reports zero capture drops, overflow or failure. One SDL input
 shortfall request estimates 2,296 extra bytes, so this run fails its zero-demand
@@ -31,12 +45,14 @@ Analysis finds a 288-frame / 6.530612 ms output zero tail absent from native PCM
 after a 52.918 ms producer pause. An offline SDL schedule reproduces every
 captured postmix frame exactly. This localizes an observed output-starvation
 mechanism; it does not identify the producer pause's cause or resolve all
-reported title glitches. A headroom remedy is under development and is not yet
-in the production candidate. The original failed playback criterion remains
+reported title glitches. Candidate 003 adds one actual output-device period to
+the 60 ms queue target; the measured device now uses 83.22 ms. The same recorded
+demand schedule has no shortage with this policy, and the actual visible test
+above passes. The original failed playback criterion remains
 preserved. Integrity evidence is
 `build/validation/mac-release-audit/candidate002-audio-review.json`.
 
-The packaged Metal candidate's sound-on course replay applies all 4,398 input
+The preserved candidate 002 Metal sound-on course replay applies all 4,398 input
 events through 20,000 frames, 3,662,512,354 instructions and 8,692,041,001 reference
 cycles, ending at PC `0x005ca464`. It supplies 15,332,761 stereo PCM frames with
 zero chip/host drops and no frontier or manual takeover. All 670 recorded
@@ -70,7 +86,7 @@ the latter SHA-256 is
 | Sound generation | Native linked board captures 2,409,170 stereo frames: 54.6297052 seconds including nonzero 44.1 kHz PCM; shared-core drains agree | Whole-game audio parity unvalidated |
 | Sound CPU/board comparison | Actual initialization matches persistent MAME CPU execution for 1,000,000 instructions, including 383 IRQ/RTE pairs and 35,955 SCSP writes; synthetic UART/nonzero-PCM cases also pass | The actual initialization's 51,158 PCM frames are silent; shared devices, instruction-start MMIO and idle serial do not establish music or independent sound-on recording parity |
 | Authentic sound commands | Corrected independent MAME CPU comparison passes 14,947,325 instructions, 14,614 IRQ entries and all 1,929 cuts through 55 actual UART accesses; 728,884 PCM frames match, including nonzero audio. The native payload also matches the preserved neutral host WAV prefix | Shared device models and instruction-start MMIO; no independent chip, physical bus-phase, title-music or whole sound-on recording claim. The earlier observer failure remains preserved |
-| Audio output | Earlier v16 and neutral capture have zero demands; candidate 002 paired capture preserves native PCM but logs one demand and exposes a 6.53 ms SDL output gap reproduced by offline scheduling | Title issue unresolved; native PCM/capture integrity does not imply supplied output or audible quality; remedy not yet production |
+| Audio output | Candidate 003 fixes the reproduced 6.53 ms starvation gap; its visible 7,200-frame capture has zero demands/drops, exact native PCM and no missing SDL output frames in complete offline reproduction | One measured Mac/device run; broader listening confirmation, device changes and full sound fidelity remain open |
 | Controller input | Xbox One Elite 2 detected; 329 mapping/virtual-device checks, normal build, menu Metal checks and actual-host input isolation pass; live recording contains intermediate steering, throttle and brake values | Recorded cabinet inputs do not identify their physical source; Y/navigation feedback remains open; wheels/force feedback remain outside this implementation |
 | Exact host recording | Candidate 002 matches all 40,006 resumes, 15,332,761 PCM frames and final saves; preserved v17 matches 9,459 resumes and 3,625,487 PCM frames; v16 matches 25,953 resumes | Same-Machine reproducibility; full-course and independent CPU/sound parity remain open |
 | Independent host recording | Actual sound-off driving bundle passes 5,201 resumes, 500,035,460 instructions, 15,156,607 ordered writes, 1,130,001,001 cycles and 2,600 frames after immutable preflight | Independent i960 with shared boards; longer/manual captures, sound-on and hardware parity remain open; fault rows rejected |
@@ -382,15 +398,18 @@ diagnostic preserves native PCM, image, saves, inputs and ordered resumes
 exactly. Its 44 telemetry rows contain no estimated demand shortfalls or drops.
 Startup includes 158.83 ms maximum pacing lateness and a 114.82 ms presentation
 wall interval; neither is GPU execution time. The run leaves neutral title
-behavior at frame 1,200, so the reported cover-screen glitch remains open.
+behavior at frame 1,200, so that historical check did not resolve the reported
+cover-screen glitch. Candidate 003's captured starvation remedy is described
+above; broader listening confirmation remains separate.
 
 ## Next validation work
 
 - Preserve the exact v17 manual replay and extend course validation beyond the
   new sound-on Metal Desert/Forest clears and Mountain retirement. Retain explicit
   result images and matching cabinet inputs; full-game completion is still open.
-- Localize the reported title-screen audio glitches with paced telemetry and
-  native PCM. The corrected independent sound comparison now reaches the first
+- Collect listening feedback on the verified playback-starvation fix and capture
+  any remaining audible events with both native and SDL output. The corrected
+  independent sound comparison now reaches the first
   nonzero output; extend beyond that bounded interval and keep listening quality
   separate from sample/CPU equality.
 - Confirm controller Y, menu navigation, remapping and neutral resume during
@@ -398,7 +417,7 @@ behavior at frame 1,200, so the reported cover-screen glitch remains open.
 - Check continuous real-race texture flicker and measure native/CRT cost in a
   quiet interval. Saved-scene equality and offscreen timings do not establish
   visible gameplay behavior or speed.
-- Complete the second race and remaining courses with sound, then extend
+- Complete Mountain and the remaining course paths with sound, then extend
   independent replay to those paths and coupled sound. Full MAME-machine
   comparison, PCB timing and extended-precision validation remain open.
 

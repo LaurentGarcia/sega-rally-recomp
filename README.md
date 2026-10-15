@@ -21,8 +21,11 @@ python3 scripts/segarally_mac.py --roms /path/to/srallyc.zip \
 
 Choose a new output directory. The command verifies the supplied Revision B
 ROMs, generates native main/TGP/sound code, builds, runs host checks and packages
-a signed app. Open `build/segarally-player/mac/Sega Rally Native.app` afterward.
+an ad-hoc signed local app. Open
+`build/segarally-player/mac/Sega Rally Native.app` afterward.
 No game data is included in the repository.
+The package targets the build Mac's architecture and is not notarized for public
+distribution.
 
 Direct no-argument startup enables compiled-in sound and the faster instruction
 boundary path. The app opens windowed with normal pacing. Press and release
@@ -34,27 +37,27 @@ automatic selection, display controls and saves.
 
 ## Current checkpoint
 
-Candidate 002 was built from the supplied archive at source revision `481bf63`.
-All eleven dedicated Mac CTests pass, and the signed package is preserved at
-`build/mac-candidate-002/mac/Sega Rally Native.app`. Its actual no-argument
-startup runs 1,293 frames over a bounded 25-second check with Metal, sound and
-the instruction boundary hook enabled, with enhancements off. One SDL estimated
-input shortfall was logged. **Reported title-screen audio glitches remain
-unresolved**; successful startup and queue measurements do not establish
-listening quality.
+Candidate 003 was built from the supplied archive at source revision `7beefcf`.
+All eleven dedicated Mac CTests pass. The current signed package is
+`build/mac-candidate-003/mac/Sega Rally Native.app`.
 
-The sound-enabled Metal candidate applies all 4,398 recorded input events through
-20,000 frames, clearing Desert in **1:00.38** and Forest in **1:21.37**, entering
+**A measured audio-playback starvation bug is fixed.** The updated app passes a
+7,200-frame visible check with CRT and Accurate textures, zero audio shortfalls
+or drops, and unchanged native PCM, game execution and final image. The complete
+captured SDL logical-device postmix also reproduces exactly offline, with no
+short callbacks or underflow-added silence. The fix adds one device period of
+buffering—about 23 ms on this Mac. Broader listening
+confirmation and hardware fidelity remain separate checks.
+
+The preserved sound-enabled Metal candidate 002 applies all 4,398 recorded input
+events through 20,000 frames, clearing Desert in **1:00.38** and Forest in
+**1:21.37**, entering
 Mountain and retiring near its finish. Its exact signed-executable offline
 replay matches all 40,006 resumes, PCM hashes and final saves. This unthrottled
 run uses no playback device and is not a speed or listening check. **Full-game
 completion is not established.** Earlier independent CPU comparison and the
 preserved v17 manual replay remain documented in the status reference; neither
 is full MAME-machine or PCB parity.
-
-A separate paced capture exposes a 6.53 ms SDL output silence gap absent from
-native PCM. Offline SDL scheduling reproduces the captured output, but a buffer
-remedy remains under development and the reported title issue stays open.
 
 Optional Accurate textures matches all pixels in three saved complete scenes
 and passes 447 synthetic cases; its v17 host checks preserve audio, inputs and

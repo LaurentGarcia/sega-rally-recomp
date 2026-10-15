@@ -67,12 +67,15 @@ into a new directory:
 
 ```sh
 python3 scripts/segarally_mac.py --roms /path/to/srallyc.zip \
-    --output build/mac-candidate-001 --jobs 4
+    --output build/segarally-player --jobs 4
 ```
 
 This verifies and generates the main CPU, TGP, graphics and timed sound inputs,
 builds the Release Metal host with indexed dispatch and the instruction boundary
 hook, runs its host regression tests, packages the app and verifies its signature.
+This is an ad-hoc signed local package for the build Mac's architecture, not a
+notarized or universal distribution. It includes personal ROM-derived assets
+and must stay outside the source repository.
 It includes controller/Settings support and input recording. Display enhancements
 retain their off-by-default settings. It never downloads dependencies or launches
 the game; the final output prints the windowed launch command with sound and the
@@ -640,8 +643,11 @@ The 240 ms backlog cap and ±0.5% trim remain fixed. Diagnostics print the actua
 rate, period and target. Invalid periods or periods longer than 60 ms fail
 explicitly; device changes after opening are not adaptively retuned. A captured
 52.9 ms delivery pause caused a verified 288-frame postmix gap, absent from native
-PCM. Replaying that exact SDL schedule with the new policy removes its shortage;
-fresh device validation and broader listening confirmation remain separate.
+PCM. Replaying that exact SDL schedule with the new policy removes its shortage.
+Candidate 003 then passes a visible 7,200-frame check with CRT and Accurate
+textures, no shortfalls/drops, exact native PCM and captured SDL logical-device
+output with no underflow-added silence. Other devices and broader listening
+confirmation remain separate.
 
 One paced 2,600-frame CRT check preserves native WAV/image, saves and all ordered
 resumes exactly, with no shortfalls or drops. A separate fresh 7,200-frame

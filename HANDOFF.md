@@ -1,5 +1,92 @@
 # Handoff
 
+## Candidate 003 visible playback passes (2026-10-15)
+
+The fresh pipeline at clean `7beefcf315e8f60614b334eaec6fcc500836c528` passes all
+ten steps and eleven dedicated Mac CTests. Current app:
+`build/mac-candidate-003/mac/Sega Rally Native.app`; signed executable SHA-256
+`a07578cb501012b0a2b96a3be7de28fcc8e0b3e1bd24989ea9c22c5fe7d51416`.
+Independent source/generated-code/assets/notices/signature audit passes at
+`build/validation/mac-release-audit/fresh-candidate-003-review.json`, SHA-256
+`2e04a2912377994707aa0752c9331385a2fd6e4572649390f2bf8728aa68ea7e`.
+
+One quiet visible capture enables CRT, Accurate textures, sound and the boundary
+hook with fresh FF seeds and the original neutral frame-0/7,199 input schedule.
+It passes 7,200 frames / 1,399,415,787 instructions / 3,129,161,000 cycles /
+PC `005ca464`, exit zero. Native WAV, all 14,404 input/execution payload rows,
+observations and final native image match candidate 002 exactly. Its 121 audio
+telemetry rows report zero demands or chip/host drops. Actual device format is
+44.1 kHz stereo / 1,024 frames; the target is 3,670 frames and 2,902 remain queued
+at detach. Visible CRT swapchain initialization is logged. Whole-process duration
+126.785 seconds is not a performance comparison with the hidden prior capture.
+Result: `build/validation/mac-candidate-003-host/audio-001/result.json`, SHA-256
+`af337c65b09df13387caa7e3b969becc247997086301201ac458c0e4947929ea`.
+
+Independent audit verifies 48 frozen inputs, twenty retained outputs, recording
+seal, every PCM interval hash, neutral pins, seed/final saves and the unchanged
+signed app. All 5,516,288 postmix frames are finite and covered by 5,387 contiguous
+packets with no capture failure. Report:
+`build/validation/mac-release-audit/candidate003-audio-review.json`, SHA-256
+`c33b68916bf5bada52d9cb979873c08655c797ba800d8fb89c5b91b9cd1ed74e`.
+Pre-execution review caught a test-script assertion looking for the queue log
+in redirected stderr instead of host.log; it was corrected and frozen before
+the single device run. No capture was discarded or retried for that issue.
+
+An unbound SDL stream using the production policy reproduces the entire new
+postmix bit for bit, with zero queue/scalar mismatches, short callbacks or missing
+frames. The old gap's corresponding native-input neighborhood has no inserted
+zero tail in this capture. Report:
+`build/worktrees/audio-device-headroom/build/validation/actual003-postmix-001/report.json`,
+SHA-256 `7f5d270454bf62c98820d978dad4ce546e2de71e385734dde2f3941d37276031`.
+Independent review binds twenty inputs and outputs at
+`build/validation/actual003-postmix-independent-review/result.json`, SHA-256
+`5e915e111fd769f98b53d42961b3f6f7053a16249312bd38f3cab620b6c262e2`.
+The new visible run's longest post-prime producer pause is 18.460417 ms; it did
+not repeat the old 52.918334 ms pause. The separate exact-old-schedule
+counterfactual demonstrates coverage of that recorded longer pause. Together
+these verify the captured starvation remedy, not every reported glitch,
+physical speaker waveform, device route or full sound fidelity. The earlier
+failed result remains preserved. No further audio device run is needed without
+new evidence or a source change.
+
+Course measurements also reject two speculative controller diagnoses. The first
+observer watched an inactive pose-publishing routine and honestly produced no
+latches; it was not evidence of incoherence. The corrected dual observer watches
+both actual publication families and records 15,201 complete publications per
+slot, with no observed partial/mixed primary-field frame cuts on the unchanged
+normal-difficulty path. Node `0x500000`, handler `0x5d3f40` and global `0x2140cc`
+associate the original `0x213b40` pose with pedal-driven physics; prototype
+"camera" annotations were misleading. The other pose is a different car,
+15–76 world units away on Mountain. Secondary velocity agrees with observed movement.
+Exact terminal counters, inputs and selected images remain unchanged. Evidence:
+`build/worktrees/course-driving/build/course-driving/dual-observer-analysis-001/result.json`,
+SHA-256 `fe9fea8dca98e3941b83e1542c821c7869b9433fa4a4c75271935b75a30504ad`.
+
+One measured Mountain-only early-braking experiment preserves the successful
+Desert/Forest prefix but retires earlier, near route segment 194 versus the
+best normal path's 281. That failure is preserved; neither a wrong-pose retarget
+nor further blind steering/braking sweeps are justified. A further coverage path
+uses only the game's ordinary Test/Service menu controls to select EASY, keeping
+the normal replay unchanged. Actual menu probes show GAME DIFFICULTY EASY and
+GAME MODE NORMAL. The game saves the setting and exits through its own menu;
+the subsequent bounded drive still retires at the same Mountain point, with
+the added 3,000-frame operator prefix accounted for. EASY did not produce the
+assumed useful time extension; a completed race remains unverified.
+EASY does not itself establish Lakeside access: the observed Mountain-finish
+branch requires a further rank-related condition before selecting course 3.
+The EASY run reaches 24,000 frames / 4,446,796,292 instructions /
+10,430,441,000 cycles without a native frontier. Its racing pins and 476 telemetry
+samples match NORMAL after the operator offset. The frozen coverage inventory
+binds forty source/input files, sixteen prepared manifests and fifteen run
+results, with actual initial/operator-saved/final save snapshots:
+`build/worktrees/course-driving/build/course-driving/coverage-final-001/evidence.json`,
+SHA-256 `59f452fc5afe3cd21ff1ff385d24963a23eb968d36f063d35caae89e9edcd6c9`.
+Its accompanying README SHA-256 is
+`2028b52d67a65135d3ea005b2efc3a3202b9372a8d3a0fba5b7193a17ad64b05`.
+Operator GAME MODE has separate NORMAL/SHORT/LONG/LONGEST labels. Its effect on
+the remaining course path and the front-end Practice route are the next bounded
+coverage investigation; neither is established by the failed EASY test.
+
 ## Device-period audio headroom (2026-10-15)
 
 Audio and Reference & validation govern a measured presentation-buffer fix.
