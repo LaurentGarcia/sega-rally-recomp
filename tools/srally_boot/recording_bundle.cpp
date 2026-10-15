@@ -260,7 +260,47 @@ void Recorder::finish(const Machine &machine,TerminalKind kind) {
         write(p.directory/"complete.tmp",serialize(c));std::filesystem::rename(p.directory/"complete.tmp",p.directory/"complete.txt");p.finished=true;
     }catch(...){p.failed=true;throw;}
 }
-ReplaySummary replay_bundle(const std::filesystem::path &dir,const std::filesystem::path &data,const std::filesystem::path &exe) {
+struct PreflightBundle::Data {
+    std::filesystem::path directory;
+    Manifest manifest;
+    Completion seal;
+    Machine::Images images;
+    std::vector<uint8_t> assets, initial_eeprom, initial_backup, final_eeprom, final_backup;
+    std::string resumes, observations;
+};
+const Machine::Options &PreflightBundle::options() const { return data_->manifest.opts; }
+const Machine::Images &PreflightBundle::images() const { return data_->images; }
+const std::vector<uint8_t> &PreflightBundle::assets_report() const { return data_->assets; }
+const std::vector<uint8_t> &PreflightBundle::initial_eeprom() const { return data_->initial_eeprom; }
+const std::vector<uint8_t> &PreflightBundle::initial_backup() const { return data_->initial_backup; }
+const std::vector<uint8_t> &PreflightBundle::final_eeprom() const { return data_->final_eeprom; }
+const std::vector<uint8_t> &PreflightBundle::final_backup() const { return data_->final_backup; }
+Witness PreflightBundle::initial() const { return data_->manifest.initial; }
+hi::Context PreflightBundle::context() const { return recording::context(data_->manifest); }
+ReplaySummary PreflightBundle::summary() const {
+    const auto &c=data_->seal;return {c.records,c.terminal,c.kind==TerminalKind::Frontier||c.kind==TerminalKind::Fault,c.kind};
+}
+void PreflightBundle::each(const std::function<void(const hi::Resume &,const Machine::RunResult &,uint64_t,const std::string &)> &visit) const {
+    const auto &p=*data_;const auto ctx=context();
+    std::istringstream stream(p.resumes),observations(p.observations);
+    hi::Reader reader(stream,ctx,p.manifest.initial,approval(ctx));uint64_t used=0;
+    if(line(observations,used)!="segarally-recording-observations-v1")fail("unknown observations version");
+    Witness last=p.manifest.initial;Machine::Reason last_reason=Machine::Reason::Budget;
+    while(const auto r=reader.next()){
+        const auto o=read_observation(observations,used,*r,p.manifest.opts.sound);
+        if(visit)visit(*r,o.result,o.samples,o.pcm);
+        last=r->after;last_reason=r->reason;
+    }
+    observation_end(observations,used,reader.records());
+    if(!reader.complete_transcript()||reader.records()!=p.seal.records||last!=p.seal.terminal)fail("terminal/record count mismatch");
+    terminal_reason(p.seal.kind,last_reason,last.instructions);
+}
+void PreflightBundle::verify_stream_files_unchanged() const {
+    const auto &p=*data_;
+    if(digest_file(p.directory/"resumes.txt",TEXT_LIMIT)!=p.seal.transcript||
+       digest_file(p.directory/"observations.txt",TEXT_LIMIT)!=p.seal.observations)fail("artifact digest/size mismatch");
+}
+PreflightBundle preflight_bundle(const std::filesystem::path &dir,const std::filesystem::path &data,const std::filesystem::path &exe) {
     const auto seal=completion(dir);
     for(const auto &entry:std::filesystem::directory_iterator(dir)){
         const auto name=entry.path().filename().string();const std::array<const char*,9> allowed{"manifest.txt","assets.json","eeprom.initial.bin","backup.initial.bin","resumes.txt","observations.txt","eeprom.final.bin","backup.final.bin","complete.txt"};
@@ -282,32 +322,25 @@ ReplaySummary replay_bundle(const std::filesystem::path &dir,const std::filesyst
     const auto initial_eeprom=read_bounded(dir/"eeprom.initial.bin",128),initial_backup=read_bounded(dir/"backup.initial.bin",16384);
     const auto final_eeprom=read_bounded(dir/"eeprom.final.bin",128),final_backup=read_bounded(dir/"backup.final.bin",16384);
     if(digest(initial_eeprom)!=manifest.eeprom||digest(initial_backup)!=manifest.backup||digest(final_eeprom)!=seal.eeprom||digest(final_backup)!=seal.backup)fail("actual loaded seed bytes differ");
-    const auto ctx=context(manifest);
-    auto scan=[&](Machine *machine){
-        std::istringstream stream(resume_text),observations(observation_text);
-        hi::Reader reader(stream,ctx,manifest.initial,approval(ctx));uint64_t used=0;
-        if(line(observations,used)!="segarally-recording-observations-v1")fail("unknown observations version");
-        Witness last=manifest.initial;Machine::Reason last_reason=Machine::Reason::Budget;
-        while(const auto r=reader.next()){
-            const auto o=read_observation(observations,used,*r,manifest.opts.sound);
-            if(machine){
-                if(Witness::of(machine->stats())!=r->before)fail("replay pre-witness mismatch");machine->inputs()=r->inputs;
-                const auto result=machine->run_until_frame(r->budget);const auto pcm=machine->take_audio();
-                if(Witness::of(machine->stats())!=r->after)fail("replay post-witness mismatch");compare_result(result,o.result);
-                if(pcm.size()!=o.samples||pcm_digest(pcm).hash!=o.pcm)fail("replay PCM count/raw bits mismatch");
-            }
-            last=r->after;last_reason=r->reason;
-        }
-        observation_end(observations,used,reader.records());
-        if(!reader.complete_transcript()||reader.records()!=seal.records||last!=seal.terminal)fail("terminal/record count mismatch");terminal_reason(seal.kind,last_reason,last.instructions);
-    };
-    scan(nullptr); // No Machine exists and no instruction can execute yet.
-    Machine machine(std::move(images),manifest.opts);machine.load_eeprom(initial_eeprom);machine.load_backup(initial_backup);
-    if(Witness::of(machine.stats())!=manifest.initial)fail("actual startup Machine witness differs");scan(&machine);
-    if(machine.save_eeprom()!=final_eeprom||machine.save_backup()!=final_backup)fail("replay final EEPROM/backup differs");
-    // Recheck stream seals after execution; concurrent edits cannot become a
-    // successful replay merely because they occurred after preflight.
-    check("resumes.txt",seal.transcript,TEXT_LIMIT);check("observations.txt",seal.observations,TEXT_LIMIT);
-    return {seal.records,seal.terminal,seal.kind==TerminalKind::Frontier||seal.kind==TerminalKind::Fault,seal.kind};
+    auto frozen=std::make_shared<PreflightBundle::Data>();frozen->directory=dir;
+    frozen->manifest=manifest;frozen->seal=seal;frozen->images=std::move(images);frozen->assets=assets;
+    frozen->initial_eeprom=initial_eeprom;frozen->initial_backup=initial_backup;
+    frozen->final_eeprom=final_eeprom;frozen->final_backup=final_backup;
+    frozen->resumes=resume_text;frozen->observations=observation_text;
+    PreflightBundle result(std::move(frozen));result.each({}); // No CPU exists.
+    return result;
+}
+ReplaySummary replay_bundle(const std::filesystem::path &dir,const std::filesystem::path &data,const std::filesystem::path &exe) {
+    const auto frozen=preflight_bundle(dir,data,exe);
+    Machine machine(frozen.images(),frozen.options());machine.load_eeprom(frozen.initial_eeprom());machine.load_backup(frozen.initial_backup());
+    if(Witness::of(machine.stats())!=frozen.initial())fail("actual startup Machine witness differs");
+    frozen.each([&](const hi::Resume &r,const Machine::RunResult &expected,uint64_t samples,const std::string &pcm_hash){
+        if(Witness::of(machine.stats())!=r.before)fail("replay pre-witness mismatch");machine.inputs()=r.inputs;
+        const auto result=machine.run_until_frame(r.budget);const auto pcm=machine.take_audio();
+        if(Witness::of(machine.stats())!=r.after)fail("replay post-witness mismatch");compare_result(result,expected);
+        if(pcm.size()!=samples||pcm_digest(pcm).hash!=pcm_hash)fail("replay PCM count/raw bits mismatch");
+    });
+    if(machine.save_eeprom()!=frozen.final_eeprom()||machine.save_backup()!=frozen.final_backup())fail("replay final EEPROM/backup differs");
+    frozen.verify_stream_files_unchanged();return frozen.summary();
 }
 } // namespace srally::recording

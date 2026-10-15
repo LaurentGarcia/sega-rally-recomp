@@ -202,6 +202,45 @@ device state and frames using shared device implementations. It is not complete
 MAME-machine or PCB parity. Keep input hashes and final checkpoint counts beside
 the report; see [replay format](segarally-input-replay.md).
 
+### Independent sound-off recording consumer
+
+The separate test consumer accepts a sealed sound-off recording with supported
+options and no captured fault rows. It uses the canonical immutable preflight,
+actual initial/final saves and the existing raw harness's two board instances;
+production same-executable replay and raw parity defaults remain unchanged.
+The first actual check passes six resumes, 563,041 instructions, 283,375 ordered
+writes and two frames. Longer/manual captures and coupled sound remain open.
+
+The ROM-free recording checks require the pinned `extern/lzma` revision
+`0766b733fe3e06dd2a7f9a3cfbf2108ac73abd17` for SHA-256, alongside the
+normal reference-test dependencies. Run them through CMake:
+
+```sh
+cmake -S . -B build/recording-tests -DM2_BUILD_WINDOWED_APP=OFF
+cmake --build build/recording-tests --parallel 2 --target \
+    test_segarally_recording_reference test_segarally_recording_bundle \
+    test_segarally_reference_resume
+ctest --test-dir build/recording-tests --output-on-failure \
+    -R '^segarally_(recording_reference|recording_reference_build|recording_bundle|reference_resume)$'
+```
+
+`tests/test_segarally_recording_reference.py` verifies the actual preserved raw
+host, its `compile_commands.json`, measured source/object/link artifacts,
+staged assets and audited generation. Supply `--generation`, `--host-build`,
+`--host-evidence` and a new exclusive `--output` directory. It links existing
+verified native/TGP objects; it does not regenerate or compile native chunks.
+The evidence directory must contain the original `compiled-object-contract.json`,
+`linked-artifact-identities.json`, `native-link.txt` and `recording-link.txt`.
+Missing evidence is rejected, not replaced by a supplied digest. TGP source
+identity remains `identity_only`, not independently authenticated generation.
+
+The default prepares only. To execute, add `--bundle DIR --run`, an explicit
+`--max-instructions` (at most 20 million) and `--timeout` (at most 180 seconds).
+The first actual check uses one million and 90 seconds. Output retains the
+build/run commands, frozen identities and comparison transcript; no SDL/GPU,
+audio output or live-save writes occur. Preserve the original raw host and its
+matching measurements; a changed or signed executable needs matching evidence.
+
 Relevant source-level regression checks include:
 
 ```sh

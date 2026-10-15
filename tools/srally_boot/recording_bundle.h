@@ -37,6 +37,35 @@ private:
     std::unique_ptr<Impl> impl_;
 };
 struct ReplaySummary { uint64_t records; Witness terminal; bool frontier; TerminalKind kind; };
+// Immutable, fully parsed/sealed bundle plus ACTUAL executable/assets/images
+// and seed bytes. This authenticates file equality, not generation provenance.
+// Independent consumers must separately bind their linked generated/runtime
+// contract and reject unsupported configurations before constructing any CPU.
+class PreflightBundle {
+public:
+    struct Data;
+    const Machine::Options &options() const;
+    const Machine::Images &images() const;
+    const std::vector<uint8_t> &assets_report() const;
+    const std::vector<uint8_t> &initial_eeprom() const;
+    const std::vector<uint8_t> &initial_backup() const;
+    const std::vector<uint8_t> &final_eeprom() const;
+    const std::vector<uint8_t> &final_backup() const;
+    Witness initial() const;
+    host_input::Context context() const;
+    ReplaySummary summary() const;
+    // Each traversal uses only the same immutable bytes checked at preflight.
+    void each(const std::function<void(const host_input::Resume &,
+        const Machine::RunResult &, uint64_t, const std::string &)> &) const;
+    void verify_stream_files_unchanged() const;
+private:
+    explicit PreflightBundle(std::shared_ptr<const Data> data) : data_(std::move(data)) {}
+    std::shared_ptr<const Data> data_;
+    friend PreflightBundle preflight_bundle(const std::filesystem::path &,
+        const std::filesystem::path &, const std::filesystem::path &);
+};
+PreflightBundle preflight_bundle(const std::filesystem::path &bundle,
+    const std::filesystem::path &data, const std::filesystem::path &actual_capture_executable);
 // Preflight the WHOLE bundle before creating/executing the replay Machine.
 // Hash actual executable/assets/images, load only captured startup seeds,
 // preserve all ten options, drain once per resume, and compare all evidence.

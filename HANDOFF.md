@@ -1,5 +1,29 @@
 # Handoff
 
+## Short independent whole-recording validation (2026-10-14)
+
+A separate test-only sound-off consumer now reuses canonical immutable bundle
+preflight and the raw harness's two independent board instances. Actual host,
+assets/options/startup seeds, measured source/object/link inputs and all 75,207
+generated instruction addresses are checked before CPU execution. Each opcode
+compares architectural/cache/FP state, cycle-stamped writes, IRQs and device
+state without adding an end synchronization. All four focused CTests pass:
+22 complete-bundle checks, seven build-binding tests, 165 existing bundle checks
+and 249 phase checks. Independent read-only review found no blocker. MAIN integration preserves all
+ten non-CMake source identities; its normal Debug build and all four focused
+CTests pass (21.48 seconds). The root CMake file also retains the new CRT target.
+
+One fresh v14 raw-host sound-off capture then passes all six resumes through
+two frames: 563,041 instructions, 283,375 ordered writes, 910,200 cycles and
+PC `0000053c`. The one-shot independent run takes 1.222 seconds; the complete
+bundle and measured inputs remain unchanged. Evidence:
+`build/validation/independent-recording-v14/actual-result.json`, SHA-256
+`d83412b50d2e9d880fe7c031aa5c673100a55b9be7ee91f3a2dd616ef810b681`.
+This is independent i960 execution with shared board/TGP/video implementations;
+TGP generation evidence retains its `identity_only` limit. Longer/manual
+sound-off captures remain unvalidated. Sound-on and captured fault rows reject
+intact; production exact-executable replay and raw parity defaults are unchanged.
+
 ## Optional CRT controls and windowed v15 preview (2026-10-14)
 
 The dedicated host now has a lazy F1 Display panel and F6 CRT toggle. Common
@@ -119,11 +143,10 @@ strict-clean. Original failed probes are preserved as ignored evidence.
 
 Evidence: `build/validation/ordered-resume-reference/result.json`, SHA-256
 `28ec789b02df84608b4aa400fa372376b59684fc43b247a78a1485faa89b48fc`.
-This is a low-level phase component, not a complete recording replay oracle.
-Next bind immutable bundle preflight, actual host/images/options/seed bytes,
-generated instruction profiles and a full independent board provider before
-running any real captured rows. Capability booleans are not provenance proof.
-No sound-on recording has been converted, accepted or independently validated.
+That initial checkpoint supplied the low-level phase component; the later
+whole-recording integration above adds actual byte/profile/board binding.
+Capability booleans alone remain insufficient provenance proof. No sound-on
+recording has been converted, accepted or independently validated.
 
 ## Repeated stepping across complete scenes (2026-10-14)
 

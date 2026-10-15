@@ -247,11 +247,16 @@ Invalid profiles, changed live guards and fetch faults fail closed. Captured
 fault rows are rejected because the interpreter's fault IP phase is unproven.
 Neither the production Machine nor the raw reference harness changes.
 
-This component is not a whole-bundle replay command. Immutable preflight, actual
-host/images/options/seed binding, generated instruction-profile provenance and
-the full independent board provider still need integration before accepting a
-game capture. Capability flags alone do not verify those facts; sound-on bundles
-remain unsupported without altering their recorded configuration.
+The separate test-only whole-bundle consumer now reuses canonical immutable
+preflight and the raw harness's two board instances. It binds the actual capture
+host/assets/options/seeds, existing measured source/object/link evidence and
+generated instruction inventory before stepping. Capability flags alone cannot
+approve a capture. One fresh sound-off v14 bundle passes all six resumes through
+two frames and 563,041 instructions, with 283,375 ordered writes and 910,200
+cycles. Evidence remains under `build/validation/independent-recording-v14/`.
+This is a short neutral-input check with shared device implementations, not
+full-race, sound-on or hardware parity. See the
+[bounded consumer procedure](segarally-build-validation.md#independent-sound-off-recording-consumer).
 
 The ROM-free tests cover 98 stream/contract checks and 84 Machine checks in
 both execution modes. A real timer IRQ in the synthetic fixture completes a

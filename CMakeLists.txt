@@ -514,6 +514,16 @@ if(TARGET sha256_digest)
         M2_SRALLY_VIDEO M2_SRALLY_TGP M2_SRALLY_IO M2_SRALLY_UART M2_SRALLY_SOUND)
     target_link_libraries(test_segarally_recording_bundle PRIVATE sha256_digest)
     add_test(NAME segarally_recording_bundle COMMAND test_segarally_recording_bundle)
+    add_executable(test_segarally_recording_reference tests/test_segarally_recording_reference.cpp
+        tools/srally_boot/recording_bundle.cpp src/refcore/i960_ref.cpp src/i960/decode.cpp src/i960/isa.cpp
+        ${SEGARALLY_INPUT_MACHINE_SOURCES} src/runtime/model2a_comm.cpp src/runtime/comm_board.cpp
+        src/runtime/model2_uart.cpp src/runtime/model2a_uart.cpp)
+    target_include_directories(test_segarally_recording_reference PRIVATE src .)
+    target_compile_definitions(test_segarally_recording_reference PRIVATE M2_INSTRUCTION_BOUNDARY_HOOK
+        M2_SRALLY_CONTROL M2_SRALLY_SCREEN M2_SRALLY_VIDEO M2_SRALLY_TGP M2_SRALLY_IO M2_SRALLY_COMM M2_SRALLY_UART)
+    target_link_libraries(test_segarally_recording_reference PRIVATE sha256_digest)
+    target_compile_options(test_segarally_recording_reference PRIVATE $<IF:$<CXX_COMPILER_ID:MSVC>,/UNDEBUG,-UNDEBUG>)
+    add_test(NAME segarally_recording_reference COMMAND test_segarally_recording_reference)
 endif()
 
 add_executable(test_segarally_host_input_machine tests/test_segarally_host_input_machine.cpp
@@ -718,6 +728,10 @@ add_test(NAME trace COMMAND test_trace ${CMAKE_CURRENT_BINARY_DIR})
 
 # The MAME plugin's Lua core against the C++ trace library (needs lupa).
 find_package(Python3 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+    add_test(NAME segarally_recording_reference_build
+        COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tests/test_segarally_recording_reference_build.py)
+endif()
 if(Python3_FOUND)
     add_test(NAME segarally_recording_launcher
         COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tests/test_segarally_recording_launcher.py)

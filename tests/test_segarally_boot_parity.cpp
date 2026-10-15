@@ -5,6 +5,10 @@
 #include "runtime/model2a_bus.h"
 #include "runtime/model2a_clock.h"
 #include "tools/srally_boot/input_replay.h"
+#ifdef M2_SRALLY_RECORDING_REFERENCE
+#include "tools/srally_boot/recording_reference.h"
+#include M2_SRALLY_RECORDING_CONTRACT_HEADER
+#endif
 #include <cstdio>
 #include <deque>
 #include <cstring>
@@ -62,7 +66,7 @@ struct ObservedBus : rt::Bus {
     void write_dword(uint32_t a,uint32_t v) override { const auto at=cycles();board.write_dword(a,v);writes.emplace_back(a,4,v,at); }
 };
 
-static std::vector<uint8_t> load(const char* path) {
+[[maybe_unused]] static std::vector<uint8_t> load(const char* path) {
     std::ifstream file(path,std::ios::binary);
     if(!file) throw rt::Fatal("cannot read input image");
     return {std::istreambuf_iterator<char>(file),{}};
@@ -103,6 +107,10 @@ static bool same(const rt::Cpu& a,const rt::Cpu& b) {
 int main(int argc,char** argv) {
     bool enable_io=false,enable_comm=false,enable_control=false,enable_video=false,enable_screen=false,enable_uart=false;
     const char *replay_path=nullptr;
+#ifdef M2_SRALLY_RECORDING_REFERENCE
+    if(argc!=5||std::strcmp(argv[1],"--recording")!=0)return 2;
+    int positional_argc=8;
+#else
     int positional_argc=argc;
     while(positional_argc>1) {
         if(positional_argc>2 && std::strcmp(argv[positional_argc-2],"--input-replay")==0 && !replay_path) {
@@ -123,7 +131,15 @@ int main(int argc,char** argv) {
     if(enable_screen && (!enable_control || !enable_video)) return 2;
     if(enable_uart && !enable_control) return 2;
     if(replay_path && (!enable_screen || !enable_io)) return 2;
+#endif
     try {
+#ifdef M2_SRALLY_RECORDING_REFERENCE
+        const auto recording=srally::recording::preflight_bundle(argv[2],argv[3],argv[4]);
+        const auto profile=srally::recording_reference::validate(recording,argv[4],srally::recording_contract::binding());
+        const auto &opts=recording.options();
+        enable_io=opts.io;enable_comm=opts.comm;enable_control=opts.control;
+        enable_video=opts.video;enable_screen=opts.screen;enable_uart=opts.uart;
+#endif
 #ifdef M2_INSTRUCTION_BOUNDARY_HOOK
         if(!rt::Lockstep::boundary_hook_abi() || !gen::instruction_boundary_hook_compatible())
             throw rt::Fatal("raw CPU parity has incompatible generated boundary chunks");
@@ -135,7 +151,11 @@ int main(int argc,char** argv) {
             native_replay.emplace(stream);
             reference_replay=native_replay;
         }
+#ifdef M2_SRALLY_RECORDING_REFERENCE
+        const auto &p=recording.images().program,&d=recording.images().main_data;
+#else
         auto p=load(argv[1]),d=load(argv[2]);
+#endif
         ObservedBus nb(p,d),rb(p,d);
         rt::Cpu native(&nb);rt::I960Ref ref(&rb);
         nb.core=&native;rb.core=&ref;
@@ -301,7 +321,7 @@ int main(int argc,char** argv) {
             nb.board.add_model(&native_io);rb.board.add_model(&reference_io);
             std::puts("I/O parity reference_cycle_clock=true ns_per_cycle=40 independent_devices=true pcb_timing_verified=false");
         }
-        const auto replay_inputs=[&] {
+        [[maybe_unused]] const auto replay_inputs=[&] {
             if(!native_replay) return;
             const bool applied=native_replay->apply(native_renders,native_io.inputs);
             if(applied!=reference_replay->apply(reference_renders,reference_io.inputs))
@@ -310,7 +330,7 @@ int main(int argc,char** argv) {
                 (unsigned long long)native_renders,(unsigned long long)ls.count,
                 (unsigned long long)native.reference_cycles,unsigned(native_io.inputs.in0));
         };
-        const auto report_inputs=[&] {
+        [[maybe_unused]] const auto report_inputs=[&] {
             if(native_replay) std::printf("input_replay events=%zu applied=%zu pending=%zu frame_origin=completed_renders independent_cursors=true\n",
                 native_replay->size(),native_replay->applied(),native_replay->size()-native_replay->applied());
         };
@@ -330,14 +350,18 @@ int main(int argc,char** argv) {
 #else
         if(enable_io) throw rt::Fatal("I/O support not linked into test");
         const auto same_io=[] { return true; };
-        const auto replay_inputs=[] {};
-        const auto report_inputs=[] {};
+        [[maybe_unused]] const auto replay_inputs=[] {};
+        [[maybe_unused]] const auto report_inputs=[] {};
 #endif
 #ifdef M2_SRALLY_TGP
         std::unique_ptr<rt::TgpBoard> nt,rtgp;
         std::unique_ptr<NativeTgpModel> nm,rm;
         if(positional_argc>=6) {
+#ifdef M2_SRALLY_RECORDING_REFERENCE
+            const auto &tables=recording.images().tgp_tables,&data=recording.images().copro_data;
+#else
             auto tables=load(argv[4]),data=load(argv[5]);
+#endif
             nt=std::make_unique<rt::TgpBoard>(tables,data);
             rtgp=std::make_unique<rt::TgpBoard>(tables,data);
             nm=std::make_unique<NativeTgpModel>(*nt);rm=std::make_unique<NativeTgpModel>(*rtgp);
@@ -350,7 +374,11 @@ int main(int argc,char** argv) {
         std::unique_ptr<rt::Geo> native_geo,reference_geo;
         std::unique_ptr<rt::Model2AVideo> native_video,reference_video;
         if(enable_video) {
+#ifdef M2_SRALLY_RECORDING_REFERENCE
+            const auto &polygons=recording.images().polygons,&textures=recording.images().textures;
+#else
             auto polygons=load(argv[6]),textures=load(argv[7]);
+#endif
             native_geo=std::make_unique<rt::Geo>(polygons,textures,nt->buffer_data());
             reference_geo=std::make_unique<rt::Geo>(polygons,textures,rtgp->buffer_data());
             native_video=std::make_unique<rt::Model2AVideo>(rt::Model2AVideo::Hooks{
@@ -359,6 +387,10 @@ int main(int argc,char** argv) {
             reference_video=std::make_unique<rt::Model2AVideo>(rt::Model2AVideo::Hooks{
                 [&] { return enable_screen?reference_screen->latched_frame():uint64_t(0); },[&] { return uint32_t(reference_geo->polys.size()); },
                 [&](uint32_t value) { reference_geo->zclip_w(value); }});
+#ifdef M2_SRALLY_RECORDING_REFERENCE
+            native_video->video().set_external_3d(opts.external_video,opts.external_video);
+            reference_video->video().set_external_3d(opts.external_video,opts.external_video);
+#endif
             nb.board.add_model(native_video.get());rb.board.add_model(reference_video.get());
             std::printf("Video parity independent_devices=true actual_geo_bound=true screen_connected=%s hardware_rendering_verified=false\n",enable_screen?"true":"false");
         }
@@ -435,6 +467,9 @@ int main(int argc,char** argv) {
         native.reset();ref.reset();
         if(!same(native,ref) || nb.writes!=rb.writes) throw rt::Fatal("reset parity mismatch");
         gen::Env env{native,ls};
+#ifdef M2_SRALLY_RECORDING_REFERENCE
+#include "segarally_recording_reference.inc"
+#else
         const uint64_t limit=std::stoull(argv[3]);
         uint64_t writes=0;
         while(ls.count<limit) {
@@ -527,5 +562,6 @@ int main(int argc,char** argv) {
             (unsigned long long)ls.count,(unsigned long long)writes,(unsigned long long)native.reference_cycles,
             (unsigned long long)native_irqs.total,native.m_IP);
         return 0;
+#endif
     } catch(const std::exception& e) { std::fprintf(stderr,"boot parity: %s\n",e.what());return 1; }
 }

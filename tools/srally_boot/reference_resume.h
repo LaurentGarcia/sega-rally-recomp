@@ -25,6 +25,9 @@ struct Hooks {
     std::function<uint64_t()> board_time_ns, frames;
     std::function<std::optional<GuardedInstruction>(uint32_t)> guarded_instruction;
     rt::Model2AIO::Inputs *inputs = nullptr;
+    // Optional differential-test observer, after a completed independent
+    // opcode/count increment, before any next-boundary synchronization.
+    std::function<void()> after_instruction = {};
 };
 
 inline void load_startup_seeds(rt::Model2Eeprom &eeprom, rt::Model2ABus &bus,
@@ -140,6 +143,7 @@ public:
                 }
                 fetch_bus_.execute(cpu_,*instruction);
                 ++count_;
+                if (hooks_.after_instruction) hooks_.after_instruction();
             }
         } catch (...) { poisoned_ = true; throw; }
     }
