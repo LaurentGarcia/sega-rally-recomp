@@ -34,8 +34,10 @@ SDL3 and Metal put the result on your Mac.
 | Native SCSP sound and cabinet saves | Paused Settings; windowed or fullscreen play | Cabinet-input recording and exact offline replay |
 
 **Experimental source prerelease:** `v0.1.0-rc.1` supplies source and tools, not
-ROMs, generated game code or a ready-to-play app. macOS is the active target;
-phone work is deferred. Display enhancements start off on fresh preferences.
+ROMs, generated game code or a ready-to-play app. Mac/iPhone packaging and
+Windows/Linux Vulkan bring-up are active; see the **[four-platform package
+status](docs/release-platforms.md)** for actual availability and requirements.
+Display enhancements start off on fresh preferences.
 
 ## On the stages
 

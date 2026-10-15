@@ -1,5 +1,41 @@
 # Handoff
 
+## Local Mac builder and four-platform distribution (2026-10-15)
+
+The requested long-term graphics contract is Metal on Mac/iPhone and Vulkan on
+Windows/Linux through the existing SDL3 GPU abstraction, with common renderer
+and shader sources. This resumes phone development and desktop portability;
+the design scope and release-platform matrix now say so. Full-machine/race/PCB
+criteria remain unchanged. Root CI's green tools/tests matrix does not prove
+that the native game host compiles or renders on Windows/Linux.
+
+The personal Apple Silicon game DMG is preserved locally under
+`build/installers/mac-2d101a4-001/`, SHA-256
+`53f23cbc7770b63dd512ad346824e2669c3630467b5db1ab5966044701043658`.
+It contains personal game data, is ad-hoc signed, not notarized, and is not a
+public release asset. Source prerelease v0.1.0-rc.1 is already published at
+`9c969c140a6f3d050395abda6fab8a29ff0bcf9e`; its three uploaded assets are
+the source archive, manifest and checksums, not four game binaries.
+
+A separate SwiftUI Mac local builder contains no game payload. It snapshots a
+selected ZIP, downloads the exact public source revision above and the three
+pinned dependencies, runs the existing local pipeline, then verifies completed
+app bytes/signature before permitting launch. Each attempt has its own folder,
+logs and saves; cancellation reaps build subprocesses. Twenty focused tests
+pass, including failed-completion, receipt tampering and cancellation cases.
+Packaging compiles/signs the original UI, creates an Applications-alias DMG and
+records every bundle byte. CI now produces that empty arm64 DMG as an artifact.
+This is an ad-hoc signed macOS 13+ builder requiring local build tools, not a
+notarized ready-to-play app. GUI interaction remains untested.
+
+The first real importer attempt failed at GitHub DNS inside the sandbox; its
+separate failed folder is preserved. The authorized second attempt is running
+under `build/worktrees/mac-importer/build/importer-e2e-002/`. It has downloaded
+the pinned source/dependencies and completed generation/configuration, and is
+compiling the native host. Record its final result before publishing the empty
+DMG. The native iOS build and Windows/Linux host portability are separate work
+in progress; no installable phone/Windows/Linux binary is claimed here.
+
 ## CRT stage gallery (2026-10-15)
 
 The requested On the stages gallery now uses the same real production Metal CRT

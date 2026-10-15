@@ -1,0 +1,34 @@
+name: Mac local builder
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: ROM-free macOS arm64 DMG
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test import coordination
+        run: python3 tests/test_segarally_mac_importer.py
+      - name: Build and verify empty app and DMG
+        run: python3 platform/segarally/macos/importer/package.py --output build/mac-local-builder --dmg
+      - name: Retain package and byte inventory
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sega-Rally-macOS-arm64-local-builder
+          if-no-files-found: error
+          path: |
+            build/mac-local-builder/Sega-Rally-Local-Builder-macOS-arm64.dmg
+            build/mac-local-builder/result.json

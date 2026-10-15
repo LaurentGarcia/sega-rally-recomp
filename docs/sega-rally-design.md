@@ -6,10 +6,12 @@ The sections **i960 static recompiler**, **Reference & validation**, and
 **Platform layer & build** govern that reuse. Daytona-specific addresses and
 hardware mappings are evidence to inspect, not defaults for Sega Rally.
 
-Current development scope is Mac only, following the 2026-10-14 direction.
-Complete and validate the native game before resuming iPhone work. The shared
-SDL3/Metal architecture remains; device builds, installs and testing are deferred
-until requested again.
+The 2026-10-15 distribution request resumes iPhone work and adds Windows and
+Linux alongside continued Mac game validation. The existing SDL3 GPU interface
+is the rendering abstraction: Metal on Apple platforms, Vulkan on Windows and
+Linux, with shared game/CRT shaders and the same native machine implementation.
+Platform compilation is not evidence of GPU correctness or full-game fidelity.
+The current deliverables and validation gaps are in [release platforms](release-platforms.md).
 
 ## Required end state
 
@@ -17,9 +19,9 @@ until requested again.
 - Execute the actual game control flow, including menus, races, and results.
 - Preserve geometry command, polygon-priority, texture, audio, timing, and input
   behavior using tested shared components from Daytona where the hardware agrees.
-- Run through SDL3 and hardware Metal on Mac, with functioning keyboard/controller
-  inputs and lifecycle handling. Resume the iPhone target after the native game
-  is ready and device work is requested again.
+- Run through SDL3 and Metal on Mac/iPhone and Vulkan on Windows/Linux, preserving
+  keyboard/controller behavior and adding optional touch input on iPhone.
+  Validate lifecycle handling and presentation separately on each platform.
 - Validate actual game scenes and replayed inputs, including buildings, car
   decals, shadows, water, and foreground occlusion.
 
@@ -39,7 +41,8 @@ until requested again.
 5. Connect the verified game to the shared SDL3/Metal host. Bring up the correct
    sound-board behavior, inputs, saves, pause/resume, and frame pacing.
 6. Run attract, course selection, driving, finish/results, and restart checks on
-   Mac. Record what passed and what remains incomplete; phone checks are deferred.
+   Mac. Preserve that evidence while adding platform-specific input, lifecycle,
+   audio and GPU checks; record what passed and what remains incomplete.
 
 ## Current evidence and unresolved work
 
