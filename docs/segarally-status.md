@@ -12,7 +12,7 @@ The [design](sega-rally-design.md) records interpretation and hardware limits.
 | Driving parity | Two billion held-gas instructions, 86,328,770 ordered writes, 4,650,936,033 cycles, 113,101 IRQs and 10,701 renders; nineteen replay events match | Sound off; independent CPU with shared boards and final-frame comparison; no full MAME race |
 | Later game paths | Fresh credit/start after attract reaches a second race; sound-on frame 12,800 shows 118 km/h in fourth gear, 15.83 seconds elapsed | Complete second race and Game Over overlay not separately validated |
 | Course progress | Desert clear/results show 1:12.15; forested second course enters, times out, then attract returns | Centered steering does not complete second-course bends; remaining courses unvalidated |
-| Metal fidelity | Optional native repeated stepping is integrated into v15; three complete scenes fall from 2,519 differing pixels to 5, and 447 synthetic cases pass | Default OFF; sustained cost, continuous flicker and whole-game fidelity remain open |
+| Metal fidelity | Optional native repeated stepping plus certified reciprocal now matches all pixels in three complete saved scenes; 447 synthetic cases pass | Default OFF; new Mac host validation, sustained cost, continuous flicker and whole-game fidelity remain open |
 | Sound generation | Native linked board captures 2,409,170 stereo frames: 54.6297052 seconds including nonzero 44.1 kHz PCM; shared-core drains agree | Whole-game audio parity unvalidated |
 | Sound CPU/board comparison | Actual initialization matches persistent MAME CPU execution for 1,000,000 instructions, including 383 IRQ/RTE pairs and 35,955 SCSP writes; synthetic UART/nonzero-PCM cases also pass | The actual initialization's 51,158 PCM frames are silent; shared devices, instruction-start MMIO and idle serial do not establish music or independent sound-on recording parity |
 | Authentic sound commands | Seven actual main UART writes recapture exactly at 163 native sound-state cuts, including first-byte MIDI reception, IRQ clear and 63,722 PCM frames | Native recapture only; PCM is silent, and independent CPU comparison of this traffic is next |
@@ -260,15 +260,24 @@ prototype now passes 262,144 arithmetic rows on Metal: 130,898 signed normal
 results and 131,072 seed/fallback cases match exact integer oracles, while
 174 excluded inputs preserve a separately compiled legacy shader's bits.
 Ordinary division differs on 13,317 sampled normals, at most one ULP. This
-is an arithmetic-only result; the helper is not integrated into production.
+initially establishes arithmetic correctness separately from scene integration.
 The actual span steps at the two remaining first-car pixels are now measured:
 the same signed width produces a one-ULP-different reciprocal and three
 one-ULP-different steps. Repeated float32 addition from identical starts
 reconstructs the observed texture-coordinate and filtered-texel differences.
-The full accepted image remains exact under instrumentation. An isolated
-common-shader candidate, complete-scene/default-off/synthetic guards and cost
-are the next gates. See `HANDOFF.md` for frozen inputs, readbacks and
-independent artifact audits. Temporal flicker improvement remains untested.
+The full accepted image remains exact under instrumentation. The corrected
+common-shader candidate now passes all 447 synthetic cases and matches all
+571,392 pixels across the three complete CPU images, fixing precisely the five
+remaining differences. Default-OFF images remain byte-identical. The exact
+candidate is integrated behind the existing native-scale option.
+
+A four-arm, 540-render comparison measures current/candidate ON medians of
+2.230/2.309, 2.233/2.375 and 2.167/2.130 ms on Apple M5. Candidate/current OFF
+ratios are 0.898/0.981/0.963, with substantial block variability. These are
+completed offscreen render latencies, not GPU timestamps or game FPS; no
+general speedup or precise overhead is established. The next check is the
+new host's representative driving replay. See `HANDOFF.md` for frozen inputs,
+raw images and independent audits. Temporal flicker improvement remains untested.
 
 ### Optional CRT and Display controls
 

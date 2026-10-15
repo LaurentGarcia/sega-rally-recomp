@@ -209,8 +209,17 @@ medians of 2.119/2.126/2.527 ms on Apple M5. The first-car diagnostic comparison
 shows about 51% higher latency; driving controls vary too much to generalize
 the loop cost. This includes encoding/submission/completion wait and excludes
 presentation and readback; it is neither GPU timestamp timing nor gameplay FPS.
-Residual texture precision, live cost and whole-game fidelity remain open;
-the option stays off by default. See [the evidence table](segarally-status.md#graphics-evidence).
+The remaining five pixels have since been traced to one-ULP reciprocal
+differences at span width and final depth. A shared HLSL helper now certifies
+nearest-even normal reciprocals with integer arithmetic, preserving ordinary
+division outside its supported domain. It applies only to the optional native
+span path. All 447 synthetic cases pass; all pixels in the three complete
+saved scenes now equal the CPU image, with default-OFF images unchanged.
+Current/candidate ON completed-render medians in a new four-arm measurement
+are 2.230/2.309, 2.233/2.375 and 2.167/2.130 ms. Controls vary substantially;
+this does not establish precise overhead, live performance or game FPS.
+The option stays off by default. New host replay, continuous flicker and
+whole-game fidelity remain open. See [the evidence table](segarally-status.md#graphics-evidence).
 Polygon scanline rasterization is distinct from the optional CRT presentation
 pass. Newly built hosts offer adjustable scanlines, phosphor mask, glow,
 curvature and color fringing after native composition. Effects default off;

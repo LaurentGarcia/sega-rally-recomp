@@ -1,5 +1,51 @@
 # Handoff
 
+## Native texture reciprocal correction integrated (2026-10-14)
+
+The optional native-scale texture path now uses the tested integer-certified
+reciprocal at the two measured discrepancy sites: polygon span width and
+final reciprocal depth. The shared HLSL helper handles signed normal inputs
+with normal reciprocals, retaining the original division outside its exact
+domain. No epsilon, texture-coordinate bias, platform shader fork or C++
+renderer change is included. The default remains OFF; enhanced-scale and
+default fan expressions remain unchanged. This follows **Geometry (TGP) and
+rendering** and **Reference & validation**.
+
+All 447 synthetic cases pass, comparing 85,137,408 pixels. Three fully
+composed saved scenes at frames 1,634, 2,329 and 2,599 now match every CPU RGBA
+byte: zero differing pixels, correcting the previous 3/1/1 residuals without
+new differences. CPU/raw tile-character composition and all three default-OFF
+historical image guards pass. All 188 frozen identities remain unchanged.
+Evidence in
+`build/worktrees/mac-triangle-fidelity/build/validation/reciprocal-gpu-001/candidate-001/report.json`,
+SHA-256 `100226d212d19d03285ac03669787a385bd2884fdfed0b5cd2c73af63ec687a6`.
+Independent raw-image review:
+`build/validation/reciprocal-candidate-independent-review/result.json`, SHA-256
+`a00dd1068af99117a72c3261d772383c87dc174fdfdae130998a9d34e18da6a5`.
+
+A separate quiet four-arm cost run verifies twelve accepted images, then
+collects 384 measurements in 48 rotated blocks, with 144 warmups: 540 total
+renders and twelve upfront readbacks under a 30-second watchdog. On Apple M5,
+current-ON versus candidate-ON completed-render medians are 2.230/2.309,
+2.233/2.375 and 2.167/2.130 ms. Candidate-OFF/current-OFF median ratios are
+0.898/0.981/0.963. Blocks vary substantially, up to 2.35 times in a control,
+so these figures do not establish a precise helper cost or general speedup.
+They include host encoding, submission and fence completion, excluding
+presentation/readback; they are not GPU timestamps or gameplay FPS. All 202
+cost inputs remain unchanged, with no competing game/build observed.
+`cost/run-01/report.json` SHA-256:
+`9b7ab2c5a82615917c8d1f03987b8cfc53ef80313954a27e53f97dff89317919`.
+Independent statistics/image review:
+`build/validation/reciprocal-cost-independent-review/result.json`, SHA-256
+`bf94d9433993a78dd44ee8ffd33e56f5ad0e5b364b31816b9c5eb4abed47889e`.
+
+The three integrated files match the tested candidate byte-for-byte, including
+the generated common shader header. The prepared native-domain arithmetic
+and original full-scene evidence remain frozen. No other backend device,
+phone, continuous-flicker or whole-game fidelity result follows from these
+saved scenes. Next build a separate Mac host and verify a representative
+driving replay with both texture settings, preserving the signed v16 app.
+
 ## Authentic main-to-sound UART prefix recaptures exactly (2026-10-14)
 
 A test-only forwarding observer now captures real main-program UART accesses

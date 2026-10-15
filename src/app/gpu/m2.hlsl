@@ -8,6 +8,8 @@
 // is src/app/gpu/shaders_gen.h. Resource spaces follow SDL_GPU: vertex
 // uniforms space1; fragment textures and samplers space2.
 
+#include "normal_reciprocal.hlsl"
+
 struct Screen { float2 size; float2 pad; }; // the render target, in pixels
 [[vk::binding(0, 1)]] cbuffer ScreenUBO : register(b0, space1) { Screen screen; };
 
@@ -158,7 +160,11 @@ float3 polygon_oz(PolyOut i) {
     if ((i.info.x & 3u) < 2u) return i.oz;
     precise float3 lp = float3(le.origin.zw, le.tail.x) + ldy * le.step.yzw;
     precise float3 rp = float3(re.origin.zw, re.tail.x) + rdy * re.step.yzw;
-    precise float3 dpdx = (rp - lp) * (1.0 / (stopx - startx));
+    precise float3 dpdx;
+    // Native reference spans require the CPU-rounded reciprocal before the
+    // separate parameter multiplication. Enhanced scales retain their path.
+    if (scale == 1.0) dpdx = (rp - lp) * normal_reciprocal_or_legacy(stopx - startx);
+    else dpdx = (rp - lp) * (1.0 / (stopx - startx));
     if (scale == 1.0) {
         const int clip_left = int(polyedges[i.edges.x + nl + nr].origin.x);
         const int clipped_left = max(min(left, right), clip_left);
@@ -282,7 +288,11 @@ float4 ps_poly(PolyOut i) : SV_Target {
     // raster.cpp draw_tex_span, one pixel
     const bool translucent = renderer == 3u;
     const int max_level = int((flags >> 12) & 31u);
-    const float z = 1.0 / oz.x;
+    // Edge metadata exists only for the optional span path. Apply the
+    // normal-range reciprocal contract at native scale; preserve fan and
+    // enhanced-scale arithmetic, including the existing excluded classes.
+    const bool native_span = (i.edges.y >> 8u) == 1u;
+    const float z = native_span ? normal_reciprocal_or_legacy(oz.x) : 1.0 / oz.x;
     const int mml = -int(i.more.x) + fast_log2(z);
     const int level = clamp(mml >> 7, 0, max_level);
     const int u = to_s32(oz.y * z * 256.0);
