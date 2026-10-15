@@ -1,5 +1,40 @@
 # Handoff
 
+## Longer sound reference stops at a transfer-count mismatch (2026-10-14)
+
+The first independent CPU run against the nonzero transcript fails after
+305.693664 seconds at `per-event modeled data transfer count`. The last
+flushed checkpoint has 31,000,000 paired observations, 14,454,514 sound
+instructions, 179,376,509 cycles, PC `602a20`, 1,813 cuts and board time
+15,888,649,643 ns. This is a lower bound, not the precise failing instruction
+or time. Full CPU registers/SR, RAM and queue/UART/RNG/sample progression are
+compared before the failing count assertion. The fixture does not print the
+counts or offending rows there, so neither the exact opcode nor a runtime
+bug can yet be attributed. No success state is written, no assertion is
+relaxed, and no runtime or generated code changes are justified by this alone.
+
+Preparation passes in 11.107108 seconds. All 965 measured inputs and four
+prepared artifacts remain unchanged after failure. The OS rejects the requested
+nice priority; the reference executes, but lower scheduling priority is not
+established. The preserved first failure has no retry. Evidence under
+`build/worktrees/sound-init-reference/build/`:
+`uart-nonzero-reference-run-001/result.json`, SHA-256
+`6bb5267eaca27014e543cc59ab03a026c278e5b3eca66a32be3ecb99406bb9fe`;
+`uart-nonzero-reference-outcome-001/summary.json`, SHA-256
+`f41e30e07c187d0acd043148b6f125840cb2d57e47dcee6fcf93535ccec80b21`.
+The separately passing native nonzero capture/recapture remains valid. A new
+read-only comparison also finds its entire 5,831,072-byte PCM payload identical
+to the corresponding preserved neutral v15 host WAV prefix, including the
+nonzero tail. Report:
+`build/validation/sound-uart-nonzero-integration/neutral-host-PCM-prefix.json`,
+SHA-256 `a85e2c3208a20c8f26c2ee2726193ccb16e192bd5bb7ac5d63de50ed137cb8d2`.
+
+Next use a separately frozen diagnostic fixture to print the first differing
+transfer counts, CPU boundary and ordered rows before the unchanged assertion.
+Preserve the original sources and failed evidence; do not infer an audio fix,
+completed nonzero independent comparison or title-scene identity. This follows
+**Audio** and **Reference & validation**.
+
 ## Authentic sound capture reaches nonzero PCM (2026-10-14)
 
 The separate first-nonzero fixture captures 55 actual UART accesses and 1,929
