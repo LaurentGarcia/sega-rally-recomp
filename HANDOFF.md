@@ -1,6 +1,6 @@
 # Handoff
 
-## Mac icon packages and recording fixture correction (2026-10-15)
+## Apple icon packages and recording fixture correction (2026-10-15)
 
 The bbfdb31 Mac configure/build succeeds; the bare game executable is unchanged
 at SHA256 `596e06fb98ca2c93e424aca938bdff7e863af0af5c9b3c859046d3102add04a9`.
@@ -10,16 +10,43 @@ query, so the valid-recording case failed before signing. Its fixture now
 supplies a synthetic ICNS and asserts icon bytes/plist at the mock signing call.
 No production behavior changed. The repeated full thirteen checks pass in 1.38 s.
 
-Both new Mac icon DMGs are built locally from bbfdb31 and strictly signed and
-verified. The import edition is 12,816,659 bytes, SHA256
+Both new Mac icon DMGs are built locally from bbfdb31; ad-hoc signing, strict
+signature verification and disk-image checks pass. The import edition is 12,816,659 bytes, SHA256
 `8909619e36283989280574bee288877afc4ba63e03c8eb2f6cba0e4668bc2211`;
 the personal edition is 32,018,708 bytes, SHA256
 `f01d7bf1967f1b31519a12d8bbf3f62b403b853aaaeb2e02d90d844e770b733c`.
 Outputs are build/installers/mac-player-{import,personal}-icon-001. Both contain
 the same ICNS, SHA256
 `aced86cc20f59720323e85a7681b6f3d6d73c67f663bccc5479e317074b6fb50`.
+Independent audit passes: every file matches its manifest, icon hashes are
+covered by CodeResources before signing, both signatures verify, and the
+personal/import editions contain exactly eight/no asset images respectively.
+All non-signature executable sections match the reviewed bare executable.
+Report build/validation/mac-icon-package-independent-001/result.json SHA256 is
+`5de3436fa1964fba243dd10fccc186475a08f7d19cdeea5a75c0732d362e562e`.
 These are local packages; existing release assets remain unchanged. No gameplay
-or fidelity change is claimed. Signed iPhone icon archive/export is in progress.
+or fidelity change is claimed.
+
+The bbfdb31 iPhone version 0.1.0/build 2 archive and local debugging export pass.
+The new IPA is 27,769,177 bytes, SHA256
+`ede1db2a9262c7b874da4cdfa5a390ab08abc6b4984a99219f51ee662999b1ee`.
+Compiled Assets.car and merged iPhone/iPad icon metadata verify in both archive
+and exported app. The catalog includes phone, tablet and 1024-pixel marketing
+icons with no alpha. Strict signatures, eight unchanged game images, eight
+notice files and all 209 reused native inputs verify. The old IPA is unchanged.
+Independent report under build/worktrees/ios-personal-signed/build/
+personal-icon-001/independent-review/result.json has SHA256
+`2a7833a48fcaea13b12b37d816fedc6605ce6ae1620fc227c56e8f21403c6c69`.
+The actual certificate still expires 2026-10-27 18:31:31 UTC; the development
+profile still covers only two devices. No install, physical test, provisioning
+change or upload was performed. This is not a TestFlight distribution build.
+
+All three new Apple packages are collected as verified hardlinks under
+build/installers/apple-icon-preview-001 with README, manifest and checksums.
+Source and icon integration are pushed; source gates pass at bbfdb31 and
+c814c8b. The latter's hosted boundary job passes; compiler CI is still running
+at this checkpoint. Further work is physical iPhone testing and, separately,
+distribution rights, personal App Store Connect setup and submission readiness.
 
 ## Original app icon and local iPhone distribution preparation (2026-10-15)
 

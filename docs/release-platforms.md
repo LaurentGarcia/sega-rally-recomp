@@ -94,6 +94,15 @@ Updated Mac import/personal DMGs are local at
 release still contains the preceding package. Both new bundles include the
 same icon before signing and retain the existing game executable, CRT and sound
 defaults. These packaging checks do not add gameplay or fidelity evidence.
+The corresponding icon-equipped personal iPhone IPA is version 0.1.0/build 2,
+27,769,177 bytes, SHA256
+`ede1db2a9262c7b874da4cdfa5a390ab08abc6b4984a99219f51ee662999b1ee`.
+It passes archive/export, compiled icon, signature, data and notice checks;
+installation and physical testing remain pending. It retains the same
+two-device development profile and October 27, 2026 certificate expiry.
+All three updated Apple packages are collected locally in
+`build/installers/apple-icon-preview-001`, with installation notes and checksums.
+No TestFlight upload or invitations were made.
 
 ## Local Linux package
 
