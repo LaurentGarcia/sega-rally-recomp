@@ -13,7 +13,7 @@ The distribution work targets these four platforms:
 | --- | --- | --- | --- |
 | Mac, Apple Silicon | Metal | Public prebuilt DMG; private data-inclusive DMG | macOS 13 deployment target; signed ad hoc, not notarized. Actual public app imports ZIP and passes a 2,100-frame CRT/sound check, with native audio/image/saves matching the prior player. Actual native-picker interaction and execution on macOS 13 remain untested. |
 | iPhone, arm64 | Metal | Signed personal IPA with game data | iOS 15+ development IPA built and signature/assets/notices verified for two registered devices. Installation and physical testing remain pending; this personal IPA is not a public release asset. |
-| Windows, x86-64 | Vulkan through SDL3 GPU | Local ROM-import and private data-inclusive ZIPs prepared; not uploaded | Actual generated game executable compiled and linked; independent archive audit passed. Wine `--help`, 4,260 importer-fixture checks and owned-ZIP import pass, verifying 23 ROMs and eight image identities. Native Windows GPU, audio and gameplay remain unvalidated. |
+| Windows, x86-64 | Vulkan through SDL3 GPU | Local ROM-import and private data-inclusive ZIPs prepared; not uploaded | Independent archive audit, Wine `--help`, 4,260 importer-fixture checks and owned-ZIP import pass, verifying 23 ROMs and eight image identities. A user confirmed audio working on a PC on 16 October. GPU capture, controller and full-race validation remain open. |
 | Linux, x86-64 | Vulkan through SDL3 GPU | Local ROM-import and private data-inclusive archives prepared; not uploaded | Ubuntu 24.04/glibc 2.39+ preview; final archive audit passed. Fresh relocated package passes `./play.sh --help` and CPU-only `--rom ZIP --import-only` with no source/build mount, verifying 23 ROMs and eight image identities. Linux desktop/GPU, device audio and gameplay remain unvalidated. |
 
 The personal game package contains the owner's local game data and generated
@@ -138,15 +138,16 @@ Extract the entire ZIP and open `play.cmd`, or use
 No compiler, Python or development SDK is required; a 64-bit Windows system
 with working Vulkan drivers is needed for the intended desktop player.
 
-The current executable/import evidence runs under Wine. It is not evidence of
-native Windows desktop rendering, physical audio, controller behavior or a
-completed race. The import still enforces its existing reparse-point guard;
-no runtime guard was relaxed for Wine testing.
+The executable/import automation runs under Wine. A user subsequently confirmed
+audio working on a PC on 16 October; no hardware details or recorded full race
+accompanied that report. Graphics captures, controller behavior and complete-race
+validation remain open. The import still enforces its existing reparse-point
+guard; no runtime guard was relaxed for Wine testing.
 
 ## One renderer, four hosts
 
-The long-term runtime target is SDL-free. Direct Metal and Vulkan backends will
-consume common geometry and shader inputs, while native host adapters supply
+The long-term runtime target is SDL-free. Direct Metal and Vulkan backends
+consume common geometry and shader inputs, while planned native host adapters supply
 windows, lifecycle, audio and controls. The existing SDL implementation remains
 the working comparison baseline during migration. Removing SDL also requires
 replacing its non-graphics duties; a direct renderer alone does not finish that
@@ -158,4 +159,7 @@ CI matrix compiles tools and runs ROM-free tests. A native frontend compile/link
 fixture can exercise platform APIs without distributing game instructions, but
 such a fixture cannot play the game. Real Vulkan device creation, game and CRT
 rendering, audio, controllers and a full race still need platform execution.
-The existing full-machine/PCB fidelity requirements remain unchanged.
+The new offscreen backend comparisons are described in
+[native renderers](native-renderers.md); they do not change the playable
+packages' SDL dependency. The existing full-machine/PCB fidelity requirements
+remain unchanged.

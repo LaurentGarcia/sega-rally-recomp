@@ -1,0 +1,48 @@
+name: Native Vulkan ROM-free Model2 renderer
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  lavapipe-model2:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install native Vulkan development files and software driver
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends libvulkan-dev mesa-vulkan-drivers vulkan-validationlayers
+      - name: Fetch pinned legacy reference only
+        run: |
+          git init extern/sdl3
+          git -C extern/sdl3 fetch --depth 1 https://github.com/libsdl-org/SDL.git fa2c02bb6e21974a89ea9824bc53c9932abe5f9c
+          git -C extern/sdl3 checkout --detach FETCH_HEAD
+      - name: Select the actual installed software ICD
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          paths = sorted(Path('/usr/share/vulkan/icd.d').glob('lvp_icd*.json'))
+          if len(paths) != 1 or 'lvp' not in json.loads(paths[0].read_text())['ICD']['library_path']:
+              raise SystemExit('Expected exactly one installed lavapipe ICD')
+          print(paths[0], paths[0].read_text())
+          with open(os.environ['GITHUB_ENV'], 'a') as out:
+              out.write(f'VK_DRIVER_FILES={paths[0].resolve()}\n')
+          PY
+      - name: Execute independent native and SDL reference renderer binaries
+        run: python3 tests/test_native_vulkan_model2.py --output build/native-vulkan-model2-ci --require-software --require-validation
+      - name: Show preserved outcomes
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          for path in sorted(Path('build/native-vulkan-model2-ci').glob('*')):
+              if path.is_file() and path.suffix in ('.stdout','.stderr','.json','.txt'):
+                  print(f'--- {path}\n{path.read_text(errors="replace")}')
+          PY

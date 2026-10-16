@@ -370,7 +370,20 @@ packages include the owner's game data and stay private. Generated C++ and ROM
 bytes remain excluded from source Git history and source archives. This is the
 package contract, not a legal clearance or a change to fidelity criteria.
 
-One CMake project, C++20, SDL3 for window, input, haptics, audio and GPU, so platform-specific code stays under a few hundred lines. The user runs a first-launch importer that verifies their ROMs and generates the game code locally.
+**Rally renderer update, 16 October 2026.** The SDL3 host below describes the
+working migration baseline. The requested long-term Rally host instead uses
+direct Metal on Apple platforms and direct Vulkan on Windows/Linux, with native
+window, input and audio adapters. Both graphics backends consume the same
+`Model2Frame`, resource packing and generated shaders. Offscreen comparisons
+against the existing backend precede host integration and optimization;
+equivalent images do not establish PCB fidelity or a faster player. The current
+implementation and remaining host work are recorded in
+[native renderers](native-renderers.md). SDL remains in the playable releases
+until those replacement duties are implemented and tested.
+
+The original baseline is one CMake project, C++20, with SDL3 for window, input,
+haptics, audio and GPU. Developer builds generate native game code locally;
+the Rally player importer follows the prebuilt distribution contract above.
 
 | Platform | Arch | Graphics | Toolchain | Package |
 | --- | --- | --- | --- | --- |

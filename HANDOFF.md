@@ -1,5 +1,109 @@
 # Handoff
 
+## Direct Model 2 renderers and Windows audio confirmation (2026-10-16)
+
+Direct Metal/Vulkan development is now active under the inherited design's
+Platform layer & build and Reference & validation sections. The former now
+explicitly records the Rally migration from SDL, preserving the one-shader-path
+and shared machine/frame/resource contracts. The playable apps still use SDL.
+No game logic, generated shader or existing player executable changed here.
+Implementation, commands and remaining integration are in
+docs/native-renderers.md. Native Apple window prototypes remain separate,
+untracked work; no clear-color host is represented as a playable native app.
+
+The direct Metal Model2 backend encodes into caller-owned retained command
+buffers and targets. It draws background tiles, ordered polygons and foreground
+or CPU-composed HUD from the unchanged Model2Frame/resources and generated MSL.
+It copies per-frame resources; tests retain two unsubmitted draws, mutate Video,
+submit in reverse order and verify both images. Depth clamp mirrors pinned SDL,
+and input device/target/dimensions/palette checks reject invalid calls. Existing
+untracked direct Metal CRT sources and tests are integrated unchanged after
+actual GPU verification. Neither native binary links SDL.
+
+On Apple M5 with Metal API Validation, 38 Model2 images match SDL Metal exactly:
+17,547,264 pixels, zero differences. Twenty-six invented images exercise tile,
+texture, cutout, order, scissor, Accurate-textures, scale and widened CPU-front
+paths; twelve draw three private recorded scenes at scales 1/2 with the polygon
+scanline option off/on. Native-scale recorded OFF also matches preserved SDL;
+ON matches preserved CPU pixels, and composition hashes pass. The native
+fixture passes 440 checks including snapshot ownership. Report
+build/worktrees/native-metal-model2-002/build/model2-metal-004/result.json has
+SHA256 `7014ba379e1d72f560366b9cef7c962bceefcf967f9524dd6e3ce8e9aeb5b8bd`.
+CRT passes sixteen exact comparisons and 204 checks; report crt-metal-002 in
+the same build directory has SHA256
+`309051d8443e56b2b45c26b14c3845e10425d7de4132e3285594ef101b47c691`.
+Both runs have clean validation output. Independent integration review verifies
+all root source bytes against the tested hashes, rehashes both reports' inputs
+and artifacts, and confirms the queued-frame test outlives its CPU storage.
+These are offscreen correctness checks,
+not player performance or complete-game evidence.
+
+Direct Vulkan consumes the same packet/resource packing and generated SPIR-V.
+It checks Vulkan 1.1/depth clamp, format support and physical dimension limits.
+The synchronous implementation snapshots resources, creates pipelines per
+frame, submits, waits and reads back BGRA. Native linkage has no SDL. Thirty-eight
+images match the separate pinned SDL Vulkan binary exactly, also 17,547,264
+pixels/zero differences, with Khronos synchronization validation enabled and
+zero errors/VUIDs. Execution used lavapipe/Mesa 25.2.8, loader/layers 1.3.275
+in a Linux x86-64 container on this Mac. The report at
+build/worktrees/native-vulkan-model2/build/lavapipe-model2-003/result.json has
+SHA256 `c5c63e9d42d50cefde2b93ff204f22c3606006724d0d03ba37b0647bf5e62900`.
+Independent review rehashed all 21 measured inputs, both executables, eight
+patch payloads and all 38 image pairs. Software-driver equivalence is not
+vendor GPU coverage or an arcade-fidelity certificate. A wrapper watchdog
+bounds failed test processes; synchronous device-idle cleanup is not a
+production latency guarantee.
+
+Dedicated Vulkan CI executes the 26 invented scenes with lavapipe and
+synchronization validation. Dedicated Metal CI builds a static native library
+and links both fixture clients; it explicitly makes no hosted GPU claim.
+The latter's seven translation units compile/link locally with C++20, strict
+floating point and Objective-C ARC, and both clients have no SDL symbols or
+linkage. Local report under the Vulkan worktree's build/metal-ci-review-001 has
+SHA256 `f3ead3e5b38a1fb7cc798f0ac477140c763b09b6d21c9932942bbfc76c7ac888`.
+The common recorded-scene reader contains no captured data; actual scenes,
+images, generated code, executables and test logs remain ignored/private.
+
+Retained failures and corrections: review found temporary polygon vectors
+whose lifetime ended before Video rendered them, and synthetic palette bytes
+without palette_w notifications, leaving tile pens black. The shared fixture
+now owns polygon storage and initializes/asserts colored pens. Vulkan rejected
+zero sizes but originally accepted positive dimensions inconsistent with Video;
+it now rejects those and checks device limits, with positive mismatch tests.
+The first Vulkan build hit a GCC -Werror fixture-parentheses issue; the second
+run asserted colored pens before screen_update resolved the dirty palette.
+Both fixture errors were corrected before the passing run. The first Metal
+compile hit an existing unused-private-field warning, suppressed only for the
+fixture build. Initial sandboxed GPU runs could not access displays; unchanged
+elevated runs passed. The final Metal wrapper rejects dirty pinned SDL source
+and terminates child process groups on timeout. No gameplay fix was inferred
+from these harness failures. No capture baseline or shader was rewritten.
+
+The requested Windows SDL build was already current with gameplay source at
+6df4433: its older package source differs only in later docs/Apple packaging.
+Fresh independent audit build/validation/windows-sdl-readiness-002/result.json
+SHA256 `026c257e4630278f69a95b8574f638264b50fa6614910e7fee64d3c2e8bec019`
+verifies manifests, PE architecture/dependencies and notices. The first audit
+incorrectly expected a newer THIRD_PARTY table in the frozen ZIP; the second
+checks the actual complete bundled notices. No rebuild was necessary. Both
+ZIPs are collected unchanged at build/installers/windows-sdl-preview-001 with
+README, manifest and checksums: import 17,000,917 bytes/SHA256
+`065e1ab8bddf7ffebbb32c56a0e75e6b1de83d9c3d12a8307d45c1ccfa39e6c0`,
+personal 33,555,527 bytes/SHA256
+`a36b707c45cfb0b38b04cbb695c6f5d230e9a80614a217ad43e4b29877253231`.
+The owner reported audio working on a PC after initially suspecting silence.
+No audio code or package change was made. This is qualitative device playback
+confirmation; no hardware details, GPU capture or full-race recording was
+provided. Personal game-data packages remain local, with no new binary upload.
+
+Next: integrate asynchronous resource reuse and presentation, then native host
+Settings/input/audio lifecycle; validate actual game replay and physical
+devices before switching a player backend. Keep full-course completion,
+independent MAME/PCB comparison and precision gaps separate. Existing build CI
+and native Vulkan CRT CI are green at 6df4433; the new workflows must pass on
+the published integration commit. All thirteen source-boundary regression
+checks pass; the exact committed tree still receives its publication gate.
+
 ## Apple icon packages and recording fixture correction (2026-10-15)
 
 The bbfdb31 Mac configure/build succeeds; the bare game executable is unchanged

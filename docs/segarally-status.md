@@ -1,6 +1,10 @@
 # Evidence and status
 
-Snapshot: **2026-10-15**. macOS is the active target; phone work is deferred.
+Snapshot: **2026-10-16**. Mac remains the principal gameplay validation target.
+Local packages also exist for iPhone, Windows and Linux; Windows audio has
+been confirmed by a user on a PC. Direct Metal/Vulkan development is active.
+See [platform status](release-platforms.md) for current packages and
+[native renderers](native-renderers.md) for backend evidence and remaining work.
 This reference summarizes the latest recorded checkpoints. Exact hashes,
 failure history and ignored evidence locations are in [HANDOFF.md](../HANDOFF.md).
 The [design](sega-rally-design.md) records interpretation and hardware limits.
@@ -15,9 +19,9 @@ source publication and host regression checks do not extend their fidelity scope
 The [source history map](source-history.md) resolves original local commit IDs
 to their public counterparts.
 
-## Current Mac candidate
+## Recorded Mac candidate
 
-Candidate 006 is generated from the supplied ROM archive at source revision
+The preserved Candidate 006 gameplay checkpoint is generated from the supplied ROM archive at source revision
 `0b9ba0eba47d6effa3378f9a2b7fae9010a1c11e`, with all eleven dedicated Mac CTests
 passing. Its signed package is `build/mac-candidate-006/mac/Sega Rally Native.app`;
 the executable SHA-256 is
