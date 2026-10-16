@@ -1,5 +1,26 @@
 # Handoff
 
+## Mac icon packages and recording fixture correction (2026-10-15)
+
+The bbfdb31 Mac configure/build succeeds; the bare game executable is unchanged
+at SHA256 `596e06fb98ca2c93e424aca938bdff7e863af0af5c9b3c859046d3102add04a9`.
+The first host run passed twelve of thirteen checks. The recording launcher's
+separate subprocess fixture returned empty output for the new sips metadata
+query, so the valid-recording case failed before signing. Its fixture now
+supplies a synthetic ICNS and asserts icon bytes/plist at the mock signing call.
+No production behavior changed. The repeated full thirteen checks pass in 1.38 s.
+
+Both new Mac icon DMGs are built locally from bbfdb31 and strictly signed and
+verified. The import edition is 12,816,659 bytes, SHA256
+`8909619e36283989280574bee288877afc4ba63e03c8eb2f6cba0e4668bc2211`;
+the personal edition is 32,018,708 bytes, SHA256
+`f01d7bf1967f1b31519a12d8bbf3f62b403b853aaaeb2e02d90d844e770b733c`.
+Outputs are build/installers/mac-player-{import,personal}-icon-001. Both contain
+the same ICNS, SHA256
+`aced86cc20f59720323e85a7681b6f3d6d73c67f663bccc5479e317074b6fb50`.
+These are local packages; existing release assets remain unchanged. No gameplay
+or fidelity change is claimed. Signed iPhone icon archive/export is in progress.
+
 ## Original app icon and local iPhone distribution preparation (2026-10-15)
 
 The shared original 1024-square RGB icon is assets/branding/app-icon.png,

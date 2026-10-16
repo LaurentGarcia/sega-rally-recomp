@@ -3,6 +3,7 @@ import contextlib
 import hashlib
 import io
 import json
+import plistlib
 from pathlib import Path
 import runpy
 import subprocess
@@ -13,6 +14,8 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 LAUNCHER = ROOT / "platform/segarally/macos/launch.py"
+sys.path.insert(0,str(ROOT/"platform/segarally"))
+import build_icons
 
 
 class RecordingLauncherTests(unittest.TestCase):
@@ -25,6 +28,8 @@ class RecordingLauncherTests(unittest.TestCase):
         (self.build / "licenses").mkdir()
         for name in ("Project-BSD-3-Clause.txt", "THIRD_PARTY.md", "SDL.txt", "ImGui.txt", "ImGui-embedded-fonts.txt", "Source-notices.txt"):
             (self.build / "licenses" / name).write_text("synthetic notice " + name)
+        self.icon = self.build / "original-fixture.icns"
+        self.icon.write_bytes(b"original synthetic recording icon fixture")
         assets = self.build / "assets"
         assets.mkdir()
         images = {}
@@ -42,10 +47,15 @@ class RecordingLauncherTests(unittest.TestCase):
 
         def command(argv, **kwargs):
             calls.append(argv)
+            if argv[0] == "codesign":
+                contents=self.build/"Sega Rally Native.app/Contents"
+                self.assertEqual((contents/"Resources/AppIcon.icns").read_bytes(),self.icon.read_bytes())
+                with (contents/"Info.plist").open("rb") as file:
+                    self.assertEqual(plistlib.load(file)["CFBundleIconFile"],"AppIcon.icns")
             status = (0 if active else 1) if argv[0] == "pgrep" else 0
             return subprocess.CompletedProcess(argv, status, "123\n" if argv[0] == "pgrep" and active else "", "")
 
-        with patch.object(sys, "argv", args), patch("subprocess.run", command), contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+        with patch.object(build_icons,"build_icons",return_value=self.icon), patch.object(sys, "argv", args), patch("subprocess.run", command), contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             try:
                 runpy.run_path(str(LAUNCHER), run_name="__main__")
             except SystemExit as result:

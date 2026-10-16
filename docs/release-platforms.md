@@ -88,6 +88,13 @@ Windows and Linux packages remain local; neither is a published download at
 this checkpoint. Local build, import and archive checks do not establish four
 completed platform releases.
 
+The new original app icon is integrated into both Apple packaging paths.
+Updated Mac import/personal DMGs are local at
+`build/installers/mac-player-{import,personal}-icon-001`; the published Mac
+release still contains the preceding package. Both new bundles include the
+same icon before signing and retain the existing game executable, CRT and sound
+defaults. These packaging checks do not add gameplay or fidelity evidence.
+
 ## Local Linux package
 
 The audited ROM-import archive is
