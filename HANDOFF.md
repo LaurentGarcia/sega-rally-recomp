@@ -1,5 +1,96 @@
 # Handoff
 
+## Desktop player packages and CI (2026-10-16)
+
+Player Preview 3 is published on the personal LaurentGarcia/sega-rally-recomp
+repository as v0.1.0-player.3, targeting 1a59cea. Its seven assets are the
+Mac/Windows/Linux ROM-import binaries, three manifests and SHA256SUMS.
+The Mac DMG and manifest are byte-identical to Preview 2 and retain their
+tested 8360ea9 identity; the new Windows/Linux packages bind to 1a59cea.
+Public upload sizes/digests and the remote tag match the final audited staging.
+Publication proof: build/publication/native-player-003-published.json.
+Final assets/notes are at build/publication/native-player-003-final;
+personal Windows/Linux archives are at
+build/installers/native-player-preview-003-final and were not uploaded.
+The Mac personal DMG remains in mac-direct-metal-personal-001. No iOS build
+or TestFlight submission is added by this release. README/platform guides
+now link the real three-platform binaries and explain each launcher.
+
+Independent archive/source/dependency review passes 1,547 checks, report
+build/worktrees/native-vulkan-frontend-ci-001/build/release-package-independent-audit-001/result.json,
+SHA256 `c601f576faa34616d59197f9b76d9c5e941ba72dd0800f1367db6cac7b3be6b1`.
+The final Linux README-only delta and final public/private staging pass
+335 further checks at release-package-independent-audit-002/result.json
+in the same build directory, SHA256
+`a5e5c46407558c3ff37cbe281767161eefc1e6cf0e06e057b6151af9725e7bc7`.
+These supplement the gameplay evidence; native Windows GPU/audio/controller
+testing, physical Linux GPU/speakers and full-machine/PCB fidelity remain open.
+
+The direct Vulkan integration is committed and pushed as
+`1a59ceafc6ff6870d06db723a1e6cf035bbebe57`. All five GitHub workflows pass:
+Build 38939712027, Metal 38939711941, Vulkan CRT 38939711991,
+Vulkan Model2/presentation 38939711929 and Vita 38939711949. The Build matrix
+includes Linux GCC/Clang full direct Vulkan frontend links, Windows MSVC/Clang,
+Mac direct Metal and the source boundary. Thirteen source-boundary regressions
+pass; the exact Git archive gate is
+build/publication/native-vulkan-player-source-gate-001.json, SHA256
+`8a421e3835f278204b7225fe07c1a1858a5dbc228ab665c95cce317b2eb533d6`.
+
+The actual Windows game cross-build compiles all 57 generated game/TGP/sound
+units with direct Vulkan and the SDL comparison path. Its AMD64 PE is
+27,802,900 bytes, SHA256
+`03f87d793d9a9004ec49589d8ca1698ff19ca810d9d1129261cf51f88b5842f7`.
+Compiler dependencies bind to the committed source. Runtime checks identify
+the three bundled MinGW runtime DLLs and the GPU driver's external vulkan-1.dll;
+the import library comes from the pinned official Vulkan-Loader definition,
+not Wine. Wine startup, help, importer fixtures and owned-ZIP import pass,
+including all eight image identities. This does not test Windows rendering,
+physical audio, controllers or a complete race. Reports under
+build/worktrees/native-vulkan-windows-001/build/ are:
+windows-vulkan-003/result.json SHA256
+`09bcc7ed13313f46ca4777297a1fea7dab24f0fca6f08f3eebb89b79d6014409`,
+windows-runtime-001/result.json SHA256
+`0b6c18f5e69ac6e9b600b1f764da5aa1b277d2b2e6fd62a2cef5d280096312db`,
+and windows-wine-002/result.json SHA256
+`6390c3865fc9ef237e4f7d63daa020c87a83be279308be66ae0652ac85da6098`.
+The import ZIP is 17,114,899 bytes/SHA256
+`edc84f1ab5b31efe6162fc289fabde6817ea507a9072394f6b367f5893806052`;
+the private ZIP is 33,669,831 bytes/SHA256
+`fac3761c7ac3b5c090c5834701413ab4b1f4b091f43f4819c649b1861c48b1d0`.
+
+The extracted Linux import archive verifies the owned ZIP, then runs 2,600
+visible direct Vulkan frames without source/build directory mounts. Final
+image and audio reproduce the measured game run, with CRT enabled and zero
+validation errors. The separate private archive starts for 120 frames using
+bundled data without import. The exact measured ELF is preserved, SHA256
+`a331c400cf019d4e73110cfb2de82668fde5466cb42239b2e9e5a7a932952d66`.
+Outer integrity evidence under the native-vulkan-playable-001 worktree is
+build/linux-packages-1a59cea-001/relocated-check-001/result.json, SHA256
+`84fbacdb9fabe0b2da31250c35a9e96416670ee99472be3467c4295624dc1e3f`.
+
+Packaging findings: generated Windows inputs must sit beneath the ignored
+build root for staging; they were mounted there without editing generated code.
+Legacy SDL_GPU_D3D12/SDL_GPU_VULKAN cache flags are unused by pinned SDL;
+actual compiled backends, rather than those flags, establish capability.
+The first Wine local-socket operation and Linux container wrapper were blocked
+by the sandbox before their checks ran; authorized retries preserve those
+failures and complete validation. Final Linux documentation review finds
+SDL_WAYLAND=OFF and SDL_X11=ON: this binary requires X11 or XWayland, not native
+Wayland. A new archive revision corrects the README while preserving the
+measured executable/assets and preceding archives.
+
+The corrected Linux archives are under
+build/worktrees/native-vulkan-playable-001/build/linux-packages-1a59cea-002/:
+import 8,586,382 bytes/SHA256
+`3168a945b6caadb0749acb8954e04886f8bb1671b8f00f9d945468a7cdec9ad9`;
+private 25,097,897 bytes/SHA256
+`f679d994b53ca828bcced96d209c2539df9703393c0e7098d2a80e8530cb3211`.
+Only README text differs from the relocated tested package. The new result
+rehashes all archive entries, 99 source dependencies and 57 generated inputs,
+and explicitly binds unchanged executable/assets to the earlier run:
+result.json SHA256
+`894caa626c516f7757d69a5be71a16a3e8e261cab7f84a04e802486888c911ad`.
+
 ## Direct Vulkan game, presentation and Settings (2026-10-16)
 
 Platform layer & build and Reference & validation govern this integration.

@@ -1,14 +1,18 @@
 # Evidence and status
 
 Snapshot: **2026-10-16**. Mac remains the principal gameplay validation target.
-Local packages also exist for iPhone, Windows and Linux; Windows audio has
-been confirmed by a user on a PC. The Mac game now defaults to direct Metal
+Preview 3 provides public Mac, Windows and Linux binaries; personal iPhone
+packaging remains local. Windows audio was confirmed by a user on a PC with
+the preceding SDL package. The Mac game now defaults to direct Metal
 for game, CRT and Settings, with SDL retained for window/input/audio services.
 The 2,600-frame driving comparison preserves native execution/audio/saves and
 final images; a separate 2,100-frame visible run reports no audio shortfalls
 or drops. Direct Vulkan now passes the same three-arm 2,600-frame driving
 comparison on Linux/lavapipe with actual X11 presentation and zero validation
-errors. It remains opt-in; Windows/vendor-GPU execution is not established.
+errors. The extracted Linux package repeats that driving input without source
+or build mounts, preserving final image and audio. Direct Vulkan remains
+opt-in; Windows/vendor-GPU execution is not established. The Windows game
+cross-build, dependencies and Wine startup/import checks pass.
 See [platform status](release-platforms.md) for current packages and
 [native renderers](native-renderers.md) for backend evidence and remaining work.
 This reference summarizes the latest recorded checkpoints. Exact hashes,

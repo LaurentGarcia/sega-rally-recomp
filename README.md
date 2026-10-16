@@ -2,21 +2,21 @@
 
 # Sega Rally Championship
 
-### The Model 2A rally classic. Native on Mac.
+### The Model 2A rally classic. Native on Mac, Windows and Linux.
 
-Generated C++ game code · Native board devices · SDL3 + Metal
+Generated C++ game code · Native board devices · Metal + Vulkan
 
 **Original arcade game by SEGA.** This is an unofficial project, not affiliated
 with or endorsed by SEGA.
 
-[![Mac Player](https://img.shields.io/badge/Mac_Player-Preview_2-e3a238?style=flat-square)](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.2)
+[![Player](https://img.shields.io/badge/Player-Preview_3-e3a238?style=flat-square)](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.3)
 [![Prerelease](https://img.shields.io/badge/prerelease-v0.1.0--rc.1-e3a238?style=flat-square)](docs/releases/v0.1.0-rc.1.md)
-[![Platform](https://img.shields.io/badge/platform-macOS-111111?style=flat-square&logo=apple)](docs/getting-started.md)
-[![Graphics](https://img.shields.io/badge/graphics-Metal-657b91?style=flat-square)](docs/segarally-architecture.md)
+[![Platform](https://img.shields.io/badge/platform-Mac_%7C_Windows_%7C_Linux-111111?style=flat-square)](docs/release-platforms.md)
+[![Graphics](https://img.shields.io/badge/graphics-Metal_%2B_Vulkan-657b91?style=flat-square)](docs/segarally-architecture.md)
 [![Build](https://github.com/LaurentGarcia/sega-rally-recomp/actions/workflows/build.yml/badge.svg)](https://github.com/LaurentGarcia/sega-rally-recomp/actions/workflows/build.yml)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-2e8b57?style=flat-square)](LICENSE)
 
-**[Download the Mac game](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.2) · [Platform status](docs/release-platforms.md) · [Player manual](docs/mac-player-manual.md) · [Architecture](docs/segarally-architecture.md)**
+**[Download the game](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.3) · [Platform status](docs/release-platforms.md) · [Player manual](docs/mac-player-manual.md) · [Architecture](docs/segarally-architecture.md)**
 
 <img src="docs/images/crt.png" alt="Actual Metal CRT presentation: Martini Lancia in Desert with scanlines, phosphor mask and curved screen" width="960">
 
@@ -26,12 +26,13 @@ with or endorsed by SEGA.
 
 ## Gravel, gears and native code
 
-This project brings Sega Rally Championship (1995, Model 2A) to macOS through
+This project brings Sega Rally Championship (1995, Model 2A) to desktop computers through
 static recompilation. Developer builds turn verified Revision B ROMs into native
 C++; the published player already contains those compiled game instructions and
 imports only the data from your ZIP. Shared hardware code supplies the arcade
 board's devices, geometry and sound.
-SDL3 and Metal put the result on your Mac.
+Metal on Mac and Vulkan on Windows/Linux present the result; SDL3 handles
+windows, controls and audio.
 
 | Drive | Make it yours | Keep it reproducible |
 | :--- | :--- | :--- |
@@ -39,13 +40,23 @@ SDL3 and Metal put the result on your Mac.
 | Analog steering, accelerator and brake | Optional CRT effects and Accurate textures | Local import, generation, build and test pipeline |
 | Native SCSP sound and cabinet saves | Paused Settings; windowed or fullscreen play | Cabinet-input recording and exact offline replay |
 
-**Prebuilt Mac player:** open the app and select your own verified Revision B
-ROM ZIP. No compiler, Python, CMake, Xcode or network connection is needed to
+**Prebuilt players:** select your own verified Revision B ROM ZIP. No compiler,
+Python, CMake, Xcode or network connection is needed to
 play. The executable contains statically recompiled game instructions; the
 public package excludes ROM archives and extracted game assets. Arcade CRT and
 sound start enabled; saved display choices are retained. The earlier compiler
 bootstrap previews have been withdrawn. See the **[four-platform package
 status](docs/release-platforms.md)** for other builds and current limits.
+
+| Download | Start |
+| --- | --- |
+| Mac Apple Silicon DMG | Open the app; direct Metal is the default. |
+| Windows x86-64 ZIP | Extract everything. Open `play.cmd`, or `play-vulkan.cmd` for direct Vulkan. |
+| Linux x86-64 archive | Extract everything. Run `./play.sh`, or `./play-vulkan.sh` for direct Vulkan. |
+
+Windows/Linux retain SDL GPU as the default renderer. Direct Vulkan passes
+Linux software-driver gameplay and window checks; physical GPU, controller
+and full-race validation remain open. These are experimental previews.
 
 `v0.1.0-rc.1` remains a separate experimental source prerelease. Developers can
 use the [source build guide](docs/getting-started.md#build-from-source-instead).
@@ -135,8 +146,9 @@ The importer checks ROM sizes, CRC32 and SHA1 against committed manifests.
 Static recompilers emit reached i960, TGP and 68000 instructions into ignored
 local build output. The native runtime supplies memory, ordered device events,
 I/O, video and SCSP sound. The Mac game renders directly through Metal; SDL3
-handles its window, input and audio output. The existing SDL GPU path remains
-available for comparison while direct Vulkan game integration continues.
+handles its window, input and audio output. Windows/Linux can use direct Vulkan
+for game, CRT and Settings; the existing SDL GPU path remains available in the
+same executable for comparison.
 Missing code and unsupported hardware stop with diagnostics instead of skipping
 behavior.
 

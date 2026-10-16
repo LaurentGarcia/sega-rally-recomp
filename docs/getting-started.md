@@ -5,11 +5,11 @@ connection. It contains compiled native game instructions and imports the game
 data from a supported ZIP you supply. The separate **v0.1.0-rc.1 source
 prerelease** is for developers who want to build from source.
 
-[Player Preview 2](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.2)
-is published for Apple Silicon Macs. Download its `Sega-Rally-Native-macOS-arm64.dmg`
+[Player Preview 3](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.3)
+includes the tested Apple Silicon Mac app. Download its `Sega-Rally-Native-macOS-arm64.dmg`
 and see [package and platform status](release-platforms.md) for checksums and
-validation limits. Earlier compiler-bootstrap previews were withdrawn. Windows,
-Linux and iPhone readiness is tracked separately there.
+validation limits. Windows and Linux downloads are on the same release page;
+iPhone remains separate. Earlier compiler-bootstrap previews were withdrawn.
 
 ## Play a prebuilt Mac app
 

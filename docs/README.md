@@ -1,11 +1,11 @@
 # Sega Rally documentation
 
-The [prebuilt Mac player](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.2)
-imports your own verified Revision B (`srallycb`) ZIP without developer tools.
-Its executable contains compiled game instructions; the public download excludes
+The [prebuilt Mac, Windows and Linux players](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.3)
+import your own verified Revision B (`srallycb`) ZIP without developer tools.
+Their executables contain compiled game instructions; the public downloads exclude
 ROM archives and extracted assets. Personal packages with game data remain
-private. Signed personal iPhone packaging and Windows/Linux builds are tracked
-in [platform status](release-platforms.md). `v0.1.0-rc.1` is the separate source
+private. Installation, platform validation and signed personal iPhone packaging
+are tracked in [platform status](release-platforms.md). `v0.1.0-rc.1` is the separate source
 prerelease for developers.
 
 | Guide | Purpose |
@@ -13,7 +13,7 @@ prerelease for developers.
 | [Getting started](getting-started.md) | Fresh checkout, Mac requirements, exact dependency pins and first play |
 | [Mac player manual](mac-player-manual.md) | Controls, Practice selection, settings, sound, saves and recordings |
 | [Build and validation](segarally-build-validation.md) | Pipeline, individual build stages, tests and reference setup |
-| [Technical architecture](segarally-architecture.md) | Generated CPUs, native devices, clock, Metal and SDL3 audio |
+| [Technical architecture](segarally-architecture.md) | Generated CPUs, native devices, clock, Metal/Vulkan and SDL3 audio |
 | [Evidence and status](segarally-status.md) | Recorded behavior, measurements and unresolved validation |
 | [Cabinet input replay](segarally-input-replay.md) | Script format, frame boundaries and exact host recordings |
 | [Project design](sega-rally-design.md) | Rally scope, implementation contracts and findings |

@@ -13,7 +13,7 @@ See [current evidence](segarally-status.md).
 
 ## Start the game
 
-Download the published [Mac Player Preview 2](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.2).
+Download the Mac DMG from [Player Preview 3](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.3).
 See [package and platform status](release-platforms.md) for checksums and exact
 validation limits. The package targets Apple Silicon and Metal, with a macOS 13
 deployment target; execution on macOS 13 and Intel Macs is unvalidated. It is
