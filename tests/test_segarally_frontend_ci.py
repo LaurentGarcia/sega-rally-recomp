@@ -45,18 +45,34 @@ class ToolchainTests(unittest.TestCase):
    (root/'CMakeFiles/3.30.0/CMakeCCompiler.cmake').write_text('set(CMAKE_C_COMPILER "incomplete")\n')
    with self.assertRaisesRegex(ValueError,'Missing actual'):m.toolchain(root)
  def test_macos_renderer_coverage_is_required(self):
-  self.assertEqual(m.renderer_features({'SEGARALLY_NATIVE_METAL':'ON'},'darwin'),
-                   {'native_metal':True,'sdl_gpu':True})
+  self.assertEqual(m.renderer_features({'SEGARALLY_NATIVE_METAL':'ON','SEGARALLY_NATIVE_VULKAN':'OFF'},'darwin'),
+                   {'native_metal':True,'native_vulkan':False,'sdl_gpu':True})
   with self.assertRaisesRegex(RuntimeError,'must be ON'):
    m.renderer_features({'SEGARALLY_NATIVE_METAL':'OFF'},'darwin')
  def test_nonapple_ci_retains_sdl_without_metal(self):
   for platform in ('win32','linux'):
-   self.assertEqual(m.renderer_features({'SEGARALLY_NATIVE_METAL':'OFF'},platform),
-                    {'native_metal':False,'sdl_gpu':True})
+   self.assertEqual(m.renderer_features({'SEGARALLY_NATIVE_METAL':'OFF','SEGARALLY_NATIVE_VULKAN':'OFF'},platform),
+                    {'native_metal':False,'native_vulkan':False,'sdl_gpu':True})
    with self.assertRaisesRegex(RuntimeError,'OFF elsewhere'):
     m.renderer_features({'SEGARALLY_NATIVE_METAL':'ON'},platform)
  def test_missing_or_invalid_renderer_cache_rejects(self):
   for actual in ({},{'SEGARALLY_NATIVE_METAL':''},{'SEGARALLY_NATIVE_METAL':'other'}):
    with self.assertRaisesRegex(RuntimeError,'Missing or invalid'):
     m.renderer_features(actual,'darwin')
+ def test_direct_vulkan_coverage_is_explicit(self):
+  for platform in ('win32','linux'):
+   self.assertEqual(m.renderer_features({'SEGARALLY_NATIVE_METAL':'OFF','SEGARALLY_NATIVE_VULKAN':'ON'},platform,True),
+                    {'native_metal':False,'native_vulkan':True,'sdl_gpu':True})
+   for enabled,requested in (('ON',False),('OFF',True)):
+    with self.assertRaisesRegex(RuntimeError,'differs from the requested'):
+     m.renderer_features({'SEGARALLY_NATIVE_METAL':'OFF','SEGARALLY_NATIVE_VULKAN':enabled},platform,requested)
+ def test_missing_or_invalid_vulkan_cache_rejects(self):
+  for value in (None,'','other'):
+   actual={'SEGARALLY_NATIVE_METAL':'OFF'}
+   if value is not None:actual['SEGARALLY_NATIVE_VULKAN']=value
+   with self.assertRaisesRegex(RuntimeError,'Missing or invalid SEGARALLY_NATIVE_VULKAN'):
+    m.renderer_features(actual,'linux',True)
+ def test_vulkan_cannot_replace_metal_on_macos(self):
+  with self.assertRaisesRegex(RuntimeError,'targets Windows/Linux'):
+   m.renderer_features({'SEGARALLY_NATIVE_METAL':'ON','SEGARALLY_NATIVE_VULKAN':'ON'},'darwin',True)
 if __name__=='__main__':unittest.main()

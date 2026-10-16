@@ -25,6 +25,13 @@ option(SEGARALLY_NATIVE_METAL "Build optional direct Metal player rendering on m
 if(SEGARALLY_NATIVE_METAL AND (NOT APPLE OR CMAKE_SYSTEM_NAME STREQUAL "iOS"))
     message(FATAL_ERROR "Direct Metal player integration currently targets macOS")
 endif()
+option(SEGARALLY_NATIVE_VULKAN "Build opt-in direct Vulkan player rendering on Windows/Linux" OFF)
+if(SEGARALLY_NATIVE_VULKAN)
+    if(APPLE)
+        message(FATAL_ERROR "Direct Vulkan player integration targets Windows/Linux; Apple uses Metal")
+    endif()
+    find_package(Vulkan 1.1 REQUIRED)
+endif()
 set(ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 get_filename_component(ROOT "${ROOT}" ABSOLUTE)
 set(SEGARALLY_NATIVE_BUILD "${ROOT}/build/segarally-timed" CACHE PATH "Audited native generation directory")
@@ -63,6 +70,10 @@ if(SEGARALLY_NATIVE_METAL)
     target_compile_options(segarally_imgui PRIVATE "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>")
     target_link_libraries(segarally_imgui PUBLIC "-framework Metal" "-framework Foundation")
 endif()
+if(SEGARALLY_NATIVE_VULKAN)
+    target_sources(segarally_imgui PRIVATE "${SEGARALLY_IMGUI_SOURCE}/backends/imgui_impl_vulkan.cpp")
+    target_link_libraries(segarally_imgui PUBLIC Vulkan::Vulkan)
+endif()
 file(GLOB GENERATED CONFIGURE_DEPENDS "${SEGARALLY_NATIVE_BUILD}/gen/*.cpp")
 if(NOT SEGARALLY_FRONTEND_COMPILE_ONLY AND (NOT GENERATED OR NOT EXISTS "${SEGARALLY_NATIVE_BUILD}/tgp/program.cpp"))
     message(FATAL_ERROR "Generate the audited native main/TGP code before configuring the host")
@@ -79,6 +90,10 @@ if(SEGARALLY_NATIVE_METAL)
     list(APPEND SOURCES "${ROOT}/src/app/native/metal/model2_metal.mm"
         "${ROOT}/src/app/native/metal/metal_crt.mm" "${ROOT}/src/app/native/metal/metal_presenter.mm"
         "${ROOT}/src/app/segarally_display_metal.mm")
+endif()
+if(SEGARALLY_NATIVE_VULKAN)
+    list(APPEND SOURCES "${ROOT}/src/app/native/vulkan/model2_vulkan.cpp"
+        "${ROOT}/src/app/native/vulkan/vulkan_presenter.cpp" "${ROOT}/src/app/segarally_display_vulkan.cpp")
 endif()
 if(SEGARALLY_FRONTEND_COMPILE_ONLY)
     list(APPEND SOURCES "${ROOT}/tests/fixtures/segarally_frontend_link.cpp")
@@ -204,6 +219,10 @@ if(SEGARALLY_NATIVE_METAL)
     target_compile_options(${HOST_TARGET} PRIVATE
         "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc;-fno-fast-math;-ffp-contract=off>")
 endif()
+if(SEGARALLY_NATIVE_VULKAN)
+    target_compile_definitions(${HOST_TARGET} PRIVATE SEGARALLY_NATIVE_VULKAN=1)
+    target_link_libraries(${HOST_TARGET} PRIVATE Vulkan::Vulkan)
+endif()
 target_compile_definitions(${HOST_TARGET} PRIVATE M2_SRALLY_TGP=1 M2_SRALLY_IO=1
     M2_SRALLY_COMM=1 M2_SRALLY_CONTROL=1 M2_SRALLY_VIDEO=1 M2_SRALLY_SCREEN=1 M2_SRALLY_UART=1 SDL_MAIN_HANDLED)
 if(SEGARALLY_SOUND)
@@ -299,6 +318,27 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
 endif()
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     enable_testing()
+    if(SEGARALLY_NATIVE_VULKAN AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        find_package(X11 REQUIRED)
+        add_executable(test_native_vulkan_blit EXCLUDE_FROM_ALL "${ROOT}/tests/test_native_vulkan_blit.cpp"
+            "${ROOT}/src/app/native/vulkan/model2_vulkan.cpp" "${ROOT}/src/app/native/vulkan/vulkan_presenter.cpp"
+            "${ROOT}/src/app/gpu/model2_frame.cpp" "${ROOT}/src/app/gpu/gpu_renderer.cpp"
+            "${ROOT}/src/runtime/video.cpp" "${ROOT}/src/runtime/raster.cpp")
+        target_include_directories(test_native_vulkan_blit PRIVATE "${ROOT}/src")
+        target_compile_options(test_native_vulkan_blit PRIVATE -Wall -Wextra -Werror
+            -Wno-missing-field-initializers -Wno-misleading-indentation -fno-fast-math -ffp-contract=off)
+        target_link_libraries(test_native_vulkan_blit PRIVATE SDL3::SDL3-static Vulkan::Vulkan X11::X11)
+        add_executable(test_segarally_display_vulkan EXCLUDE_FROM_ALL "${ROOT}/tests/test_segarally_display_vulkan.cpp"
+            "${ROOT}/src/app/segarally_display.cpp" "${ROOT}/src/app/segarally_display_vulkan.cpp"
+            "${ROOT}/src/app/segarally_controls.cpp" "${ROOT}/src/app/native/vulkan/model2_vulkan.cpp"
+            "${ROOT}/src/app/native/vulkan/vulkan_presenter.cpp" "${ROOT}/src/app/gpu/model2_frame.cpp"
+            "${ROOT}/src/runtime/video.cpp" "${ROOT}/src/runtime/raster.cpp")
+        target_compile_definitions(test_segarally_display_vulkan PRIVATE SEGARALLY_NATIVE_VULKAN=1)
+        target_include_directories(test_segarally_display_vulkan PRIVATE "${ROOT}/src")
+        target_compile_options(test_segarally_display_vulkan PRIVATE -Wall -Wextra -Werror
+            -Wno-missing-field-initializers -Wno-misleading-indentation -fno-fast-math -ffp-contract=off)
+        target_link_libraries(test_segarally_display_vulkan PRIVATE SDL3::SDL3-static segarally_imgui Vulkan::Vulkan X11::X11)
+    endif()
     add_executable(test_segarally_rom_import EXCLUDE_FROM_ALL "${ROOT}/tests/test_segarally_rom_import.cpp" "${ROOT}/src/runtime/zip.cpp")
     target_include_directories(test_segarally_rom_import PRIVATE "${ROOT}/src")
     target_link_libraries(test_segarally_rom_import PRIVATE segarally_digests)

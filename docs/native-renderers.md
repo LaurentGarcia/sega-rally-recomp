@@ -5,8 +5,9 @@ tiles, ordered polygons, foreground tiles and the optional CPU-composed HUD.
 They reuse the existing game-facing frame packet, resource packing and shaders.
 The Mac player now uses direct Metal for the game, CRT and Settings by default.
 SDL3 still supplies its window, input and audio services. The same executable
-retains `--sdl-gpu` for comparison. Vulkan game integration remains in progress;
-the current Windows/Linux packages use SDL3 GPU.
+retains `--sdl-gpu` for comparison. Windows/Linux source builds can additionally
+enable the direct Vulkan player with `SEGARALLY_NATIVE_VULKAN=ON` and select it
+using `--native-vulkan`. The earlier Windows/Linux packages use SDL3 GPU.
 
 ## Shared rendering contract
 
@@ -41,12 +42,21 @@ resizing, paused Settings changes and hidden-window game updates preserve the
 existing host behavior. Capture drains the queue and reads the image before CRT.
 No SDL GPU device or SDL GPU commands are used on this path.
 
-Vulkan's `VulkanModel2` currently owns a device, command buffer and synchronous
-offscreen target. It submits, waits and returns BGRA pixels. Vulkan 1.1, depth
-clamp and the required image formats are checked; dimensions must match Video
-and device limits. Its full snapshots, per-frame pipeline creation and readback
-make it a correctness implementation. It needs resource reuse, asynchronous
-frame submission and a swapchain before production performance testing.
+Vulkan's `VulkanModel2` owns a device and three fenced frame slots with reusable
+buffers, targets and persistent pipelines. It snapshots frame resources,
+encodes, permits caller commands, and submits asynchronously. Its diagnostic
+`render`/readback API uses the same encoder. Vulkan 1.1, depth clamp, required
+image formats and dimensions are checked against Video and device limits.
+
+`VulkanPresenter` uses SDL only to create the window and Vulkan surface. It
+owns a FIFO swapchain, image-indexed presentation semaphores, CRT resources and
+cached paused frames. CRT-off presentation uses the same native image blit as
+the SDL reference, including nearest/linear filtering and integer scaling.
+Settings uses the pinned ImGui Vulkan backend after the game presentation.
+Its UI buffer count covers both swapchain images and the three command slots;
+reconfiguration drains incompatible resources. Resize/minimize and hidden
+updates are handled separately from the game clock. Device-loss errors stop
+the host; automatic recovery and injected device-loss testing remain open.
 
 Both native test executables link without SDL. Separate reference executables
 use pinned SDL commit `fa2c02bb6e21974a89ea9824bc53c9932abe5f9c` and the current
@@ -93,6 +103,35 @@ resize, hidden updates and paused texture changes with Metal validation enabled.
 The separate Settings fixture passes 91 checks for actual mouse CRT toggles,
 persisted preferences, binding isolation, foreign-context handling and switching
 between native and SDL rendering within one executable.
+
+The asynchronous Vulkan implementation repeats all 38 offscreen image
+comparisons exactly. Three deliberately pending submissions retain their
+images after CPU inputs are mutated or destroyed. Window tests exercise 101
+presentations, four swapchains, resize/minimize/restore, cached frames, hidden
+updates and overlays, with zero synchronization errors. Steady frames do not
+recreate pipelines, allocate renderer resources or wait for the entire device.
+This establishes resource reuse, not performance on a hardware GPU.
+
+Four actual X11 window comparisons cover odd and downscaled output sizes with
+nearest and linear filtering: all 538,020 pixels equal SDL Vulkan. The Settings
+fixture passes 304 checks, including mouse CRT toggles, preferences, binding
+isolation, queued UI frames, resize and native/SDL transitions. These Vulkan
+checks run on lavapipe in a Linux container; Windows and vendor-GPU execution
+remain separate requirements.
+
+The actual Linux game additionally passes three visible 2,600-frame driving
+runs: SDL Vulkan, direct Vulkan and direct Vulkan with Accurate textures.
+Execution, native PCM, inputs, recordings and final saves are identical. Each
+direct arm presents all 2,600 frames with one swapchain, four Model 2 pipelines,
+one CRT pipeline and zero validation errors. The final default image equals
+SDL Vulkan; Accurate textures equals the same-machine CPU reference. These
+unthrottled runs capture/drain audio without physical playback.
+
+Default images are not claimed identical across graphics APIs: the preserved
+SDL Vulkan/Linux and SDL Metal/Mac final images differ at 951 of 190,464 pixels,
+despite matching CPU execution. That existing cross-API difference remains a
+separate fidelity investigation; matching each backend's baseline does not
+resolve it or certify an entire race.
 
 The wrappers preserve command output, executable/source hashes and image
 comparisons under a new ignored output directory. They verify source and
@@ -160,11 +199,37 @@ Mac build. The option is currently unavailable on iOS and non-Apple systems.
 The regular macOS frontend CI compiles the direct player and Settings path
 using ROM-free link fixtures; hosted CI does not claim GPU execution.
 
+For the Windows/Linux game build, add `-DSEGARALLY_NATIVE_VULKAN=ON` to the
+dedicated host configuration in the [build guide](segarally-build-validation.md).
+This requires Vulkan development headers and the loader library. Run
+`segarally_native --player --native-vulkan` to select it; SDL GPU remains the
+Windows/Linux default. Add `--vulkan-validation` only when the Khronos
+validation layer is installed. Both renderers remain in the same executable.
+
+On Linux, the extra X11 fixtures can be built explicitly:
+
+```sh
+cmake --build /path/to/host-build --target test_native_vulkan_blit test_segarally_display_vulkan
+python3 tests/test_native_vulkan_blit.py \
+  --executable /path/to/host-build/test_native_vulkan_blit \
+  --output build/native-vulkan-blit-check-001
+python3 tests/test_native_vulkan_player.py \
+  --executable /path/to/host-build/segarally_native --data /path/to/owned/assets \
+  --visible --output build/native-vulkan-game-check-001
+```
+
+The game check requires locally generated game code and verified owner data;
+its outputs remain private. Use `xvfb-run -a` around that command on headless
+Linux. CI instead compiles the full Vulkan host and
+Settings using original ROM-free link fixtures on Linux GCC and Clang. The
+separate Vulkan workflows execute invented render/presentation fixtures with
+lavapipe, never uploaded game data.
+
 ## Remaining integration
 
-1. Add asynchronous Vulkan frame resources and presentation; measure allocation
-   and upload costs for both backends before optimizing shared behavior.
-2. Connect Vulkan to the actual game and Settings; replace SDL window services.
+1. Validate Vulkan gameplay and physical GPUs on supported Windows/Linux systems;
+   measure upload costs and pacing before optimizing shared behavior.
+2. Replace SDL window services while preserving presentation and Settings.
 3. Replace SDL input, controller and audio services with equivalent lifecycle
    handling, including focus loss, suspend/resume and device changes.
 4. Run recorded gameplay and physical audio/controller checks on each platform.

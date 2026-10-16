@@ -1,6 +1,9 @@
 // Optional presentation controls. No Machine, game-save or recording access.
 #pragma once
 #include "app/gpu/crt_settings.h"
+#ifdef SEGARALLY_NATIVE_VULKAN
+#include "app/native/vulkan/vulkan_presenter.h"
+#endif
 #include <SDL3/SDL.h>
 #include <filesystem>
 #include <functional>
@@ -28,6 +31,10 @@ public:
     bool init_metal(SDL_Window *, void *metal_device,
                     const std::filesystem::path &save_directory, DisplaySettings &);
 #endif
+#ifdef SEGARALLY_NATIVE_VULKAN
+    bool init_vulkan(SDL_Window *, const native::VulkanPresenter::UIContext &,
+                     const std::filesystem::path &save_directory, DisplaySettings &);
+#endif
     bool init(SDL_Window *, SDL_GPUDevice *, SDL_GPUTextureFormat,
               const std::filesystem::path &save_directory, DisplaySettings &);
     // Borrowed; detach before destroying Controls. Existing display-only hosts
@@ -50,6 +57,13 @@ public:
     bool new_frame_metal(DisplaySettings &, void *render_pass_descriptor,
                          const std::function<void()> &overlay = {});
     bool render_metal(void *command_buffer, void *render_encoder);
+#endif
+#ifdef SEGARALLY_NATIVE_VULKAN
+    // Query the presenter's current context before each UI frame. Record draw
+    // data only after its slot fence is waited, inside its active render pass.
+    bool new_frame_vulkan(DisplaySettings &, const native::VulkanPresenter::UIContext &,
+                          const std::function<void()> &overlay = {});
+    bool render_vulkan(VkCommandBuffer);
 #endif
     bool new_frame(DisplaySettings &, const std::function<void()> &overlay = {});
     // Prepare before opening the render pass, then render last in that pass.

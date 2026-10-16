@@ -6,7 +6,9 @@ been confirmed by a user on a PC. The Mac game now defaults to direct Metal
 for game, CRT and Settings, with SDL retained for window/input/audio services.
 The 2,600-frame driving comparison preserves native execution/audio/saves and
 final images; a separate 2,100-frame visible run reports no audio shortfalls
-or drops. Direct Vulkan game integration is active.
+or drops. Direct Vulkan now passes the same three-arm 2,600-frame driving
+comparison on Linux/lavapipe with actual X11 presentation and zero validation
+errors. It remains opt-in; Windows/vendor-GPU execution is not established.
 See [platform status](release-platforms.md) for current packages and
 [native renderers](native-renderers.md) for backend evidence and remaining work.
 This reference summarizes the latest recorded checkpoints. Exact hashes,

@@ -6,6 +6,9 @@
 #ifdef SEGARALLY_NATIVE_METAL
 #include "app/segarally_display_metal.h"
 #endif
+#ifdef SEGARALLY_NATIVE_VULKAN
+#include "app/segarally_display_vulkan.h"
+#endif
 #include "backends/imgui_impl_sdlgpu3.h"
 #include <algorithm>
 #include <cmath>
@@ -22,6 +25,10 @@ struct DisplayPanel::Impl {
     SDL_Window *window=nullptr;
 #ifdef SEGARALLY_NATIVE_METAL
     void *metal_device=nullptr;
+#endif
+#ifdef SEGARALLY_NATIVE_VULKAN
+    native::VulkanPresenter::UIContext vulkan_context{};
+    display_vulkan::Backend vulkan;
 #endif
     SDL_GPUDevice *device=nullptr;
     SDL_GPUTextureFormat format=SDL_GPU_TEXTUREFORMAT_INVALID;
@@ -41,7 +48,18 @@ struct DisplayPanel::Impl {
         return false;
 #endif
     }
+    bool using_vulkan() const {
+#ifdef SEGARALLY_NATIVE_VULKAN
+        return vulkan_context.device!=VK_NULL_HANDLE;
+#else
+        return false;
+#endif
+    }
+    bool using_native() const {return using_metal() || using_vulkan();}
     void stop_renderer() {
+#ifdef SEGARALLY_NATIVE_VULKAN
+        if (using_vulkan()) {vulkan.shutdown();return;}
+#endif
 #ifdef SEGARALLY_NATIVE_METAL
         if (using_metal()) {display_metal::shutdown();return;}
 #endif
@@ -79,7 +97,7 @@ struct DisplayPanel::Impl {
     }
     bool backend() {
         if (context) return true;
-        if (!window || (!device && !using_metal())) {error="Display panel is not initialized.";return false;}
+        if (!window || (!device && !using_native())) {error="Display panel is not initialized.";return false;}
         const auto previous=ImGui::GetCurrentContext();
         IMGUI_CHECKVERSION();context=ImGui::CreateContext();
         ImGui::SetCurrentContext(context);
@@ -91,9 +109,14 @@ struct DisplayPanel::Impl {
         // scaling. Do not multiply fonts by the Retina framebuffer ratio.
         ImGui::GetStyle().FontSizeBase=17.0f;
         ImGui::GetStyle().FramePadding=ImVec2(7,5);
-        platform=using_metal()?ImGui_ImplSDL3_InitForMetal(window):ImGui_ImplSDL3_InitForSDLGPU(window);
+        platform=using_vulkan()?ImGui_ImplSDL3_InitForVulkan(window):
+            using_metal()?ImGui_ImplSDL3_InitForMetal(window):ImGui_ImplSDL3_InitForSDLGPU(window);
         if (platform) {
             ImGui_ImplSDL3_SetGamepadMode(ImGui_ImplSDL3_GamepadMode_Manual,nullptr,0);
+#ifdef SEGARALLY_NATIVE_VULKAN
+            if (using_vulkan()) renderer=vulkan.init(vulkan_context,error);
+            else
+#endif
 #ifdef SEGARALLY_NATIVE_METAL
             if (using_metal()) renderer=display_metal::init(metal_device);
             else
@@ -104,7 +127,9 @@ struct DisplayPanel::Impl {
             }
         }
         if (!platform || !renderer) {
-            error="Cannot open display controls: ";error+=SDL_GetError();
+            if (!using_vulkan() || error.empty()) {
+                error="Cannot open display controls: ";error+=SDL_GetError();
+            }
             if (renderer) stop_renderer();
             if (platform) ImGui_ImplSDL3_Shutdown();
             ImGui::DestroyContext(context);context=nullptr;platform=renderer=false;
@@ -121,6 +146,18 @@ bool DisplayPanel::init_metal(SDL_Window *window,void *device,
     shutdown();auto &s=*impl_;s.error.clear();
     if (!window || !device) {s.error="Display panel requires a window and Metal device.";return false;}
     s.window=window;s.metal_device=device;
+    s.preferences=save_directory.empty()?std::filesystem::path{}:save_directory/"display.settings";
+    if (!s.preferences.empty()) display_preferences::load(s.preferences,settings,s.error);
+    s.saved=settings;return true;
+}
+#endif
+#ifdef SEGARALLY_NATIVE_VULKAN
+bool DisplayPanel::init_vulkan(SDL_Window *window,const native::VulkanPresenter::UIContext &context,
+        const std::filesystem::path &save_directory,DisplaySettings &settings) {
+    shutdown();auto &s=*impl_;s.error.clear();
+    if (!window) {s.error="Display panel requires a window.";return false;}
+    if (!display_vulkan::valid(context,s.error)) return false;
+    s.window=window;s.vulkan_context=context;
     s.preferences=save_directory.empty()?std::filesystem::path{}:save_directory/"display.settings";
     if (!s.preferences.empty()) display_preferences::load(s.preferences,settings,s.error);
     s.saved=settings;return true;
@@ -175,8 +212,28 @@ bool DisplayPanel::new_frame_metal(DisplaySettings &settings,void *pass,const st
     return new_frame_impl(settings,overlay,pass);
 }
 #endif
+#ifdef SEGARALLY_NATIVE_VULKAN
+bool DisplayPanel::new_frame_vulkan(DisplaySettings &settings,const native::VulkanPresenter::UIContext &context,
+        const std::function<void()> &overlay) {
+    auto &s=*impl_;s.draw=nullptr;
+    if (!s.using_vulkan()) {s.error="Display panel is not using Vulkan.";return false;}
+    if (!display_vulkan::valid(context,s.error)) return false;
+    if (!display_vulkan::same_device(s.vulkan_context,context)) {
+        s.error="Display panel Vulkan device changed; reinitialize the panel.";return false;
+    }
+    s.vulkan_context=context;
+    return new_frame_impl(settings,overlay,nullptr);
+}
+bool DisplayPanel::render_vulkan(VkCommandBuffer command) {
+    auto &s=*impl_;
+    if (!s.using_vulkan()) {s.error="Display panel is not using Vulkan.";return false;}
+    if (!s.draw || s.draw->DisplaySize.x<=0 || s.draw->DisplaySize.y<=0) return true;
+    CurrentContext current(s.context);
+    return s.vulkan.render(s.draw,command,s.error);
+}
+#endif
 bool DisplayPanel::new_frame(DisplaySettings &settings,const std::function<void()> &overlay) {
-    if (impl_->using_metal()) {impl_->error="Display panel requires its Metal frame descriptor.";return false;}
+    if (impl_->using_native()) {impl_->error="Display panel requires its native frame context.";return false;}
     return new_frame_impl(settings,overlay,nullptr);
 }
 bool DisplayPanel::new_frame_impl(DisplaySettings &settings,const std::function<void()> &overlay,void *pass) {
@@ -186,6 +243,11 @@ bool DisplayPanel::new_frame_impl(DisplaySettings &settings,const std::function<
     if(s.visible) s.navigation();
     else ImGui_ImplSDL3_SetGamepadMode(ImGui_ImplSDL3_GamepadMode_Manual,nullptr,0);
     (void)pass;
+#ifdef SEGARALLY_NATIVE_VULKAN
+    if (s.using_vulkan()) {
+        if (!s.vulkan.new_frame(s.vulkan_context,s.error)) return false;
+    } else
+#endif
 #ifdef SEGARALLY_NATIVE_METAL
     if (s.using_metal()) {
         if (!display_metal::new_frame(s.metal_device,pass)) {
@@ -321,11 +383,11 @@ bool DisplayPanel::render_metal(void *command,void *encoder) {
 }
 #endif
 void DisplayPanel::prepare(SDL_GPUCommandBuffer *command) {
-    auto &s=*impl_;if (s.using_metal() || !command || !s.draw || s.draw->DisplaySize.x<=0 || s.draw->DisplaySize.y<=0) return;
+    auto &s=*impl_;if (s.using_native() || !command || !s.draw || s.draw->DisplaySize.x<=0 || s.draw->DisplaySize.y<=0) return;
     CurrentContext current(s.context);ImGui_ImplSDLGPU3_PrepareDrawData(s.draw,command);
 }
 void DisplayPanel::render(SDL_GPUCommandBuffer *command,SDL_GPURenderPass *pass) {
-    auto &s=*impl_;if (s.using_metal() || !command || !pass || !s.draw || s.draw->DisplaySize.x<=0 || s.draw->DisplaySize.y<=0) return;
+    auto &s=*impl_;if (s.using_native() || !command || !pass || !s.draw || s.draw->DisplaySize.x<=0 || s.draw->DisplaySize.y<=0) return;
     CurrentContext current(s.context);ImGui_ImplSDLGPU3_RenderDrawData(s.draw,command,pass);
 }
 bool DisplayPanel::save(const DisplaySettings &settings) {
@@ -349,6 +411,9 @@ void DisplayPanel::shutdown() {
     s.context=nullptr;s.platform=s.renderer=false;s.window=nullptr;
 #ifdef SEGARALLY_NATIVE_METAL
     s.metal_device=nullptr;
+#endif
+#ifdef SEGARALLY_NATIVE_VULKAN
+    s.vulkan_context={};
 #endif
     s.device=nullptr;s.format=SDL_GPU_TEXTUREFORMAT_INVALID;
 }

@@ -22,6 +22,14 @@ same executable keeps the SDL GPU baseline for recorded comparisons; a
 final image, and a separate 2,100-frame visible run validates presentation and
 fresh sound/CRT defaults. See [native renderers](native-renderers.md) for scope.
 
+Direct Vulkan is now an optional Windows/Linux host path with three reusable
+frame slots, FIFO presentation and the same Settings UI. Actual Linux/lavapipe
+driving tests preserve execution, native PCM, saves and final images relative
+to SDL Vulkan; the final Accurate-textures image matches the CPU reference.
+Window tests cover filtering, resize and queued UI resources. SDL window,
+input and audio services remain; vendor-GPU and Windows execution, default
+cross-API pixel identity and full arcade fidelity are not established by this.
+
 ## Required end state
 
 - Generate Sega Rally's native game code reproducibly from verified user ROMs.

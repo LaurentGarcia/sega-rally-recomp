@@ -9,14 +9,14 @@ Generated C++ game code · Native board devices · SDL3 + Metal
 **Original arcade game by SEGA.** This is an unofficial project, not affiliated
 with or endorsed by SEGA.
 
-[![Mac Player](https://img.shields.io/badge/Mac_Player-Preview_1-e3a238?style=flat-square)](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.1)
+[![Mac Player](https://img.shields.io/badge/Mac_Player-Preview_2-e3a238?style=flat-square)](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.2)
 [![Prerelease](https://img.shields.io/badge/prerelease-v0.1.0--rc.1-e3a238?style=flat-square)](docs/releases/v0.1.0-rc.1.md)
 [![Platform](https://img.shields.io/badge/platform-macOS-111111?style=flat-square&logo=apple)](docs/getting-started.md)
 [![Graphics](https://img.shields.io/badge/graphics-Metal-657b91?style=flat-square)](docs/segarally-architecture.md)
 [![Build](https://github.com/LaurentGarcia/sega-rally-recomp/actions/workflows/build.yml/badge.svg)](https://github.com/LaurentGarcia/sega-rally-recomp/actions/workflows/build.yml)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-2e8b57?style=flat-square)](LICENSE)
 
-**[Download the Mac game](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.1) · [Platform status](docs/release-platforms.md) · [Player manual](docs/mac-player-manual.md) · [Architecture](docs/segarally-architecture.md)**
+**[Download the Mac game](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.2) · [Platform status](docs/release-platforms.md) · [Player manual](docs/mac-player-manual.md) · [Architecture](docs/segarally-architecture.md)**
 
 <img src="docs/images/crt.png" alt="Actual Metal CRT presentation: Martini Lancia in Desert with scanlines, phosphor mask and curved screen" width="960">
 

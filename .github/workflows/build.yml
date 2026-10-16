@@ -77,3 +77,10 @@ jobs:
         run: |
           python -m unittest discover -s tests -p test_segarally_frontend_ci.py -v
           python scripts/segarally_frontend_ci.py
+      # Build the real optional Vulkan host and ImGui bridge too. This remains
+      # a ROM-free link fixture; no playable binary or GPU execution is claimed.
+      - name: Compile direct Vulkan Rally frontend (Linux GCC and Clang)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y --no-install-recommends libvulkan-dev
+          python3 scripts/segarally_frontend_ci.py --native-vulkan --output build/rally-frontend-vulkan

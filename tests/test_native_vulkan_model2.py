@@ -33,7 +33,7 @@ def main():
  'src/app/gpu/gpu_renderer.h','src/app/gpu/gpu_renderer.cpp','src/app/gpu_device.h',
  'src/runtime/video.h','src/runtime/video.cpp','src/runtime/raster.h','src/runtime/raster.cpp',
  'src/runtime/model2_priority.h','tests/model2_recorded_fixture.h','tests/model2_native_fixture.h','tests/test_native_vulkan_model2.cpp',
- 'tests/test_native_vulkan_model2.py','platform/segarally/native-vulkan-model2/CMakeLists.txt']
+ 'tests/test_native_vulkan_model2.py','tests/test_native_vulkan_async.cpp','platform/segarally/native-vulkan-model2/CMakeLists.txt']
  before={name:sha(ROOT/name) for name in measured};out.mkdir(parents=True)
  result={'status':'running','inputs':before,'sdl_revision':revision,'sdl_diff_sha256':hashlib.sha256(changes).hexdigest(),
  'scope':'Native Vulkan consumes common Model2Frame/resources; invented/optional recorded comparisons against separate pinned SDL Vulkan binary. No SDL in native linkage, game execution/audio/OS surface or performance evidence.','validation_required':a.require_validation,'commands':[]}
@@ -73,11 +73,13 @@ def main():
    assert len(paths)==1
    return paths[0]
   native=binary('test_native_vulkan_model2');reference=binary('test_sdl_vulkan_model2')
-  result['executables']={'native':sha(native),'reference':sha(reference)}
+  async_binary=binary('test_native_vulkan_async')
+  result['executables']={'native':sha(native),'reference':sha(reference),'async':sha(async_binary)}
   for name in ('reference','native'):(out/name).mkdir()
   scene_args=[v for scene in scenes for v in ('--scene',str(scene))]
   run([str(reference),str(out/'reference'),*scene_args],'reference',180)
   run([str(native),str(out/'native'),*(['--require-software'] if a.require_software else []),*(['--require-validation'] if a.require_validation else []),*scene_args],'native',180)
+  run([str(async_binary),*(['--require-software'] if a.require_software else []),*(['--require-validation'] if a.require_validation else [])],'async',60)
   result['images']=[]
   for i in range(26+4*len(scenes)):
    name=f'scene-{i:02d}.bgra';expected=(out/'reference'/name).read_bytes();actual=(out/'native'/name).read_bytes()
@@ -90,7 +92,7 @@ def main():
   assert subprocess.check_output(['git','-C',str(sdl),'diff','HEAD','--'])==changes
   assert private_inputs=={str(path):{p.name:sha(p) for p in sorted(path.iterdir()) if p.is_file()} for path in scenes}
   if a.require_validation:
-   for name in ('native','reference'):
+   for name in ('native','reference','async'):
     logs=(out/(name+'.stdout')).read_text()+(out/(name+'.stderr')).read_text()
     assert 'Validation Error' not in logs and 'VUID-' not in logs,(name,'validation diagnostics')
   if sys.platform.startswith('linux'):

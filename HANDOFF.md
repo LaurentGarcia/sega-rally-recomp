@@ -1,5 +1,146 @@
 # Handoff
 
+## Direct Vulkan game, presentation and Settings (2026-10-16)
+
+Platform layer & build and Reference & validation govern this integration.
+Windows/Linux builds can enable SEGARALLY_NATIVE_VULKAN and select
+--native-vulkan; the SDL GPU default/comparison path remains available in the
+same executable. --vulkan-validation requires the Khronos layer. Metal defaults
+and the shared game/audio/input/save/recording loop are preserved. SDL still
+provides windows, controls and audio; this is not complete SDL removal.
+
+VulkanModel2 now uses persistent pipelines and three fenced asynchronous
+slots with owned snapshots and reusable buffers/images. Callers may append
+commands before submission. Diagnostic render/readback uses this same encoder.
+VulkanPresenter owns FIFO presentation, image-indexed completion semaphores,
+cached frames, native-aspect/integer scaling, hidden updates, resize/minimize,
+raw capture and the common CRT shader. Original-display scaling uses
+vkCmdBlitImage, matching pinned SDL's primitive. Device/format/blit support is
+checked before use. Errors are latched; device loss exits rather than silently
+falling back. Device-loss injection/recovery is not claimed tested.
+
+Settings uses the unchanged pinned ImGui Vulkan renderer, with its own
+descriptor/font resources and buffers covering both swapchain images and the
+three command slots. Incompatible count/pass changes drain and rebuild;
+steady UI frames do not wait for the whole device. The shared Controls,
+preferences, input isolation and foreign-context fix remain in one UI body.
+Teardown drains old submissions before releasing UI and presentation resources.
+
+The asynchronous offscreen regression repeats all 38 images / 17,547,264 pixels
+exactly against SDL Vulkan. Three deliberately pending submissions preserve
+571,392 pixels after CPU inputs are mutated/destroyed. Report
+build/worktrees/native-vulkan-playable-001/build/async-regression-002/result.json
+has SHA256 `6d898d9832a24321f68de2fb267784cd05148392ece3496ec7a325cff926521e`.
+The final exact-source presentation-008/result.json in that build directory
+has SHA256 `86e12afeb0b393ffe74c41c1f63ee163bb1209dfd76c0c981a04e435cd18335c`:
+101 actual X11 presentations, four swapchains, three resize idle waits,
+four Model2/one CRT pipelines, 28 buffers including diagnostic capture,
+six images and zero validation errors. Steady frames do not recreate
+pipelines, allocate renderer resources or wait for device idle.
+
+Four independent SDL/direct window comparisons cover 497x385 and 317x245,
+nearest and linear: 538,020 pixels exactly equal. vulkan-blit-001/result.json
+has SHA256 `ff3ccdfb97a94c7ad72a3273a78ad7e5aa64bbf39f3c53f90703980777de0962`.
+The Settings fixture passes 304 checks including actual mouse CRT toggles,
+preferences, binding isolation, foreign contexts, 24 queued frames, resize,
+CRT/plain-blit overlays and native-to-SDL-to-native switching. Report
+build/worktrees/native-vulkan-display-001/build/panel-vulkan-003/result.json
+has SHA256 `4cf43770dd0f9a56089d54c0458ec922ff582088ddaac75308c3488107b496a8`.
+All use Linux X11/lavapipe with zero Vulkan validation errors. They do not
+establish vendor GPU performance or physical Windows playback.
+
+The actual Linux game passes three visible 2,600-frame arms: SDL Vulkan,
+direct Vulkan and direct Accurate textures. All end at 500,035,460 instructions,
+1,130,001,001 reference cycles and PC 0x005e6964. All WAVs (1,993,322 stereo
+frames), final saves, inputs, observation and complete resume files match.
+Each direct arm presents 2,600 frames with one swapchain, four Model2/one CRT
+pipelines and zero validation errors. Default final pixels equal SDL Vulkan;
+Accurate final pixels equal the same-machine CPU reference. These unthrottled
+runs drain/capture audio without physical playback. player-parity-001/result.json
+under the Vulkan worktree build has SHA256
+`69d6b203c566c9bf61d24416eed287c855be4c76a396d9b74b86f37cc5303859`.
+Its final-audit.json rehashes 227 inputs and 49 artifacts, SHA256
+`995b115c9103bfb1e644e001ea732ef042fca0d3b26b534bf29a61968c370a1f`.
+It retains a separate existing cross-API discrepancy: default SDL Vulkan/Linux
+and SDL Metal/Mac images differ at 951/190,464 pixels despite matching CPU
+execution. Same-backend equivalence is not cross-API or arcade certification.
+
+Failure history: initial WSI validation exposed missing barriers for reused
+offscreen/acquired images; explicit dependencies fixed them. A deliberately
+closed queue gate stalled lavapipe cold allocations; prewarming three slots
+and diagnostic readbacks before closing the gate produces the intended
+three-pending-frame ownership test without driver allocation serialization.
+The UI fixture first captured during an asynchronous SDL/X11 resize with
+inconsistent dimensions; waiting for the requested size fixed the fixture.
+The initial plain path reused a zero-strength CRT shader; review required the
+actual SDL blit primitive and exact odd/downscaled window comparison instead.
+Those changes are all included in the final measured source, without shader
+forks, game-clock changes or rewritten capture baselines.
+
+The regular Linux GCC/Clang CI now additionally compiles/links the entire
+direct Vulkan host and ImGui path using ROM-free link symbols. Eleven script
+regressions pass. Local Linux GNU 13.3 full frontend and fourteen host CTests
+pass; report build/worktrees/native-vulkan-frontend-ci-001/build/frontend-ci-validation.json
+has SHA256 `b74914ffb9eb9aa7330fcc18c6c82d9ef62639b086d36513e04e5a059c501b0c`.
+Root Mac compilation with the combined source also passes fourteen host tests
+at build/rally-native-mac-frontend-001. Separate Vulkan CI executes invented
+offscreen/async and window fixtures with lavapipe. Windows cross compilation
+and actual player packaging proceed separately; physical Windows GPU testing
+and complete-race/independent MAME/PCB checks remain open.
+
+Final independent review passes 1,029 checks: every recorded input/artifact
+rehashes, all 170 source files match root, and complete recordings/PCM/saves
+and both final image comparisons are independently reread. The sole mapped
+root input difference is the documented platform README update. No blocking
+flag, lifecycle or queued-UI reuse defect is found. Report
+build/worktrees/native-vulkan-frontend-ci-001/build/final-game-independent-audit-001/result.json
+has SHA256 `c2077303418c6f736377b25715f97bd6944e9583e82426c6eaed1c392c4cd380`.
+
+## Direct Metal Mac packages and preview publication (2026-10-16)
+
+The measured 8360ea9 player is packaged in both editions. Personal DMG:
+build/installers/mac-direct-metal-personal-001,
+32,140,096 bytes/SHA256
+`dedd27a907c14c6d43c0c6427c2a7105e929e55afb41ffb915bf006090d6779b`.
+ROM-import DMG: build/installers/mac-direct-metal-import-001,
+12,953,680 bytes/SHA256
+`2d1c4d4703904ecc9584f452df23404673139a1a21e0b271d8e007c1c1c41b9d`.
+Independent package audit passes 182 checks: read-only mounted bytes match
+manifests/staging, strict signatures verify, notices/icon match, the personal
+edition contains exactly eight verified images, and the import edition contains
+no separate ROM/data files. Signed executables differ from the measured input
+only in signature blobs and three signature-size metadata fields. Both retain
+the honest compiled-game-instructions notice and ad-hoc/not-notarized scope.
+Report build/worktrees/native-metal-presenter-001/build/mac-package-independent-audit-001/result.json
+has SHA256 `416f2030f490c90370c84f35fc88d022a97dad1493b62416c12a31d6ac38da0c`.
+
+All five GitHub workflows pass for 8360ea9, including the complete platform
+matrix and the Mac direct frontend feature assertion. The source/export gate
+passes at build/publication/native-metal-player-source-gate-001.json. The
+ROM-import DMG, sanitized player manifest and checksums are published as
+v0.1.0-player.2 on the personal LaurentGarcia/sega-rally-recomp repository.
+The tag targets 8360ea9 explicitly; personal data is not uploaded. Publication
+inputs remain at build/publication/native-metal-player-002.
+
+The first packaged launch failed to read the external Documents-directory
+selection replay and exited before SDL/game initialization. Its log is retained
+at build/validation/native-metal-player-001/manual-001/host.log; the specific
+access failure is not diagnosed as a game defect. A launch without that
+external replay uses bundled data and fresh temporary saves at
+/private/tmp/sega-rally-metal-play-8360ea9-001. It runs windowed with direct Metal,
+sound, instruction-boundary timing and CRT, beyond 5,340 frames without a
+logged frontier. No controller was connected. It subsequently closes cleanly
+at 11,062 game frames / 11,060 presentations / two skipped drawables, with
+8,480,974 native stereo PCM frames and zero logged chip/host drops or device
+input shortfalls. The completed log/saves are preserved at
+build/validation/native-metal-player-001/manual-002. This telemetry is not
+a completed-race or physical sound certification.
+
+Next: finish the parallel Vulkan actual-game/Settings integration and CI,
+while retaining the tested SDL Windows package and replacing remaining SDL
+platform services separately. Full-course and independent arcade fidelity
+requirements remain open.
+
 ## Direct Metal game and Settings integration (2026-10-16)
 
 The Platform layer & build and Reference & validation contracts govern this

@@ -1,4 +1,4 @@
-// Shared Model2A host with SDL GPU and optional direct Metal presentation.
+// Shared Model2A host with SDL GPU and optional direct Metal/Vulkan presentation.
 #include "runtime/model2a_machine.h"
 #include "app/gpu/gpu_renderer.h"
 #include "app/gpu/crt_renderer.h"
@@ -13,6 +13,9 @@
 #include "app/segarally_startup.h"
 #ifdef SEGARALLY_NATIVE_METAL
 #include "app/native/metal/metal_presenter.h"
+#endif
+#ifdef SEGARALLY_NATIVE_VULKAN
+#include "app/native/vulkan/vulkan_presenter.h"
 #endif
 #include "../../tools/srally_boot/input_replay.h"
 #ifdef SEGARALLY_INPUT_RECORDING
@@ -107,6 +110,7 @@ int segarally_host_main(int argc,char **argv) {
 #else
     bool native_metal_requested=false;
 #endif
+    bool native_vulkan_requested=false,vulkan_validation=false;
     // A player launcher can pass paths without losing interactive defaults.
     // Explicit diagnostics remain opt-in; replay restores its recorded options.
     bool player_defaults=argc==1,sound_disabled=false;
@@ -137,8 +141,10 @@ int segarally_host_main(int argc,char **argv) {
         else if(arg=="--original-display") original_display=true;
         else if(arg=="--accurate-textures") accurate_textures=true;
         else if(arg=="--display-controls") show_display_controls=true;
-        else if(arg=="--native-metal") native_metal_requested=true;
-        else if(arg=="--sdl-gpu") native_metal_requested=false;
+        else if(arg=="--native-metal") {native_metal_requested=true;native_vulkan_requested=false;}
+        else if(arg=="--native-vulkan") {native_vulkan_requested=true;native_metal_requested=false;}
+        else if(arg=="--vulkan-validation") vulkan_validation=true;
+        else if(arg=="--sdl-gpu") {native_metal_requested=false;native_vulkan_requested=false;}
         else if(arg=="--log") log_path=value();
         else if(arg=="--input-replay") replay_path=value();
 #ifdef SEGARALLY_INPUT_RECORDING
@@ -155,6 +161,7 @@ int segarally_host_main(int argc,char **argv) {
         else if(arg=="--help") {puts("Sega Rally native: --data DIR --save-dir DIR --frames N --instructions N --capture FILE.ppm --reference-capture FILE.ppm --touch --unthrottled --hidden --fullscreen --log FILE --input-replay FILE --player --sound --no-sound --audio-capture FILE.wav --audio-diagnostics --instruction-boundary-hook\nNo-argument startup or --player enables compiled sound, exact instruction-boundary execution and CRT for fresh player preferences. --no-sound mutes the native sound board. Explicit commands keep sound opt-in with diagnostic instruction-boundary timing. Unthrottled runs capture/drain audio without device playback.\nKeys: arrows steer, Z gas, X brake, C coin, Return start, V view, A/S gear down/up, Space handbrake, F2 test, F3 service, Escape quit.");
             puts("Display: F1 opens controls and pauses; F6 toggles CRT effects. --crt enables the Arcade CRT preset; --original-display uses display defaults; --accurate-textures enables optional native interpolation; --display-controls opens the panel. Native --capture remains before display effects.");
             puts("Mac builds with SEGARALLY_NATIVE_METAL use direct Metal game, CRT and Settings rendering by default. --sdl-gpu selects the comparison backend; --native-metal explicitly selects the direct backend. Window, input and audio services still use SDL.");
+            puts("Windows/Linux builds with SEGARALLY_NATIVE_VULKAN support --native-vulkan for direct game, CRT and Settings rendering. --vulkan-validation enables required Vulkan synchronization validation for diagnostics. SDL GPU remains the default Windows/Linux backend.");
             puts("Controls: F1 or Xbox Y opens Settings. Configure keyboard/controller bindings and optional controller input in Controls. Xbox defaults: left stick steer, RT gas, LT brake, LB/RB shift, A view, X handbrake, Back coin, Start start.");
             puts("First launch: choose your Sega Rally Revision B ZIP when prompted; no compiler or network required. --rom FILE.zip imports it directly. --import-only with --rom verifies/imports without starting the game. Personal packages can include verified game data.");
             puts("--audio-output-capture FILE.wav records only this app's logical SDL mix before the physical backend, plus FILE.wav.events.txt. Requires paced --sound --audio-diagnostics --audio-capture with a distinct path; format changes/overflow fail the capture.");
@@ -176,6 +183,10 @@ int segarally_host_main(int argc,char **argv) {
 #ifndef SEGARALLY_NATIVE_METAL
     if(native_metal_requested) throw std::runtime_error("--native-metal requires a Mac build with SEGARALLY_NATIVE_METAL=ON");
 #endif
+#ifndef SEGARALLY_NATIVE_VULKAN
+    if(native_vulkan_requested) throw std::runtime_error("--native-vulkan requires SEGARALLY_NATIVE_VULKAN=ON");
+#endif
+    if(vulkan_validation&&!native_vulkan_requested) throw std::runtime_error("--vulkan-validation requires --native-vulkan");
     const bool explicit_data=!data.empty();
     if(!rom_path.empty() && explicit_data)throw std::runtime_error("Use either --rom or --data, not both");
     if(import_only && rom_path.empty())throw std::runtime_error("--import-only requires --rom FILE.zip");
@@ -233,6 +244,9 @@ int segarally_host_main(int argc,char **argv) {
 #ifdef SEGARALLY_NATIVE_METAL
     std::unique_ptr<app::native::MetalPresenter> native_metal;
 #endif
+#ifdef SEGARALLY_NATIVE_VULKAN
+    std::unique_ptr<app::native::VulkanPresenter> native_vulkan;
+#endif
     // Fresh player preferences start with Arcade CRT. Loading a saved choice
     // below takes precedence; --original-display remains the explicit bypass.
     display_settings.crt.enabled=player_defaults;
@@ -280,6 +294,7 @@ int segarally_host_main(int argc,char **argv) {
 #endif
         SDL_WindowFlags flags=SDL_WINDOW_RESIZABLE|SDL_WINDOW_HIGH_PIXEL_DENSITY;
         if(native_metal_requested) flags|=SDL_WINDOW_METAL;
+        if(native_vulkan_requested) flags|=SDL_WINDOW_VULKAN;
         if(hidden) flags|=SDL_WINDOW_HIDDEN;
         if(fullscreen) flags|=SDL_WINDOW_FULLSCREEN;
 #ifdef SEGARALLY_IOS
@@ -293,6 +308,14 @@ int segarally_host_main(int argc,char **argv) {
             if(!native_metal->init(window)) throw std::runtime_error(native_metal->error());
             fprintf(stderr,"GPU selected=direct-metal; game, CRT and Settings use native Metal commands; SCSP=%s playback=%d\n",
                 sound?"instruction_boundary":"disabled",int(sound&&!unthrottled));
+        } else
+#endif
+#ifdef SEGARALLY_NATIVE_VULKAN
+        if(native_vulkan_requested) {
+            native_vulkan=std::make_unique<app::native::VulkanPresenter>();
+            if(!native_vulkan->init(window,false,vulkan_validation)) throw std::runtime_error(native_vulkan->error());
+            fprintf(stderr,"GPU selected=direct-vulkan device=%s validation=%d; game, CRT and Settings use native Vulkan commands; SCSP=%s playback=%d\n",
+                native_vulkan->renderer().device_name().c_str(),int(vulkan_validation),sound?"instruction_boundary":"disabled",int(sound&&!unthrottled));
         } else
 #endif
         {
@@ -333,6 +356,10 @@ int segarally_host_main(int argc,char **argv) {
         bool display_initialized=false;
 #ifdef SEGARALLY_NATIVE_METAL
         if(native_metal) display_initialized=display.init_metal(window,native_metal->metal_device(),saves,display_settings);
+        else
+#endif
+#ifdef SEGARALLY_NATIVE_VULKAN
+        if(native_vulkan) display_initialized=display.init_vulkan(window,native_vulkan->ui_context(),saves,display_settings);
         else
 #endif
         display_initialized=display.init(window,device,SDL_GetGPUSwapchainTextureFormat(device,window),saves,display_settings);
@@ -557,6 +584,20 @@ int segarally_host_main(int argc,char **argv) {
                     throw std::runtime_error(native_metal->error());
             } else
 #endif
+#ifdef SEGARALLY_NATIVE_VULKAN
+            if(native_vulkan) {
+                if(!display.new_frame_vulkan(display_settings,native_vulkan->ui_context(),overlay)) throw std::runtime_error(display.error());
+                const bool mode_changed=rendered_accurate_textures!=display_settings.accurate_textures;
+                const auto outcome=native_vulkan->present(machine->video(),1,display_settings.accurate_textures,display_settings.crt,
+                    new_frame||(displayed&&mode_changed),new_frame||displayed!=0,
+                    [&](VkCommandBuffer command){if(!display.render_vulkan(command))throw std::runtime_error(display.error());},
+                    display_settings.linear_filter,display_settings.integer_scale);
+                if(outcome==app::native::VulkanPresenter::Outcome::error||outcome==app::native::VulkanPresenter::Outcome::device_lost)
+                    throw std::runtime_error(native_vulkan->error());
+                rendered_accurate_textures=display_settings.accurate_textures;
+                if(new_frame) ++displayed;
+            } else
+#endif
             {
             if(!display.new_frame(display_settings,overlay)) throw std::runtime_error(display.error());
             auto *cmd=SDL_AcquireGPUCommandBuffer(device);if(!cmd) throw std::runtime_error(SDL_GetError());
@@ -628,12 +669,20 @@ int segarally_host_main(int argc,char **argv) {
 #ifdef SEGARALLY_NATIVE_METAL
         if(native_metal && !native_metal->wait_idle()) throw std::runtime_error(native_metal->error());
 #endif
+#ifdef SEGARALLY_NATIVE_VULKAN
+        if(native_vulkan) native_vulkan->drain();
+#endif
         audio.finish_output_capture();
         diagnostic_log(true);
         if(!capture_path.empty() && displayed) {
 #ifdef SEGARALLY_NATIVE_METAL
             if(native_metal) {
                 if(!native_metal->capture(capture_path)) throw std::runtime_error(native_metal->error());
+            } else
+#endif
+#ifdef SEGARALLY_NATIVE_VULKAN
+            if(native_vulkan) {
+                if(!native_vulkan->capture(capture_path)) throw std::runtime_error(native_vulkan->error());
             } else
 #endif
             capture(device,screen,capture_path);
@@ -655,6 +704,17 @@ int segarally_host_main(int argc,char **argv) {
                 static_cast<unsigned long long>(rendered.skipped_drawables));
         }
 #endif
+#ifdef SEGARALLY_NATIVE_VULKAN
+        if(native_vulkan) {
+            const auto rendered=native_vulkan->renderer().statistics();const auto presented=native_vulkan->statistics();
+            const auto errors=native_vulkan->renderer().validation_errors();
+            fprintf(stderr,"Direct Vulkan presentation: submissions=%llu presented_frames=%llu swapchains=%llu model2_pipelines=%llu crt_pipelines=%llu validation_errors=%u\n",
+                static_cast<unsigned long long>(rendered.submissions),static_cast<unsigned long long>(presented.presentations),
+                static_cast<unsigned long long>(presented.swapchain_creations),static_cast<unsigned long long>(rendered.pipeline_creations),
+                static_cast<unsigned long long>(presented.pipeline_creations),errors);
+            if(errors) throw std::runtime_error("Direct Vulkan reported validation errors");
+        }
+#endif
         if(sound) fprintf(stderr,"Native audio: rate=%u frames=%llu nonzero_samples=%llu peak=%.9g rms=%.9g chip_dropped=%llu host_dropped=%llu queued=%u device_shortfall_requests=%llu requested_extra_input_bytes=%llu capture=%s\n",
             Machine::kAudioRate,static_cast<unsigned long long>(audio_frames),static_cast<unsigned long long>(audio_nonzero),audio_peak,
             audio_frames?std::sqrt(audio_energy/(2*audio_frames)):0,
@@ -672,6 +732,17 @@ int segarally_host_main(int argc,char **argv) {
     audio.close();
 #ifdef SEGARALLY_NATIVE_METAL
     if(native_metal) {native_metal->wait_idle();display.shutdown();native_metal->shutdown();}
+#endif
+#ifdef SEGARALLY_NATIVE_VULKAN
+    if(native_vulkan) {
+        try {native_vulkan->drain();}catch(const std::exception &error){
+            fprintf(stderr,"Vulkan shutdown: %s\n",error.what());result=1;
+            // An overlay failure can leave an unsubmitted command recording.
+            // Complete older UI submissions before destroying their resources.
+            if(native_vulkan->renderer().device())vkDeviceWaitIdle(native_vulkan->renderer().device());
+        }
+        display.shutdown();native_vulkan.reset();
+    }
 #endif
     if(device) {SDL_WaitForGPUIdle(device);display.shutdown();crt.shutdown();gpu.shutdown();if(screen) SDL_ReleaseGPUTexture(device,screen);
         if(window) SDL_ReleaseWindowFromGPUDevice(device,window);SDL_DestroyGPUDevice(device);}

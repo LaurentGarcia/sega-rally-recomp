@@ -2,7 +2,8 @@
 
 The target runs generated native C++ for Rally's i960 main CPU and TGP program,
 with native Model 2A devices. It does not replace game logic with the earlier
-lifted-C prototype. macOS is the active frontend target.
+lifted-C prototype. macOS uses direct Metal; Windows/Linux builds can enable
+direct Vulkan alongside the SDL GPU comparison path.
 
 ```mermaid
 flowchart TD
@@ -18,14 +19,19 @@ flowchart TD
     TGP --> GEO
     DATA --> GEO
     GEO --> VIDEO[Video and polygon-priority composition]
-    VIDEO --> GPU[Shared SDL_GPU renderer on Metal]
-    GPU --> UI[Optional CRT pass and ImGui Settings]
-    UI --> WINDOW[SDL3 Mac window]
+    VIDEO --> FRAME[Shared Model2Frame, resources and shaders]
+    FRAME --> METAL[Direct Metal]
+    FRAME --> VULKAN[Optional direct Vulkan]
+    FRAME --> BASELINE[SDL GPU comparison renderer]
+    METAL --> UI[Shared CRT and ImGui Settings]
+    VULKAN --> UI
+    BASELINE --> UI
+    UI --> WINDOW[SDL3 window services]
     BOARD <--> SOUND[Native sound board and SCSP]
     SND --> SOUND
     DATA --> SOUND
     SOUND --> PCM[Bounded 44.1 kHz stereo PCM]
-    PCM --> AUDIO[SDL3 audio stream and Mac output]
+    PCM --> AUDIO[SDL3 audio stream and platform output]
     MACHINE --> RECORD[Optional exact resume and cabinet-input recording]
     PCM --> RECORD
     RECORD --> REPLAY[Same-executable offline replay without output devices]
@@ -101,8 +107,11 @@ firmware available does not change these native device limits.
 Rally uploads its own verified 1,665-word TGP program. Shared geometry consumes
 verified polygon and texture images plus CPU-written RAM. The
 [video adapter](../src/runtime/model2a_video.cpp) preserves Model 2A mappings and
-feeds the inherited CPU renderer or the shared SDL_GPU renderer. The dedicated
-[host](../src/app/segarally_main.cpp) requires Metal on Mac. Polygon priority
+feeds the CPU renderer or shared frame/resource packing used by all GPU paths.
+The dedicated [host](../src/app/segarally_main.cpp) selects direct Metal on Mac
+and offers direct Vulkan on Windows/Linux while retaining SDL GPU comparisons.
+See [native renderers](native-renderers.md) for asynchronous submission,
+presentation and Settings ownership. Polygon priority
 retains window, sort-bucket, submission and face rules; camera depth does not
 replace arcade ordering. The default GPU path uses triangle fans. Optional Accurate textures uses measured
 span stepping and a certified reciprocal correction; saved-scene pixel matches

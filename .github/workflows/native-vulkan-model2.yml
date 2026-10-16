@@ -46,3 +46,39 @@ jobs:
               if path.is_file() and path.suffix in ('.stdout','.stderr','.json','.txt'):
                   print(f'--- {path}\n{path.read_text(errors="replace")}')
           PY
+  lavapipe-presentation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install direct Vulkan and X11 software presentation dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends libvulkan-dev mesa-vulkan-drivers vulkan-validationlayers xvfb xauth libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev libxss-dev libxtst-dev libxkbcommon-dev
+      - name: Fetch pinned SDL window and surface implementation
+        run: |
+          git init extern/sdl3
+          git -C extern/sdl3 fetch --depth 1 https://github.com/libsdl-org/SDL.git fa2c02bb6e21974a89ea9824bc53c9932abe5f9c
+          git -C extern/sdl3 checkout --detach FETCH_HEAD
+      - name: Select lavapipe and present through an X11 window
+        run: |
+          python3 - <<'PY'
+          import os, subprocess
+          from pathlib import Path
+          paths = sorted(Path('/usr/share/vulkan/icd.d').glob('lvp_icd*.json'))
+          if len(paths) != 1:
+              raise SystemExit('Expected one installed lavapipe driver')
+          os.environ['VK_DRIVER_FILES'] = str(paths[0])
+          subprocess.run(['python3', 'tests/test_native_vulkan_presenter.py', '--output', 'build/native-vulkan-presentation-ci'], check=True)
+          PY
+      - name: Show presentation outcomes
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          for path in sorted(Path('build/native-vulkan-presentation-ci').glob('*')):
+              if path.is_file() and path.suffix in ('.stdout', '.stderr', '.json'):
+                  print(f'--- {path}\n{path.read_text(errors="replace")}')
+          PY

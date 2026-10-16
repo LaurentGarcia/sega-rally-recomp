@@ -3,8 +3,8 @@
 [Source prerelease v0.1.0-rc.1](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-rc.1)
 contains source archives. Both compiler-bootstrap preview releases have been
 withdrawn: they required installed development tools and were not the requested
-prebuilt game apps. [Player Preview 1](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.1)
-is published with the actual precompiled Mac game app. It imports the player's own ROM
+prebuilt game apps. [Player Preview 2](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.2)
+is published with the precompiled direct Metal Mac game app. It imports the player's own ROM
 locally, without a compiler or developer-tool installation.
 
 The distribution work targets these four platforms:
@@ -32,7 +32,25 @@ IPA does not establish TestFlight distribution or a public ROM-import edition.
 
 ## Available artifacts
 
-The published [Mac Player Preview 1](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.1)
+The current [Mac Player Preview 2](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.2)
+contains `Sega-Rally-Native-macOS-arm64.dmg` (12,953,680 bytes), the player
+manifest and checksums. Its SHA256 is
+`2d1c4d4703904ecc9584f452df23404673139a1a21e0b271d8e007c1c1c41b9d`.
+Game, CRT and Settings use direct Metal; SDL retains window/input/audio duties.
+The source is `8360ea9b7781947dc2c58ba935f7ba2d1dd19953`, with all five CI
+workflows green. The actual game passes a three-arm 2,600-frame comparison and
+a separate 2,100-frame visible check with sound/CRT defaults and zero recorded
+audio drops/shortfalls. See [renderer evidence](native-renderers.md) for scope.
+
+The matching private ready-to-play DMG is local at
+`build/installers/mac-direct-metal-personal-001`, 32,140,096 bytes, SHA256
+`dedd27a907c14c6d43c0c6427c2a7105e929e55afb41ffb915bf006090d6779b`.
+Both editions include the original app icon and pass mounted-image byte,
+signature and dependency-notice checks. They are ad-hoc signed, not notarized.
+The personal app has launched windowed with its bundled data, sound and CRT.
+These packages supersede the local Mac icon packages described below.
+
+The preceding [Mac Player Preview 1](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.1)
 contains `Sega-Rally-Native-macOS-arm64.dmg` (9,839,642 bytes), a player manifest
 and [SHA256SUMS](https://github.com/LaurentGarcia/sega-rally-recomp/releases/download/v0.1.0-player.1/SHA256SUMS).
 GitHub's reported DMG digest matches the local package:

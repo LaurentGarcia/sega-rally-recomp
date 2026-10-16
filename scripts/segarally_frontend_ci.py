@@ -47,7 +47,7 @@ def verify_toolchain(base,actual):
     for key in keys:
         if actual.get(key,'') != base.get(key,''): raise RuntimeError(f'Frontend toolchain differs: {key}')
 
-def renderer_features(actual,host_platform):
+def renderer_features(actual,host_platform,native_vulkan=False):
     # Inspect the configured target rather than inferring coverage from the
     # runner name. A changed CMake default must not silently drop Metal CI.
     value=actual.get('SEGARALLY_NATIVE_METAL')
@@ -56,20 +56,32 @@ def renderer_features(actual,host_platform):
     enabled=value=='ON'
     if enabled != (host_platform=='darwin'):
         raise RuntimeError('SEGARALLY_NATIVE_METAL must be ON for macOS frontend CI and OFF elsewhere')
-    return {'native_metal':enabled,'sdl_gpu':True}
+    value=actual.get('SEGARALLY_NATIVE_VULKAN')
+    if value not in ('ON','OFF'):
+        raise RuntimeError('Missing or invalid SEGARALLY_NATIVE_VULKAN cache option')
+    if (value=='ON') != native_vulkan:
+        raise RuntimeError('SEGARALLY_NATIVE_VULKAN differs from the requested frontend CI configuration')
+    if native_vulkan and host_platform not in ('linux','win32'):
+        raise RuntimeError('Direct Vulkan frontend CI targets Windows/Linux')
+    return {'native_metal':enabled,'native_vulkan':native_vulkan,'sdl_gpu':True}
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--toolchain-build', type=Path, default=ROOT/'build')
     parser.add_argument('--output', type=Path, default=ROOT/'build/rally-frontend')
+    parser.add_argument('--native-vulkan', action='store_true',
+                        help='also compile/link the direct Vulkan host and ImGui backend (requires Vulkan SDK)')
     args = parser.parse_args()
+    if args.native_vulkan and sys.platform not in ('linux','win32'):
+        parser.error('--native-vulkan targets Windows/Linux')
     out = args.output.resolve()
     if out.exists() or not out.is_relative_to(ROOT/'build'):
         parser.error('output must be a new directory beneath ignored build/')
     base = toolchain(args.toolchain_build)
     command = ['cmake','-S',str(ROOT/'platform/segarally'),'-B',str(out),'-G',base['CMAKE_GENERATOR'],
                '-DCMAKE_BUILD_TYPE=Release','-DSEGARALLY_FRONTEND_COMPILE_ONLY=ON',
-               '-DSEGARALLY_SOUND=ON','-DSEGARALLY_INPUT_RECORDING=ON','-DSEGARALLY_INSTRUCTION_BOUNDARY_HOOK=ON']
+               '-DSEGARALLY_SOUND=ON','-DSEGARALLY_INPUT_RECORDING=ON','-DSEGARALLY_INSTRUCTION_BOUNDARY_HOOK=ON',
+               '-DSEGARALLY_NATIVE_VULKAN='+('ON' if args.native_vulkan else 'OFF')]
     for key in ('CMAKE_C_COMPILER','CMAKE_CXX_COMPILER','CMAKE_GENERATOR_INSTANCE','CMAKE_MAKE_PROGRAM'):
         if base.get(key): command.append(f'-D{key}={base[key]}')
     for key, flag in (('CMAKE_GENERATOR_PLATFORM','-A'),('CMAKE_GENERATOR_TOOLSET','-T')):
@@ -77,7 +89,7 @@ def main():
     subprocess.run(command,cwd=ROOT,check=True,timeout=300)
     actual = toolchain(out)
     verify_toolchain(base,actual)
-    features = renderer_features(actual,sys.platform)
+    features = renderer_features(actual,sys.platform,args.native_vulkan)
     subprocess.run(['cmake','--build',str(out),'--config','Release','--parallel','2','--target',
                     'segarally_frontend_compile','test_segarally_audio','test_segarally_controls',
                     'test_segarally_display_preferences','test_segarally_audio_output_capture',
