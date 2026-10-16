@@ -267,7 +267,9 @@ separate Vulkan workflows execute invented render/presentation fixtures with
 lavapipe, never uploaded game data.
 
 Native Wayland has a separate Linux fixture. Install Weston, Wayland development
-files/protocols and xkbcommon alongside the Vulkan dependencies, then pass the
+files/protocols, xkbcommon and EGL development files alongside the Vulkan
+dependencies. Pinned SDL requires EGL to enable its Wayland window backend even
+when this fixture renders through Vulkan. Pass the
 installed lavapipe ICD explicitly:
 
 ```sh

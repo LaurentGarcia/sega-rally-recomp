@@ -16,6 +16,9 @@ prerelease for developers.
 | [Technical architecture](segarally-architecture.md) | Generated CPUs, native devices, clock, Metal/Vulkan and SDL3 audio |
 | [Evidence and status](segarally-status.md) | Recorded behavior, measurements and unresolved validation |
 | [Cabinet input replay](segarally-input-replay.md) | Script format, frame boundaries and exact host recordings |
+| [Practice finish and restart](course-regression.md) | Frozen cabinet inputs, isolated saves and measured lifecycle coverage |
+| [Desktop player checks](segarally-pc-check.md) | Collect Windows/Linux renderer, audio and control evidence without rebuilding |
+| [Native renderers](native-renderers.md) | Direct Metal/Vulkan comparisons, window lifecycle tests and current limits |
 | [Project design](sega-rally-design.md) | Rally scope, implementation contracts and findings |
 | [Handoff](../HANDOFF.md) | Detailed chronological evidence and historical failure modes |
 

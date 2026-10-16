@@ -153,8 +153,9 @@ Missing code and unsupported hardware stop with diagnostics instead of skipping
 behavior.
 
 Full-game raster fidelity, extended-precision floating point, physical timing
-and full MAME-machine/PCB comparison remain open. A measured playback-buffer
-starvation mechanism is fixed; broader listening feedback is still needed.
+and full MAME-machine/PCB comparison remain open. A captured playback-buffer
+starvation mechanism has a tested remedy; a later long attract test exposed
+intermittent host stalls still under investigation. Listening feedback is needed.
 There is no fidelity certification or guaranteed frame rate.
 
 | Explore | Read |

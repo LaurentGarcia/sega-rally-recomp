@@ -92,7 +92,7 @@ jobs:
       - name: Install native Wayland software presentation dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends libvulkan-dev mesa-vulkan-drivers vulkan-validationlayers weston libwayland-dev wayland-protocols libxkbcommon-dev
+          sudo apt-get install --no-install-recommends libvulkan-dev mesa-vulkan-drivers vulkan-validationlayers weston libwayland-dev wayland-protocols libxkbcommon-dev libegl-dev
       - name: Fetch pinned SDL window and surface implementation
         run: |
           git init extern/sdl3

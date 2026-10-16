@@ -1,5 +1,24 @@
 # Handoff
 
+## Wayland CI dependency and current status correction (2026-10-16)
+
+The first hosted Wayland job (run 38981338922, job 117242648859) fails before
+WSI execution: pkg-config cannot find egl, so pinned SDL silently disables
+Wayland despite the requested CMake option. The generated-header assertion
+correctly rejects that binary. The local container already had EGL development
+files. The CI job now explicitly installs libegl-dev, and the renderer guide
+records this SDL window-backend dependency. No graphics code, fixture checks
+or passing local evidence is changed. The failed CI log is retained at
+build/rc-wayland-source-002/ci-wayland-004.log; earlier empty download attempts
+also remain. All other completed renderer jobs passed at 81f8288.
+
+The documentation index now links the course replay and desktop player checker.
+The current status page records the new Practice lifecycle and Wayland checks,
+the exact-scene pixel attribution and the long-attract audio failure/repeat.
+README wording distinguishes the earlier tested buffer remedy from the later
+intermittent host stalls. These are current-source developments; Preview 3
+release binaries are unchanged and no full RC/fidelity pass is claimed.
+
 ## Vulkan restore and native Wayland regression (2026-10-16)
 
 The original native Wayland fixture stalled after hiding and restoring a

@@ -19,6 +19,40 @@ This reference summarizes the latest recorded checkpoints. Exact hashes,
 failure history and ignored evidence locations are in [HANDOFF.md](../HANDOFF.md).
 The [design](sega-rally-design.md) records interpretation and hardware limits.
 
+## Latest development checks
+
+The [22,000-frame Practice finish/restart replay](course-regression.md) now
+covers SHORT Practice Mountain through Stage Clear, results, name entry, Top 8
+and attract, then a new Championship Desert start. The signed personal Metal
+player matches all 4,401 CPU frame checkpoints, final saves and the final
+Accurate-textures image; all 16,866,030 captured stereo PCM frames are finite
+and nonzero. This hidden unthrottled run does not test speakers or pacing, and
+it does not complete NORMAL Championship or Lakeside.
+
+A new 18,000-frame paced visible Mac attract run exposes intermittent host
+delivery stalls: 20 audio shortfall requests and 20,854 host-dropped frames,
+with no chip drops. Added opt-in timing separates event handling, PCM capture,
+submission, recording, diagnostic writes and requested/actual sleep. A separate
+instrumented repeat preserves native PCM, execution, final image and saves,
+and records no shortfalls or drops. The long stalls did not recur, so their
+cause remains unresolved; the repeat is not proof of a correction. Earlier
+shorter audio passes and the measured buffer remedy retain their narrower scope.
+
+Direct Vulkan now recreates stale presentation state after a hidden/minimized
+window is restored, fixing a measured Wayland FIFO presentation hang. The new
+native Wayland fixture passes 110 checks and 68 presentations under headless
+Weston/software Vulkan, with no validation errors. X11 still passes 101
+presentations and all nine images match its preceding baseline. A separate CI
+job covers Wayland. Preview 3's published Linux binary remains X11-only.
+
+The [exact-scene Metal/Vulkan analysis](native-renderers.md) reproduces 951
+default-image pixel differences despite identical projected vertices and CPU
+images. All 940 differences with unchanged polygon ownership change integer
+texture coordinates and texels; 11 ownership changes involve cutout textures.
+Unmodified Accurate textures matches across APIs and with CPU for that frame.
+The analysis narrows the cause, without establishing temporal-flicker coverage
+or a production shader correction. Default rendering is unchanged.
+
 ## Public source prerelease
 
 `v0.1.0-rc.1` packages the source project and documentation for local Mac builds.
