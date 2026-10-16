@@ -13,10 +13,12 @@ See [current evidence](segarally-status.md).
 
 ## Start the game
 
-Prebuilt Mac packages are being validated; see [package and platform
-status](release-platforms.md) for availability. The withdrawn compiler-bootstrap
-previews are not the prebuilt player. Current Mac packages target Apple Silicon
-with Metal and are ad-hoc signed, not notarized. Intel execution is unvalidated.
+Download the published [Mac Player Preview 1](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.1).
+See [package and platform status](release-platforms.md) for checksums and exact
+validation limits. The package targets Apple Silicon and Metal, with a macOS 13
+deployment target; execution on macOS 13 and Intel Macs is unvalidated. It is
+ad-hoc signed, not notarized. The withdrawn compiler-bootstrap previews are
+separate from this prebuilt player.
 
 Open the **ROM-import edition** DMG, copy **Sega Rally Native.app** to Applications,
 and open it. Choose your personally supplied complete Revision B (`srallycb`)

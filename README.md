@@ -6,6 +6,10 @@
 
 Generated C++ game code · Native board devices · SDL3 + Metal
 
+**Original arcade game by SEGA.** This is an unofficial project, not affiliated
+with or endorsed by SEGA.
+
+[![Mac Player](https://img.shields.io/badge/Mac_Player-Preview_1-e3a238?style=flat-square)](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.1)
 [![Prerelease](https://img.shields.io/badge/prerelease-v0.1.0--rc.1-e3a238?style=flat-square)](docs/releases/v0.1.0-rc.1.md)
 [![Platform](https://img.shields.io/badge/platform-macOS-111111?style=flat-square&logo=apple)](docs/getting-started.md)
 [![Graphics](https://img.shields.io/badge/graphics-Metal-657b91?style=flat-square)](docs/segarally-architecture.md)
@@ -23,8 +27,10 @@ Generated C++ game code · Native board devices · SDL3 + Metal
 ## Gravel, gears and native code
 
 This project brings Sega Rally Championship (1995, Model 2A) to macOS through
-static recompilation. Your verified Revision B ROMs become native C++ locally;
-shared hardware code supplies the arcade board's devices, geometry and sound.
+static recompilation. Developer builds turn verified Revision B ROMs into native
+C++; the published player already contains those compiled game instructions and
+imports only the data from your ZIP. Shared hardware code supplies the arcade
+board's devices, geometry and sound.
 SDL3 and Metal put the result on your Mac.
 
 | Drive | Make it yours | Keep it reproducible |
@@ -149,14 +155,23 @@ reference targets and their results do not establish Rally compatibility.
 
 ## Credits and source boundaries
 
+**Sega Rally Championship was created and published by SEGA.** Credit for the
+original game, its art, music, sound and arcade design belongs to SEGA and the
+original development team. SEGA, Sega Rally Championship and other game names,
+logos and content remain the property of their respective rights holders.
+
+This independent project is not affiliated with, sponsored by or endorsed by
+SEGA. The project's BSD-3-Clause license does not license SEGA's game code,
+graphics, music, sound or other content, including compiled game translations
+and the game imagery shown in screenshots.
+
 Started from **[alphanu1/daytona-arcade-recomp](https://github.com/alphanu1/daytona-arcade-recomp)**
 at `b33baeb28a1e1c94d90a4a80811f0b2c7f61106b`, retaining its history and
 [BSD-3-Clause license](LICENSE). Dependency revisions, licenses and notices are
 recorded in [THIRD_PARTY.md](THIRD_PARTY.md).
 
-This project reconstructs behavior; it is not Sega's original source code and
-is not affiliated with Sega. Sega Rally Championship and related names belong
-to their respective owners. No leaked source or SDK is used.
+This project reconstructs behavior; it is not SEGA's original source code.
+No leaked source or SDK is used.
 
 The public repository contains source, manifests, tests, analysis and curated
 documentation screenshots. Personal ROMs, generated game code, extracted runtime

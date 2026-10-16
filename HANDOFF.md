@@ -1,5 +1,28 @@
 # Handoff
 
+## Player publication and original game credit (2026-10-15)
+
+Player Preview 1 is published at v0.1.0-player.1 under the personal account.
+GitHub reports the exact local SHA256 for all three assets: the real 9,839,642-byte
+Mac DMG, player manifest and checksum list. Metadata is preserved at
+build/release-binaries/player-preview-001/published-release.json. A fresh release
+listing contains only the source prerelease and this player preview; the two
+withdrawn compiler-bootstrap releases remain deleted.
+
+The README now prominently credits SEGA and its original development team,
+states this project's unofficial status and keeps the source license separate
+from game content. Matching credits are published in both existing release
+descriptions. Credits do not change the private/public asset boundary.
+
+The personal Mac DMG and development-signed iOS IPA have been independently
+rehashed and their eight bundled images rechecked. Report SHA256
+`3bb45727bdffbec054424b4e577d87a94aa203102c7322891248443bd35c1c12`
+is at build/validation/personal-binaries-001/result.json. No phone install or
+physical test was performed. The 058d4ab hosted build run 38823583736 passes all
+six jobs. The actual x86-64 Linux game now compiles/links and passes CPU-only
+owned-ZIP import with all eight image identities exact. Linux packages and
+Windows game compilation remain in progress; GPU/audio execution is unvalidated.
+
 ## Actual Mac players and signed personal iOS binary (2026-10-15)
 
 Mac game source 058d4ab builds for macOS 13/arm64 and passes all thirteen host

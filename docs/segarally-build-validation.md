@@ -3,7 +3,9 @@
 The experimental **v0.1.0-rc.1 source prerelease** builds a local Mac app from
 verified personal Revision B (`srallycb`) ROMs. For a fresh checkout, follow
 [getting started](getting-started.md) first. See [platform status](release-platforms.md) for phone and Windows/Linux build readiness.
-Commands below run from the repository root.
+The published [Mac player](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.1)
+imports a verified ZIP without any developer tools. The commands below are for
+source development and packaging, and run from the repository root.
 
 ## Inputs and tools
 
@@ -51,8 +53,9 @@ Choose a new output directory. The pipeline runs these stages in order:
    and recording support, plus its regression executables.
 5. Run the dedicated Mac CTests, package assets/notices and verify the signature.
 
-The eleven registered Mac CTests cover host audio, controls, display preferences,
-input parsing, asset staging, launcher, notice packaging and pipeline behavior.
+The thirteen registered Mac CTests cover host audio, controls, display preferences,
+input parsing, runtime ROM import, platform file handling, asset staging, launcher,
+notice packaging and pipeline behavior.
 Their passing result is a build/regression gate, not complete gameplay validation.
 The source and test registration live in
 [platform/segarally/CMakeLists.txt](../platform/segarally/CMakeLists.txt).
@@ -76,6 +79,28 @@ apps and recordings. A failure leaves `build-result.json` and `logs/` in its out
 The report records source/dependency/input identities, commands, durations and
 artifact hashes. Preserve the first failed report before choosing another output.
 
+## Package prebuilt Mac player editions
+
+The developer-only [player packager](../platform/segarally/macos/package_player.py)
+uses an already built Apple Silicon executable. It does not generate or compile
+the game. Run its `--help` for the exact command options. Supply the build's
+actual source revision with `--build-revision`, its reviewed executable SHA256
+with `--executable-sha256`, the prepared Mac host directory with `--build-dir`,
+and a new ignored output directory with `--output`.
+
+`--edition import` packages the precompiled game and retained notices without
+ROM archives or extracted game assets. First launch imports the owner's ZIP
+locally. `--edition personal` also copies all eight fixed-identity data images;
+keep that edition private. Both contain statically recompiled game instructions.
+The original project source license does not license Sega game content.
+The packager checks the game-source binding, exact image identities, notices,
+copied executable and ad-hoc signature before producing a DMG and hash report.
+It does not launch the game, notarize the app or prove gameplay fidelity.
+
+The signed personal iOS package is a separate build/signing output, limited to
+its provisioning profile. Its local availability and device restrictions are
+recorded in [platform status](release-platforms.md#available-artifacts).
+
 ## Run the dedicated host tests again
 
 The one-command pipeline already builds the test executables and runs CTest:
@@ -90,7 +115,8 @@ build. Build them explicitly before running CTest:
 ```sh
 cmake --build build/segarally-player/mac --target test_segarally_audio \
     test_segarally_controls test_segarally_display_preferences \
-    test_segarally_audio_output_capture test_segarally_input_replay -j 4
+    test_segarally_audio_output_capture test_segarally_input_replay \
+    test_segarally_platform_files test_segarally_rom_import -j 4
 ctest --test-dir build/segarally-player/mac --output-on-failure
 ```
 
