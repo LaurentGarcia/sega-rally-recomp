@@ -1,5 +1,86 @@
 # Handoff
 
+## Extended host timing and RC checks (2026-10-16)
+
+Reference & validation and Platform layer & build govern this work. The actual
+signed personal Mac player was exercised for 18,000 paced visible attract/title
+frames with fresh saves, default CRT/sound, native PCM, logical-device output and
+a complete input recording. It completed 3,492,142,456 instructions, 7,822,841,002
+reference cycles and all 18,000 presentations without a guest frontier. However,
+the delivery gate failed: 20 device input-shortfall requests, 20,854 host-dropped
+frames, no chip drops. Producer gaps of 161–305 ms cluster around board time
+109–122 seconds; measured machine steps/presentation do not explain those gaps.
+This is a new retained failure, not a reason to erase preceding shorter passes.
+
+Evidence is build/validation/rc-attract-audio-001/capture-002. Artifact review
+verifies all 36,013 recorded PCM intervals, the completion seal and unchanged
+packaged inputs: capture-002-review.json, SHA256
+`657ce1f5d93b7178455dd0c65c66d18f6ebe3bb477c45fccb136797608ca7698`.
+The first sandboxed capture aborted before host logging and remains capture-001;
+the authorized visible retry is capture-002. Logical output precedes CoreAudio
+hardware output; these counters neither identify the stall cause nor certify
+what a listener heard. Parallel jobs were present, but are not established as
+the cause.
+
+Opt-in audio diagnostics now separately time input/event handling, PCM capture,
+audio submission, recording, diagnostic writes and requested/actual sleep with
+wake overshoot. Existing CPU/presentation timing remains. These measurements
+leave the board clock, queue policy, native PCM and normal diagnostic-off path
+unchanged. A fresh complete Mac host builds at build/rc-audio-host-001; all 13
+frontend tests pass. The first CTest invocation found seven excluded fixture
+executables unbuilt, not failing assertions; its log is preserved before the
+explicit fixture build and passing rerun.
+
+The separate instrumented repeat completes the same 18,000 paced, visible frames
+with zero chip/host drops and zero device shortfall requests. All 13,799,492
+native PCM frames, final raw image, initial/final saves, per-resume observations
+and recorded execution payload match capture-002 exactly. Maximum producer gap
+is 35.300166 ms; measured wake overshoot is at most 1.015672 ms. Result:
+build/validation/rc-attract-audio-001/instrumented-001/result.json, SHA256
+`6edf93bb5c7c8a29bb0a2a6ebd37d4c60262f1a440d8dde71436bd7263e84778`.
+The earlier long stalls did not recur, so instrumentation is validated but an
+audio-stall fix is not established. Do not relabel this repeat as a controlled
+load/performance comparison or physical listening test.
+
+The new scripts/segarally_pc_check.py runs the released Windows/Linux player
+without compiling it, using isolated saves and optional owned-ROM import. It
+collects paced SDL/direct Vulkan output, input recording, native/logical PCM,
+seals, final image/state and environment evidence. The optional hardware check
+requires a matching loader-reported integrated/discrete device; software,
+virtual and unknown devices are distinguished, and a separate bounded child
+protects the tool against a hung loader probe. Manual input and speaker results
+remain explicit operator observations. Nine focused integrity/classification
+tests pass locally and are wired into source-boundary CI. Usage is documented
+in docs/segarally-pc-check.md and linked from release-platforms.md.
+
+The actual released Linux player completes a 120-frame SDL/native plumbing run
+in software Vulkan with dummy audio. Both runs match terminal execution, PCM,
+saves, observations and final raw pixels, and all recording seals verify. The
+checker correctly returns completed_with_findings: startup sound is silent and
+the slow diagnostic environment produces 52/84 device shortfall requests. This
+is not a physical-PC or playback-quality pass. Report:
+build/worktrees/rc-platform-readiness-001/build/pc-smoke-001/result.json, SHA256
+`d1fb31ab764d77f1367ceff2cd609b0e8d320bf33a6c22787d0ed520ad5505e2`.
+Integration review re-parses both captured runs and matches the runner identity.
+An earlier xvfb-run wrapper stalled before game execution under translation;
+its process was stopped and retained before direct bounded Xvfb startup worked.
+
+The hardware audit still finds double-precision i960 FP registers and generated
+arithmetic; existing extF80 reference helpers cover only a restricted operand
+subset. A complete architectural FP migration is actual development, not a
+completed fidelity gate. Pinned MAME SCSP/device behavior also retains documented
+limitations. An Intel public manual mirror returned HTTP 403, so no new CPU
+semantics were derived from its unseen contents. A search result for a mirrored
+Sega development manual was excluded under the no-internal-documentation rule;
+it was not opened or used for implementation. Do not substitute new speculative
+hardware semantics, queue inflation or clock changes for a measured correction.
+
+Next: retain these diagnostics for the intermittent long host stall; complete
+NORMAL Championship/Practice finish coverage; resolve the measured cross-API
+default-image discrepancy; run the new player checks on physical Windows/Linux
+machines. Native Wayland and complete native host replacement remain separate
+work. Preview 3 release assets are unchanged by this source/tooling update.
+
 ## Desktop player packages and CI (2026-10-16)
 
 Player Preview 3 is published on the personal LaurentGarcia/sega-rally-recomp

@@ -256,6 +256,14 @@ Paced `--sound --audio-diagnostics` logs queue demands and host delays. A separa
 and a distinct native capture; it records this application's SDL logical-device
 mix before CoreAudio, not hardware loopback or microphone audio.
 
+Timing rows report interval maxima for input/event handling, machine execution,
+native PCM collection/capture, audio submission, recording writes, presentation,
+and diagnostic output. Sleep measurements include the requested duration, actual
+wall time and wake-up overshoot. These observations locate host stalls without
+changing board clocks, queue policy or game PCM. Wall time includes descheduling;
+it does not by itself identify a slow operation or prove CPU/GPU workload cost.
+The current diagnostic write is accounted for in the following interval.
+
 Playback primes a 60 ms base plus one actual device period, caps its queue at
 240 ms and limits presentation-rate trim to ±0.5%. Device periods longer than
 60 ms are rejected. Native PCM identity, queue health and physical listening are

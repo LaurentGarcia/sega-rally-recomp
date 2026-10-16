@@ -179,6 +179,10 @@ comparison and were not overwritten.
 
 ## One renderer, four hosts
 
+For a bounded check of a released Windows/Linux executable on your own PC,
+follow [desktop player validation](segarally-pc-check.md). It records both
+renderer paths, sound delivery, controls and saves without rebuilding the game.
+
 The long-term runtime target is SDL-free. Direct Metal and Vulkan backends
 consume common geometry and shader inputs, while planned native host adapters supply
 windows, lifecycle, audio and controls. The existing SDL implementation remains

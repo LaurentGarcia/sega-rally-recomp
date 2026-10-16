@@ -389,6 +389,8 @@ int segarally_host_main(int argc,char **argv) {
         // submission/presentation wall time includes host waiting, not GPU time.
         const Uint64 diagnostic_origin=audio_diagnostics?SDL_GetTicksNS():0;
         Uint64 producer_at=0,max_producer_gap=0,max_step=0,max_presentation=0,max_lateness=0;
+        Uint64 max_input=0,max_pcm=0,max_audio_push=0,max_recording=0,max_diagnostic_log=0;
+        Uint64 max_sleep_requested=0,max_sleep_wall=0,max_sleep_overshoot=0;
         uint64_t diagnostic_requests=0,diagnostic_period=0;
         const auto diagnostic_log=[&](bool final=false) {
             if(!audio_diagnostics) return;
@@ -398,7 +400,7 @@ int segarally_host_main(int argc,char **argv) {
             const bool shortfall=demand.requests!=diagnostic_requests;
             if(!final && !periodic && !shortfall) return;
             const Uint64 now=SDL_GetTicksNS();
-            fprintf(stderr,"Audio diagnostics: reason=%s frame=%llu board_ns=%llu host_elapsed_ns=%llu queued_frames=%u started=%d received_frames=%llu submitted_frames=%llu dropped_frames=%llu shortfall_requests=%llu estimated_extra_input_bytes=%llu last_shortfall_host_ns=%llu max_producer_gap_ns=%llu max_machine_step_ns=%llu max_presentation_wall_ns=%llu max_pacing_lateness_ns=%llu\n",
+            fprintf(stderr,"Audio diagnostics: reason=%s frame=%llu board_ns=%llu host_elapsed_ns=%llu queued_frames=%u started=%d received_frames=%llu submitted_frames=%llu dropped_frames=%llu shortfall_requests=%llu estimated_extra_input_bytes=%llu last_shortfall_host_ns=%llu max_producer_gap_ns=%llu max_machine_step_ns=%llu max_presentation_wall_ns=%llu max_pacing_lateness_ns=%llu max_input_wall_ns=%llu max_pcm_wall_ns=%llu max_audio_push_wall_ns=%llu max_recording_wall_ns=%llu max_diagnostic_log_wall_ns=%llu max_sleep_requested_ns=%llu max_sleep_wall_ns=%llu max_sleep_overshoot_ns=%llu\n",
                 final?"final":shortfall?"shortfall":"periodic",
                 static_cast<unsigned long long>(stats.frames_rendered),static_cast<unsigned long long>(stats.board_time_ns),
                 static_cast<unsigned long long>(now-diagnostic_origin),audio.queued_frames(),int(audio.started()),
@@ -407,11 +409,21 @@ int segarally_host_main(int argc,char **argv) {
                 static_cast<unsigned long long>(demand.extra_input_bytes),
                 static_cast<unsigned long long>(demand.last_shortfall_ns>=diagnostic_origin?demand.last_shortfall_ns-diagnostic_origin:0),
                 static_cast<unsigned long long>(max_producer_gap),static_cast<unsigned long long>(max_step),
-                static_cast<unsigned long long>(max_presentation),static_cast<unsigned long long>(max_lateness));
+                static_cast<unsigned long long>(max_presentation),static_cast<unsigned long long>(max_lateness),
+                static_cast<unsigned long long>(max_input),static_cast<unsigned long long>(max_pcm),
+                static_cast<unsigned long long>(max_audio_push),static_cast<unsigned long long>(max_recording),
+                static_cast<unsigned long long>(max_diagnostic_log),static_cast<unsigned long long>(max_sleep_requested),
+                static_cast<unsigned long long>(max_sleep_wall),static_cast<unsigned long long>(max_sleep_overshoot));
             diagnostic_period=stats.frames_rendered/60;diagnostic_requests=demand.requests;
             max_producer_gap=max_step=max_presentation=max_lateness=0;
+            max_input=max_pcm=max_audio_push=max_recording=0;
+            max_sleep_requested=max_sleep_wall=max_sleep_overshoot=0;
+            // Include this write in the next interval: a slow diagnostic sink
+            // must not be mistaken for a machine, renderer or pacing stall.
+            max_diagnostic_log=SDL_GetTicksNS()-now;
         };
         while(!quit) {
+            const Uint64 input_start=audio_diagnostics?SDL_GetTicksNS():0;
 #ifdef SEGARALLY_INPUT_RECORDING
             std::optional<srally::host_input::Resume> recorded_resume;
             Machine::RunResult recorded_result;
@@ -498,6 +510,7 @@ int segarally_host_main(int argc,char **argv) {
                 if(!stopped && !quit) touch.consume();
             } else {controls.sample(touch_actions,false);touch.clear();}
             } else {controls.sample(touch_actions,false);touch.clear();}
+            if(audio_diagnostics) max_input=std::max(max_input,SDL_GetTicksNS()-input_start);
             bool new_frame=false;
             if(!stopped && !quit && !display_paused) {
                 const uint64_t completed=machine->stats().instructions;
@@ -539,6 +552,7 @@ int segarally_host_main(int argc,char **argv) {
                 }
             }
             if(sound && !display_paused) {
+                const Uint64 pcm_start=audio_diagnostics?SDL_GetTicksNS():0;
                 const auto samples=machine->take_audio();
                 if(reference && reference->take_audio()!=samples)
                     throw std::runtime_error("Native software/GPU machines produced different SCSP samples");
@@ -549,20 +563,31 @@ int segarally_host_main(int argc,char **argv) {
                     audio_energy+=double(sample)*sample;
                 }
                 if(audio_capture) audio_capture->push(samples);
+                if(audio_diagnostics) max_pcm=std::max(max_pcm,SDL_GetTicksNS()-pcm_start);
                 if(!unthrottled && !stopped) {
+                    const Uint64 push_start=audio_diagnostics?SDL_GetTicksNS():0;
                     if(audio_diagnostics && !samples.empty()) {
                         const Uint64 now=SDL_GetTicksNS();
                         if(producer_at) max_producer_gap=std::max(max_producer_gap,now-producer_at);
                         producer_at=now;
                     }
                     audio.push(samples);
+                    if(audio_diagnostics) max_audio_push=std::max(max_audio_push,SDL_GetTicksNS()-push_start);
                 }
 #ifdef SEGARALLY_INPUT_RECORDING
-                if(recorded_resume)recording->append(*recorded_resume,recorded_result,samples);
+                if(recorded_resume) {
+                    const Uint64 record_start=audio_diagnostics?SDL_GetTicksNS():0;
+                    recording->append(*recorded_resume,recorded_result,samples);
+                    if(audio_diagnostics) max_recording=std::max(max_recording,SDL_GetTicksNS()-record_start);
+                }
 #endif
             }
 #ifdef SEGARALLY_INPUT_RECORDING
-            if(recorded_resume&&!sound)recording->append(*recorded_resume,recorded_result,{});
+            if(recorded_resume&&!sound) {
+                const Uint64 record_start=audio_diagnostics?SDL_GetTicksNS():0;
+                recording->append(*recorded_resume,recorded_result,{});
+                if(audio_diagnostics) max_recording=std::max(max_recording,SDL_GetTicksNS()-record_start);
+            }
 #endif
             if(instruction_limit && machine->stats().instructions>=instruction_limit) {
                 quit=true;
@@ -661,7 +686,15 @@ int segarally_host_main(int argc,char **argv) {
                 // Pace the host to the machine's exact board time, without changing device clocks.
                 const Uint64 deadline=start+stats.board_time_ns,now=SDL_GetTicksNS();
                 if(audio_diagnostics && now>deadline) max_lateness=std::max(max_lateness,now-deadline);
-                if(deadline>now) SDL_DelayNS(deadline-now);
+                if(deadline>now) {
+                    SDL_DelayNS(deadline-now);
+                    if(audio_diagnostics) {
+                        const Uint64 wake=SDL_GetTicksNS();
+                        max_sleep_requested=std::max(max_sleep_requested,deadline-now);
+                        max_sleep_wall=std::max(max_sleep_wall,wake-now);
+                        if(wake>deadline) max_sleep_overshoot=std::max(max_sleep_overshoot,wake-deadline);
+                    }
+                }
             }
             diagnostic_log();
             if(stopped || display_paused) SDL_Delay(10);
