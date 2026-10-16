@@ -1,5 +1,119 @@
 # Handoff
 
+## Vulkan restore and native Wayland regression (2026-10-16)
+
+The original native Wayland fixture stalled after hiding and restoring a
+window at unchanged dimensions. Bounded phase tracing locates the block in
+vkQueuePresentKHR: event pumping, the frame-slot fence, image acquisition,
+cached-frame encoding and queue submission all return. The presenter now
+marks a hidden/minimized/zero-size swapchain dirty; on restoration, the existing
+drain/device-idle retirement recreates presentation state even at the same
+extent. Game image resources, shaders, pipelines and FIFO mode are unchanged.
+
+The new ROM-free fixture runs under private headless Weston with pinned SDL,
+Wayland enabled, X11 and SDL GPU disabled, CPU Vulkan and synchronization
+validation. It covers pause/cache, hidden offscreen update, same-size restore,
+three resizes and overlay submissions. Final uninstrumented run passes 110
+checks and 68 presentations, with five swapchains/four lifecycle idle waits,
+persistent four Model 2 plus one CRT pipeline, and zero validation errors.
+Both integration and independent review verify all 18 measured source hashes;
+all 23 artifacts also rehash. Captures are raw offscreen images. This is not
+actual-game, compositor-pixel, physical GPU/input/audio or display certification.
+
+Evidence root: build/worktrees/rc-platform-readiness-001/build.
+wayland-check-003/result.json SHA256
+`03d3050ae638b7db836f60dc79e91c9b907f2546a9608d53a11cdae21c61f6f0`
+preserves the phase-traced timeout. Earlier timeout runs 001/002 and their
+measured source/executable versions remain intact. Instrumented fix run 004
+passes; final run wayland-check-005/result.json SHA256
+`79b14cec55927bed33c0e96e7026d21f6677d5cfdd9df2d34eadda8a4ae8183e`
+binds the exact uninstrumented production fix. Timeout cleanup is bounded and
+stops both the fixture and its private compositor.
+
+A separate pinned-SDL Wayland CI job and opt-in standalone CMake target are
+added. docs/native-renderers.md gives the command and limits. Preview 3's
+published Linux player remains X11-only; source fixture success does not
+retroactively add Wayland support to that binary. The existing X11 regression
+also passes: 101 presentations, six swapchains/five lifecycle idle waits,
+persistent four plus one pipelines, zero validation errors. All nine raw and
+displayed images equal the prior presentation-008 baseline. Its report is
+x11-regression-001/result.json under the evidence root, SHA256
+`e68b6fba08b55087a89a6549f19b2b8289d95d89d96432e988ddd431fdbb0f13`.
+The exact staged source/archive boundary check passes before publication.
+
+## Exact-scene Metal and Vulkan attribution (2026-10-16)
+
+An unchanged production frame at 2,600 completed frames reproduces the existing
+951-pixel default Metal/Vulkan difference under isolated offscreen rendering.
+All 8,526 projected vertices and CPU images match across hosts; the export also
+preserves actual execution records, PCM and final saves. Executable/recording
+identity hashes differ because export instrumentation changes the executable.
+Of the 951 pixels, 940 retain polygon ownership but differ in integer UV and
+sampled texel. The other 11 change surviving polygon and all involve cutouts.
+This narrows investigation to GPU vertex/interpolation and texture sampling;
+vertex arithmetic versus interpolation, and coverage versus cutout thresholds,
+remain unresolved. No production shader/default change is justified yet.
+
+Unmodified Accurate-textures output agrees across APIs and with CPU for this
+one frame. Eight instrumented Accurate draws are excluded: optimization dropped
+unused resources and compacted Metal's edge-buffer binding. Default diagnostic
+packets never access that buffer, with all edge metadata verified zero. The
+invalid draws and initial analysis are retained. This is neither temporal
+flicker coverage nor independent MAME/PCB or performance certification.
+docs/native-renderers.md records the detailed counts and interpretation.
+
+The report rehashes 170 sources and 262 artifacts at
+build/worktrees/rc-raster-001/build/cross-api-001/result.json, SHA256
+`a525657551cde68020edf78d0fee7e24ab1ee3d52a2c7b481130844801ff1d9e`.
+Only documentation is integrated; game snapshots, diagnostic shaders and
+captures remain ignored local evidence. Next is a bounded common-shader
+investigation of the GPU arithmetic/interpolation stage, without rebaselining
+away the discrepancy or claiming an entire race from one scene.
+
+## Reusable Practice finish and Championship restart (2026-10-16)
+
+The frozen config/segarally_short_mountain_finish_restart.inputs now covers
+SHORT Practice Mountain through Stage Clear, results, name entry, Top 8,
+attract return, then two new credits/start and a visibly moving Championship
+Desert race. This is Practice completion followed by a Championship start;
+it is not Championship completion. The operator SHORT setting remains active.
+docs/course-regression.md gives the explicit 22,000-frame invocation with new
+isolated saves, startup settings, observed frame landmarks and evidence hashes.
+Only original cabinet inputs are added; no game data/captures or generated code.
+
+The CPU prefix preserves 602 prior instruction/cycle checkpoints and 99 shared
+numbered images. The released signed personal Mac app then completes all 22,000
+frames, 4,208,428,228 instructions and 9,561,241,000 reference cycles, ending at
+005dde3c. All 1,901 input events apply with no takeover. All 4,401 CPU frame cuts,
+final saves and final Accurate-textures raw image match; the 16,866,030 stereo
+PCM frames are finite and nonzero. This hidden, unthrottled run opens no playback
+device and provides no presentation-pacing, speaker or independent MAME/PCB pass.
+The complete recording audit verifies 44,014 resume rows, pin values, continuity
+and the completion seal. Integration verifies the frozen replay/report hashes.
+
+Evidence under build/worktrees/rc-courses-001/build/course-coverage:
+cpu-coverage-review.json SHA256
+`4fabc182e58a35ead7e4e60441b18e84bbacac378113388b6dbd2a20dc7c9926`;
+metal-short-restart-003/result.json SHA256
+`c5ff8bc0fa5b64d7e97855b366377c2f1cd7edc1e7cfeed306993a29da60c153`;
+recording-review.json SHA256
+`66067af8322f5cb20d06a2f8ae496c7aac76023aa0501b79ccaffb82c8adcf0f`.
+The tracked replay SHA256 is
+`94a36fd909030d7330bdbe16fbfb1d33e189b7d2d11641c7b6b8329d51510b2e`.
+The first Metal attempt stopped in the sandbox before guest execution. The
+second redundantly enabled the CPU reference renderer on every frame and was
+stopped at 20,222 frames after 858 seconds; its bound assertion failed. Both
+are retained. The successful third attempt compares against the already frozen
+CPU run and does not duplicate its expensive renderer during Metal execution.
+
+NORMAL coverage remains open: best Championship inputs finish Desert 0:59.60
+and Forest 1:20.85, but retire on Mountain segment 293/300. Practice Lakeside
+finishes lap one in 1:19.75, then retires on lap two. Stronger steering helped;
+broader anticipation, braking and predictive input searches did not establish
+full completion. These attempts did not identify a missing native callback;
+they do not establish a game defect or exclude one. No timer, physics,
+instruction or clock patch was introduced.
+
 ## Extended host timing and RC checks (2026-10-16)
 
 Reference & validation and Platform layer & build govern this work. The actual

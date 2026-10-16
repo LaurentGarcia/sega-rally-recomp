@@ -127,11 +127,52 @@ one CRT pipeline and zero validation errors. The final default image equals
 SDL Vulkan; Accurate textures equals the same-machine CPU reference. These
 unthrottled runs capture/drain audio without physical playback.
 
-Default images are not claimed identical across graphics APIs: the preserved
-SDL Vulkan/Linux and SDL Metal/Mac final images differ at 951 of 190,464 pixels,
-despite matching CPU execution. That existing cross-API difference remains a
-separate fidelity investigation; matching each backend's baseline does not
-resolve it or certify an entire race.
+Default images are not claimed identical across graphics APIs. An exact-scene
+experiment reproduces the preserved SDL Vulkan/Linux versus SDL Metal/Mac
+final-image discrepancy: 951 of 190,464 pixels differ. The frame is exported
+after the 2,600-frame replay, at 500,035,460 instructions, 1,130,001,001 reference
+cycles and PC `0x005e6964`, then reconstructed independently on Apple M5 Metal
+and Linux lavapipe. Both offscreen images reproduce their respective game
+captures. All 8,526 projected vertices and both CPU images are byte-identical,
+which excludes host projection and CPU raster differences for this scene.
+
+The exporter also reproduces native PCM, input observations, final saves and
+all actual resume records. Instrumenting the executable changes its recording
+identity, so manifest/context and transcript hashes differ; those identity
+fields are distinguished from the unchanged execution records.
+
+Diagnostic outputs retain the same surviving polygon at 940 of the differing
+pixels. Every one of those 940 pixels has a different integer U or V coordinate
+and a different sampled texel. The other 11 pixels change surviving polygon,
+and every case involves a cutout texture. This localizes the discrepancy to the
+default GPU projection/interpolation and texture sampling path; it does not yet
+separate vertex arithmetic from raster interpolation, or edge coverage from
+cutout thresholds at those 11 pixels. No renderer default or shader correction
+is justified by this attribution alone.
+
+Against the identical CPU image, default Metal differs at 21,062 pixels and
+default Vulkan at 20,644. Among the 951 cross-API differences, Metal agrees with
+CPU at 241, Vulkan at 659, and neither at 51. The unmodified Accurate-textures
+outputs are identical across APIs and equal CPU for this frame. That optional
+path is a separate result, not a correction to the default path.
+
+Eight Accurate-mode **diagnostic** draws are rejected: dead-code elimination
+removes unused luma/translation buffers, and SPIRV-Cross compacts Metal's edge
+buffer binding. Default diagnostic packets have zero edge metadata and never
+read that buffer; only those default draws contribute to attribution. The
+unmodified production Accurate comparisons above remain valid. The rejected
+draws and initial analysis are retained, not counted as passing comparisons.
+
+The local report is
+`build/worktrees/rc-raster-001/build/cross-api-001/result.json`, SHA256
+`a525657551cde68020edf78d0fee7e24ab1ee3d52a2c7b481130844801ff1d9e`.
+It records 170 source hashes and 262 rechecked artifact hashes. Game snapshots,
+shader instrumentation and captures remain local ignored evidence. This is one
+frame's attribution, not temporal-flicker coverage, a performance result or an
+independent arcade reference. Full-race requirements remain in the binding
+[Reference & validation](daytona-usa-recomp-design.md#reference--validation)
+section; player build checks are described in the
+[build and validation guide](segarally-build-validation.md).
 
 The wrappers preserve command output, executable/source hashes and image
 comparisons under a new ignored output directory. They verify source and
@@ -224,6 +265,37 @@ Linux. CI instead compiles the full Vulkan host and
 Settings using original ROM-free link fixtures on Linux GCC and Clang. The
 separate Vulkan workflows execute invented render/presentation fixtures with
 lavapipe, never uploaded game data.
+
+Native Wayland has a separate Linux fixture. Install Weston, Wayland development
+files/protocols and xkbcommon alongside the Vulkan dependencies, then pass the
+installed lavapipe ICD explicitly:
+
+```sh
+python3 tests/test_native_vulkan_wayland.py \
+  --icd /path/to/lvp_icd.json --output build/native-vulkan-wayland-check-001
+```
+
+This builds pinned SDL with Wayland enabled and both X11 and SDL GPU disabled.
+It starts a private headless Weston compositor and exercises the direct Vulkan
+presenter with original synthetic scenes. The check covers cached-frame pause,
+an offscreen update while hidden, restoration at the same size, three resizes
+and overlay submissions. The local run passes 110 checks, 68 presentations and
+zero Vulkan validation errors; four Model 2 pipelines and one CRT pipeline
+persist across five swapchains. Captures are raw offscreen images, not compositor
+screenshots or evidence of physical display/input/audio behavior.
+
+This regression exposed a hang in `vkQueuePresentKHR` after restoring a hidden
+window without changing its size. The presenter now marks the swapchain stale
+while hidden, minimized or zero-sized, then retires it through the existing
+drain/device-idle path before resuming. Unmapping can leave FIFO presentation
+state unusable even when the dimensions still match. The shared game image and
+pipelines survive this transition. The original timeout and instrumented
+diagnosis are retained alongside the passing uninstrumented result at
+`build/worktrees/rc-platform-readiness-001/build/wayland-check-005/result.json`,
+SHA256 `79b14cec55927bed33c0e96e7026d21f6677d5cfdd9df2d34eadda8a4ae8183e`.
+The dedicated workflow runs this regression separately from X11. Preview 3's
+published Linux player remains X11-only; this fixture does not add native
+Wayland support to that already published binary.
 
 ## Remaining integration
 

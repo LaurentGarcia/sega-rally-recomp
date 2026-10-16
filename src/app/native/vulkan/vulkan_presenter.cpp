@@ -144,7 +144,12 @@ struct VulkanPresenter::Impl {
         if(lost)return Outcome::device_lost;if(failed)return Outcome::error;
         int width=0,height=0;if(!SDL_GetWindowSizeInPixels(window,&width,&height))throw std::runtime_error(SDL_GetError());
         const auto offscreen=[&]{if(update_game&&has_game){renderer.encode(video,video.width(),rt::Video::H,scale,scanlines);renderer.submit();}};
-        if(width<=0||height<=0||(SDL_GetWindowFlags(window)&(SDL_WINDOW_MINIMIZED|SDL_WINDOW_HIDDEN))){offscreen();return Outcome::paused;}
+        if(width<=0||height<=0||(SDL_GetWindowFlags(window)&(SDL_WINDOW_MINIMIZED|SDL_WINDOW_HIDDEN))){
+            // Remapping can invalidate presentation state without changing the
+            // extent. In particular, a Wayland FIFO frame callback from the old
+            // mapping may never arrive. Retire that swapchain before resuming.
+            dirty=true;offscreen();return Outcome::paused;
+        }
         if(dirty||extent.width!=uint32_t(width)||extent.height!=uint32_t(height))if(!resize(uint32_t(width),uint32_t(height))){offscreen();return Outcome::paused;}
         renderer.wait_next();auto &slot=slots[renderer.next_slot()];uint32_t index=0;
         const auto acquired=vkAcquireNextImageKHR(device,swapchain,1000000000ULL,slot.acquired,VK_NULL_HANDLE,&index);

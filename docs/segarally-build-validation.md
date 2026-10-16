@@ -232,6 +232,11 @@ devices. It is not a full independent MAME machine. Defaults are two million
 instructions and 180 seconds; longer budgets/timeouts must be explicit. Record
 checkout, import, input and final checkpoint identities with every claim.
 
+For a longer lifecycle regression, the [Practice finish and restart replay](course-regression.md)
+covers SHORT Practice Mountain through results, score entry and a new
+Championship Desert start. Its isolated-save command and frozen evidence do
+not establish NORMAL Championship completion or full MAME/PCB parity.
+
 ### Independent sound-off recording consumer
 
 A separate developer consumer tests supported sealed sound-off recordings using
