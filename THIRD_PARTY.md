@@ -22,6 +22,23 @@ font comment notices and the complete MIT terms in `ImGui-embedded-fonts.txt`,
 alongside the unchanged Dear ImGui license. No font data is extracted or added
 to source control.
 
+The Linux Wayland player additionally compiles protocol interface code generated
+by `wayland-scanner` from all 24 XML files in the pinned SDL checkout's
+[`wayland-protocols/`](https://github.com/libsdl-org/SDL/tree/fa2c02bb6e21974a89ea9824bc53c9932abe5f9c/wayland-protocols)
+directory. Those inputs are unchanged and remain outside source Git. Their
+per-file copyright/permission terms are retained separately from SDL's zlib
+license in `licenses/SDL-Wayland-protocols.txt` in the Wayland-enabled Linux
+package, with input paths and hashes. Most carry MIT-style permission notices;
+`text-input-unstable-v3.xml` carries its own permissive terms, including the
+copyright-holder-name advertising restriction. The pinned
+`pointer-gestures-unstable-v1.xml` supplies no per-file copyright block; the
+notice inventory records that absence and also retains SDL's license. No
+protocol XML or generated interface C is added to the source repository.
+Wayland client/cursor/EGL and xkbcommon shared libraries are loaded from the
+host system, rather than bundled in the player archive. This protocol notice
+record describes the new Linux package; earlier Mac/Windows binaries and
+the X11-only Linux preview do not add this compiled Wayland backend.
+
 The Model 2A memory adapter is implemented from the public address-map contracts
 in MAME `src/mame/sega/model2.cpp` at the same pinned MAME revision listed below,
 `dddd73680656e355bb2b5beecab1167c9f07bf81` (BSD-3-Clause). The inspected file's

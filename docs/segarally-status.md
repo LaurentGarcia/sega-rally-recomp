@@ -25,9 +25,17 @@ The [22,000-frame Practice finish/restart replay](course-regression.md) now
 covers SHORT Practice Mountain through Stage Clear, results, name entry, Top 8
 and attract, then a new Championship Desert start. The signed personal Metal
 player matches all 4,401 CPU frame checkpoints, final saves and the final
-Accurate-textures image; all 16,866,030 captured stereo PCM frames are finite
-and nonzero. This hidden unthrottled run does not test speakers or pacing, and
-it does not complete NORMAL Championship or Lakeside.
+Accurate-textures image. The 16,866,030-frame stereo PCM stream has finite samples
+and contains nonzero audio. This hidden unthrottled run does not test speakers or
+pacing, and it does not complete NORMAL Championship or Lakeside.
+
+The same input sequence also completes a separate raw i960 comparison:
+4,208,428,228 instructions, 134,770,594 ordered writes and 233,617 IRQ entries
+agree with the inherited interpreter. All 1,901 cabinet-input boundaries and
+terminal state/pixels correlate with the Metal recording. This comparison has
+sound off and shared CPU helpers/board/TGP implementations; it is not a full
+independent MAME-machine, sound or extF80 hardware certification. The linked
+course regression documents that distinction and the frozen evidence.
 
 A new 18,000-frame paced visible Mac attract run exposes intermittent host
 delivery stalls: 20 audio shortfall requests and 20,854 host-dropped frames,

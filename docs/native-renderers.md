@@ -299,6 +299,41 @@ The dedicated workflow runs this regression separately from X11. Preview 3's
 published Linux player remains X11-only; this fixture does not add native
 Wayland support to that already published binary.
 
+A separate local player build from `81f8288` enables Wayland alongside X11 and
+SDL GPU. It reused all 57 generated-game objects unchanged. The normal executable
+SHA256 is `a621cd2ba1309b270248cbc72fe74f80adda08c4f078b39ca26b7cbcdbc9b915`.
+Three recorded 2,800-frame drives exercised SDL Vulkan, direct Vulkan, and a
+separate direct Vulkan diagnostic executable. All three finished at 536,636,736
+instructions, 1,216,921,001 cycles and PC `005d07d8`, with identical native PCM,
+final saves, raw final image and recorded observations. Both direct Vulkan runs
+enabled synchronization validation and reported zero errors.
+
+The diagnostic executable adds original link wrappers around event polling and
+presentation; the normal executable contains no lifecycle automation. It hid
+the actual Wayland game window, observed 22 offscreen game updates while hidden,
+then observed 2,415 successful presentations after restoration. The full run
+presented 2,778 frames through two swapchains while retaining four Model 2
+pipelines and one CRT pipeline. Its execution transcript also matched the normal
+run after excluding the manifest-context line, which necessarily changes with
+the executable identity.
+
+These tests used CPU lavapipe, headless Weston/pixman and dummy audio. They retain
+`completed_with_findings`: dummy-device input shortfall counts were 3,252 for
+SDL, 3,151 for direct Vulkan and 3,071 for the lifecycle diagnostic; chip and host
+audio drops were zero. This establishes the measured gameplay and window
+lifecycle comparisons, not physical GPU/display/controller/speaker quality or
+MAME/PCB fidelity. The existing published Linux binary remains unchanged.
+
+The local evidence is
+`build/worktrees/rc-platform-readiness-001/build/wayland-player-001/execution/audited-result.json`,
+SHA256 `c4aa727ca7aac6f36379f1e8d03ed5fa631d875d3aedc3ee5415255c48ce8a1d`.
+The original outer runner failed after all game runs because it searched
+`stderr.txt` for lifecycle markers, while the player redirects stderr to
+`host.log`. That failure is preserved; the audited report rehashes the completed
+artifacts and checks the correct log without changing or rerunning the game.
+Its 99-file build-input inventory is a recorded subset, not a complete inventory
+of linked-library dependencies; package verification checks those separately.
+
 ## Remaining integration
 
 1. Validate Vulkan gameplay and physical GPUs on supported Windows/Linux systems;

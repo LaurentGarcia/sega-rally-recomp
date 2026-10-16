@@ -1,5 +1,111 @@
 # Handoff
 
+## Linux package notice inventory (2026-10-16)
+
+The Wayland-enabled SDL library compiles generated interfaces for all 24 pinned
+protocol XMLs. The package must retain their per-file notices, not only SDL's
+zlib license: 23 files contain copyright blocks, including the distinct
+text-input-unstable-v3 terms; pointer-gestures-unstable-v1 contains no such block.
+THIRD_PARTY.md now records the exact SDL pin, generator inputs and separate
+notice inventory. The new import-only package is being checked with those
+notices included; no new release is claimed by this documentation commit.
+The host-provided Wayland/xkbcommon libraries are not copied into the package.
+
+## Full SHORT Practice lifecycle i960 comparison (2026-10-16)
+
+The bounded raw native/i960-reference run completes all 22,000 frames and
+4,208,428,228 instructions without a mismatch: 134,770,594 ordered writes,
+9,561,241,000 reference cycles, 233,617 IRQ entries, terminal PC 005dde3c.
+Every opcode compares architectural CPU state, ordered cycle-stamped writes,
+interrupts and separately instantiated board state; final video RAM/pixels
+also agree. All 1,901 replay events apply with no pending events. The Practice
+start and finish callbacks execute successfully, followed by results, score
+entry, attract and a new Championship start.
+
+This raw harness has sound off, UART RX idle and no Machine boundary callback.
+It reuses CPU context/helpers and shared board/TGP implementations. Independent
+TGP/sound, full MAME-machine/PCB and extF80 hardware parity are not established.
+A separate offline audit correlates all twelve pins and instruction/cycle
+counts at all 1,901 event cuts with the sound-on Metal recording, fresh all-FF
+seeds, terminal frame/counts/PC and final BGRA hash 90fb8f11f726352f. It does not
+consume Machine resume cuts or compare every intermediate CPU register to that
+recording. Raw final saves are not exported; prior save comparisons are separate.
+
+All 207 frozen reference inputs rehash, also independently checked at integration.
+The guest takes 2,304.586 monotonic seconds under its original 3,600-second cap;
+host suspension extends wall age, so neither is a gameplay speed measurement.
+The temporary PID-bound idle-sleep assertion exits normally with the guest.
+No CPU/runtime/generator source changed during the run. Documentation is added
+to docs/course-regression.md and summarized in the current status reference.
+Review also corrects the earlier PCM wording: the stream contains nonzero
+audio, not nonzero samples at every frame; startup silence is present.
+
+Evidence root: build/worktrees/rc-courses-001/build/course-coverage/independent-i960.
+attempt-001/result.json SHA256
+`a22c98f231562d9c550c37945d50386420cbb1cd6339bbce1b9991bc8c2623fb`;
+full-review.json SHA256
+`22434fe6f5a9984419b4102771eeff6674bf5abc04ef7a0dba4a4acdab20d2cc`;
+attempt-001/guest/stdout.txt SHA256
+`d3184d5bbe8cebd45746631d22fbd2a3df8ae210464412088e1d748f9b10dcef`.
+NORMAL Championship/Lakeside completion and the other fidelity gates remain open.
+
+## Actual Wayland player and restoration (2026-10-16)
+
+A separate Linux player build from 81f8288 enables Wayland alongside X11 with
+libdecor disabled. An isolated 258 MiB copy preserves the original build cache;
+all 57 generated-game objects are reused unchanged. The normal executable is
+SHA256 `a621cd2ba1309b270248cbc72fe74f80adda08c4f078b39ca26b7cbcdbc9b915`.
+Only original wrappers in a separate diagnostic executable automate hide/show
+and report presentation outcomes; that automation is absent from the player.
+
+Three 2,800-frame runs (SDL Vulkan, direct Vulkan, diagnostic direct Vulkan)
+match native PCM, final saves, raw image, observations and terminal execution:
+536,636,736 instructions, 1,216,921,001 cycles, PC 005d07d8. The diagnostic
+records 22 real hidden offscreen updates and 2,415 successful restored presents;
+all execution payload rows match after excluding executable-context identity.
+It presents 2,778 frames, uses two swapchains and retains four Model 2 plus one
+CRT pipeline. Both direct runs enable synchronization validation, with no errors.
+
+Software lavapipe/headless Weston/dummy audio produce 3,252/3,151/3,071 device
+input shortfall requests, respectively, with zero chip/host drops. Quality
+reports correctly remain completed_with_findings. These are gameplay/window
+comparisons, not physical device playback, controller, GPU or MAME/PCB passes.
+The first outer runner looked for redirected lifecycle logs in stderr.txt and
+failed after all three games completed. That failure is retained. A separate
+audit reads host.log and rehashes the existing captures without rerunning them.
+
+Report: build/worktrees/rc-platform-readiness-001/build/wayland-player-001/execution/audited-result.json,
+SHA256 `c4aa727ca7aac6f36379f1e8d03ed5fa631d875d3aedc3ee5415255c48ce8a1d`.
+The build report SHA256 is
+`2773e0d130ba3d2aca27021d65c3e599a761537ec2f6e2b94b2e4331ed4c9562`.
+Its 99-file source inventory is explicitly a subset of linked dependencies;
+package verification separately covers the linked digest/recording libraries.
+Original build objects, source inputs, game data and existing archives remain
+unchanged. docs/native-renderers.md records the commands' scope and findings.
+
+## Bounded Mountain follow-up and hosted Wayland check (2026-10-16)
+
+One input-only NORMAL Championship trial uses the exact best Desert/Forest
+prefix, steering gain 1.5, lookahead three and takeover at frame 11,987. All
+2,399 guest-state/pin checkpoints through frame 11,985 match. It visibly retires
+fourth at frame 16,800, reaching Mountain segment 287 versus the previous
+lookahead-four best's 293/third. Desert 0:59.60 and Forest 1:20.85 are unchanged.
+It stops normally at the explicit 26,000-frame/10B-instruction/600-second bounds:
+4,835,942,698 instructions, 11,299,641,004 cycles, 144.24 seconds. Exit zero at
+that bound is not finish evidence. No further sweep or runtime change follows.
+
+The final audit verifies 108 frozen inputs and 146 artifacts at
+build/worktrees/rc-raster-001/build/course-coverage-001/championship-mountain-look3-001/final-audit.json,
+SHA256 `cbd096426de4dd5db33680dfc4db9081c60309d0eb1b3064c9ade822f9d3cda9`.
+The guest result hash is
+`087c8b4220efa0d123713c74449f757a4b55034f1d073124f63dcc94ed979909`.
+docs/course-regression.md retains this negative result alongside the best path.
+
+After explicitly installing EGL development files, the hosted native Wayland
+job passes at f1c42e0 (run 38981705741, job 117243826616). Its sibling X11
+presentation and Model 2 jobs also pass. The earlier rejected disabled-Wayland
+build remains in CI history; no assertion or backend requirement was relaxed.
+
 ## Wayland CI dependency and current status correction (2026-10-16)
 
 The first hosted Wayland job (run 38981338922, job 117242648859) fails before
@@ -104,8 +210,9 @@ The CPU prefix preserves 602 prior instruction/cycle checkpoints and 99 shared
 numbered images. The released signed personal Mac app then completes all 22,000
 frames, 4,208,428,228 instructions and 9,561,241,000 reference cycles, ending at
 005dde3c. All 1,901 input events apply with no takeover. All 4,401 CPU frame cuts,
-final saves and final Accurate-textures raw image match; the 16,866,030 stereo
-PCM frames are finite and nonzero. This hidden, unthrottled run opens no playback
+final saves and final Accurate-textures raw image match. The 16,866,030-frame
+stereo PCM stream has finite samples and contains nonzero audio alongside
+startup silence. This hidden, unthrottled run opens no playback
 device and provides no presentation-pacing, speaker or independent MAME/PCB pass.
 The complete recording audit verifies 44,014 resume rows, pin values, continuity
 and the completion seal. Integration verifies the frozen replay/report hashes.

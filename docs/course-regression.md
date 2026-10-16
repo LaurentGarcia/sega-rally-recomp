@@ -64,12 +64,39 @@ The signed personal Mac package's direct Metal run reaches **4,208,428,228
 instructions, 9,561,241,000 reference cycles, PC `005dde3c`**, exit zero.
 All 1,901 events apply, with none pending and no manual takeover. All 4,401 CPU
 frame checkpoints, final EEPROM/backup saves and the final Accurate-textures
-image match the frozen CPU run. Its 16,866,030 native stereo float PCM frames at
-44.1 kHz are finite, nonzero and have zero chip/host drops. An offline artifact
+image match the frozen CPU run. Its 16,866,030-frame native stereo float PCM
+stream at 44.1 kHz has finite samples, contains nonzero audio and has zero
+chip/host drops. An offline artifact
 audit verifies all 44,014 sealed resume records, their continuity and every
 cabinet-pin value. The 203.28-second elapsed diagnostic run is not a gameplay
 speed measurement. These are comparisons using the same native Machine, not
 independent MAME-machine or PCB certification.
+
+## Independent i960 execution
+
+A separate raw CPU comparison completes the same 22,000-frame input sequence:
+**4,208,428,228 instructions, 134,770,594 ordered writes and 233,617 IRQ entries**,
+with no mismatch. Generated instruction execution is compared after every opcode
+against the inherited MAME i960 interpreter. CPU registers, cycle-stamped writes,
+interrupts, board clocks and device state agree; full video RAM and pixels agree
+between those two instances at the terminal instruction. The final cycle count
+and PC are the same as the packaged run above.
+
+This uses shared CPU context/helpers and separately instantiated copies of the
+same board and TGP implementations. Sound is off, UART RX is idle, and the
+Machine boundary callback is not installed. It does not independently validate
+sound, TGP arithmetic, full MAME-machine behavior, PCB timing or extF80 precision.
+
+A separate offline comparison correlates this execution with the sound-on Metal
+recording: initial all-FF EEPROM/backup seeds, all twelve cabinet pins and the
+instruction/cycle counts at all 1,901 input-event boundaries match. The terminal
+frame/count/cycle/PC and final BGRA pixel hash `90fb8f11f726352f` also match.
+This is not consumption of the recorded Machine resume cuts or comparison of
+every intermediate CPU register against that recording. The raw harness does
+not export final saves; the earlier CPU/Metal save comparison remains separate.
+The bounded reference run took 2,304.59 monotonic seconds, within its 3,600-second
+execution and 512 MiB output limits. This diagnostic duration is not a gameplay
+benchmark; host suspension also extended its wall-clock age.
 
 ## Frozen evidence
 
@@ -90,6 +117,11 @@ cabinet-input replay is included here.
 | `metal-short-restart-003/native.wav` | `136f964e55600a0bb6271c7e820c8925dfbb8a7d6372bc682412da4e8e16002a` |
 | `metal-short-restart-003/recording/resumes.txt` | `66897a2fd3f23f0aa8f9ccaedc458ff311b559099cabaf83a48bfad605bd05d5` |
 | `metal-short-restart-003/recording/complete.txt` | `0a003962bab02e6fbba5a2d44680aa9264b1c315f328ac9cbe84fda5c12e46ed` |
+| `independent-i960/attempt-001/plan.json` | `d4f51dcdd5d47afe14bcb983378c98b4f44dffe53795a8c5e22d53c639fdc229` |
+| `independent-i960/attempt-001/result.json` | `a22c98f231562d9c550c37945d50386420cbb1cd6339bbce1b9991bc8c2623fb` |
+| `independent-i960/attempt-001/guest/stdout.txt` | `d3184d5bbe8cebd45746631d22fbd2a3df8ae210464412088e1d748f9b10dcef` |
+| `independent-i960/full-review.json` | `22434fe6f5a9984419b4102771eeff6674bf5abc04ef7a0dba4a4acdab20d2cc` |
+| `independent-i960/prefix-review.json` | `38c83123a1d91430350fb31ffc9b0570578cd61f7af3a3776dd15e75f31288dc` |
 
 The tested signed executable is
 `build/installers/mac-direct-metal-personal-001/stage/Sega Rally Native.app/Contents/MacOS/segarally_native`,
@@ -111,3 +143,13 @@ segment 293/300. A Lancia Practice Lakeside run completes lap one in 1:19.75 but
 retires on lap two. The CPU review binds those attempts, including unsuccessful
 steering, anticipation, braking and predictive-input experiments. These do not
 establish a missing native-code defect or full-game completion.
+
+One further input-only trial preserved that exact best Championship prefix
+through Mountain entry, then reduced lookahead from four to three with steering
+gain 1.5. All 2,399 guest-state/cabinet-pin checkpoints through frame 11,985
+match. It visibly retires in fourth at Mountain segment 287, worse than the
+preserved best's 293 in third; Desert/Forest times are unchanged. This does not
+justify a game-code change or another untargeted parameter sweep. The retained
+audit is
+`build/worktrees/rc-raster-001/build/course-coverage-001/championship-mountain-look3-001/final-audit.json`,
+SHA-256 `cbd096426de4dd5db33680dfc4db9081c60309d0eb1b3064c9ade822f9d3cda9`.
