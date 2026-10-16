@@ -2,7 +2,11 @@
 
 Snapshot: **2026-10-16**. Mac remains the principal gameplay validation target.
 Local packages also exist for iPhone, Windows and Linux; Windows audio has
-been confirmed by a user on a PC. Direct Metal/Vulkan development is active.
+been confirmed by a user on a PC. The Mac game now defaults to direct Metal
+for game, CRT and Settings, with SDL retained for window/input/audio services.
+The 2,600-frame driving comparison preserves native execution/audio/saves and
+final images; a separate 2,100-frame visible run reports no audio shortfalls
+or drops. Direct Vulkan game integration is active.
 See [platform status](release-platforms.md) for current packages and
 [native renderers](native-renderers.md) for backend evidence and remaining work.
 This reference summarizes the latest recorded checkpoints. Exact hashes,

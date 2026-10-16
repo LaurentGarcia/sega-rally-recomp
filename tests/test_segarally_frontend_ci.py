@@ -44,4 +44,19 @@ class ToolchainTests(unittest.TestCase):
    with self.assertRaises(ValueError):m.toolchain(root)
    (root/'CMakeFiles/3.30.0/CMakeCCompiler.cmake').write_text('set(CMAKE_C_COMPILER "incomplete")\n')
    with self.assertRaisesRegex(ValueError,'Missing actual'):m.toolchain(root)
+ def test_macos_renderer_coverage_is_required(self):
+  self.assertEqual(m.renderer_features({'SEGARALLY_NATIVE_METAL':'ON'},'darwin'),
+                   {'native_metal':True,'sdl_gpu':True})
+  with self.assertRaisesRegex(RuntimeError,'must be ON'):
+   m.renderer_features({'SEGARALLY_NATIVE_METAL':'OFF'},'darwin')
+ def test_nonapple_ci_retains_sdl_without_metal(self):
+  for platform in ('win32','linux'):
+   self.assertEqual(m.renderer_features({'SEGARALLY_NATIVE_METAL':'OFF'},platform),
+                    {'native_metal':False,'sdl_gpu':True})
+   with self.assertRaisesRegex(RuntimeError,'OFF elsewhere'):
+    m.renderer_features({'SEGARALLY_NATIVE_METAL':'ON'},platform)
+ def test_missing_or_invalid_renderer_cache_rejects(self):
+  for actual in ({},{'SEGARALLY_NATIVE_METAL':''},{'SEGARALLY_NATIVE_METAL':'other'}):
+   with self.assertRaisesRegex(RuntimeError,'Missing or invalid'):
+    m.renderer_features(actual,'darwin')
 if __name__=='__main__':unittest.main()

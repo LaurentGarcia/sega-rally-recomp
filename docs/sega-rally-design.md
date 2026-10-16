@@ -15,6 +15,13 @@ and the native machine implementation must not fork between backends.
 Platform compilation is not evidence of GPU correctness or full-game fidelity.
 The current deliverables and validation gaps are in [release platforms](release-platforms.md).
 
+The 2026-10-16 Mac integration now selects direct Metal for game, CRT and
+Settings rendering. SDL still supplies the window, controls and audio. The
+same executable keeps the SDL GPU baseline for recorded comparisons; a
+2,600-frame driving comparison preserves execution, native PCM, saves and
+final image, and a separate 2,100-frame visible run validates presentation and
+fresh sound/CRT defaults. See [native renderers](native-renderers.md) for scope.
+
 ## Required end state
 
 - Generate Sega Rally's native game code reproducibly from verified user ROMs.

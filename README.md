@@ -134,7 +134,9 @@ Lancia/Practice selection, saves and recording are in the
 The importer checks ROM sizes, CRC32 and SHA1 against committed manifests.
 Static recompilers emit reached i960, TGP and 68000 instructions into ignored
 local build output. The native runtime supplies memory, ordered device events,
-I/O, video and SCSP sound. SDL3 handles input, audio output and Metal presentation.
+I/O, video and SCSP sound. The Mac game renders directly through Metal; SDL3
+handles its window, input and audio output. The existing SDL GPU path remains
+available for comparison while direct Vulkan game integration continues.
 Missing code and unsupported hardware stop with diagnostics instead of skipping
 behavior.
 

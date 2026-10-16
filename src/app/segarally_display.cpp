@@ -3,6 +3,9 @@
 #include "app/segarally_controls.h"
 #include "imgui.h"
 #include "backends/imgui_impl_sdl3.h"
+#ifdef SEGARALLY_NATIVE_METAL
+#include "app/segarally_display_metal.h"
+#endif
 #include "backends/imgui_impl_sdlgpu3.h"
 #include <algorithm>
 #include <cmath>
@@ -17,6 +20,9 @@ struct CurrentContext {
 }
 struct DisplayPanel::Impl {
     SDL_Window *window=nullptr;
+#ifdef SEGARALLY_NATIVE_METAL
+    void *metal_device=nullptr;
+#endif
     SDL_GPUDevice *device=nullptr;
     SDL_GPUTextureFormat format=SDL_GPU_TEXTUREFORMAT_INVALID;
     ImGuiContext *context=nullptr;
@@ -28,6 +34,19 @@ struct DisplayPanel::Impl {
     std::filesystem::path preferences;
     DisplaySettings saved{};
     std::string error;
+    bool using_metal() const {
+#ifdef SEGARALLY_NATIVE_METAL
+        return metal_device!=nullptr;
+#else
+        return false;
+#endif
+    }
+    void stop_renderer() {
+#ifdef SEGARALLY_NATIVE_METAL
+        if (using_metal()) {display_metal::shutdown();return;}
+#endif
+        ImGui_ImplSDLGPU3_Shutdown();
+    }
     void isolate_input() {
         wait_pad_neutral=true;
         if (controls) held_keys=controls->snapshot().keys;
@@ -60,9 +79,10 @@ struct DisplayPanel::Impl {
     }
     bool backend() {
         if (context) return true;
-        if (!window || !device) {error="Display panel is not initialized.";return false;}
+        if (!window || (!device && !using_metal())) {error="Display panel is not initialized.";return false;}
         const auto previous=ImGui::GetCurrentContext();
         IMGUI_CHECKVERSION();context=ImGui::CreateContext();
+        ImGui::SetCurrentContext(context);
         ImGui::GetIO().IniFilename=nullptr;
         ImGui::GetIO().LogFilename=nullptr;
         ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
@@ -71,15 +91,21 @@ struct DisplayPanel::Impl {
         // scaling. Do not multiply fonts by the Retina framebuffer ratio.
         ImGui::GetStyle().FontSizeBase=17.0f;
         ImGui::GetStyle().FramePadding=ImVec2(7,5);
-        platform=ImGui_ImplSDL3_InitForSDLGPU(window);
+        platform=using_metal()?ImGui_ImplSDL3_InitForMetal(window):ImGui_ImplSDL3_InitForSDLGPU(window);
         if (platform) {
             ImGui_ImplSDL3_SetGamepadMode(ImGui_ImplSDL3_GamepadMode_Manual,nullptr,0);
-            ImGui_ImplSDLGPU3_InitInfo info{};info.Device=device;info.ColorTargetFormat=format;
-            renderer=ImGui_ImplSDLGPU3_Init(&info);
+#ifdef SEGARALLY_NATIVE_METAL
+            if (using_metal()) renderer=display_metal::init(metal_device);
+            else
+#endif
+            {
+                ImGui_ImplSDLGPU3_InitInfo info{};info.Device=device;info.ColorTargetFormat=format;
+                renderer=ImGui_ImplSDLGPU3_Init(&info);
+            }
         }
         if (!platform || !renderer) {
             error="Cannot open display controls: ";error+=SDL_GetError();
-            if (renderer) ImGui_ImplSDLGPU3_Shutdown();
+            if (renderer) stop_renderer();
             if (platform) ImGui_ImplSDL3_Shutdown();
             ImGui::DestroyContext(context);context=nullptr;platform=renderer=false;
         }
@@ -89,6 +115,17 @@ struct DisplayPanel::Impl {
 };
 DisplayPanel::DisplayPanel():impl_(std::make_unique<Impl>()) {}
 DisplayPanel::~DisplayPanel() {shutdown();}
+#ifdef SEGARALLY_NATIVE_METAL
+bool DisplayPanel::init_metal(SDL_Window *window,void *device,
+        const std::filesystem::path &save_directory,DisplaySettings &settings) {
+    shutdown();auto &s=*impl_;s.error.clear();
+    if (!window || !device) {s.error="Display panel requires a window and Metal device.";return false;}
+    s.window=window;s.metal_device=device;
+    s.preferences=save_directory.empty()?std::filesystem::path{}:save_directory/"display.settings";
+    if (!s.preferences.empty()) display_preferences::load(s.preferences,settings,s.error);
+    s.saved=settings;return true;
+}
+#endif
 bool DisplayPanel::init(SDL_Window *window,SDL_GPUDevice *device,SDL_GPUTextureFormat format,
         const std::filesystem::path &save_directory,DisplaySettings &settings) {
     shutdown();auto &s=*impl_;s.error.clear();
@@ -132,13 +169,32 @@ bool DisplayPanel::process_event(const SDL_Event &event,bool controls_consumed) 
     // This result describes explicit isolation, not ImGui's broad event types.
     return false;
 }
+#ifdef SEGARALLY_NATIVE_METAL
+bool DisplayPanel::new_frame_metal(DisplaySettings &settings,void *pass,const std::function<void()> &overlay) {
+    if (!impl_->using_metal()) {impl_->error="Display panel is not using Metal.";return false;}
+    return new_frame_impl(settings,overlay,pass);
+}
+#endif
 bool DisplayPanel::new_frame(DisplaySettings &settings,const std::function<void()> &overlay) {
+    if (impl_->using_metal()) {impl_->error="Display panel requires its Metal frame descriptor.";return false;}
+    return new_frame_impl(settings,overlay,nullptr);
+}
+bool DisplayPanel::new_frame_impl(DisplaySettings &settings,const std::function<void()> &overlay,void *pass) {
     auto &s=*impl_;s.draw=nullptr;if (!s.visible && !overlay) return true;
     if (!s.backend()) {s.visible=false;return false;}
     CurrentContext current(s.context);
     if(s.visible) s.navigation();
     else ImGui_ImplSDL3_SetGamepadMode(ImGui_ImplSDL3_GamepadMode_Manual,nullptr,0);
-    ImGui_ImplSDLGPU3_NewFrame();ImGui_ImplSDL3_NewFrame();ImGui::NewFrame();
+    (void)pass;
+#ifdef SEGARALLY_NATIVE_METAL
+    if (s.using_metal()) {
+        if (!display_metal::new_frame(s.metal_device,pass)) {
+            s.error="Display panel requires the current Metal render pass.";return false;
+        }
+    } else
+#endif
+    ImGui_ImplSDLGPU3_NewFrame();
+    ImGui_ImplSDL3_NewFrame();ImGui::NewFrame();
     if(!s.visible) {overlay();ImGui::Render();s.draw=ImGui::GetDrawData();return true;}
     const auto *viewport=ImGui::GetMainViewport();
     const ImVec2 available(std::max(1.0f,viewport->WorkSize.x-24.0f),
@@ -252,12 +308,24 @@ bool DisplayPanel::new_frame(DisplaySettings &settings,const std::function<void(
     // UI changes persist separately; a failed save does not stop game playback.
     save(settings);if (s.controls) s.controls->save();return true;
 }
+#ifdef SEGARALLY_NATIVE_METAL
+bool DisplayPanel::render_metal(void *command,void *encoder) {
+    auto &s=*impl_;
+    if (!s.using_metal()) {s.error="Display panel is not using Metal.";return false;}
+    if (!s.draw || s.draw->DisplaySize.x<=0 || s.draw->DisplaySize.y<=0) return true;
+    CurrentContext current(s.context);
+    if (!display_metal::render(s.draw,s.metal_device,command,encoder)) {
+        s.error="Display panel requires a live Metal command and encoder.";return false;
+    }
+    return true;
+}
+#endif
 void DisplayPanel::prepare(SDL_GPUCommandBuffer *command) {
-    auto &s=*impl_;if (!command || !s.draw || s.draw->DisplaySize.x<=0 || s.draw->DisplaySize.y<=0) return;
+    auto &s=*impl_;if (s.using_metal() || !command || !s.draw || s.draw->DisplaySize.x<=0 || s.draw->DisplaySize.y<=0) return;
     CurrentContext current(s.context);ImGui_ImplSDLGPU3_PrepareDrawData(s.draw,command);
 }
 void DisplayPanel::render(SDL_GPUCommandBuffer *command,SDL_GPURenderPass *pass) {
-    auto &s=*impl_;if (!command || !pass || !s.draw || s.draw->DisplaySize.x<=0 || s.draw->DisplaySize.y<=0) return;
+    auto &s=*impl_;if (s.using_metal() || !command || !pass || !s.draw || s.draw->DisplaySize.x<=0 || s.draw->DisplaySize.y<=0) return;
     CurrentContext current(s.context);ImGui_ImplSDLGPU3_RenderDrawData(s.draw,command,pass);
 }
 bool DisplayPanel::save(const DisplaySettings &settings) {
@@ -274,10 +342,14 @@ void DisplayPanel::shutdown() {
     s.controls=nullptr;s.held_keys={};s.capture_was_active=false;s.wait_pad_neutral=true;
     if (s.context) {
         auto *previous=ImGui::GetCurrentContext();ImGui::SetCurrentContext(s.context);
-        if (s.renderer) ImGui_ImplSDLGPU3_Shutdown();
+        if (s.renderer) s.stop_renderer();
         if (s.platform) ImGui_ImplSDL3_Shutdown();
         ImGui::DestroyContext(s.context);ImGui::SetCurrentContext(previous==s.context?nullptr:previous);
     }
-    s.context=nullptr;s.platform=s.renderer=false;s.window=nullptr;s.device=nullptr;s.format=SDL_GPU_TEXTUREFORMAT_INVALID;
+    s.context=nullptr;s.platform=s.renderer=false;s.window=nullptr;
+#ifdef SEGARALLY_NATIVE_METAL
+    s.metal_device=nullptr;
+#endif
+    s.device=nullptr;s.format=SDL_GPU_TEXTUREFORMAT_INVALID;
 }
 } // namespace app

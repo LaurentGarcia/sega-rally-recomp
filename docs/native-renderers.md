@@ -3,9 +3,10 @@
 The direct backends render the complete Model 2 image offscreen: background
 tiles, ordered polygons, foreground tiles and the optional CPU-composed HUD.
 They reuse the existing game-facing frame packet, resource packing and shaders.
-The playable apps still use SDL3; these backends are the tested starting point
-for replacing its graphics duties. Window presentation, Settings, input and
-audio require separate host integration.
+The Mac player now uses direct Metal for the game, CRT and Settings by default.
+SDL3 still supplies its window, input and audio services. The same executable
+retains `--sdl-gpu` for comparison. Vulkan game integration remains in progress;
+the current Windows/Linux packages use SDL3 GPU.
 
 ## Shared rendering contract
 
@@ -31,6 +32,14 @@ target. It requires retained command references and copies frame resources so
 later CPU changes cannot overwrite an in-flight draw. The caller submits,
 presents and handles completion. `MetalCrt` uses the existing generated CRT
 shader and also leaves submission and presentation to the caller.
+
+The Mac `MetalPresenter` owns the device, command queue and CAMetalLayer behind
+an SDL Metal view. One ordered queue protects the cached game texture, with at
+most two pending command buffers. It draws CRT or the original nearest/linear
+image, then Settings using the pinned Dear ImGui Metal backend. Integer scaling,
+resizing, paused Settings changes and hidden-window game updates preserve the
+existing host behavior. Capture drains the queue and reads the image before CRT.
+No SDL GPU device or SDL GPU commands are used on this path.
 
 Vulkan's `VulkanModel2` currently owns a device, command buffer and synchronous
 offscreen target. It submits, waits and returns BGRA pixels. Vulkan 1.1, depth
@@ -67,6 +76,23 @@ textures off and preserved CPU output with it on. Two unsubmitted command
 buffers keep their distinct snapshots after Video mutation and reverse
 submission. Direct Metal CRT separately passes 16 exact SDL comparisons and
 204 checks. These are bounded offscreen checks, not a full-game speed result.
+
+Actual Mac game integration additionally passes three 2,600-frame driving
+runs from fresh saves: SDL Metal, direct Metal and direct Metal with Accurate
+textures. Execution, replayed inputs, native PCM and final saves match exactly.
+The final direct image equals SDL; the Accurate-textures image equals the
+same-machine CPU renderer. These comparisons cover final images, not every
+intermediate frame or an independent arcade reference.
+
+A separate visible, paced run presents all 2,100 game frames with fresh sound
+and CRT defaults enabled. It produces 1,610,005 stereo PCM frames with zero
+chip/host drops or reported device input shortfalls. This measures application
+output delivery, not physical speaker fidelity. The presenter fixture passes
+55 checks, including 20 real presentations, Settings, filtering, integer scale,
+resize, hidden updates and paused texture changes with Metal validation enabled.
+The separate Settings fixture passes 91 checks for actual mouse CRT toggles,
+persisted preferences, binding isolation, foreign-context handling and switching
+between native and SDL rendering within one executable.
 
 The wrappers preserve command output, executable/source hashes and image
 comparisons under a new ignored output directory. They verify source and
@@ -114,11 +140,31 @@ cmake -S platform/segarally/native-metal -B build/native-metal-compile \
 cmake --build build/native-metal-compile --parallel 2
 ```
 
+The window/Settings fixture additionally links the pinned ImGui library with
+its SDL3, SDL GPU and Metal backends. Run it on a Mac with a display:
+
+```sh
+python3 tests/test_native_metal_presenter.py \
+  --sdl-source extern/sdl3 --sdl-library /path/to/libSDL3.a \
+  --imgui-source extern/imgui --imgui-library /path/to/libsegarally_imgui.a \
+  --output build/native-metal-presenter-check-001
+```
+
+Add `--panel` with a new output directory to run the focused Settings fixture.
+
+The dedicated game CMake project enables `SEGARALLY_NATIVE_METAL` on macOS.
+Use `--player` for normal sound/CRT startup when passing explicit paths;
+`--native-metal` makes the backend selection explicit, and `--sdl-gpu` selects
+the existing renderer. Configure `-DSEGARALLY_NATIVE_METAL=OFF` for an SDL-only
+Mac build. The option is currently unavailable on iOS and non-Apple systems.
+The regular macOS frontend CI compiles the direct player and Settings path
+using ROM-free link fixtures; hosted CI does not claim GPU execution.
+
 ## Remaining integration
 
 1. Add asynchronous Vulkan frame resources and presentation; measure allocation
    and upload costs for both backends before optimizing shared behavior.
-2. Connect the verified rendering path and CRT to native windows and Settings.
+2. Connect Vulkan to the actual game and Settings; replace SDL window services.
 3. Replace SDL input, controller and audio services with equivalent lifecycle
    handling, including focus loss, suspend/resume and device changes.
 4. Run recorded gameplay and physical audio/controller checks on each platform.

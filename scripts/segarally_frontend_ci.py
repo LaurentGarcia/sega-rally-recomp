@@ -9,6 +9,7 @@ import json
 import re
 from pathlib import Path
 import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -46,6 +47,17 @@ def verify_toolchain(base,actual):
     for key in keys:
         if actual.get(key,'') != base.get(key,''): raise RuntimeError(f'Frontend toolchain differs: {key}')
 
+def renderer_features(actual,host_platform):
+    # Inspect the configured target rather than inferring coverage from the
+    # runner name. A changed CMake default must not silently drop Metal CI.
+    value=actual.get('SEGARALLY_NATIVE_METAL')
+    if value not in ('ON','OFF'):
+        raise RuntimeError('Missing or invalid SEGARALLY_NATIVE_METAL cache option')
+    enabled=value=='ON'
+    if enabled != (host_platform=='darwin'):
+        raise RuntimeError('SEGARALLY_NATIVE_METAL must be ON for macOS frontend CI and OFF elsewhere')
+    return {'native_metal':enabled,'sdl_gpu':True}
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--toolchain-build', type=Path, default=ROOT/'build')
@@ -65,13 +77,15 @@ def main():
     subprocess.run(command,cwd=ROOT,check=True,timeout=300)
     actual = toolchain(out)
     verify_toolchain(base,actual)
+    features = renderer_features(actual,sys.platform)
     subprocess.run(['cmake','--build',str(out),'--config','Release','--parallel','2','--target',
                     'segarally_frontend_compile','test_segarally_audio','test_segarally_controls',
                     'test_segarally_display_preferences','test_segarally_audio_output_capture',
                     'test_segarally_input_replay','test_segarally_platform_files','test_segarally_rom_import'],cwd=ROOT,check=True,timeout=900)
     subprocess.run(['ctest','--test-dir',str(out),'-C','Release','--output-on-failure'],cwd=ROOT,check=True,timeout=300)
     (out/'frontend-ci-result.json').write_text(json.dumps({'status':'passed',
-        'scope':'ROM-free real frontend compile/link and host tests only; not playable or Vulkan/device validation',
+        'scope':'ROM-free real frontend compile/link and host tests only; not playable or GPU device validation',
+        'renderer_features':features,
         'toolchain':{k:actual[k] for k in ('CMAKE_C_COMPILER','CMAKE_CXX_COMPILER','CMAKE_C_COMPILER_ID','CMAKE_CXX_COMPILER_ID','CMAKE_C_COMPILER_VERSION','CMAKE_CXX_COMPILER_VERSION','CMAKE_GENERATOR')},
         'fixture':'tests/fixtures/segarally_frontend_link.cpp','uploaded':False},indent=2)+'\n')
 

@@ -24,6 +24,10 @@ public:
     DisplayPanel &operator=(const DisplayPanel &) = delete;
     // CPU-only registration/load. Invalid/missing preferences retain settings;
     // invalid preferences supply a warning through error(). No ImGui GPU work.
+#ifdef SEGARALLY_NATIVE_METAL
+    bool init_metal(SDL_Window *, void *metal_device,
+                    const std::filesystem::path &save_directory, DisplaySettings &);
+#endif
     bool init(SDL_Window *, SDL_GPUDevice *, SDL_GPUTextureFormat,
               const std::filesystem::path &save_directory, DisplaySettings &);
     // Borrowed; detach before destroying Controls. Existing display-only hosts
@@ -40,6 +44,13 @@ public:
     // Closed with no overlay does no backend/frame/GPU work. An optional
     // presentation-only overlay lazily shares the Settings context and frame.
     // Callback runs only when Settings is closed, with that context current.
+#ifdef SEGARALLY_NATIVE_METAL
+    // Borrow the actual UI render-pass descriptor, with its BGRA8 target, before
+    // opening its encoder. The host renders this draw data last in that pass.
+    bool new_frame_metal(DisplaySettings &, void *render_pass_descriptor,
+                         const std::function<void()> &overlay = {});
+    bool render_metal(void *command_buffer, void *render_encoder);
+#endif
     bool new_frame(DisplaySettings &, const std::function<void()> &overlay = {});
     // Prepare before opening the render pass, then render last in that pass.
     // Both are no-ops without current draw data.
@@ -50,6 +61,7 @@ public:
     const std::string &error() const;
     void shutdown(); // Call before destroying the SDL window/device.
 private:
+    bool new_frame_impl(DisplaySettings &, const std::function<void()> &, void *render_pass_descriptor);
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };

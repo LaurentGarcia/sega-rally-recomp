@@ -1,5 +1,113 @@
 # Handoff
 
+## Direct Metal game and Settings integration (2026-10-16)
+
+The Platform layer & build and Reference & validation contracts govern this
+integration. Mac builds now select direct Metal for the game, CRT and Settings
+by default. `--sdl-gpu` retains the same-executable comparison path;
+`--native-metal` selects the direct path explicitly. CMake's
+SEGARALLY_NATIVE_METAL defaults ON only for macOS and can be disabled. iOS and
+non-Apple players keep their existing backend. SDL remains responsible for
+window/input/audio services; this is not complete SDL removal.
+
+MetalPresenter owns the device, ordered queue, CAMetalLayer and cached 496x384
+game target, with two pending submissions at most and explicit normal-exit
+error checks. It supports CRT, original nearest/linear output, integer scaling,
+resize, hidden offscreen updates and paused Accurate-textures redraws. Settings
+uses the unchanged pinned ImGui Metal backend through a small typed bridge.
+The existing event/controls/pause/audio/save loop and generated shaders remain
+unchanged. Capture drains commands and reads pre-CRT pixels. Teardown drains
+before destroying Settings, the Metal view or the window.
+
+The Release game at build/native-metal-player-001 uses the existing audited
+generation in build/player-defaults-6c22e24-001/native. Its executable SHA256 is
+`edad3e83bb9d0fe54f0a461d577d6d6d3ca405a56c5cb7d3074c72eb45cfb8c5`.
+All thirteen dedicated host CTests pass. First CTest invocation had seven
+Not Run entries because excluded fixture executables had not been built;
+building their explicit targets then rerunning all thirteen passes. The
+original log is retained at
+build/validation/native-metal-player-001/ctest-unbuilt-fixtures-001.log.
+
+Three actual game arms run 2,600 frames with the same fixed Lancia driving
+inputs and fresh saves: SDL Metal, default direct Metal and direct Accurate
+textures. All end at 500,035,460 instructions / 1,130,001,001 reference cycles /
+PC 0x005e6964 without fault. Native PCM, exact input/resume payload, observation
+records and final saves match. Direct final raw image equals SDL; Accurate
+final image equals the same-machine CPU renderer. Hidden direct runs report
+2,600 game updates and 2,600 skipped drawables. Metal validation reports no
+errors. Report build/validation/native-metal-player-001/parity-001/result.json
+has SHA256 `6e1b4eb1db017aa611d38cdc275e5b0c7faf5364c60e2d370cf8177c58134eb2`.
+Only final images are compared; this is neither full-race nor MAME/PCB proof.
+
+A separate visible paced run uses --player with no explicit sound/CRT/backend
+flags. Fresh defaults enable all three. It presents 2,100 of 2,100 game frames,
+produces 1,610,005 native stereo PCM frames, and reports zero chip/host drops,
+device input shortfall requests or requested extra input bytes. Runtime is
+38.825 seconds including startup, not a comparative performance benchmark.
+Application output capture is not a physical speaker fidelity measurement.
+Report build/validation/native-metal-player-001/paced-001/result.json has SHA256
+`1c8bbd5418956cc1627ed18cc25cb6fb0e9f709ddda1fa1a02e9e23c6a524002`.
+Both wrappers hash source, executable and data before/after execution.
+
+The actual window presenter fixture passes 55 checks: 20 presentations, four
+game updates, two hidden updates, Settings/CRT/filter/integer scale/resize,
+paused texture changes, capture and drained teardown. Four captures equal
+preserved SDL fixture pixels, with clean Metal validation. Report
+build/worktrees/native-metal-presenter-001/build/presenter-002/result.json has
+SHA256 `ef3f550583154e0f0b7da4f0bc8f5f052edff58e95246c2a1b737367af4277d9`.
+Its initial compile failed when the new SDK deprecated a pinned ImGui symbol
+under Werror; matching the app's macOS 13 deployment target fixes the fixture
+without changing upstream code. Read-only integration review finds no blocking
+input, resource lifetime or cleanup regression. Regular frontend CI already
+compiles this real Mac path using ROM-free symbols; it now asserts the Metal
+cache option and records renderer coverage. All eight script checks pass.
+All five workflows for the preceding 0a1de61 checkpoint are green.
+
+The separate Settings fixture initially crashed with a foreign ImGui context:
+CreateContext restores the preceding context, so the shared panel initialized
+its renderer on that foreign context. The normal single-context game path did
+not expose this. Explicitly selecting the newly created panel context fixes
+the defect. The real GPU fixture then passes 91 checks, including actual mouse
+Original/Arcade CRT toggles, preferences, remapping isolation, foreign-context
+restoration and native-to-SDL-to-native rendering in one executable. EEPROM
+and backup sentinel bytes remain unchanged. Report
+build/worktrees/native-metal-display-001/build/panel-metal-003/result.json has
+SHA256 `c45f836571d2d869b46b1bd6fc7915f6e39a240b4507967fba907d1314675546`.
+The failing binary and crash report are retained; debugger approval had delayed
+investigation, and the existing system crash report supplied the necessary
+stack without a debugger. The final player is rebuilt with this one-line fix;
+its executable SHA256 is
+`788e2548af403a54882adcc319d67de5f0a497aa1490128d3e654969a95f3604`.
+
+The final executable repeats all three 2,600-frame game comparisons successfully;
+parity-002/result.json under the same validation directory has SHA256
+`a818a9a2bec7669bd4aa47f5cf4b04c72fb61a1a741d34686b9493927ef21c45`.
+The reusable presenter runner now accepts --panel for the focused Settings
+fixture. Both modes pass with the fixed UI and Metal validation: panel-runner-001
+has 91 checks/report SHA256
+`c3485dc46f7499c5c13041b105de0d7da0f7da07450b32bccff1ed56e42e6b3f`;
+presenter-003 has 55 checks/report SHA256
+`f7f267cdfae8a6faf25fa76c6e3b54ef913429ef2269b4642121cc919e7a650a`.
+Both are under build/worktrees/native-metal-presenter-001/build, with source,
+dependency and output identities preserved.
+The final paced-002 run likewise presents 2,100/2,100 frames with the same PCM
+count and zero reported audio drops/shortfalls. Its duration is 37.408 seconds
+including startup; result SHA256 is
+`8960c5e39a94243b0138ccd335afab32cd52958ee1eb98039c32688f8a2ef35c`.
+Independent audit passes 863 checks, rehashing each final run's 219 inputs and
+all 72 artifacts, parsing the WAVs/PPMs and comparing the recordings byte for
+byte. The paced output contains 1,605,632 finite stereo frames; native WAV
+peak/RMS agree with telemetry. All final fixture source/dependency hashes also
+match root. Report actual-game-independent-audit-002/result.json in the same
+presenter worktree has SHA256
+`64473e657b654eb4c6bdf18b975baadcf34bc7559695244205f442cb48563759`.
+
+Next: package and launch this measured Mac player, finish direct Vulkan game
+and Settings integration, then replace remaining SDL platform services with
+equivalent lifecycle handling. Full-course completion and independent
+MAME/PCB/precision evidence remain separate requirements. Private scenes,
+captures, generated code and personal game-data packages stay outside Git.
+
 ## Direct Model 2 renderers and Windows audio confirmation (2026-10-16)
 
 Direct Metal/Vulkan development is now active under the inherited design's
