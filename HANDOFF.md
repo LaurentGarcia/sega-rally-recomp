@@ -1,5 +1,46 @@
 # Handoff
 
+## Four personal platform packages collected (2026-10-15)
+
+The Mac DMG, signed iOS IPA, Linux archive and Windows ZIP with personal game
+data are collected at build/installers/personal-player-preview-001, with a
+manifest, checksums and installation/validation limits. These are hardlinks to
+the exact independently reviewed artifacts; all four hashes match. No personal
+package was uploaded. New Windows/Linux import packages also remain local while
+the owner considers distribution. The existing Mac player release stays public.
+SEGA credit is published in the README and both releases; credit does not grant
+permission to distribute game content. No post was made on social media.
+
+Linux002 import/personal archives are 8,578,159 and 25,091,934 bytes. A freshly
+extracted public package passes help and owned-ZIP import without source/build
+mounts: 23 files and eight fixed image identities. Relocation report SHA256 is
+`cdc9ae6e2e6ead9c2fe66eecd5f6df17602178f60d2bf84a283f7e023a776e15`.
+The conservative preview target is Ubuntu 24.04/glibc 2.39 with GCC 13 runtime,
+Vulkan and desktop/audio libraries. No software Vulkan or Xvfb was installed;
+desktop rendering, physical audio and gameplay remain untested.
+
+Windows001 import/personal ZIPs are 17,000,917 and 33,555,527 bytes. The exact
+AMD64 PE and three bundled DLLs pass Wine CPU003 help, 4,260 importer checks and
+actual owned-ZIP import with all eight image sizes/hashes exact. CPU001 omitted
+the fixture argument; CPU002 hit Wine Z: host-path reparse points. Both failures
+are preserved. CPU003 uses fresh ordinary C: storage; no runtime guard changed.
+The final independent audit SHA256 is
+`2b78328ce2042caf004dda60b41bf917c771c8a629f32994ea2d2e03c9d918d7`.
+Native Windows rendering, physical audio, controller behavior and gameplay are
+unvalidated. THIRD_PARTY records exact GCC/MinGW package versions, reference
+commits, DLL hashes and runtime-exception/MinGW notices. The initially missing
+MinGW copyright notice was captured before final packaging.
+
+Aggregate desktop evidence is build/validation/desktop-game-binaries-001/
+completion.json, SHA256
+`881d71c4362a3b924d0744ec6aab7cdf08856a2c33c3a2643446b98306ff0e62`.
+Original and copied 209-file native generation remain unchanged. Actual desktop
+game source is 058d4ab; iOS remains the separately signed 64aca2d build. No new
+game code or renderer changes were made. Public-only desktop archives/manifests
+and checksums are staged under build/release-binaries/desktop-preview-001.
+Native Windows/Linux/device gameplay validation and distribution decisions are
+the next steps; these packages do not establish full arcade fidelity.
+
 ## Player publication and original game credit (2026-10-15)
 
 Player Preview 1 is published at v0.1.0-player.1 under the personal account.

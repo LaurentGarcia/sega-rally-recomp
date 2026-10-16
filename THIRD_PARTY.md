@@ -246,6 +246,37 @@ GPL-3.0-or-later, read at `591e148e87d27e03d50cbf7318bf0b1d1328c4bf`) is read as
 a reference only. Nothing is lifted from it: it is GPL, and this project is
 BSD-3-Clause (`LICENSE`).
 
+## Windows GCC and MinGW-w64 runtime
+
+The local Windows x86-64 player build uses Ubuntu's
+`g++-mingw-w64-x86-64-posix` and `gcc-mingw-w64-x86-64-posix-runtime`
+`13.2.0-6ubuntu1+26.1`, with `mingw-w64-common` and
+`mingw-w64-x86-64-dev` `11.0.1-3build1`. The three unmodified runtime DLLs below
+are copied beside the game executable; no compiler is required to run it.
+These are separately licensed runtime components, not BSD-licensed project code.
+
+| Component | Upstream reference | License and use |
+| --- | --- | --- |
+| GCC 13.2.0 `libstdc++-6.dll`, `libgcc_s_seh-1.dll` | [GCC source](https://gcc.gnu.org/), upstream release commit [`c891d8dc23e1a46ad9f3e757d09e57b500d40044`](https://github.com/gcc-mirror/gcc/tree/c891d8dc23e1a46ad9f3e757d09e57b500d40044) | GPL-3.0-or-later with [GCC Runtime Library Exception 3.1](https://github.com/gcc-mirror/gcc/blob/c891d8dc23e1a46ad9f3e757d09e57b500d40044/COPYING.RUNTIME). C++ standard-library and compiler-support runtime; no project changes to the DLLs. |
+| MinGW-w64 11.0.1 `libwinpthread-1.dll` and toolchain CRT support | [MinGW-w64 source](https://github.com/mingw-w64/mingw-w64), upstream release commit [`c3e587c067a00a561899d49d3e63a659e38802ec`](https://github.com/mingw-w64/mingw-w64/tree/c3e587c067a00a561899d49d3e63a659e38802ec) | [Winpthreads COPYING](https://github.com/mingw-w64/mingw-w64/blob/c3e587c067a00a561899d49d3e63a659e38802ec/mingw-w64-libraries/winpthreads/COPYING): MIT and retained BSD-3-Clause terms for Lockless-derived parts. Other CRT/header terms are retained in the MinGW-w64 package copyright notice, including ZPL-2.1 and per-file exceptions. No project changes. |
+
+The upstream commits identify release references; the actual binaries come from
+the Ubuntu package versions above, including distro packaging. Exact bundled
+DLL identities are:
+
+| File | SHA256 |
+| --- | --- |
+| `libstdc++-6.dll` | `dc04a17d6e9fe93bcb0639e93aca2811ad53c81c523e1909a2c24daf827fd2cd` |
+| `libgcc_s_seh-1.dll` | `306983c483d96a6d08a2df044e360f0962e21dac021baf8311d3c0cb3b2c9def` |
+| `libwinpthread-1.dll` | `fc9f14551f6609dd51801daec2c194579d35345551ef84fe465cbdb3339c2a6f` |
+
+Windows packages retain the installed GCC and MinGW-w64 copyright notices,
+GPL/LGPL texts and GCC runtime exception in `licenses/compiler-runtime/`.
+The game executable and these libraries are distinct components; the exception
+does not relicense the runtime libraries as BSD. Windows system DLLs are
+provided by Windows and are not copied into the package. No runtime DLL or
+compiler binary is committed to this source repository.
+
 ## Shader compilers (tools only)
 
 The hardware renderer's shaders (`src/app/gpu/m2.hlsl`, including the MAME

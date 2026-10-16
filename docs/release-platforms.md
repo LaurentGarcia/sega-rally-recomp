@@ -13,8 +13,8 @@ The distribution work targets these four platforms:
 | --- | --- | --- | --- |
 | Mac, Apple Silicon | Metal | Public prebuilt DMG; private data-inclusive DMG | macOS 13 deployment target; signed ad hoc, not notarized. Actual public app imports ZIP and passes a 2,100-frame CRT/sound check, with native audio/image/saves matching the prior player. Actual native-picker interaction and execution on macOS 13 remain untested. |
 | iPhone, arm64 | Metal | Signed personal IPA with game data | iOS 15+ development IPA built and signature/assets/notices verified for two registered devices. Installation and physical testing remain pending; this personal IPA is not a public release asset. |
-| Windows, x86-64 | Vulkan through SDL3 GPU | Prebuilt game ZIP and private data-inclusive edition | Real frontend and thirteen host tests pass; complete native game cross-build in progress. |
-| Linux, x86-64 | Vulkan through SDL3 GPU | Prebuilt game archive and private data-inclusive edition in preparation | Ubuntu 24.04/glibc 2.39 native game compiled and linked; CPU-only import verifies 23 ROM files and all eight image identities. Packaging is in progress. Linux game, GPU and audio execution remain unvalidated. |
+| Windows, x86-64 | Vulkan through SDL3 GPU | Local ROM-import and private data-inclusive ZIPs prepared; not uploaded | Actual generated game executable compiled and linked; independent archive audit passed. Wine `--help`, 4,260 importer-fixture checks and owned-ZIP import pass, verifying 23 ROMs and eight image identities. Native Windows GPU, audio and gameplay remain unvalidated. |
+| Linux, x86-64 | Vulkan through SDL3 GPU | Local ROM-import and private data-inclusive archives prepared; not uploaded | Ubuntu 24.04/glibc 2.39+ preview; final archive audit passed. Fresh relocated package passes `./play.sh --help` and CPU-only `--rom ZIP --import-only` with no source/build mount, verifying 23 ROMs and eight image identities. Linux desktop/GPU, device audio and gameplay remain unvalidated. |
 
 The personal game package contains the owner's local game data and generated
 game instructions. It stays local. The requested public player executable also
@@ -51,9 +51,48 @@ release downloads:
   Installation and physical testing remain pending. It cannot be installed on
   arbitrary devices and is not a TestFlight release.
 
-Windows and Linux player downloads are not published at this checkpoint.
-Their source/frontend checks and local game-build progress do not establish
-four completed platform releases.
+Windows and Linux packages remain local; neither is a published download at
+this checkpoint. Local build, import and archive checks do not establish four
+completed platform releases.
+
+## Local Linux package
+
+The audited ROM-import archive is
+`Sega-Rally-Native-Linux-x86_64-import.tar.gz` (8,578,159 bytes), SHA256
+`58f89c547850b1117a4fc1749cc1e1d474322ee06fbf3081fbab6e9d772f3557`.
+The separate personal archive is 25,091,934 bytes, SHA256
+`34ee3cdcc9d703bdb337938e0191c7e33b99d67410a6d95fd87730cfc879cb11`;
+it includes the owner's game data and stays private.
+
+Extract the whole archive and run `./play.sh` from its folder. The ROM-import
+edition asks for the owner's Revision B ZIP; `./play.sh --rom ZIP` selects it
+directly. No compiler or Python is needed. This preview targets Ubuntu 24.04 or
+compatible Linux with glibc 2.39+, the GCC 13 `libstdc++` runtime, Vulkan drivers,
+and an X11 or Wayland desktop with its audio libraries. It is not a static
+binary or an AppImage. The package checks above are CPU-only, not desktop game
+or playback validation.
+
+## Local Windows package
+
+The audited ROM-import archive is `Sega-Rally-Native-Windows-x86_64-import.zip`
+(17,000,917 bytes), SHA256
+`065e1ab8bddf7ffebbb32c56a0e75e6b1de83d9c3d12a8307d45c1ccfa39e6c0`.
+The separate personal archive is 33,555,527 bytes, SHA256
+`a36b707c45cfb0b38b04cbb695c6f5d230e9a80614a217ad43e4b29877253231`;
+it includes the owner's game data and stays private. Neither is uploaded.
+
+Extract the entire ZIP and open `play.cmd`, or use
+`.\play.cmd --rom "C:\path\to\srallyc.zip"` from PowerShell. Keep
+`libstdc++-6.dll`, `libgcc_s_seh-1.dll` and `libwinpthread-1.dll` beside
+`segarally_native.exe`. Their versions, identities and notices are recorded in
+[THIRD_PARTY.md](../THIRD_PARTY.md#windows-gcc-and-mingw-w64-runtime).
+No compiler, Python or development SDK is required; a 64-bit Windows system
+with working Vulkan drivers is needed for the intended desktop player.
+
+The current executable/import evidence runs under Wine. It is not evidence of
+native Windows desktop rendering, physical audio, controller behavior or a
+completed race. The import still enforces its existing reparse-point guard;
+no runtime guard was relaxed for Wine testing.
 
 ## One renderer, four hosts
 
