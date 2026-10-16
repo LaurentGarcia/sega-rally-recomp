@@ -8,6 +8,13 @@
     <key>CFBundleDisplayName</key><string>Sega Rally Native</string>
     <key>CFBundleShortVersionString</key><string>${SEGARALLY_IOS_VERSION}</string>
     <key>CFBundleVersion</key><string>${SEGARALLY_IOS_BUILD_NUMBER}</string>
+    <!-- actool merges the matching icon filenames from the AppIcon catalog. -->
+    <key>CFBundleIcons</key><dict><key>CFBundlePrimaryIcon</key><dict>
+        <key>CFBundleIconName</key><string>AppIcon</string>
+    </dict></dict>
+    <key>CFBundleIcons~ipad</key><dict><key>CFBundlePrimaryIcon</key><dict>
+        <key>CFBundleIconName</key><string>AppIcon</string>
+    </dict></dict>
     <key>LSRequiresIPhoneOS</key><true/>
     <key>UISupportedInterfaceOrientations</key><array>
         <string>UIInterfaceOrientationLandscapeLeft</string>

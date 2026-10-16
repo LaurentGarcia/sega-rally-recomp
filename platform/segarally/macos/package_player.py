@@ -12,6 +12,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / 'platform/segarally'))
 from package_licenses import collect
+from build_icons import build_icons
 
 def sha(path):
     with path.open('rb') as f:
@@ -78,11 +79,14 @@ def main():
            'covers the original runtime and tools, not Sega game content.\n'
            'Experimental preview; ad-hoc signed and not notarized.\n')
     (resources/'README.txt').write_text(text)
+    icon=build_icons(ROOT/'assets/branding/app-icon.png',out/'branding','mac')
+    shutil.copyfile(icon,resources/'AppIcon.icns')
     with (contents/'Info.plist').open('wb') as f:
         plistlib.dump({'CFBundleIdentifier':'com.lgarciacarro.segarally.macnative',
             'CFBundleName':'Sega Rally Native','CFBundleDisplayName':'Sega Rally Native',
             'CFBundlePackageType':'APPL','CFBundleExecutable':'segarally_native',
             'CFBundleShortVersionString':'0.1.0','CFBundleVersion':'3',
+            'CFBundleIconFile':'AppIcon.icns',
             'LSMinimumSystemVersion':'13.0',
             'NSHighResolutionCapable':True,'NSPrincipalClass':'NSApplication'},f)
     def run(argv,name):
@@ -106,6 +110,8 @@ def main():
         'source_revision':revision,
         'package_revision':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
         'input_executable_sha256':args.executable_sha256,'contains_recompiled_game_program':True,
+        'icon_source_sha256':sha(ROOT/'assets/branding/app-icon.png'),
+        'icon_icns_sha256':sha(resources/'AppIcon.icns'),
         'game_assets_included':args.edition=='personal','requires_development_tools':False,
         'notarized':False,'app':str(app),'files':files,
         'dmg':{'path':str(dmg),'size':dmg.stat().st_size,'sha256':sha(dmg)},

@@ -46,10 +46,43 @@ release downloads:
 - **Mac personal DMG:** 28,995,081 bytes; ad-hoc signed and not notarized.
   SHA256 `b3c5d8d2e2893ab77419157cbf584403a0caba72eace848439fba6f76921e268`.
 - **iPhone personal IPA:** 24,341,339 bytes; development-signed for the two
-  devices covered by the existing profile, which expires on 2027-10-14.
+  devices covered by the existing profile. The actual signing certificate
+  expires on **2026-10-27 at 18:31:31 UTC**, earlier than the profile's
+  2027-10-14 expiry. The profile date is not a promise of app usability until
+  that date; certificate validity, revocation and device trust also apply.
   SHA256 `a108448667ffcce4e2db26e2cc1dbe1fb8e661ee8127e604b5737594532224c1`.
   Installation and physical testing remain pending. It cannot be installed on
   arbitrary devices and is not a TestFlight release.
+
+The requested friends distribution route is external TestFlight. Preparation
+is local only: distribution rights are unresolved, no build has been uploaded,
+and no tester invitations have been sent. The current development IPA is not
+an invitation-based install for friends.
+
+The local signing audit found a development identity, but no matching
+distribution identity/profile for this app. Personal App Store Connect access,
+an app record matching `com.lgarciacarro.segarally.native`, and an unused upload
+build number remain unverified. An unrelated app's cached profile is not used.
+The iOS script can plan a local `app-store-connect` export; its destination is
+always `export`, never `upload`. That option does not establish distribution
+signing or App Store readiness. Beta metadata, required privacy/export declarations
+and physical device testing also remain before submission.
+
+Apple's
+[Ad Hoc distribution](https://developer.apple.com/help/account/provisioning-profiles/create-an-ad-hoc-provisioning-profile/)
+requires a distribution certificate and a provisioning profile containing each
+registered device. The current personal development IPA is not that package.
+[External TestFlight](https://developer.apple.com/help/app-store-connect/test-a-beta-version/testflight-overview/)
+provides invitations and updates, requires review for the first external build,
+and limits each build to 90 days. Neither signing route grants rights to SEGA
+game content. Bundled-data distribution requires a separate rights assessment;
+credit and private sharing do not supply permission.
+
+The current iPhone build uses bundled data. Its pinned SDL dialog backend does
+not implement the desktop ROM chooser on iOS. A user-import edition still needs
+a native Files picker and sandbox-safe data import; desktop import evidence
+does not establish that iPhone workflow. Excluding extracted data would not
+remove the translated game instructions from the executable.
 
 Windows and Linux packages remain local; neither is a published download at
 this checkpoint. Local build, import and archive checks do not establish four

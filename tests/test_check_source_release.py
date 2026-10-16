@@ -127,6 +127,22 @@ class SourceRelease(unittest.TestCase):
             with self.subTest(prefix=prefix), self.assertRaisesRegex(ValueError, "private-key"):
                 release.classify("settings.txt", key)
 
+    def test_project_artwork_requires_exact_path_and_bytes(self):
+        path = "assets/branding/app-icon.png"
+        data = b"\x89PNG\r\n\x1a\n" + b"original artwork identity fixture"
+        with patch.object(release, "PROJECT_ARTWORK", {path: release.sha256(data)}):
+            self.assertEqual(release.classify(path, data), "original_project_artwork")
+            with self.assertRaisesRegex(ValueError, "artwork bytes"):
+                release.classify(path, data + b"changed")
+            with self.assertRaisesRegex(ValueError, "filename"):
+                release.classify("assets/branding/other.png", data)
+            self.commit({path: data})
+            row = next(r for r in self.manifest()["files"] if r["path"] == path)
+            self.assertEqual(row["classification"], "original_project_artwork")
+            self.commit({path: data + b"changed"})
+            with self.assertRaisesRegex(ValueError, "artwork bytes"):
+                self.manifest()
+
     def test_exact_archives_accept_git_prefix_and_reject_added_or_changed_files(self):
         manifest = self.manifest()
         expected = {row["path"] for row in manifest["files"]}

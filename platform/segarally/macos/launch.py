@@ -8,8 +8,11 @@ import plistlib
 import re
 import shutil
 import subprocess
+import sys
 
 ROOT=Path(__file__).resolve().parents[3]
+sys.path.insert(0,str(ROOT/"platform/segarally"))
+from build_icons import build_icons
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--build-dir",type=Path,default=ROOT/"build/segarally-mac")
 parser.add_argument("--no-launch",action="store_true",help="Package and sign only; record the launch command without opening a window")
@@ -100,11 +103,14 @@ try:
     bundled_replay=resources/"input-replay.inputs"
     bundled_replay.unlink(missing_ok=True)
     if replay_bytes is not None:bundled_replay.write_bytes(replay_bytes)
+    icon=build_icons(ROOT/"assets/branding/app-icon.png",build/"branding","mac")
+    shutil.copyfile(icon,resources/"AppIcon.icns")
     with (app/"Contents/Info.plist").open("wb") as file:
         plistlib.dump({"CFBundleIdentifier":"com.lgarciacarro.segarally.macnative",
             "CFBundleName":"Sega Rally Native","CFBundleDisplayName":"Sega Rally Native",
             "CFBundlePackageType":"APPL","CFBundleExecutable":"segarally_native",
             "CFBundleShortVersionString":"0.1","CFBundleVersion":"1",
+            "CFBundleIconFile":"AppIcon.icns",
             "NSHighResolutionCapable":True,"NSPrincipalClass":"NSApplication"},file)
     subprocess.run(["codesign","--force","--sign","-",str(app)],check=True)
     startup=["--player","--save-dir",str(build/"live-app-save"),"--log",str(build/"live-app.log")]

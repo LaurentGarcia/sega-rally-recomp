@@ -1,5 +1,45 @@
 # Handoff
 
+## Original app icon and local iPhone distribution preparation (2026-10-15)
+
+The shared original 1024-square RGB icon is assets/branding/app-icon.png,
+SHA256 `021c23ada71d5fb229384d4555c4a541e2449106314b40c418f70271a0896226`.
+It is pinned by exact path and bytes in the source-release gate. No arbitrary
+PNG exception was added; thirteen boundary tests pass. Mac launcher/player
+packaging derives ICNS and sets bundle metadata before signing. iOS CMake
+derives an iPhone/iPad AppIcon catalog for Xcode to compile before signing.
+All derived assets stay in ignored build output. The platform/build section
+of the inherited design governs this packaging-only change.
+
+The reviewed six-file wiring patch is app-icon-wiring-002, SHA256
+`a4b8b08b15e7a1adbae7b4a54290d81df6e9499e7091f2278582cccbe7467716`.
+Actual ICNS conversion, iOS 15 actool compilation and 21 existing launcher
+checks pass in the isolated wiring checkout. The first sandboxed iconutil
+attempt failed; the same conversion succeeds with system access. The initial
+001 custom PNG decoder proposal was discarded in favor of sips metadata checks
+and standard Apple conversions. Host test count remains thirteen. Actual Mac
+packages and a signed iOS archive must now be rebuilt from this commit; no
+previously signed package is edited in place and game-source binding stays strict.
+
+The requested friends route is TestFlight, but the owner has not obtained
+distribution authorization for the game content. Work remains local: no upload,
+rights declaration, account changes or invitations. The local-only TestFlight
+export plan is build/icon-design-001/testflight-local-plan.json. Existing signing
+has only a development identity; no matching app distribution profile is
+established. Personal App Store Connect access/app record, beta metadata,
+required privacy/export declarations and physical device testing remain pending.
+The current iOS build has no native Files ROM chooser; removing bundled assets
+would not remove the translated game instructions from its executable.
+
+The actual development signing certificate expires 2026-10-27 18:31:31 UTC,
+earlier than the profile's 2027-10-14 date. The certificate is the same leaf
+embedded in the app and profile; evidence is
+build/validation/ios-signing-expiry-001/result.json, SHA256
+`210658bdcca4229e9ab8b0078a7e144df54366960227cec9f7a74bfd279cfef3`.
+The profile covers only two devices. Documentation and the private collection's
+README now distinguish these dates; the previous profile-only statement did
+not establish app usability through 2027. Existing package bytes remain intact.
+
 ## Four personal platform packages collected (2026-10-15)
 
 The Mac DMG, signed iOS IPA, Linux archive and Windows ZIP with personal game

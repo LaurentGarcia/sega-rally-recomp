@@ -4,6 +4,7 @@ import contextlib
 import hashlib
 import io
 import json
+import plistlib
 from pathlib import Path
 import re
 import runpy
@@ -16,6 +17,8 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 LAUNCHER = ROOT / "platform/segarally/macos/launch.py"
+sys.path.insert(0,str(ROOT/"platform/segarally"))
+import build_icons
 
 
 class MacLauncher(unittest.TestCase):
@@ -44,6 +47,8 @@ class MacLauncher(unittest.TestCase):
         (self.build / "licenses").mkdir()
         for name in ("Project-BSD-3-Clause.txt", "THIRD_PARTY.md", "SDL.txt", "ImGui.txt", "ImGui-embedded-fonts.txt", "Source-notices.txt"):
             (self.build / "licenses" / name).write_text("synthetic notice " + name)
+        self.icon = self.build / "original-fixture.icns"
+        self.icon.write_bytes(b"original synthetic icon fixture")
         self.calls = []
         self.sign_checks = None
 
@@ -65,6 +70,9 @@ class MacLauncher(unittest.TestCase):
                                                    stdout="12345\n" if active else "",
                                                    stderr="process query failed" if process_error is not None else "")
             if command[0] == "codesign":
+                self.assertEqual((self.resources/"AppIcon.icns").read_bytes(),self.icon.read_bytes())
+                with (self.app/"Contents/Info.plist").open("rb") as file:
+                    self.assertEqual(plistlib.load(file)["CFBundleIconFile"],"AppIcon.icns")
                 self.assertEqual(command, ["codesign", "--force", "--sign", "-", str(self.app)])
                 self.assertEqual(kwargs, {"check": True})
                 self.assertEqual((self.app / "Contents/MacOS/segarally_native").read_bytes(),
@@ -78,7 +86,7 @@ class MacLauncher(unittest.TestCase):
                 self.assertEqual(kwargs, {"check": True})
             return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
 
-        with patch.object(sys, "argv", [str(LAUNCHER), "--build-dir", str(self.build), *arguments]), \
+        with patch.object(build_icons,"build_icons",return_value=self.icon), patch.object(sys, "argv", [str(LAUNCHER), "--build-dir", str(self.build), *arguments]), \
              patch("subprocess.run", side_effect=fake_run), \
              contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             try:

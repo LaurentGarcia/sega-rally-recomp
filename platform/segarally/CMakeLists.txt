@@ -133,8 +133,28 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
         BYPRODUCTS ${ASSETS} VERBATIM COMMENT "Verify personally imported Sega Rally assets")
     add_dependencies(${HOST_TARGET} segarally_assets)
     target_compile_definitions(${HOST_TARGET} PRIVATE SEGARALLY_IOS=1)
+    # The shared original PNG is the only committed icon. Xcode compiles the
+    # derived asset catalog before signing; never inject resources after signing.
+    set(ICON_SOURCE "${ROOT}/assets/branding/app-icon.png")
+    set(ICON_BUILDER "${CMAKE_CURRENT_SOURCE_DIR}/build_icons.py")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${ICON_SOURCE}" "${ICON_BUILDER}")
+    execute_process(COMMAND "${Python3_EXECUTABLE}" "${ICON_BUILDER}"
+        --source "${ICON_SOURCE}" --output "${CMAKE_BINARY_DIR}/branding" --platform ios
+        RESULT_VARIABLE ICON_RESULT OUTPUT_VARIABLE ICON_CATALOG OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(NOT ICON_RESULT EQUAL 0 OR NOT EXISTS "${ICON_CATALOG}/AppIcon.appiconset/Contents.json")
+        message(FATAL_ERROR "A valid shared 1024x1024 opaque app icon is required")
+    endif()
+    set_source_files_properties("${ICON_CATALOG}" PROPERTIES
+        MACOSX_PACKAGE_LOCATION Resources XCODE_EXPLICIT_FILE_TYPE folder.assetcatalog)
+    target_sources(${HOST_TARGET} PRIVATE "${ICON_CATALOG}")
+    add_custom_target(segarally_icons
+        COMMAND "${Python3_EXECUTABLE}" "${ICON_BUILDER}"
+            --source "${ICON_SOURCE}" --output "${CMAKE_BINARY_DIR}/branding" --platform ios
+        VERBATIM COMMENT "Verify derived app icon resources")
+    add_dependencies(${HOST_TARGET} segarally_icons)
     set_target_properties(${HOST_TARGET} PROPERTIES MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/ios/Info.plist.in"
         XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${SEGARALLY_IOS_BUNDLE_ID}"
+        XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
         XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
         XCODE_ATTRIBUTE_SKIP_INSTALL "NO"
         XCODE_ATTRIBUTE_INSTALL_PATH "$(LOCAL_APPS_DIR)"
