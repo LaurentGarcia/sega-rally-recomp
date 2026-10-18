@@ -1,7 +1,7 @@
 # Evidence and status
 
-Snapshot: **2026-10-16**. Mac remains the principal gameplay validation target.
-Preview 3 provides public Mac, Windows and Linux binaries; personal iPhone
+Snapshot: **2026-10-17**. Mac remains the principal gameplay validation target.
+Preview 4 provides public Mac, Windows and Linux binaries; personal iPhone
 packaging remains local. Windows audio was confirmed by a user on a PC with
 the preceding SDL package. The Mac game now defaults to direct Metal
 for game, CRT and Settings, with SDL retained for window/input/audio services.
@@ -9,8 +9,10 @@ The 2,600-frame driving comparison preserves native execution/audio/saves and
 final images; a separate 2,100-frame visible run reports no audio shortfalls
 or drops. Direct Vulkan now passes the same three-arm 2,600-frame driving
 comparison on Linux/lavapipe with actual X11 presentation and zero validation
-errors. The extracted Linux package repeats that driving input without source
-or build mounts, preserving final image and audio. Direct Vulkan remains
+errors. Preview 4 adds native Wayland and a window-restoration fix in Linux,
+retaining the earlier Mac and Windows binaries. Three 2,800-frame Wayland game
+runs and a fresh archive/import run preserve execution, native PCM, images and
+saves; dummy-audio shortfalls remain recorded. Direct Vulkan remains
 opt-in; Windows/vendor-GPU execution is not established. The Windows game
 cross-build, dependencies and Wine startup/import checks pass.
 See [platform status](release-platforms.md) for current packages and
@@ -51,7 +53,8 @@ window is restored, fixing a measured Wayland FIFO presentation hang. The new
 native Wayland fixture passes 110 checks and 68 presentations under headless
 Weston/software Vulkan, with no validation errors. X11 still passes 101
 presentations and all nine images match its preceding baseline. A separate CI
-job covers Wayland. Preview 3's published Linux binary remains X11-only.
+job covers Wayland. Preview 4 publishes the Wayland-enabled Linux player;
+Preview 3's older Linux binary remains X11-only.
 
 The [exact-scene Metal/Vulkan analysis](native-renderers.md) reproduces 951
 default-image pixel differences despite identical projected vertices and CPU

@@ -1,5 +1,64 @@
 # Handoff
 
+## Linux Wayland player publication (2026-10-17)
+
+Player Preview 4 is published on LaurentGarcia/sega-rally-recomp as
+v0.1.0-player.4, release 416015569, targeting 53ec202. Its seven uploaded assets
+are the Mac DMG, Windows ZIP, Linux tar.gz, three platform manifests and
+SHA256SUMS. All seven remote sizes and GitHub SHA256 digests match the frozen
+local allowlist; the tag points at the expected commit and release notes match.
+The target's four triggered CI workflows pass: Build 38983515035, native Metal
+38983514843, Vulkan CRT 38983514927 and Vulkan Model2/WSI 38983514915, including
+the separate native Wayland job. The source archive gate passes the exact
+53ec202 tree (8911ddc9e5bb43350a777b95234eb317df5b96f0).
+
+The new Linux import archive is 8,698,088 bytes, SHA256
+`ef14d4e84938f34afab416271b4e01a7fc9d0a35eafd6ed994aa7567772b3862`.
+It retains the normal Wayland-enabled executable from 81f8288, SHA256
+`a621cd2ba1309b270248cbc72fe74f80adda08c4f078b39ca26b7cbcdbc9b915`.
+The 101 recorded project compiler inputs match that commit; 57 generated inputs
+are identified by hash only. The archive includes 16 files and two directories,
+with all bytes, hashes and modes independently checked and no symlinks, ROM
+assets, generated game source or lifecycle wrapper. Its external manifest is
+7,911 bytes, SHA256
+`0735056bcc53f2d6c136ef50f0639c7f84f051cc8f3688f6af264caae412e6b9`.
+
+All 24 pinned protocol XML identities and 23 exact copyright blocks are checked.
+The initial independent notice audit expected the later THIRD_PARTY.md snapshot;
+the frozen archive actually retains 81f8288's file plus the complete separate
+SDL-Wayland-protocols.txt notices. The manifest records that distinction from
+repository-only notice metadata at 53ec202. The archive was not rewritten.
+An earlier opaque Python packager stalled on a Docker escalation and created no
+archive; its script is preserved. The completed packager separates ordinary file
+work from narrowly scoped explicit Docker checks and preserves all older assets.
+
+A fresh extraction, with no source/build directories mounted, imports all eight
+expected game images and completes 2,800 frames through direct Vulkan under
+headless Weston/CPU lavapipe. Execution, native PCM, final raw image, saves and
+observations match the earlier normal run; CRT is on, exit/saves are clean and
+validation reports zero errors. The quality checker correctly retains
+completed_with_findings: 3,111 dummy-device shortfall requests, zero chip/host
+drops. This is not a physical GPU/controller/speaker or performance pass.
+
+Final packaging evidence is under
+build/worktrees/rc-platform-readiness-001/build/linux-wayland-packaging-002:
+final-result.json SHA256
+`73005170833e8da1b348c4a1b011fe569ae23cfc6f3ce7c6505ac36da1ab94d5`;
+relocated-001/evidence/result.json SHA256
+`89bbb003269f7653ea3795571e3e1b97f982fb51b00ffe89abbce67d73e86aff`.
+Publication inventory, independent audit and remote proof are in
+build/publication/native-player-004. Mac/Windows binaries and manifests remain
+byte-identical to Preview 3, preserving their distinct compiled-source identities.
+The earlier Linux personal archive remains local and X11-only. No personal
+package or iOS build was uploaded. README and current platform/status references
+now point at Preview 4; historical Preview 3 evidence remains intact.
+
+Next RC work remains NORMAL Championship/Lakeside completion, reproducing the
+intermittent long host-audio stalls, physical Windows/Linux device testing and
+independent full-race MAME/PCB comparisons. The passing SHORT Practice CPU
+lifecycle and recorded cross-API scene findings do not close those requirements.
+SDL window/input/audio replacement and public iPhone distribution remain separate.
+
 ## Linux package notice inventory (2026-10-16)
 
 The Wayland-enabled SDL library compiles generated interfaces for all 24 pinned

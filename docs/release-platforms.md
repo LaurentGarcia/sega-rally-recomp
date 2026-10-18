@@ -3,10 +3,12 @@
 [Source prerelease v0.1.0-rc.1](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-rc.1)
 contains source archives. Both compiler-bootstrap preview releases have been
 withdrawn: they required installed development tools and were not the requested
-prebuilt game apps. [Player Preview 3](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.3)
+prebuilt game apps. [Player Preview 4](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.4)
 provides precompiled Mac, Windows and Linux games. They import the player's own
 ROM locally, without a compiler or developer-tool installation. Windows/Linux
 add opt-in direct Vulkan; the Mac package retains the tested direct Metal build.
+Preview 4 updates Linux with native Wayland and the Vulkan window-restoration
+fix. Mac and Windows binaries and manifests are unchanged from Preview 3.
 
 The distribution work targets these four platforms:
 
@@ -15,7 +17,7 @@ The distribution work targets these four platforms:
 | Mac, Apple Silicon | Metal | Public prebuilt DMG; private data-inclusive DMG | macOS 13 deployment target; signed ad hoc, not notarized. Actual public app imports ZIP and passes a 2,100-frame CRT/sound check, with native audio/image/saves matching the prior player. Actual native-picker interaction and execution on macOS 13 remain untested. |
 | iPhone, arm64 | Metal | Signed personal IPA with game data | iOS 15+ development IPA built and signature/assets/notices verified for two registered devices. Installation and physical testing remain pending; this personal IPA is not a public release asset. |
 | Windows, x86-64 | SDL GPU Vulkan default; direct Vulkan opt-in | Public ROM-import ZIP; private data-inclusive ZIP stays local | Full game cross-compile/link, dependency checks and Wine startup/import pass, including eight imported image identities. The user's earlier PC audio confirmation applies to the preceding SDL package. New direct Vulkan GPU, controller and full-race validation remain open. |
-| Linux, x86-64 | SDL GPU Vulkan default; direct Vulkan opt-in | Public ROM-import archive; private data-inclusive archive stays local | Three 2,600-frame Linux X11/lavapipe game comparisons pass. A freshly extracted package imports owned data and repeats the 2,600-frame run without source/build mounts, preserving final image/audio. Requires X11/XWayland; native Wayland is not compiled. Physical GPU and speaker output remain untested. |
+| Linux, x86-64 | SDL GPU Vulkan default; direct Vulkan opt-in | Public ROM-import archive; earlier private data-inclusive archive stays local | Native Wayland and X11 included. Three 2,800-frame Wayland/software Vulkan game comparisons pass, including a separate hide/restore diagnostic. Fresh extraction/import repeats the direct run without source/build mounts. Dummy-audio shortfalls remain recorded; physical GPU and speaker output remain untested. |
 
 The personal game package contains the owner's local game data and generated
 game instructions. It stays local. The requested public player executable also
@@ -33,7 +35,7 @@ IPA does not establish TestFlight distribution or a public ROM-import edition.
 
 ## Available artifacts
 
-The current [Player Preview 3](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.3)
+The current [Player Preview 4](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.4)
 contains three platform binaries, their manifests and checksums. Its
 `Sega-Rally-Native-macOS-arm64.dmg` (12,953,680 bytes) is byte-identical to
 the [Mac Preview 2](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.2)
@@ -105,7 +107,7 @@ a native Files picker and sandbox-safe data import; desktop import evidence
 does not establish that iPhone workflow. Excluding extracted data would not
 remove the translated game instructions from the executable.
 
-Windows and Linux import editions are public in Preview 3; their personal
+Windows and Linux import editions are public in Preview 4; their personal
 editions remain local. iPhone remains separate, with no public IPA or TestFlight
 release. These checks do not establish four completed platform releases.
 
@@ -128,25 +130,39 @@ No TestFlight upload or invitations were made.
 ## Linux package
 
 The audited ROM-import archive is
-`Sega-Rally-Native-Linux-x86_64-import.tar.gz` (8,586,382 bytes), SHA256
-`3168a945b6caadb0749acb8954e04886f8bb1671b8f00f9d945468a7cdec9ad9`.
-The separate personal archive is 25,097,897 bytes, SHA256
+`Sega-Rally-Native-Linux-x86_64-import.tar.gz` (8,698,088 bytes), SHA256
+`ef14d4e84938f34afab416271b4e01a7fc9d0a35eafd6ed994aa7567772b3862`.
+It contains the normal executable built from
+`81f82882079ed1c9b3984f9365141f25348b3e76`, with native Wayland and X11 enabled.
+All 101 recorded project compiler inputs match that revision. The package
+includes the separate copyright/permission notices from its pinned SDL Wayland
+protocol inputs, alongside SDL's license and the other dependency notices.
+The earlier personal archive remains unchanged at 25,097,897 bytes, SHA256
 `f679d994b53ca828bcced96d209c2539df9703393c0e7098d2a80e8530cb3211`;
-it includes the owner's game data and stays private.
+it includes the owner's game data and stays private. That older archive retains
+the X11-only executable from `1a59ceafc6ff6870d06db723a1e6cf035bbebe57`.
 
 Extract the whole archive and run `./play.sh` from its folder, or
 `./play-vulkan.sh` for direct Vulkan. The ROM-import
 edition asks for the owner's Revision B ZIP; `./play.sh --rom ZIP` selects it
 directly. No compiler or Python is needed. This preview targets Ubuntu 24.04 or
 compatible Linux with glibc 2.38+, the GCC 13 `libstdc++` runtime
-(`GLIBCXX_3.4.31`), `libvulkan.so.1`, Vulkan drivers,
-and an X11 desktop (or XWayland on a Wayland desktop) with its audio libraries.
-Native Wayland support is not compiled into this preview. It is not a static
-binary or an AppImage. Both launchers enable sound and CRT unless saved display
-preferences override the default. The 2,600-frame relocated game check uses
-X11/lavapipe, not a physical GPU or speaker. The personal archive separately
-passes a 120-frame startup using its bundled data without import. Both preserve
-the measured executable from `1a59ceafc6ff6870d06db723a1e6cf035bbebe57`.
+(`GLIBCXX_3.4.31`), `libvulkan.so.1`, Vulkan drivers and a desktop with its audio
+libraries. Native Wayland also requires `libwayland-client.so.0`,
+`libwayland-cursor.so.0`, `libwayland-egl.so.1` and `libxkbcommon.so.0`.
+X11/XWayland remains available; libdecor is disabled. It is not a static binary
+or an AppImage. Both launchers enable sound and CRT unless saved display
+preferences override the default.
+
+A fresh extraction imports all eight expected game images and completes a
+2,800-frame direct Vulkan run with no source/build directories mounted.
+Execution, native PCM, final image, saves and recorded observations match the
+earlier Wayland run; synchronization validation reports zero errors. These
+checks use headless Weston, CPU lavapipe and dummy audio. The relocated check
+retains 3,111 dummy-device shortfall requests with zero chip/host drops, so its
+quality result is `completed_with_findings`. Physical graphics, controls,
+speaker quality and performance remain untested. The earlier personal archive
+separately passed a 120-frame startup using bundled data without import.
 
 ## Windows package
 

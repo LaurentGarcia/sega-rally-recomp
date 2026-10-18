@@ -296,11 +296,11 @@ diagnosis are retained alongside the passing uninstrumented result at
 `build/worktrees/rc-platform-readiness-001/build/wayland-check-005/result.json`,
 SHA256 `79b14cec55927bed33c0e96e7026d21f6677d5cfdd9df2d34eadda8a4ae8183e`.
 The dedicated workflow runs this regression separately from X11. Preview 3's
-published Linux player remains X11-only; this fixture does not add native
-Wayland support to that already published binary.
+Linux player remains X11-only; Preview 4 adds the separately built and tested
+Wayland-enabled player described below.
 
-A separate local player build from `81f8288` enables Wayland alongside X11 and
-SDL GPU. It reused all 57 generated-game objects unchanged. The normal executable
+A separate player build from `81f8288`, published in Preview 4, enables Wayland
+alongside X11 and SDL GPU. It reused all 57 generated-game objects unchanged. The normal executable
 SHA256 is `a621cd2ba1309b270248cbc72fe74f80adda08c4f078b39ca26b7cbcdbc9b915`.
 Three recorded 2,800-frame drives exercised SDL Vulkan, direct Vulkan, and a
 separate direct Vulkan diagnostic executable. All three finished at 536,636,736
@@ -322,7 +322,8 @@ These tests used CPU lavapipe, headless Weston/pixman and dummy audio. They reta
 SDL, 3,151 for direct Vulkan and 3,071 for the lifecycle diagnostic; chip and host
 audio drops were zero. This establishes the measured gameplay and window
 lifecycle comparisons, not physical GPU/display/controller/speaker quality or
-MAME/PCB fidelity. The existing published Linux binary remains unchanged.
+MAME/PCB fidelity. Preview 4 retains this exact normal executable; older Linux
+archives remain unchanged.
 
 The local evidence is
 `build/worktrees/rc-platform-readiness-001/build/wayland-player-001/execution/audited-result.json`,
@@ -333,6 +334,20 @@ The original outer runner failed after all game runs because it searched
 artifacts and checks the correct log without changing or rerunning the game.
 Its 99-file build-input inventory is a recorded subset, not a complete inventory
 of linked-library dependencies; package verification checks those separately.
+
+The Preview 4 import archive passes a separate fresh-extraction check: all eight
+imported game images match, and a 2,800-frame direct Vulkan run preserves the
+earlier execution, native PCM, raw image, saves and observations. No source or
+build directories are mounted. CRT is enabled and synchronization validation
+reports zero errors. Its 3,111 dummy-device shortfall requests remain findings;
+chip/host drops are zero. The archive excludes the lifecycle diagnostic wrapper.
+All 16 packaged files and their modes/hashes, 101 project compiler inputs and
+24 pinned protocol XML identities are checked; 23 verbatim protocol notice
+blocks are included. The final package evidence is
+`build/worktrees/rc-platform-readiness-001/build/linux-wayland-packaging-002/final-result.json`,
+SHA256 `73005170833e8da1b348c4a1b011fe569ae23cfc6f3ce7c6505ac36da1ab94d5`.
+See [platform status](release-platforms.md#linux-package) for downloads and
+runtime dependencies.
 
 ## Remaining integration
 

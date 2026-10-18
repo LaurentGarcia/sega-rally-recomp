@@ -1,6 +1,6 @@
 # Sega Rally documentation
 
-The [prebuilt Mac, Windows and Linux players](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.3)
+The [prebuilt Mac, Windows and Linux players](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.4)
 import your own verified Revision B (`srallycb`) ZIP without developer tools.
 Their executables contain compiled game instructions; the public downloads exclude
 ROM archives and extracted assets. Personal packages with game data remain
