@@ -1,6 +1,6 @@
 # Evidence and status
 
-Snapshot: **2026-10-17**. Mac remains the principal gameplay validation target.
+Snapshot: **2026-10-18**. Mac remains the principal gameplay validation target.
 Preview 4 provides public Mac, Windows and Linux binaries; personal iPhone
 packaging remains local. Windows audio was confirmed by a user on a PC with
 the preceding SDL package. The Mac game now defaults to direct Metal
@@ -22,6 +22,12 @@ failure history and ignored evidence locations are in [HANDOFF.md](../HANDOFF.md
 The [design](sega-rally-design.md) records interpretation and hardware limits.
 
 ## Latest development checks
+
+The [personal iPhone preview](iphone.md) now builds the shared direct Metal
+renderer, an original touch overlay and the Pit Stop menu. Full arm64/iOS 15
+build, development signature and archive checks pass. ROM-free Mac UI proofs
+cover two phone-sized viewports; installation failed on a device connection
+reset, so physical iPhone touch, gameplay and audio remain untested.
 
 The [22,000-frame Practice finish/restart replay](course-regression.md) now
 covers SHORT Practice Mountain through Stage Clear, results, name entry, Top 8

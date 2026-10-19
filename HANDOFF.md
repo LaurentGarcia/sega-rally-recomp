@@ -1,5 +1,54 @@
 # Handoff
 
+## Signed iPhone touch preview and Xcode ownership fix (2026-10-18)
+
+The complete arm64/iOS 15 app now compiles, links and is development-signed
+locally as version 0.1.0/build 5. Its private IPA is 28,381,881 bytes, SHA256
+c25f9e2b533d07937da471c81d2c7a7923b7697c2070d6389a0f688ed42f8546.
+All 25 archive files match the signed app, including eight verified images,
+icons, profile and dependency notices. `codesign --verify --deep --strict`
+passes. The existing identity/profile covers the paired iPhone and same bundle;
+no account, certificate or provisioning changes were made. The existing signing
+certificate expires October 27, 2026. Private metadata stays ignored.
+
+The first install attempt failed before installation: CoreDevice 4000,
+connection reset by peer. No physical launch, graphics, touch or sound pass is
+claimed. Reconnect/unlock before retrying. No IPA was uploaded to GitHub or
+Apple, and older signed packages remain unchanged. Package and checksums are
+in build/installers/iphone-touch-preview-001; the build-result.json binds final
+source inputs, executable, archive and validation limits. Device output is in
+build/ios-player-integration-001/install.json.
+
+The full Xcode build exposed an ownership issue hidden by standalone compiler
+checks: COMPILE_LANGUAGE:OBJCXX target options did not emit -fobjc-arc for the
+mixed-language ImGui library. The pinned backend warned that bridge-retained
+and bridge-transfer casts had no effect. The host's ARC setting was already
+correct; segarally_imgui now sets XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC=YES too.
+The final object/response files confirm ARC and the incremental build passes
+without those warnings. The iOS bootstrap also guards SDL_MAIN_HANDLED because
+Xcode supplies it already. Existing filesystem u8path deprecations in unchanged
+host code and SDL empty-object archive warnings remain. Initial product/object
+identities are preserved in the worktree's build/iphone-before-imgui-arc-001.
+
+A redirected configure command and a separate cosmetic preview executable
+waited at execution approval and were cancelled without starting. Retrying the
+explicit CMake command without redirection used the existing scoped approval.
+The older mac-candidate-006 inputs then failed the correct boundary-source
+check: tools/m2recomp/main.cpp was stale. The current preserved generation at
+build/player-defaults-6c22e24-001/native passes the boundary and sound contracts.
+78 required files (140,302,767 bytes) were copied with identical hashes into the
+isolated checkout, retaining audited relative paths. No audit was rewritten or
+weakened. The previous copied inputs and failures remain retained.
+
+The final checkbox color change compiled in the full iPhone build; its separate
+Mac cosmetic capture did not execute. Functional layout evidence remains the
+704/1,136-check runs before that color-only delta. The earlier strict iOS API
+checks and touch tests keep their stated scope. All five GitHub workflows pass
+for published UI commit 54dbb3c: Build, Metal, Vulkan CRT, Vulkan Model2/WSI and
+Vita. Its exact source tree/archive gate passed at 144ff622, with local proof
+in build/ios-source-gate-001. This follow-up records the real Xcode fix and
+package outcome; the final source tree is gated separately before publication.
+
 ## iPhone direct Metal and touch interface (2026-10-18)
 
 The Apple source build now defaults to direct Metal on iOS as well as macOS.

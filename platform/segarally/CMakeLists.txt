@@ -68,6 +68,9 @@ target_link_libraries(segarally_imgui PUBLIC SDL3::SDL3-static)
 if(SEGARALLY_NATIVE_METAL)
     target_sources(segarally_imgui PRIVATE "${SEGARALLY_IMGUI_SOURCE}/backends/imgui_impl_metal.mm")
     target_compile_options(segarally_imgui PRIVATE "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>")
+    # Xcode does not apply this per-language target option to a mixed C++/ObjC++
+    # library. Keep the Metal backend's bridge ownership enabled there too.
+    set_target_properties(segarally_imgui PROPERTIES XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC YES)
     target_link_libraries(segarally_imgui PUBLIC "-framework Metal" "-framework Foundation")
 endif()
 if(SEGARALLY_NATIVE_VULKAN)

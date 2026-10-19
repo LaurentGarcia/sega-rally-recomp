@@ -1,7 +1,9 @@
 // SDL3 scene startup follows the working Daytona/Sega Rally iOS bootstrap.
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
+#ifndef SDL_MAIN_HANDLED
 #define SDL_MAIN_HANDLED
+#endif
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <cstdio>

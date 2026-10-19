@@ -5,6 +5,11 @@ uses direct Metal for game pixels, CRT presentation and Settings. SDL3 still
 provides the window, touch/controller events and audio; this is not yet an
 SDL-free host. The deployment target is iOS 15 on arm64.
 
+The current personal preview is version 0.1.0/build 5. Its full device build,
+signature and archive checks pass. Installation is pending after a device
+connection reset; no physical gameplay result is claimed. Artifact identity
+and signing limits are recorded in [platform status](release-platforms.md#personal-iphone-touch-preview).
+
 ## Driving interface
 
 The original touch interface uses translucent graphite panels, ivory labels

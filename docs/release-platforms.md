@@ -15,7 +15,7 @@ The distribution work targets these four platforms:
 | Platform | Graphics | Package | Current validation |
 | --- | --- | --- | --- |
 | Mac, Apple Silicon | Metal | Public prebuilt DMG; private data-inclusive DMG | macOS 13 deployment target; signed ad hoc, not notarized. Actual public app imports ZIP and passes a 2,100-frame CRT/sound check, with native audio/image/saves matching the prior player. Actual native-picker interaction and execution on macOS 13 remain untested. |
-| iPhone, arm64 | Metal | Signed personal IPA with game data | iOS 15+ development IPA built and signature/assets/notices verified for two registered devices. Installation and physical testing remain pending; this personal IPA is not a public release asset. |
+| iPhone, arm64 | Direct Metal | Signed personal touch-preview IPA with game data | iOS 15+ arm64 app, signature, eight assets and complete archive verified. The existing profile covers the paired phone; installation failed on a device connection reset. Physical gameplay/touch/audio checks remain pending. No public IPA or TestFlight release. |
 | Windows, x86-64 | SDL GPU Vulkan default; direct Vulkan opt-in | Public ROM-import ZIP; private data-inclusive ZIP stays local | Full game cross-compile/link, dependency checks and Wine startup/import pass, including eight imported image identities. The user's earlier PC audio confirmation applies to the preceding SDL package. New direct Vulkan GPU, controller and full-race validation remain open. |
 | Linux, x86-64 | SDL GPU Vulkan default; direct Vulkan opt-in | Public ROM-import archive; earlier private data-inclusive archive stays local | Native Wayland and X11 included. Three 2,800-frame Wayland/software Vulkan game comparisons pass, including a separate hide/restore diagnostic. Fresh extraction/import repeats the direct run without source/build mounts. Dummy-audio shortfalls remain recorded; physical GPU and speaker output remain untested. |
 
@@ -33,10 +33,10 @@ uses existing development provisioning and includes the owner's game data.
 Registered-device distribution and TestFlight are separate routes; the personal
 IPA does not establish TestFlight distribution or a public ROM-import edition.
 
-The newer source development path adds direct Metal and an original touch
+The new personal touch preview adds direct Metal and an original touch
 interface with a safe-area-aware Pit Stop menu. Build instructions and validation
-limits are in the [iPhone guide](iphone.md). This source update does not replace
-the previously signed IPA or add a public iPhone release.
+limits are in the [iPhone guide](iphone.md). It stays local; earlier signed
+packages are preserved.
 
 ## Available artifacts
 
@@ -131,6 +131,26 @@ two-device development profile and October 27, 2026 certificate expiry.
 All three updated Apple packages are collected locally in
 `build/installers/apple-icon-preview-001`, with installation notes and checksums.
 No TestFlight upload or invitations were made.
+
+## Personal iPhone touch preview
+
+The latest local IPA is version **0.1.0/build 5**, at
+`build/installers/iphone-touch-preview-001/Sega-Rally-Native-iOS-arm64-personal.ipa`.
+It is 28,381,881 bytes, SHA256
+`c25f9e2b533d07937da471c81d2c7a7923b7697c2070d6389a0f688ed42f8546`.
+The complete arm64/iOS 15 app compiles with direct Metal for game, CRT and
+Settings. Xcode's ImGui Metal target explicitly enables ARC; the earlier mixed
+C++/Objective-C++ target option did not apply it. All 25 archive files match
+the signed app, including eight verified game data images and retained notices.
+
+The existing personal development identity/profile signs this preview and
+covers the paired iPhone. Its certificate still expires on October 27, 2026;
+no account or provisioning changes were made. The first install attempt failed
+before installation because CoreDevice's connection reset. The app has not
+launched on the physical device. Reconnect/unlock the phone before retrying;
+layout previews on Mac do not establish phone performance, touch feel or sound.
+The earlier build-2 icon IPA remains available locally. No personal package was
+uploaded to GitHub or Apple.
 
 ## Linux package
 
