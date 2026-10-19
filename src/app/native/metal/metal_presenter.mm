@@ -7,6 +7,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_metal.h>
 #import <QuartzCore/CAMetalLayer.h>
+#import <TargetConditionals.h>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -131,7 +132,9 @@ bool MetalPresenter::init(SDL_Window *window) { @autoreleasepool {
     if (!s.layer) { s.error = "SDL Metal view has no CAMetalLayer"; shutdown(); return false; }
     s.layer.device = s.device; s.layer.pixelFormat = MTLPixelFormatBGRA8Unorm;
     s.layer.framebufferOnly = YES; s.layer.opaque = YES; s.layer.allowsNextDrawableTimeout = YES;
+#if TARGET_OS_OSX || TARGET_OS_MACCATALYST
     s.layer.displaySyncEnabled = YES;
+#endif
     s.layer.maximumDrawableCount = 3;
     s.queue = [s.device newCommandQueue];
     auto *desc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm

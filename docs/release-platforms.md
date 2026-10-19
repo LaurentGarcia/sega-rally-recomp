@@ -33,6 +33,11 @@ uses existing development provisioning and includes the owner's game data.
 Registered-device distribution and TestFlight are separate routes; the personal
 IPA does not establish TestFlight distribution or a public ROM-import edition.
 
+The newer source development path adds direct Metal and an original touch
+interface with a safe-area-aware Pit Stop menu. Build instructions and validation
+limits are in the [iPhone guide](iphone.md). This source update does not replace
+the previously signed IPA or add a public iPhone release.
+
 ## Available artifacts
 
 The current [Player Preview 4](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.4)

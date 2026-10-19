@@ -34,7 +34,7 @@ struct DisplayPanel::Impl {
     SDL_GPUTextureFormat format=SDL_GPU_TEXTUREFORMAT_INVALID;
     ImGuiContext *context=nullptr;
     ImDrawData *draw=nullptr;
-    bool visible=false,platform=false,renderer=false;
+    bool visible=false,platform=false,renderer=false,touch_interface=false;
     segarally::Controls *controls=nullptr;
     std::array<bool,SDL_SCANCODE_COUNT> held_keys{};
     bool wait_pad_neutral=true,capture_was_active=false;
@@ -95,6 +95,40 @@ struct DisplayPanel::Impl {
         // not open or poll an unrelated pad, including during binding capture.
         ImGui_ImplSDL3_SetGamepadMode(ImGui_ImplSDL3_GamepadMode_Manual,pad?&pad:nullptr,pad?1:0);
     }
+    void style() {
+        auto &ui=ImGui::GetStyle();
+        ui=ImGuiStyle{};
+        ImGui::StyleColorsDark();
+        ui.FontSizeBase=17.0f;
+        ui.FramePadding=ImVec2(7,5);
+        if (!touch_interface) return;
+        // All dimensions are logical points. A normal framed control is 45pt
+        // high; framebuffer density must never shrink the touch target.
+        ui.FramePadding=ImVec2(12,14);
+        ui.WindowPadding=ImVec2(16,12);
+        ui.ItemSpacing=ImVec2(12,10);
+        ui.WindowRounding=18;ui.ChildRounding=12;ui.FrameRounding=9;
+        ui.ScrollbarSize=28;ui.GrabMinSize=28;
+        ui.Colors[ImGuiCol_WindowBg]=ImVec4(.055f,.065f,.075f,.98f);
+        ui.Colors[ImGuiCol_Text]=ImVec4(.96f,.94f,.88f,1);
+        ui.Colors[ImGuiCol_Button]=ImVec4(.20f,.23f,.25f,1);
+        ui.Colors[ImGuiCol_ButtonHovered]=ImVec4(.36f,.25f,.15f,1);
+        ui.Colors[ImGuiCol_ButtonActive]=ImVec4(.70f,.33f,.10f,1);
+        ui.Colors[ImGuiCol_FrameBg]=ImVec4(.14f,.17f,.19f,1);
+        ui.Colors[ImGuiCol_FrameBgHovered]=ImVec4(.26f,.22f,.18f,1);
+        ui.Colors[ImGuiCol_FrameBgActive]=ImVec4(.34f,.25f,.17f,1);
+        ui.Colors[ImGuiCol_Header]=ImVec4(.18f,.21f,.23f,1);
+        ui.Colors[ImGuiCol_HeaderHovered]=ImVec4(.36f,.25f,.15f,1);
+        ui.Colors[ImGuiCol_HeaderActive]=ImVec4(.46f,.29f,.15f,1);
+        ui.Colors[ImGuiCol_CheckMark]=ImVec4(1,.57f,.24f,1);
+        ui.Colors[ImGuiCol_CheckboxSelectedBg]=ImVec4(.34f,.25f,.17f,1);
+        ui.Colors[ImGuiCol_SliderGrab]=ImVec4(1,.57f,.24f,1);
+        ui.Colors[ImGuiCol_SliderGrabActive]=ImVec4(1,.72f,.44f,1);
+        ui.Colors[ImGuiCol_Tab]=ImVec4(.14f,.17f,.19f,1);
+        ui.Colors[ImGuiCol_TabSelected]=ImVec4(.35f,.23f,.13f,1);
+        ui.Colors[ImGuiCol_TabHovered]=ImVec4(.50f,.30f,.14f,1);
+        ui.Colors[ImGuiCol_TabSelectedOverline]=ImVec4(1,.57f,.24f,1);
+    }
     bool backend() {
         if (context) return true;
         if (!window || (!device && !using_native())) {error="Display panel is not initialized.";return false;}
@@ -104,11 +138,9 @@ struct DisplayPanel::Impl {
         ImGui::GetIO().IniFilename=nullptr;
         ImGui::GetIO().LogFilename=nullptr;
         ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-        ImGui::StyleColorsDark();
         // SDL supplies logical window points; its backend handles framebuffer
         // scaling. Do not multiply fonts by the Retina framebuffer ratio.
-        ImGui::GetStyle().FontSizeBase=17.0f;
-        ImGui::GetStyle().FramePadding=ImVec2(7,5);
+        style();
         platform=using_vulkan()?ImGui_ImplSDL3_InitForVulkan(window):
             using_metal()?ImGui_ImplSDL3_InitForMetal(window):ImGui_ImplSDL3_InitForSDLGPU(window);
         if (platform) {
@@ -140,6 +172,12 @@ struct DisplayPanel::Impl {
 };
 DisplayPanel::DisplayPanel():impl_(std::make_unique<Impl>()) {}
 DisplayPanel::~DisplayPanel() {shutdown();}
+void DisplayPanel::set_touch_interface(bool enabled) {
+    auto &s=*impl_;
+    if (s.touch_interface==enabled) return;
+    s.touch_interface=enabled;
+    if (s.context) {CurrentContext current(s.context);s.style();}
+}
 #ifdef SEGARALLY_NATIVE_METAL
 bool DisplayPanel::init_metal(SDL_Window *window,void *device,
         const std::filesystem::path &save_directory,DisplaySettings &settings) {
@@ -261,11 +299,24 @@ bool DisplayPanel::new_frame_impl(DisplaySettings &settings,const std::function<
     const auto *viewport=ImGui::GetMainViewport();
     const ImVec2 available(std::max(1.0f,viewport->WorkSize.x-24.0f),
                            std::max(1.0f,viewport->WorkSize.y-24.0f));
-    ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x+12.0f,viewport->WorkPos.y+12.0f),ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize(ImVec2(std::min(560.0f,available.x),std::min(660.0f,available.y)),ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSizeConstraints(ImVec2(std::min(320.0f,available.x),std::min(260.0f,available.y)),available);
-    if (ImGui::Begin("Settings",&s.visible,ImGuiWindowFlags_NoCollapse)) {
-        ImGui::TextUnformatted("Paused  |  F1 or Xbox Y to resume");
+    ImGuiWindowFlags flags=ImGuiWindowFlags_NoCollapse;
+    if (s.touch_interface) {
+        SDL_Rect safe{};int width=0,height=0;SDL_GetWindowSize(s.window,&width,&height);
+        if (!SDL_GetWindowSafeArea(s.window,&safe) || safe.x<0 || safe.y<0 || safe.w<=0 || safe.h<=0 ||
+            double(safe.x)+safe.w>width || double(safe.y)+safe.h>height) safe={0,0,width,height};
+        ImGui::SetNextWindowPos(ImVec2(viewport->Pos.x+safe.x+8,viewport->Pos.y+safe.y+8));
+        ImGui::SetNextWindowSize(ImVec2(std::max(1,safe.w-16),std::max(1,safe.h-16)));
+        flags|=ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoResize;
+    } else {
+        ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x+12.0f,viewport->WorkPos.y+12.0f),ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(std::min(560.0f,available.x),std::min(660.0f,available.y)),ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSizeConstraints(ImVec2(std::min(320.0f,available.x),std::min(260.0f,available.y)),available);
+    }
+    if (ImGui::Begin("Settings",&s.visible,flags)) {
+        if (s.touch_interface) {
+            ImGui::TextColored(ImVec4(1,.57f,.24f,1),"PIT STOP");
+            ImGui::SameLine();ImGui::TextDisabled("Your drive is paused");
+        } else ImGui::TextUnformatted("Paused  |  F1 or Xbox Y to resume");
         // Only tab content scrolls. Resume stays reachable even at 640x480.
         const float footer=ImGui::GetFrameHeightWithSpacing()+ImGui::GetStyle().ItemSpacing.y*2;
         const float tab_height=std::max(1.0f,ImGui::GetContentRegionAvail().y-footer);
@@ -274,9 +325,12 @@ bool DisplayPanel::new_frame_impl(DisplaySettings &settings,const std::function<
         if (ImGui::BeginTabItem("Display")) {
         ImGui::BeginChild("Display settings",ImVec2(0,0));
         ImGui::PushItemWidth(std::max(100.0f,ImGui::GetContentRegionAvail().x*.52f));
-        if (ImGui::Button("Original")) settings.crt.enabled=false;
+        const float preset_width=s.touch_interface?std::max(1.f,(ImGui::GetContentRegionAvail().x-ImGui::GetStyle().ItemSpacing.x)*.5f):0.f;
+        if (ImGui::Button("Original",ImVec2(preset_width,0))) settings.crt.enabled=false;
         ImGui::SameLine();
-        if (ImGui::Button("Arcade CRT")) {settings.crt=CrtSettings{};settings.crt.enabled=true;}
+        if (ImGui::Button("Arcade CRT",ImVec2(preset_width,0))) {settings.crt=CrtSettings{};settings.crt.enabled=true;}
+        const bool tune=!s.touch_interface || ImGui::CollapsingHeader("Tune the screen");
+        if (tune) {
         ImGui::Separator();
         ImGui::Checkbox("CRT effects",&settings.crt.enabled);
         ImGui::BeginDisabled(!settings.crt.enabled);
@@ -295,6 +349,7 @@ bool DisplayPanel::new_frame_impl(DisplaySettings &settings,const std::function<
         ImGui::SetItemTooltip("Use whole-number scaling to keep pixels evenly sized.");
         ImGui::Checkbox("Accurate textures",&settings.accurate_textures);
         ImGui::SetItemTooltip("Improves texture detail and edges. May reduce performance.");
+        }
         if (!s.error.empty()) ImGui::TextWrapped("Display preferences could not be saved or loaded.");
         ImGui::PopItemWidth();ImGui::EndChild();ImGui::EndTabItem();
         }
@@ -305,7 +360,7 @@ bool DisplayPanel::new_frame_impl(DisplaySettings &settings,const std::function<
                 auto &controls=*s.controls;auto &options=controls.mapper.settings;
                 const bool capturing=controls.binding();
                 if (controls.connected()) ImGui::TextWrapped("Connected: %s",controls.device_name().c_str());
-                else ImGui::TextWrapped("No controller connected. Keyboard controls are available.");
+                else ImGui::TextWrapped("%s",s.touch_interface?"Touch controls are ready. Connect a controller to customize its buttons.":"No controller connected. Keyboard controls are available.");
                 if (capturing) {
                     ImGui::TextWrapped("%s: %s",segarally::action_name(controls.binding_action()),
                         controls.binding_source()==segarally::Source::Keyboard ? "press a key" : "press a button or move an axis");
@@ -337,7 +392,8 @@ bool DisplayPanel::new_frame_impl(DisplaySettings &settings,const std::function<
                         if (ImGui::Button(keyname && *keyname?keyname:"Unknown key",ImVec2(-1,0))) {
                             controls.begin_binding(action,segarally::Source::Keyboard);s.isolate_input();
                         }
-                        if (ImGui::SmallButton("Clear##key")) controls.clear_binding(action,segarally::Source::Keyboard);
+                        if (s.touch_interface?ImGui::Button("Clear##key",ImVec2(-1,0)):ImGui::SmallButton("Clear##key"))
+                            controls.clear_binding(action,segarally::Source::Keyboard);
                         ImGui::PopID();ImGui::TableNextColumn();ImGui::PushID("Controller");ImGui::TextUnformatted("Controller");
                         const auto padname=segarally::describe(binding.pad);
                         const bool can_bind_pad=options.gamepad_enabled && controls.connected();
@@ -348,7 +404,8 @@ bool DisplayPanel::new_frame_impl(DisplaySettings &settings,const std::function<
                         if (!can_bind_pad && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
                             ImGui::SetTooltip("Connect and enable a controller before assigning a binding.");
                         ImGui::EndDisabled();
-                        if (ImGui::SmallButton("Clear##pad")) controls.clear_binding(action,segarally::Source::Gamepad);
+                        if (s.touch_interface?ImGui::Button("Clear##pad",ImVec2(-1,0)):ImGui::SmallButton("Clear##pad"))
+                            controls.clear_binding(action,segarally::Source::Gamepad);
                         ImGui::PopID();
                         ImGui::EndTable();
                     }
@@ -362,7 +419,7 @@ bool DisplayPanel::new_frame_impl(DisplaySettings &settings,const std::function<
         ImGui::EndTabBar();
         }
         ImGui::EndChild();
-        ImGui::Separator();if (ImGui::Button("Resume",ImVec2(-1,0))) s.visible=false;
+        ImGui::Separator();if (ImGui::Button(s.touch_interface?"Back to the stage":"Resume",ImVec2(-1,0))) s.visible=false;
     }
     ImGui::End();ImGui::Render();
     if (s.visible) s.draw=ImGui::GetDrawData();

@@ -58,6 +58,11 @@ Windows/Linux retain SDL GPU as the default renderer. Direct Vulkan passes
 Linux software-driver gameplay and window checks; physical GPU, controller
 and full-race validation remain open. These are experimental previews.
 
+**iPhone development:** the personal port now shares direct Metal rendering and
+an original touch interface with a safe-area-aware Pit Stop menu. See the
+[iPhone build guide and current limits](docs/iphone.md). It is not an App Store
+or TestFlight release.
+
 `v0.1.0-rc.1` remains a separate experimental source prerelease. Developers can
 use the [source build guide](docs/getting-started.md#build-from-source-instead).
 

@@ -1,5 +1,82 @@
 # Handoff
 
+## iPhone direct Metal and touch interface (2026-10-18)
+
+The Apple source build now defaults to direct Metal on iOS as well as macOS.
+The shared presenter guards CAMetalLayer's desktop display-sync property;
+Model 2, CRT, generated shaders and ImGui Metal rendering are reused. SDL still
+owns window, input and audio services. The iOS build script exposes
+`--graphics metal` (default) and `--graphics sdl` for comparison and records the
+selected backend. Its 12 command-plan regression tests now run in GitHub CI.
+No native CPU, board, sound or game-timing implementation
+changed. This follows the inherited design's Platform layer & build contract;
+its Reference & validation requirements remain open.
+
+The original touch overlay uses graphite panels, ivory labels, orange feedback,
+ribbed pedals, analog steering travel, shift arrows and compact top controls.
+Its hitboxes and input ownership remain unchanged. Touch-visible hosts use a
+safe-area-aware Pit Stop Settings layout, 45-point normal framed controls,
+large presets and a fixed resume footer. Display tuning is collapsed initially;
+content scrolls separately from the footer. Desktop settings keep their prior
+layout. This is a custom rendered interface, without VoiceOver support. The
+scrollbar is 28 points wide; no universal 44-point accessibility claim is made.
+
+Validation so far: 12 iOS pipeline tests and 511 touch checks pass. Five shared
+Objective-C++ units compile strictly for arm64/iOS 15 with the iOS 27 SDK and
+no diagnostics. A ROM-free direct Metal overlay harness renders idle/active
+states at 844x390 and 568x320 logical points while checking unchanged input
+state. A separate production Settings harness passes 704 and 1,136 assertions
+at those sizes, including actual SDL touch-mouse events, persisted CRT preset
+changes, tab switching, scrollbar drag to the final binding row and resume.
+Normal tabs and footer are 45 points tall. Those are macOS Metal UI checks;
+physical notch placement, multitouch, game pause, audio, pacing and lifecycle
+are separate iPhone checks. A final checkbox color correction is presentation
+only and does not change the tested layout or interactions.
+
+Ignored evidence is in build/ios-ui-review-001, build/ios-player-integration-001
+and build/worktrees/ios-touch-design-001/build/touch-proof-001. iOS API/build
+records are under build/worktrees/ios-direct-metal-001/build. The first iPhone
+configure failed because sandboxed Xcode compiler probes could not access
+DerivedData/CoreSimulator caches; that failure remains in iphone-001. The
+explicit toolchain configure retries in a new iphone-002 directory. The completed
+compiler/SDL probes then exposed the asset stager's correct refusal of native
+inputs outside the isolated checkout; copying the required existing inputs into
+that checkout preserves its containment rule without regenerating game code. An initial
+UI harness assertion was too strict about transient horizontal content extent;
+the stable layout has no active horizontal scrolling. Its failed capture and
+later successful proofs are both retained.
+
+README, architecture, renderer and package references now link the dedicated
+iPhone build/interface guide. Public desktop Preview 4 artifacts remain
+unchanged; this work does not publish a public iOS IPA or TestFlight build.
+The project's own UI does not license SEGA's game content or translated game
+instructions. Commercial distribution remains a separate rights decision.
+
+The initial GitHub audit found main at 40d9568 with four passing workflows,
+Preview 4's seven assets matching their frozen sizes/digests, and the reviewed
+documentation synchronized. The stale macOS-only About description was updated
+to mention Mac/Windows/Linux, direct Metal/Vulkan and experimental iPhone work;
+its homepage now points to Preview 4 and platform topics are current.
+
+## Local build-output cleanup (2026-10-18)
+
+The requested cleanup reclaimed 11.86 GiB from old compiler objects/dependency
+files, copied game images verified against preserved canonical assets, extracted
+stages backed by exact archives, duplicate archives and disposable Wine system
+binaries. Current public/private package identities, source edits, repository
+heads and all 83 worktrees were preserved; 75 worktrees contained changes.
+No whole worktree or source checkout was removed. Logs, saves, trace evidence,
+canonical game inputs and current release packages remain local.
+
+Audit records are under build/maintenance/disk-cleanup-2026-10-18. Historical
+build caches may need their removed derived inputs regenerated/restored. For
+current iPhone UI validation, four exact image files (90,177,536 bytes) needed
+by preserved Mac CMake caches were restored from current player assets; their
+identities are recorded in
+build/ios-player-integration-001/restored-current-build-inputs.json. No generated
+source or game assets were added to Git. Docker images were left unchanged
+because the apparent older-image sizes were almost entirely shared layers.
+
 ## Linux Wayland player publication (2026-10-17)
 
 Player Preview 4 is published on LaurentGarcia/sega-rally-recomp as

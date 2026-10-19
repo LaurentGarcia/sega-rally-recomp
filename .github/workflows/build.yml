@@ -21,6 +21,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_check_source_release.py -v
       - name: Desktop diagnostic integrity tests
         run: python3 -m unittest discover -s tests -p test_segarally_pc_check.py -v
+      - name: iPhone build plan tests
+        run: python3 -m unittest discover -s tests -p test_segarally_ios_pipeline.py -v
       - name: Check committed source and export
         run: |
           git archive --format=tar --output="$RUNNER_TEMP/segarally-source.tar" HEAD

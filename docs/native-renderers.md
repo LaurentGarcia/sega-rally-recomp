@@ -9,6 +9,11 @@ retains `--sdl-gpu` for comparison. Windows/Linux source builds can additionally
 enable the direct Vulkan player with `SEGARALLY_NATIVE_VULKAN=ON` and select it
 using `--native-vulkan`. The earlier Windows/Linux packages use SDL3 GPU.
 
+The experimental [iPhone source build](iphone.md) now defaults to this same
+direct Metal path. Its presenter guards the macOS-only display-sync property;
+the Model 2, CRT and Settings implementations remain shared. This source support
+does not extend the recorded desktop gameplay results to physical iPhones.
+
 ## Shared rendering contract
 
 ```mermaid

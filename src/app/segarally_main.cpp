@@ -160,7 +160,7 @@ int segarally_host_main(int argc,char **argv) {
         else if(arg=="--audio-output-capture") audio_output_path=value();
         else if(arg=="--help") {puts("Sega Rally native: --data DIR --save-dir DIR --frames N --instructions N --capture FILE.ppm --reference-capture FILE.ppm --touch --unthrottled --hidden --fullscreen --log FILE --input-replay FILE --player --sound --no-sound --audio-capture FILE.wav --audio-diagnostics --instruction-boundary-hook\nNo-argument startup or --player enables compiled sound, exact instruction-boundary execution and CRT for fresh player preferences. --no-sound mutes the native sound board. Explicit commands keep sound opt-in with diagnostic instruction-boundary timing. Unthrottled runs capture/drain audio without device playback.\nKeys: arrows steer, Z gas, X brake, C coin, Return start, V view, A/S gear down/up, Space handbrake, F2 test, F3 service, Escape quit.");
             puts("Display: F1 opens controls and pauses; F6 toggles CRT effects. --crt enables the Arcade CRT preset; --original-display uses display defaults; --accurate-textures enables optional native interpolation; --display-controls opens the panel. Native --capture remains before display effects.");
-            puts("Mac builds with SEGARALLY_NATIVE_METAL use direct Metal game, CRT and Settings rendering by default. --sdl-gpu selects the comparison backend; --native-metal explicitly selects the direct backend. Window, input and audio services still use SDL.");
+            puts("Apple builds with SEGARALLY_NATIVE_METAL use direct Metal game, CRT and Settings rendering by default. --sdl-gpu selects the comparison backend; --native-metal explicitly selects the direct backend. Window, input and audio services still use SDL.");
             puts("Windows/Linux builds with SEGARALLY_NATIVE_VULKAN support --native-vulkan for direct game, CRT and Settings rendering. --vulkan-validation enables required Vulkan synchronization validation for diagnostics. SDL GPU remains the default Windows/Linux backend.");
             puts("Controls: F1 or Xbox Y opens Settings. Configure keyboard/controller bindings and optional controller input in Controls. Xbox defaults: left stick steer, RT gas, LT brake, LB/RB shift, A view, X handbrake, Back coin, Start start.");
             puts("First launch: choose your Sega Rally Revision B ZIP when prompted; no compiler or network required. --rom FILE.zip imports it directly. --import-only with --rom verifies/imports without starting the game. Personal packages can include verified game data.");
@@ -181,7 +181,7 @@ int segarally_host_main(int argc,char **argv) {
     }
     if(sound_disabled) sound=false;
 #ifndef SEGARALLY_NATIVE_METAL
-    if(native_metal_requested) throw std::runtime_error("--native-metal requires a Mac build with SEGARALLY_NATIVE_METAL=ON");
+    if(native_metal_requested) throw std::runtime_error("--native-metal requires an Apple build with SEGARALLY_NATIVE_METAL=ON");
 #endif
 #ifndef SEGARALLY_NATIVE_VULKAN
     if(native_vulkan_requested) throw std::runtime_error("--native-vulkan requires SEGARALLY_NATIVE_VULKAN=ON");
@@ -599,6 +599,7 @@ int segarally_host_main(int argc,char **argv) {
             if(!new_frame && !stopped && !display_paused) {diagnostic_log();continue;}
             const Uint64 presentation_start=audio_diagnostics?SDL_GetTicksNS():0;
             if(show_display_controls && new_frame) {display.set_open(true);show_display_controls=false;}
+            display.set_touch_interface(touch.visible);
             const bool touch_overlay=touch.visible && focused && !background && !display.open();
             std::function<void()> overlay;
             if(touch_overlay) overlay=[&] {rally::draw_touch_overlay(touch,controls.mapper.gear());};

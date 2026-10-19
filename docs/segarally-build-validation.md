@@ -2,8 +2,9 @@
 
 The experimental **v0.1.0-rc.1 source prerelease** builds a local Mac app from
 verified personal Revision B (`srallycb`) ROMs. For a fresh checkout, follow
-[getting started](getting-started.md) first. See [platform status](release-platforms.md) for phone and Windows/Linux build readiness.
-The published [Mac player](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.3)
+[getting started](getting-started.md) first. See the [iPhone build guide](iphone.md) for personal device builds and
+[platform status](release-platforms.md) for phone and Windows/Linux readiness.
+The published [Mac player](https://github.com/LaurentGarcia/sega-rally-recomp/releases/tag/v0.1.0-player.4)
 imports a verified ZIP without any developer tools. The commands below are for
 source development and packaging, and run from the repository root.
 

@@ -109,7 +109,7 @@ verified polygon and texture images plus CPU-written RAM. The
 [video adapter](../src/runtime/model2a_video.cpp) preserves Model 2A mappings and
 feeds the CPU renderer or shared frame/resource packing used by all GPU paths.
 The dedicated [host](../src/app/segarally_main.cpp) selects direct Metal on Mac
-and offers direct Vulkan on Windows/Linux while retaining SDL GPU comparisons.
+and in the experimental iPhone source build, and offers direct Vulkan on Windows/Linux while retaining SDL GPU comparisons.
 See [native renderers](native-renderers.md) for asynchronous submission,
 presentation and Settings ownership. Polygon priority
 retains window, sort-bucket, submission and face rules; camera depth does not
@@ -117,6 +117,9 @@ replace arcade ordering. The default GPU path uses triangle fans. Optional Accur
 span stepping and a certified reciprocal correction; saved-scene pixel matches
 do not establish every frame or all-game raster fidelity. CRT postprocessing and
 Settings run after native composition and do not alter the game instructions.
+The [iPhone interface](iphone.md) uses the same renderer and Settings code, with
+safe-area layout and larger touch controls. Touch hitboxes and cabinet input
+ownership remain in `TouchControls`; drawing the overlay does not change them.
 
 Rally's sound path uses its generated 68000 program, native SCSP and
 physical UART/serial pin edges. Daytona uses a different Model 1 sound board;

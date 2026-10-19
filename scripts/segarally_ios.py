@@ -70,6 +70,7 @@ def build_plan(args, output: Path) -> list[dict]:
         '-DCMAKE_OSX_ARCHITECTURES=arm64', '-DCMAKE_OSX_DEPLOYMENT_TARGET=15.0',
         f'-DSEGARALLY_NATIVE_BUILD={native}', f'-DSEGARALLY_SOUND_BUILD={native}',
         '-DSEGARALLY_SOUND=ON', '-DSEGARALLY_INSTRUCTION_BOUNDARY_HOOK=ON',
+        f'-DSEGARALLY_NATIVE_METAL={"ON" if args.graphics == "metal" else "OFF"}',
         '-DSEGARALLY_INPUT_RECORDING=OFF', f'-DSEGARALLY_IOS_BUNDLE_ID={args.bundle_id}',
         f'-DSEGARALLY_IOS_VERSION={args.version}', f'-DSEGARALLY_IOS_BUILD_NUMBER={args.build_number}',
         f'-DSEGARALLY_IOS_SIGNING={"ON" if args.signing == "development" else "OFF"}']
@@ -137,6 +138,8 @@ def main(argv=None) -> int:
     inputs.add_argument('--native-build', type=Path, help='Existing audited generation in this checkout')
     parser.add_argument('--output', type=Path, required=True, help='New output directory below build/')
     parser.add_argument('--signing', choices=['unsigned', 'development'], default='unsigned')
+    parser.add_argument('--graphics', choices=['metal', 'sdl'], default='metal',
+                        help='Direct Metal by default; SDL GPU Metal is the comparison build')
     parser.add_argument('--team', help='Personal Apple development team identifier')
     parser.add_argument('--bundle-id', default='com.lgarciacarro.segarally.native')
     parser.add_argument('--device', help='Optional device UDID used only as a build destination')
@@ -185,7 +188,8 @@ def main(argv=None) -> int:
         report = {'source_diff_sha256': hashlib.sha256(changes).hexdigest(),
                   'entrypoint_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                   'source_revision': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
-                  'signing': args.signing, 'steps': [], 'installed': False, 'launched': False, 'uploaded': False,
+                  'signing': args.signing, 'graphics': args.graphics,
+                  'steps': [], 'installed': False, 'launched': False, 'uploaded': False,
                   'scope': 'Personal iOS build/package only; no gameplay or physical audio validation.'}
         destination = output / 'ios-build-result.json'
         try:

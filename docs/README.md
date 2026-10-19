@@ -11,6 +11,7 @@ prerelease for developers.
 | Guide | Purpose |
 | --- | --- |
 | [Getting started](getting-started.md) | Fresh checkout, Mac requirements, exact dependency pins and first play |
+| [iPhone development](iphone.md) | Direct Metal, original touch controls, personal builds and distribution limits |
 | [Mac player manual](mac-player-manual.md) | Controls, Practice selection, settings, sound, saves and recordings |
 | [Build and validation](segarally-build-validation.md) | Pipeline, individual build stages, tests and reference setup |
 | [Technical architecture](segarally-architecture.md) | Generated CPUs, native devices, clock, Metal/Vulkan and SDL3 audio |

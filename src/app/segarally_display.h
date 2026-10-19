@@ -40,6 +40,8 @@ public:
     // Borrowed; detach before destroying Controls. Existing display-only hosts
     // and tests may leave this null.
     void attach_controls(segarally::Controls *);
+    // Presentation-only touch layout; desktop hosts keep the compact panel.
+    void set_touch_interface(bool);
     void set_open(bool);
     bool open() const;
     bool capture_active() const;

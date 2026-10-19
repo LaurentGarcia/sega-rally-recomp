@@ -34,9 +34,19 @@ class IosPipelineTests(unittest.TestCase):
         arguments = [word for step in plan for word in step['command']]
         self.assertIn('CODE_SIGNING_ALLOWED=NO', arguments)
         self.assertIn('-DSEGARALLY_SOUND=ON', arguments)
+        self.assertIn('-DSEGARALLY_NATIVE_METAL=ON', arguments)
         self.assertIn('-DSEGARALLY_INSTRUCTION_BOUNDARY_HOOK=ON', arguments)
         self.assertIn('-DSEGARALLY_INPUT_RECORDING=OFF', arguments)
         self.assertFalse(any(word in arguments for word in ['install', 'launch', 'upload', '-allowProvisioningUpdates']))
+
+    def test_sdl_comparison_preserves_game_and_sound_options(self):
+        code, plan = self.call('--graphics', 'sdl')
+        self.assertEqual(code, 0)
+        configure = plan[0]['command']
+        self.assertIn('-DSEGARALLY_NATIVE_METAL=OFF', configure)
+        self.assertIn('-DSEGARALLY_SOUND=ON', configure)
+        self.assertIn('-DSEGARALLY_INSTRUCTION_BOUNDARY_HOOK=ON', configure)
+        self.assertIn('CODE_SIGNING_ALLOWED=NO', plan[1]['command'])
 
     def test_development_requires_team(self):
         self.assertEqual(self.call('--signing', 'development')[0], 1)
@@ -97,6 +107,7 @@ class IosPipelineTests(unittest.TestCase):
             version = '0.1.0'
             build_number = '1'
             signing = 'unsigned'
+            graphics = 'metal'
             team = None
             device = None
             archive = False
