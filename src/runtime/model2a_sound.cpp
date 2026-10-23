@@ -23,9 +23,8 @@ struct Model2ASound::Impl {
     Impl(Model2ASound &owner_, rt::Model2AClock &clock_, Images images_,
          Model2Scsp::RandomProvider random, size_t capacity)
         : owner(owner_), clock(clock_), images(std::move(images_)),
-          bus(images.program, images.samples), chip(clock, bus.sound_ram(), std::move(random), capacity),
-          schedule(cpu), env{cpu, schedule}, origin(clock.now_ns()) {
-        cpu.bus = &bus;
+          bus(images.program, images.samples, images.rom), chip(clock, bus.sound_ram(), std::move(random), capacity),
+          cpu(&bus), schedule(cpu), env{cpu, schedule}, origin(clock.now_ns()) {
         bus.set_scsp(&chip);
         cpu.model2a_timing = true;
         schedule.auto_irq = false;
@@ -95,7 +94,7 @@ struct Model2ASound::Impl {
         } catch (const std::exception &failure) {
             if (status == Status::Running) status = Status::RuntimeError;
             char address[16];
-            std::snprintf(address, sizeof address, "%06x", cpu.pc);
+            std::snprintf(address, sizeof address, "%06x", unsigned(cpu.pc));
             error = std::string("sound CPU at 0x") + address + ": " + failure.what();
             throw rt::Fatal(error);
         }

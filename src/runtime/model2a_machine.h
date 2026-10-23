@@ -3,6 +3,7 @@
 #pragma once
 #include "runtime/model2a_bus.h"
 #include "runtime/model2a_io.h"
+#include "runtime/sound_image_source.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -14,6 +15,7 @@ public:
     struct Images {
         std::vector<uint8_t> program, main_data, tgp_tables, copro_data, polygons, textures;
         std::vector<uint8_t> sound_program, sound_samples;
+        snd::SoundImageSource *sound_rom = nullptr; // Optional host-owned sound images.
 #ifdef M2_PAGED_ROM
         // Optional host-owned ROM cache. Program/data/geometry/copro images
         // use it; small TGP tables and sound images retain their own contract.
@@ -24,6 +26,7 @@ public:
         bool tgp = true, io = true, comm = true, control = true;
         bool video = true, screen = true, uart = true, external_video = false;
         bool sound = false; // Diagnostic 68000 instruction-boundary timing.
+        size_t sound_buffer_frames = 44100; // Bounded capture; default remains one second.
         // Requires an enabled runtime and separately verified generated chunks.
         // False retains the original one-instruction outer loop for comparison.
         bool instruction_boundary_hook = false;

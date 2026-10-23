@@ -274,6 +274,132 @@ class CheckpointComparisonTests(unittest.TestCase):
 
 
 class BuildBoundaryTests(unittest.TestCase):
+    def test_build_cannot_report_success_when_sources_change_during_compilation(self):
+        with tempfile.TemporaryDirectory(prefix="ps2-build-snapshot-") as temporary:
+            root = Path(temporary)
+            source = root / "source.cpp"
+            source.write_text("original input\n")
+            fingerprints = {"source.cpp": driver.digest(source)}
+            with mock.patch.object(driver, "ROOT", root):
+                driver.verify_source_snapshot(fingerprints)
+                source.write_text("changed input\n")
+                with self.assertRaisesRegex(RuntimeError, "rerun incrementally"):
+                    driver.verify_source_snapshot(fingerprints)
+                source.unlink()
+                with self.assertRaisesRegex(RuntimeError, "source.cpp"):
+                    driver.verify_source_snapshot(fingerprints)
+
+    def test_actual_native_inventory_and_transitive_headers_are_reference_free(self):
+        args = type("Args", (), {"target": "native-port", "core_manifest": None})()
+        spec = driver.build_spec(args)
+        sources = [ROOT / name for name in spec["sources"] + list(driver.NATIVE_IOP_SOURCES)]
+        headers = driver.project_headers(sources, [ROOT / name for name in spec["includes"]])
+        boundary = driver.validate_native_boundary(sources + headers)
+        self.assertFalse(boundary["arcade_machine_runtime_linked"])
+        self.assertFalse(boundary["translated_processors_linked"])
+        self.assertIn("platform/ps2/native/race_progress.cpp", boundary["checked_project_files"])
+
+    def test_native_smoke_checks_sources_without_running_reference_raster_or_compiler(self):
+        with tempfile.TemporaryDirectory(prefix="ps2-native-smoke-") as temporary:
+            root = Path(temporary).resolve()
+            main = root / "platform/ps2/native/main.cpp"
+            main.parent.mkdir(parents=True)
+            main.write_text("int main() { return 0; }\n")
+            args = type("Args", (), {"target": "native-port", "core_manifest": None})()
+            report = {}
+            with mock.patch.object(driver, "ROOT", root), \
+                 mock.patch.object(driver, "NATIVE_SOURCES", ["platform/ps2/native/main.cpp"]), \
+                 mock.patch.object(driver, "NATIVE_IOP_SOURCES", ()), \
+                 mock.patch.object(driver.subprocess, "run", side_effect=AssertionError("unexpected compiler/reference execution")), \
+                 contextlib.redirect_stdout(io.StringIO()):
+                driver.smoke(args, report)
+            self.assertEqual(report["status"], "native_source_boundary_passed")
+            self.assertFalse(report["executable_run"])
+            self.assertEqual(list(report["source_sha256"]), ["platform/ps2/native/main.cpp"])
+
+    def test_native_defined_symbols_cannot_link_known_processor_or_machine_implementations(self):
+        driver.validate_native_symbols("00100000 T main\n00101000 T ps2::AudioOutput::initialize()\n00102000 T native::RaceProgress::update()\n")
+        for symbol in ("rt::Model2AMachine::run_until_frame(unsigned long)", "rt::Cpu::reset()",
+                       "rt::Model2UART::clock()", "rt::Model2AClock::advance(unsigned long)", "rt::Bus::read()",
+                       "rt::TGP::run()", "rt::Geo::step()", "rt::Video::render()", "rt::Raster::poly()",
+                       "app::Model2Frame::build()",
+                       "snd::Cpu68k::reset()", "snd::Model2ASound::Model2ASound()", "snd::Model2Scsp::Impl::init()",
+                       "gen::run(gen::Env&)", "sndgen::run(sndgen::Env&)", "tgpgen::run()"):
+            with self.subTest(symbol=symbol), self.assertRaisesRegex(ValueError, "forbidden reference-machine symbols"):
+                driver.validate_native_symbols("00101000 T " + symbol + "\n")
+
+    def test_native_target_cannot_accept_a_reference_core_manifest(self):
+        args = type("Args", (), {"target": "native-port", "core_manifest": ROOT / "build/reference.json"})()
+        with self.assertRaisesRegex(ValueError, "core-manifest is forbidden"):
+            driver.build_spec(args)
+        args.core_manifest = None
+        spec = driver.build_spec(args)
+        self.assertEqual(spec["defines"], ["RALLY_NATIVE_PS2=1"])
+        self.assertNotIn("src", spec["includes"])
+        self.assertNotIn(".", spec["includes"])
+
+    def test_native_boundary_rejects_every_reference_subsystem_and_generated_code(self):
+        forbidden = ["src/runtime/cpu.cpp", "src/runtime/model2a_machine.cpp",
+                     "src/runtime/model2a_bus.cpp", "src/runtime/model2a_clock.cpp",
+                     "src/runtime/model2_scsp.cpp", "src/runtime/model2a_sound.cpp",
+                     "src/runtime/snd_cpu.cpp", "src/runtime/tgp.h", "src/runtime/raster.h",
+                     "src/app/gpu/model2_frame.h", "platform/ps2/game/rom_cache.h",
+                     "build/ps2/native/gen/chunk_000.cpp", "build/ps2/native/tgp/program.cpp",
+                     "build/ps2/native/sound/native-timed/snd_gen.cpp"]
+        for name in forbidden:
+            with self.subTest(name=name), self.assertRaisesRegex(ValueError, "forbids"):
+                driver.validate_native_boundary([ROOT / "platform/ps2/native/main.cpp", ROOT / name])
+
+    def test_native_boundary_checks_transitive_headers_and_resolves_symlinks(self):
+        with tempfile.TemporaryDirectory(prefix="ps2-native-boundary-") as temporary:
+            root = Path(temporary).resolve()
+            native = root / "platform/ps2/native"
+            native.mkdir(parents=True)
+            runtime = root / "src/runtime"
+            runtime.mkdir(parents=True)
+            forbidden = runtime / "model2a_machine.h"
+            forbidden.write_text("struct ReferenceMachine {};\n")
+            main = native / "main.cpp"
+            bridge = native / "bridge.h"
+            main.write_text('#include "bridge.h"\n')
+            bridge.write_text('#include "../../../src/runtime/model2a_machine.h"\n')
+            with mock.patch.object(driver, "ROOT", root):
+                dependencies = driver.project_headers([main], [native])
+                with self.assertRaisesRegex(ValueError, "model2a_machine.h"):
+                    driver.validate_native_boundary([main, *dependencies])
+                bridge.unlink()
+                bridge.symlink_to(forbidden)
+                with self.assertRaisesRegex(ValueError, "model2a_machine.h"):
+                    driver.validate_native_boundary([main, bridge])
+                allowed = driver.validate_native_boundary([main])
+                self.assertFalse(allowed["translated_processors_linked"])
+                self.assertFalse(allowed["arcade_machine_runtime_linked"])
+                main.write_text('#define SOURCE "hidden.cpp"\n#include SOURCE\n')
+                with self.assertRaisesRegex(ValueError, "opaque include"):
+                    driver.validate_native_boundary([main])
+
+    def test_sound_manifest_requires_measured_compact_configuration_and_dependencies(self):
+        audit = {"runtime_flags": ["-DSEGARALLY_SOUND_TIMED_PROBE", "-DM2_COMPACT_SOUND=1"],
+                 "sources_sha256": dict.fromkeys(prepare.SOUND_AUDIT_DEPENDENCIES, "verified elsewhere")}
+        prepare.validate_sound_configuration(audit)
+        for flags in ([], ["-DSEGARALLY_SOUND_TIMED_PROBE"], "-DM2_COMPACT_SOUND=1"):
+            with self.subTest(flags=flags), self.assertRaisesRegex(ValueError, "compact-scsp"):
+                prepare.validate_sound_configuration(dict(audit, runtime_flags=flags))
+        for omitted in prepare.SOUND_AUDIT_DEPENDENCIES:
+            sources = dict(audit["sources_sha256"])
+            del sources[omitted]
+            with self.subTest(omitted=omitted), self.assertRaisesRegex(ValueError, "dependencies"):
+                prepare.validate_sound_configuration(dict(audit, sources_sha256=sources))
+
+    def test_audio_fixture_uses_only_original_sources_and_open_iop_modules(self):
+        spec = driver.build_spec(type("Args", (), {"target": "audio-fixture"})())
+        self.assertEqual(spec["iop_modules"], ["libsd", "rally_pcm"])
+        self.assertTrue(spec["pcm_transport"])
+        self.assertNotIn("audsrv", spec["libraries"])
+        self.assertTrue(all(name.startswith("platform/ps2/") for name in spec["sources"]))
+        workflow = (ROOT / ".github/workflows/ps2.yml").read_text()
+        self.assertIn("--target audio-fixture", workflow)
+
     def test_default_output_cannot_follow_symlink_outside_build(self):
         with tempfile.TemporaryDirectory(prefix="ps2-output-confinement-") as temporary:
             directory = Path(temporary).resolve()
@@ -291,8 +417,8 @@ class BuildBoundaryTests(unittest.TestCase):
             self.assertEqual(list(outside.iterdir()), [])
 
     def test_ci_triggers_cover_bringup_sources_and_transitive_project_headers(self):
-        sources = [ROOT / name for name in driver.BRINGUP_SOURCES]
-        dependencies = sources + driver.project_headers(sources, [ROOT / "platform/ps2/include", ROOT / "src"])
+        sources = [ROOT / name for name in driver.BRINGUP_SOURCES + driver.NATIVE_SOURCES + list(driver.NATIVE_IOP_SOURCES)]
+        dependencies = sources + driver.project_headers(sources, [ROOT / "platform/ps2/include", ROOT / "platform/ps2/native", ROOT / "src"])
         workflow = (ROOT / ".github/workflows/ps2.yml").read_text()
         for event in ("push", "pull_request"):
             # The workflow uses a quoted inline list, also a Python literal;

@@ -33,6 +33,8 @@ PREFIX = LOCK["compiler_prefix"]
 BRINGUP_SOURCES = [
     "platform/ps2/src/main.cpp",
     "platform/ps2/src/gs_display.cpp",
+    "platform/ps2/src/model2_gs.cpp",
+    "platform/ps2/src/vu0_pack.cpp",
     "platform/ps2/src/pad_input.cpp",
     "platform/ps2/src/bringup_scene.cpp",
     "platform/ps2/src/presentation.cpp",
@@ -41,6 +43,19 @@ BRINGUP_SOURCES = [
     "src/runtime/raster.cpp",
 ]
 BRINGUP_LIBRARIES = ["draw", "graph", "dma", "packet", "patches", "pad", "m"]
+NATIVE_TOOLKIT_SOURCES = (
+    "platform/ps2/src/native_display.cpp",
+    "platform/ps2/src/native_frame.cpp",
+    "platform/ps2/src/pad_input.cpp", "platform/ps2/src/storage.cpp",
+    "platform/ps2/src/audio_output.cpp", "platform/ps2/src/vu0_pack.cpp",
+)
+NATIVE_SOURCES = ["platform/ps2/native/main.cpp", "platform/ps2/native/race_progress.cpp",
+                  "platform/ps2/native/car_pose.cpp", *NATIVE_TOOLKIT_SOURCES]
+NATIVE_TOOLKIT_HEADERS = {
+    "audio_output.h", "pcm_protocol.h", "pcm_resampler.h", "pcm_ring.h",
+    "native_display.h", "pad_input.h", "pad_state.h", "debug_controls.h", "storage.h", "vu0_pack.h", "diagnostic_font.h",
+}
+NATIVE_IOP_SOURCES = ("platform/ps2/iop/pcm_server.c", "platform/ps2/iop/imports.c")
 LIMITATIONS = [
     "Development ELF, not a playable Sega Rally release.",
     "Compilation and ELF inspection do not establish PS2 hardware execution.",
@@ -103,6 +118,46 @@ def compilation_key(source: Path, headers: list[Path], fingerprints: dict[str, s
     inputs = {relative(path): fingerprints[relative(path)] for path in [source, *headers]}
     return hashlib.sha256(json.dumps({"context": context, "inputs": inputs},
                                      sort_keys=True).encode()).hexdigest()
+
+
+def verify_source_snapshot(fingerprints: dict[str, str]) -> None:
+    changed = [name for name, expected in fingerprints.items()
+               if not (ROOT / name).is_file() or digest(ROOT / name) != expected]
+    if changed:
+        raise RuntimeError("Build inputs changed during compilation; rerun incrementally: " + ", ".join(sorted(changed)))
+
+
+def validate_native_boundary(paths: list[Path]) -> dict:
+    """Only original native game code and explicitly reviewed PS2 services.
+
+    Check resolved paths, including transitive project headers and IOP files;
+    a toolkit symlink cannot import the archived machine or generated code.
+    """
+    rejected = []
+    for path in paths:
+        name = relative(path.resolve())
+        native = name.startswith("platform/ps2/native/") and path.suffix in (".h", ".hpp", ".cpp", ".c", ".S")
+        toolkit = name in NATIVE_TOOLKIT_SOURCES or name in NATIVE_IOP_SOURCES
+        header = name.startswith("platform/ps2/include/") and name[len("platform/ps2/include/"):] in NATIVE_TOOLKIT_HEADERS
+        if not (native or toolkit or header):
+            rejected.append(name)
+        elif path.is_file():
+            # The dependency walk resolves literal includes. Macro-selected
+            # includes would make its closed source inventory incomplete.
+            for directive, argument in re.findall(r'^\s*#\s*(include_next|include|import)\b([^\n]*)', path.read_text(), re.MULTILINE):
+                if directive != "include" or not re.match(r'\s*[<"][^">\n]+[">]', argument):
+                    raise ValueError("Native PS2 target forbids opaque include directives: " + name)
+    if rejected:
+        raise ValueError("Native PS2 target forbids reference-machine/generated dependencies: " + ", ".join(sorted(set(rejected))))
+    return {"execution_model": "native_ps2_rewrite_bootstrap", "translated_processors_linked": False,
+            "arcade_machine_runtime_linked": False, "checked_project_files": sorted(set(relative(p.resolve()) for p in paths))}
+
+
+def validate_native_symbols(symbols: str) -> None:
+    forbidden = re.compile(r'\b(?:rt|snd|gen|sndgen|tgpgen)::|\bapp::Model2Frame\b')
+    matches = [line.strip() for line in symbols.splitlines() if forbidden.search(line)]
+    if matches:
+        raise ValueError("Native PS2 ELF defines forbidden reference-machine symbols: " + "; ".join(matches[:8]))
 
 
 def inspect_elf(path: Path) -> dict:
@@ -221,6 +276,19 @@ class Runner:
 
 
 def build_spec(args: argparse.Namespace) -> dict:
+    if args.target == "native-port":
+        if args.core_manifest:
+            raise ValueError("native-port uses a fixed original-source inventory; --core-manifest is forbidden")
+        return {"sources": NATIVE_SOURCES, "includes": ["platform/ps2/native", "platform/ps2/include"],
+                "libraries": ["draw", "graph", "dma", "packet", "patches", "pad", "fileXio", "m"],
+                "defines": ["RALLY_NATIVE_PS2=1"], "compile_flags": [], "embed_iop_modules": True,
+                "iop_modules": ["sio2man", "padman", "iomanX", "fileXio", "bdm", "bdmfs_fatfs", "usbd", "usbmass_bd", "libsd", "rally_pcm"],
+                "pcm_transport": True}
+    if args.target == "audio-fixture":
+        return {"sources": ["platform/ps2/tests/native_audio_fixture.cpp", "platform/ps2/src/audio_output.cpp"],
+                "includes": ["platform/ps2/include"], "libraries": ["patches", "m"],
+                "defines": [], "compile_flags": [], "embed_iop_modules": True,
+                "iop_modules": ["libsd", "rally_pcm"], "pcm_transport": True}
     if args.target == "bringup":
         return {"sources": BRINGUP_SOURCES, "includes": ["platform/ps2/include", "src"],
                 "libraries": BRINGUP_LIBRARIES, "defines": [], "compile_flags": [],
@@ -257,6 +325,12 @@ def build(args: argparse.Namespace, report: dict) -> None:
     dependencies = {source: project_headers([source], includes) for source in sources}
     headers = sorted({header for values in dependencies.values() for header in values})
     fingerprints = {relative(p): digest(p) for p in sorted(set(sources + headers))}
+    if spec.get("pcm_transport"):
+        iop_sources = [HERE / "iop/pcm_server.c", HERE / "iop/imports.c"]
+        iop_headers = project_headers(iop_sources, [HERE / "include"])
+        fingerprints.update({relative(p): digest(p) for p in iop_sources + iop_headers})
+    if args.target == "native-port":
+        report["native_source_boundary"] = validate_native_boundary([ROOT / name for name in fingerprints])
     report["source_sha256"] = fingerprints
     report["compile_dependencies"] = {relative(source): [relative(p) for p in headers]
                                       for source, headers in dependencies.items()}
@@ -291,11 +365,13 @@ def build(args: argparse.Namespace, report: dict) -> None:
         with ThreadPoolExecutor(max_workers=args.jobs) as pool:
             objects = list(pool.map(compile_source, sources))
         modules = spec.get("iop_modules", ["sio2man", "padman"] if spec["embed_iop_modules"] else [])
+        pcm_module = build_pcm_module(runner) if spec.get("pcm_transport") else None
         if modules:
             for module in modules:
                 obj = args.output / "obj" / (module + "_irx.o")
                 generated = obj.with_suffix(".c")
-                runner.run([runner.sdk + "/bin/bin2c", runner.sdk + "/iop/irx/" + module + ".irx",
+                module_path = runner.path(pcm_module) if module == "rally_pcm" and pcm_module else runner.sdk + "/iop/irx/" + module + ".irx"
+                runner.run([runner.sdk + "/bin/bin2c", module_path,
                             runner.path(generated), module + "_irx"], "embed-" + module)
                 runner.run([runner.tool("gcc"), "-D_EE", "-G0", "-O2", "-c",
                             runner.path(generated), "-o", runner.path(obj)], "compile-" + module)
@@ -308,6 +384,11 @@ def build(args: argparse.Namespace, report: dict) -> None:
         link += [runner.path(p) for p in objects]
         link += ["-Wl,--start-group", *["-l" + value for value in spec["libraries"]], "-Wl,--end-group"]
         runner.run(link, "link")
+        if args.target == "native-port":
+            symbols = runner.run([runner.tool("nm"), "--defined-only", "--demangle", runner.path(elf)], "native-symbol-boundary")
+            validate_native_symbols(symbols)
+            report["native_source_boundary"]["defined_symbol_audit_passed"] = True
+        verify_source_snapshot(fingerprints)
         report["elf"] = inspect_elf(elf)
         report["size"] = runner.run([runner.tool("size"), runner.path(elf)], "size").strip()
         report["status"] = "cross_compiled"
@@ -316,7 +397,49 @@ def build(args: argparse.Namespace, report: dict) -> None:
         report["commands"] = runner.commands
 
 
+def build_pcm_module(runner: Runner) -> Path:
+    """Build our original IOP server against the immutable open PS2SDK."""
+    output = runner.output / "iop"
+    output.mkdir(exist_ok=True)
+    prefix = runner.ps2dev + "/iop/bin/mipsel-none-elf-"
+    flags = ["-D_IOP", "-G0", "-Os", "-Wall", "-Wextra", "-Werror", "-fno-builtin",
+             "-msoft-float", "-mno-explicit-relocs", "-fno-toplevel-reorder",
+             "-I" + runner.sdk + "/iop/include", "-I" + runner.sdk + "/common/include",
+             "-I" + runner.path(HERE / "include")]
+    objects = []
+    for source in ("pcm_server", "imports"):
+        obj = output / (source + ".o")
+        runner.run([prefix + "gcc", *flags, "-c", runner.path(HERE / "iop" / (source + ".c")),
+                    "-o", runner.path(obj)], "iop-compile-" + source)
+        objects.append(obj)
+    linked = output / "rally_pcm.elf"
+    runner.run([prefix + "gcc", "-G0", "-msoft-float", "-nostdlib", "-r", "-Wl,-d",
+                "-T" + runner.sdk + "/iop/startup/linkfile", "-o", runner.path(linked),
+                *[runner.path(p) for p in objects]], "iop-link")
+    stripped = output / "rally_pcm.stripped.elf"
+    runner.run([prefix + "strip", "--strip-unneeded", "--remove-section=.pdr",
+                "--remove-section=.comment", "--remove-section=.mdebug.abi32",
+                "--remove-section=.gnu.attributes", "-o", runner.path(stripped), runner.path(linked)], "iop-strip")
+    module = output / "rally_pcm.irx"
+    runner.run([runner.sdk + "/bin/iopfixup", "--rb", "--irx1", "--allow-zero-text",
+                "-o", runner.path(module), runner.path(stripped)], "iop-module")
+    return module
+
+
 def smoke(args: argparse.Namespace, report: dict) -> None:
+    if args.target == "native-port":
+        # The native bootstrap has its own portable unit tests. This command
+        # checks its complete source boundary without executing a reference
+        # rasterizer or requiring the cross compiler.
+        spec = build_spec(args)
+        sources = [project_path(name) for name in spec["sources"]] + [ROOT / name for name in NATIVE_IOP_SOURCES]
+        includes = [project_path(name) for name in spec["includes"]]
+        headers = project_headers(sources, includes)
+        report["native_source_boundary"] = validate_native_boundary(sources + headers)
+        report.update(status="native_source_boundary_passed", executable_run=False,
+                      source_sha256={relative(path): digest(path) for path in sources + headers})
+        print("Native PS2 source boundary passed; this command does not execute gameplay or rendering.")
+        return
     # The scene assertions run on the development host, not a PS2 emulator.
     sources = [HERE / "src/host_smoke.cpp", HERE / "src/bringup_scene.cpp",
                HERE / "src/presentation.cpp", HERE / "src/controls.cpp",
@@ -348,7 +471,7 @@ def smoke(args: argparse.Namespace, report: dict) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("build", "smoke", "report"))
-    parser.add_argument("--target", choices=("bringup", "core-probe"), default="bringup")
+    parser.add_argument("--target", choices=("bringup", "audio-fixture", "native-port", "core-probe"), default="bringup")
     parser.add_argument("--backend", choices=("docker", "native"), default="docker")
     parser.add_argument("--output", type=project_path, default=ROOT / "build/ps2-bringup")
     parser.add_argument("--ps2dev", type=Path, default=Path(os.environ.get("PS2DEV", "/usr/local/ps2dev")))

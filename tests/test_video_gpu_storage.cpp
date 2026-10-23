@@ -75,5 +75,59 @@ int main() {
 #endif
     video.set_external_3d(false);
     assert(gpu_capacity(video) == 0);
+#ifdef M2_COMPACT_TILEMAP
+    video.set_compact_external_3d(true);
+    video.set_wide_margin(40);
+    assert(video.width() == rt::Video::W);
+    video.frame_start(); video.screen_update(polygons, 0, memory);
+    assert(gpu_capacity(video) == 0 && video.dec_chars_.capacity() == 0);
+    assert(video.background_layer().data() == video.screen().data());
+    assert(video.foreground_layer().size() >= video.screen().size());
+    for (int layer = 0; layer < 4; ++layer)
+        assert(video.pixmap_[layer].capacity() == 0 && video.flags_[layer].capacity() == 0);
+    video.render_compact_reference();
+    assert(video.screen_hash() == cpu_hash && video.compact_external_3d());
+    assert(gpu_capacity(video) == 0);
+
+    // A rejected native frame must restore visible polygon pixels, not just
+    // reproduce an empty layer. Use an original flat triangle over black.
+    video.set_compact_external_3d(false);
+    video.xhout_w(uint16_t(-84)); video.xvout_w(uint16_t(-130));
+    video.palette_dirty_ = false;
+    video.pens_[0] = 0xff000000;
+    std::fill(translation.begin(), translation.end(), 255);
+    rt::GeoPoly triangle;
+    triangle.num_vertices = 3; triangle.z = 100; triangle.luma = 252;
+    triangle.center[1] = 384;
+    triangle.viewport[2] = 495; triangle.viewport[3] = 384;
+    triangle.v[0] = {16.f, -16.f, {1.f, 0.f, 0.f}};
+    triangle.v[1] = {160.f, -16.f, {1.f, 0.f, 0.f}};
+    triangle.v[2] = {16.f, -160.f, {1.f, 0.f, 0.f}};
+    const std::vector<rt::GeoPoly> visible{triangle};
+    video.frame_start(); video.screen_update(visible, 0, memory);
+    const auto reference = video.screen();
+    assert(std::any_of(reference.begin(), reference.end(), [](uint32_t p) { return p != 0xff000000; }));
+    video.set_compact_external_3d(true);
+    video.frame_start(); video.screen_update(visible, 0, memory);
+    assert(video.background_layer() != reference && gpu_capacity(video) == 0);
+    video.render_compact_reference();
+    assert(video.screen() == reference && video.compact_external_3d());
+    video.render_compact_reference(); // A second request must not blend again.
+    assert(video.screen() == reference);
+    // Palette/translation writes can occur without a new geometrizer frame.
+    // The CPU path retains the already drawn 3D layer in that case; fallback
+    // must not regenerate it against the changed live memory (frame 325).
+    std::fill(translation.begin(), translation.end(), 0);
+    video.screen_update(visible, 0, memory);
+    video.render_compact_reference();
+    assert(video.screen() == reference);
+    std::fill(translation.begin(), translation.end(), 255);
+    video.frame_start(); video.screen_update(visible, 0, memory);
+    assert(video.background_layer() != reference && gpu_capacity(video) == 0);
+    video.set_external_3d(true, true);
+    assert(!video.compact_external_3d() && gpu_capacity(video) != 0);
+    video.set_external_3d(false);
+    assert(gpu_capacity(video) == 0);
+#endif
     std::puts("Video GPU scratch: lazy allocation, resize, release and renderer switches passed");
 }

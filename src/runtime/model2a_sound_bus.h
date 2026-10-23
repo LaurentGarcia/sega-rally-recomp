@@ -3,6 +3,7 @@
 #pragma once
 
 #include "runtime/snd_cpu.h"
+#include "runtime/sound_image_source.h"
 #include <span>
 #include <vector>
 
@@ -31,7 +32,8 @@ public:
         Frontier(Region region, bool write, uint32_t address, uint16_t data, uint16_t mask);
     };
 
-    Model2ASoundBus(std::span<const uint8_t> program, std::span<const uint8_t> samples);
+    Model2ASoundBus(std::span<const uint8_t> program, std::span<const uint8_t> samples,
+                   SoundImageSource *source = nullptr);
     // Soft reset preserves RAM except for the reference's 16-byte vector copy.
     void reset();
     void set_scsp(Scsp *chip) { scsp_ = chip; }
@@ -42,6 +44,7 @@ public:
 
 private:
     std::span<const uint8_t> program_, samples_;
+    SoundImageSource *source_ = nullptr;
     std::vector<uint8_t> ram_ = std::vector<uint8_t>(RAM_BYTES, 0);
     Scsp *scsp_ = nullptr;
 };

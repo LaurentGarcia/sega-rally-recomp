@@ -26,7 +26,7 @@ RUNTIME_SOURCES = [
     "comm_board", "model2_uart", "model2a_uart", "tgp", "m2_tgp_board",
     "model2a_video", "video", "raster", "geo",
 ]
-HOST_SOURCES = ["gs_display", "pad_input", "presentation", "controls", "storage", "status_screen"]
+HOST_SOURCES = ["gs_display", "model2_gs", "vu0_pack", "pad_input", "presentation", "controls", "storage", "status_screen"]
 DEFINITIONS = [
     "M2_PAGED_ROM=1", "M2_COMPACT_TILEMAP=1", "M2_INSTRUCTION_BOUNDARY_HOOK=1", "M2_SRALLY_TGP=1",
     "M2_SRALLY_IO=1", "M2_SRALLY_COMM=1", "M2_SRALLY_CONTROL=1",
@@ -34,6 +34,21 @@ DEFINITIONS = [
 ]
 LIBRARIES = ["draw", "graph", "dma", "packet", "patches", "pad", "m", "fileXio"]
 IOP_MODULES = ["sio2man", "padman", "iomanX", "fileXio", "bdm", "bdmfs_fatfs", "usbd", "usbmass_bd"]
+SOUND_AUDIT_DEPENDENCIES = {
+    "src/runtime/scsp_pan_table.h", "src/runtime/sound_image_source.h",
+    *["src/runtime/" + name + suffix for name in
+      ("model2_scsp", "model2_scsp_dsp", "model2a_sound_bus", "model2a_clock")
+      for suffix in (".h", ".cpp")],
+}
+
+
+def validate_sound_configuration(audit: dict) -> None:
+    flags = audit.get("runtime_flags", [])
+    if not isinstance(flags, list) or "-DM2_COMPACT_SOUND=1" not in flags:
+        raise ValueError("PS2 sound requires a timed --compact-scsp execution audit")
+    sources = audit.get("sources_sha256")
+    if not isinstance(sources, dict) or not SOUND_AUDIT_DEPENDENCIES <= sources.keys():
+        raise ValueError("PS2 sound audit lacks compact table, image source or clock dependencies")
 
 
 def build_path(path: Path) -> Path:
@@ -79,7 +94,7 @@ def validate_native_build(source: Path) -> tuple[list[Path], dict]:
     return generated, provenance
 
 
-def prepare(source: Path, output: Path) -> dict:
+def prepare(source: Path, output: Path, with_sound: bool = False) -> dict:
     source, output = build_path(source), build_path(output)
     if output.suffix != ".json":
         raise ValueError("--output must name a JSON manifest file")
@@ -89,6 +104,16 @@ def prepare(source: Path, output: Path) -> dict:
     sources = [ROOT / "platform/ps2/game/main.cpp", *generated]
     sources += [ROOT / "src/runtime" / (name + ".cpp") for name in RUNTIME_SOURCES]
     sources += [ROOT / "platform/ps2/src" / (name + ".cpp") for name in HOST_SOURCES]
+    sources += [ROOT / "src/app/gpu/model2_frame.cpp"]
+    if with_sound:
+        _, sound_generated = staging.sound_inputs(source, "srallycb")
+        sound_audit = source / "sound/native-timed/audit.json"
+        validate_sound_configuration(json.loads(staging.confined_file(sound_audit, source).read_text()))
+        sources += [sound_generated, ROOT / "platform/ps2/src/audio_output.cpp"]
+        sources += [ROOT / "src/runtime" / (name + ".cpp") for name in
+                    ("model2a_sound", "model2a_sound_bus", "snd_cpu", "model2_scsp", "model2_scsp_dsp")]
+        provenance["sound_generation_audit_sha256"] = staging.digest(source / "sound/native-timed/audit.json")
+        provenance["sound_generated_sha256"] = staging.digest(sound_generated)
     if any(not path.is_file() or not path.resolve().is_relative_to(ROOT) for path in sources):
         raise ValueError("PS2 core source inventory is missing a file or escapes the checkout")
     manifest = {
@@ -101,11 +126,13 @@ def prepare(source: Path, output: Path) -> dict:
         "provenance": provenance,
         "sources": [path.relative_to(ROOT).as_posix() for path in sources],
         "includes": ["src", ".", "platform/ps2/include"],
-        "defines": DEFINITIONS,
+        "defines": DEFINITIONS + (["M2_SRALLY_SOUND=1", "M2_COMPACT_SOUND=1"] if with_sound else []),
         "libraries": LIBRARIES,
         "compile_flags": [],
         "embed_iop_modules": True,
-        "iop_modules": IOP_MODULES,
+        "iop_modules": IOP_MODULES + (["libsd", "rally_pcm"] if with_sound else []),
+        "pcm_transport": with_sound,
+        "sound_compiled": with_sound,
     }
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = None
@@ -126,9 +153,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--native-build", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True, help="Ignored JSON build manifest; no game bytes copied")
+    parser.add_argument("--with-sound", action="store_true", help="Require audited native sound generation and add the original IOP PCM transport")
     args = parser.parse_args()
     try:
-        manifest = prepare(args.native_build, args.output)
+        manifest = prepare(args.native_build, args.output, args.with_sound)
         print(f"Prepared {len(manifest['sources'])} sources in {args.output}; PS2 gameplay remains unverified.")
         return 0
     except (OSError, ValueError, KeyError, TypeError) as error:

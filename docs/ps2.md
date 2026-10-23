@@ -1,44 +1,63 @@
 # PlayStation 2 development
 
-This is an experimental homebrew port, not a finished PS2 player. It uses the
-actual translated Sega Rally i960/TGP code and shared Model 2A devices for its
-game-core probe. A separate, ROM-free bring-up ELF exercises the display and
-controller with synthetic geometry. A successful build does not establish
-hardware execution, playable speed, sound or arcade fidelity.
+**Current direction:** a [native PS2 rewrite](ps2-native-rewrite.md) with no
+arcade processor/device emulation in its executable. The translated game-core
+probe described below remains the separate behavioral reference. The new
+`native-port` target is a platform bootstrap; game systems are being recovered
+and rewritten before it can be called playable.
 
-## Architecture
+This is an experimental homebrew port, not a finished PS2 player. Its targets
+have different purposes:
+
+| Target | Runtime | Purpose |
+| --- | --- | --- |
+| `native-port` | Independently written game systems and direct PS2 platform code | Current rewrite; original diagnostic content, no connected gameplay yet |
+| `core-probe` | Translated i960/TGP/68000 code and shared Model 2A devices | Separate behavioral and hardware comparison tool |
+| `bringup` / `audio-fixture` | ROM-free PS2 hardware diagnostics | Display, controller and PCM output checks |
+
+Build and run the current rewrite using the
+[native target instructions](ps2-native-rewrite.md#build-and-check). The
+following architecture and memory measurements describe the **separate
+reference probe**, unless explicitly marked native. They do not describe the
+new game's runtime or establish its playable speed or arcade fidelity.
+
+## Reference probe architecture
 
 The PS2 target uses the open PS2SDK directly, without SDL, Metal or Vulkan.
 
 | Component | Implemented boundary | Remaining work |
 | --- | --- | --- |
 | Emotion Engine | Native generated C++; shared board devices; bounded ROM cache; compact CPU tile compositor | Runtime memory peaks, profiling, EE floating-point validation |
-| GS/GIF/DMA | Double-buffered display, reference-frame uploads, ordered opaque solid triangle batches | Textured game polygons, shading/checker rules, edge coverage, hardware comparison |
+| GS/GIF/DMA | Double-buffered display, compact layer uploads, indexed textured triangles, CLUT cache, checker/cutout rules | Model 2 filtering and edge fidelity, DMA overlap, hardware comparison |
 | DualShock | Analog steering, pedals, gears, coin/start/view cabinet input | Physical controller validation and configuration UI |
 | IOP storage | Open USB mass/FAT modules, fileXio, bounded startup retry | USB throughput, cache stalls and real loader/device checks |
-| VU0/VU1 | No game geometry offload yet | Compare transforms/clipping with the shared reference before enabling microprograms |
-| IOP/SPU2 | No game sound output yet | PCM transport, sample-rate handling, buffering and synchronization |
+| VU0/VU1 | Optional VU0 final coordinate packing; VU1 inactive | Transform/clipping comparisons before broader offload |
+| IOP/SPU2 | Original bounded PCM server, open libsd, integer-phase resampling and DMA output | Whole-game speed, sustained queue behavior and physical audio validation |
 
-The initial game probe uses the CPU reference rasterizer and uploads its result
-to GS. Native GS triangles are currently a separate diagnostic path; unsupported
-texture/checker/edge-proxy packets are rejected explicitly. The intended final
-renderer accelerates the game through the GS, with vector-unit work introduced
-only after numerical and frame comparisons. PS2 floating-point behavior must
-not be assumed equivalent to desktop IEEE arithmetic.
+The game probe defaults to the CPU reference rasterizer and uploads its result
+to GS. `renderer=gs-nearest` explicitly enables the experimental native path;
+unsupported packets fall back to complete reference composition. Its nearest
+sampling is not arcade pixel parity. The two captured real scenes reproduce
+the same native GS image with scalar and VU0 coordinate packing. Broader
+vector-unit work requires additional numerical and frame comparisons; PS2
+floating-point behavior must not be assumed equivalent to desktop IEEE.
 
-The hardware direction is to keep board/game execution on the EE, send bounded
+The reference probe keeps board/game execution on the EE, sends bounded
 geometry batches through VIF/VU only where comparisons permit, and submit
 ordered textured primitives to GS through GIF DMA. DMA buffers need explicit
 ownership and cache synchronization so preparation can eventually overlap
 transfer. The IOP can service storage and transport buffered PCM to SPU2.
-These are implementation targets, not a claim that VU or audio offload already
-works. Pixel, numerical and timing measurements decide each optimization.
+Geometry offload beyond final XYZ conversion remains a target. Audio synthesis
+still runs on the EE; only the PCM transport/output runs on IOP/SPU2. Pixel,
+numerical and timing measurements decide each optimization. The
+[hardware decisions and profiling record](ps2-hardware-notes.md) links the
+public PS2dev documentation to the cache, DMA and VU choices.
 
-Native GS integration also needs its own bounded tile/texture staging path.
-Enabling the existing desktop external renderer allocates full tile planes
-and GPU snapshots again, undoing the EE memory savings below. Keep that
-reference path available for comparison, but measure the complete EE and GS
-allocation budgets before selecting a console renderer.
+Its native GS integration uses compact layers and bounded texture staging.
+Enabling the desktop external renderer without that mode would allocate full
+tile planes and GPU snapshots again, undoing the EE memory savings below.
+The rewrite's independent renderer receives native material and vertex data;
+it does not consume arcade video registers or tile planes.
 
 ## Memory
 
@@ -68,7 +87,7 @@ also avoid unused GPU layer copies. The compact path preserves scroll,
 category, palette and window-mask behavior; it recomputes rows and is not
 claimed as a speed improvement.
 
-The measured compact executable occupies 16,786,584 loaded bytes and leaves
+The original compact baseline executable occupies 16,786,584 loaded bytes and leaves
 15,719,272 bytes for heap and stack after the SDK's 1 MiB load origin. Known
 persistent allocations account for at least 13,246,204 bytes; the constructor
 also temporarily holds a 262,144-byte TGP table copy. Native GS sprites draw
@@ -80,6 +99,15 @@ remain to be measured before claiming complete runtime fit.
 Global `-fno-inline` increased executable residency;
 representative `-Oz` and `-fno-jump-tables` trials produced identical objects
 to `-Os`. The probe therefore retains `-Os`.
+
+The current native path defers 1,310,720 bytes of CPU raster storage until
+reference 3D is needed. Bounded GS staging saves another 720,896 bytes, and
+compact sound tables plus bus-owned sound RAM save 458,752 bytes. The indexed
+texture and CLUT cache retains the prior GS VRAM budget. Actual reference-only
+boot with the new staging/raster policy reports 11,232,608 allocated EE bytes.
+The sound-linked candidate occupies 17,764,288 static bytes, leaving 14,741,568
+bytes above the load image for heap/stack; an executable-only figure still
+does not establish busiest-scene fit. See the hardware record for scope.
 
 ## Build the ROM-free hardware test
 
@@ -104,8 +132,9 @@ not contain Sega game instructions or assets.
 
 Use the project's verified native generation with indexed dispatch and exact
 instruction-boundary hooks. A changed generation dependency requires a fresh
-audit; do not edit an old audit to suppress a mismatch. The PS2 probe currently
-disables sound and leaves performance/timing unqualified.
+audit; do not edit an old audit to suppress a mismatch. Sound and approximate
+GS rendering are explicit development options; performance/timing remains
+unqualified on physical hardware.
 
 ```sh
 python3 platform/ps2/tools/asset_pack.py pack \
@@ -116,6 +145,19 @@ python3 platform/ps2/prepare_core.py \
 python3 platform/ps2/build_ps2.py build --target core-probe \
   --core-manifest build/ps2/core-manifest.json --output build/ps2-core --optimization Os
 ```
+
+For sound, first generate the timed compact sound core using
+`scripts/segarally_sound_recompile.py --timed --compact-scsp` with the same
+verified game inputs, then pass `--with-sound` to `prepare_core.py`. The manifest
+includes the sound audit, `M2_COMPACT_SOUND`, original IOP server and open SDK
+audio module. `build_ps2.py build --target audio-fixture` builds a separate
+ROM-free non-silent PCM transport test.
+
+Optional `rally.cfg` sits beside the pack. Defaults are `renderer=reference`,
+`vu0=0`, `audio=0`, `debug=0`; see the
+[configuration and diagnostics page](ps2-hardware-notes.md#readable-diagnostics).
+**Select + Start** toggles the larger full-screen diagnostic page. The same
+ASCII snapshot is printed to stdout, while normal play remains unobstructed.
 
 Keep game-derived data and generated source private. Neither `.rpk` packs nor
 ELF/IRX binaries belong in source Git. The console game-probe path is
@@ -142,10 +184,29 @@ The ROM-free diagnostic and actual game ELF boot in Play! 0.72. The game
 displays its own `SOUND INITIALIZE ...` screen through reference-frame GS
 uploads. The observed EE checkpoints at frames 1, 2, 3 and 60 match all seven
 host CSV fields exactly. This compares four sampled checkpoints; it does not
-establish the unrecorded intervening states. No physical PS2 run, playable
-race or sound output has been demonstrated. The CPU-rendered probe advances
+establish the unrecorded intervening states. No physical PS2 run or playable
+race has been demonstrated. The original CPU-rendered probe advances
 at roughly 0.33 game frames per second in this emulator test. Play!'s display
 refresh counter is not the game's frame rate or a console speed measurement.
+
+New hardware-specific evidence is bounded and separate:
+
+- VU0 packing matches 295,872 scalar/independent binary32 components exactly
+  in Play!, including boundary, invalid-input and tail cases.
+- Captured actual game frames 1357 and 1634 render through GS, including the
+  Martini Lancia scene. Scalar/VU0 images are identical. Against the CPU image,
+  mean absolute channel errors are 7.54 and 12.24 out of 255 respectively;
+  nearest sampling remains a visible fidelity difference.
+- Indexed textures preserve those same GS images exactly while reducing repeat
+  texture traffic by 98.91% and 99.34%. Emulated renderer timings improve 6.48x
+  and 8.95x; neither ratio is a full-game or physical-console speed claim.
+- The original IOP/SPU2 fixture submits and consumes 48,001 non-silent frames,
+  with explicit silence on underrun. There is no physical or loopback audio
+  recording. The authentic sound-board replay separately matches 1,929 UART
+  checkpoints and 728,884 stereo PCM frames exactly with compact/paged sound.
+- Compact layers plus continuous reference fallback match all seven host
+  checkpoint fields across 1,634 frames. Fallback preserves already composed
+  tiles and the once-per-geometrizer-frame raster cache.
 
 Compare archived guest checkpoints with a host reference using:
 
@@ -167,9 +228,13 @@ otherwise moving focus to another application pauses the guest. Static
 diagnostic screens were observed one GS submission behind in Play!, while
 continuous game-frame uploads displayed correctly. Use guest logs and
 timestamped captures together when diagnosing an apparent stall.
+Use Play!'s Vulkan graphics handler for checker validation on macOS. Its OpenGL
+path silently omits destination-alpha testing when framebuffer-fetch support
+is unavailable; the same ELF's checker mask passes in Vulkan. That emulator
+backend choice does not make Vulkan part of the PS2 application.
 
 Before a player release: boot and measure the actual game on the destination,
-finish native textured GS rendering, validate VU optimizations, add sound,
+resolve native GS fidelity limits, broaden validated VU work, sustain game audio,
 measure heap/stack/cache peaks, then run complete courses and restarts against
 the reference. Compiled artifacts remain development probes until those
 checks pass.

@@ -287,7 +287,7 @@ void Model2ScspDsp::Step()
 		//fclose(f);
 }
 
-void Model2ScspDsp::SetSample(s32 sample, int SEL, int /*MXL*/)
+void Model2ScspDsp::SetSample(s32 sample, s32 SEL, s32 /*MXL*/)
 {
 	//MIXS[SEL] += sample << (MXL + 1)/*7*/;
 	MIXS[SEL] += sample;

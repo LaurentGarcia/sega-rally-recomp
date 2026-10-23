@@ -6,6 +6,7 @@
         "extern/ymfm",
         "extern/lzma",
         "extern/sdl3",
-        "extern/imgui"
+        "extern/imgui",
+        "build/ps2/references/PS2-Programming-Docs"
     ]
 }

@@ -96,10 +96,13 @@ def main() -> int:
     parser.add_argument("--compiler", default=os.environ.get("CXX", "c++"))
     parser.add_argument("--max-instructions", type=int, default=1_000_000)
     parser.add_argument("--timed", action="store_true", help="bounded instruction timing with native SCSP; MMIO at prior boundary")
+    parser.add_argument("--compact-scsp", action="store_true", help="Use exact compact SCSP gain tables in the timed execution probe")
     args = parser.parse_args()
     try:
         if args.max_instructions <= 0:
             raise ValueError("instruction limit must be positive")
+        if args.compact_scsp and not args.timed:
+            raise ValueError("--compact-scsp requires --timed")
         build = build_path(args.build_dir)
         spec = json.loads((ROOT / "config/segarally_sound_boot.json").read_text())
         images = verified_images(build, spec)
@@ -115,6 +118,8 @@ def main() -> int:
         candidates = []
         proof_sources = []
         runtime_flags = []
+        if args.compact_scsp:
+            runtime_flags.append("-DM2_COMPACT_SOUND=1")
         seed_config_path = "config/segarally_sound_observed_seeds.json"
         if args.timed:
             generation_flags += ["--timing", "model2a-boundary"]
@@ -162,10 +167,10 @@ def main() -> int:
                          and result.get("scsp_writes", 0) > 0 and result.get("cycles", 0) > 38)
         sources = generator_sources + runtime_sources + proof_sources + ["src/m68k/decode.h", "src/m68k/reach.h", "src/m68k/timing.h",
             "src/runtime/snd_cpu.h", "src/runtime/snd_gen_support.h", "src/runtime/snd_sched.h",
-            "src/runtime/model2a_sound_bus.h", "config/segarally_sound_boot.json",
+            "src/runtime/model2a_sound_bus.h", "src/runtime/sound_image_source.h", "config/segarally_sound_boot.json",
             "config/segarally_sound.json", "scripts/segarally_sound_recompile.py"]
         if args.timed:
-            sources += [seed_config_path, "config/segarally_sound_tables.json", "src/runtime/model2_scsp.h", "src/runtime/model2_scsp_dsp.h", "src/runtime/model2a_clock.h"]
+            sources += [seed_config_path, "config/segarally_sound_tables.json", "src/runtime/model2_scsp.h", "src/runtime/scsp_pan_table.h", "src/runtime/model2_scsp_dsp.h", "src/runtime/model2a_clock.h"]
         report = {"schema": 1, "romset": spec["romset"], "board": spec["board"],
                   "images_sha256": spec["images"], "compiler": compiler, "flags": flags, "runtime_flags": runtime_flags,
                   "sources_sha256": {path: hashlib.sha256((ROOT / path).read_bytes()).hexdigest() for path in sources},

@@ -17,7 +17,7 @@ std::string describe(Model2ASoundBus::Frontier::Region region, bool write,
     char text[128];
     std::snprintf(text, sizeof text, "unsupported sound %s %s address=%06x data=%04x mask=%04x",
                   region == Model2ASoundBus::Frontier::Region::Scsp ? "SCSP" : "unmapped",
-                  write ? "write" : "read", address, data, mask);
+                  write ? "write" : "read", unsigned(address), data, mask);
     return text;
 }
 void check_address(uint32_t address)
@@ -36,17 +36,27 @@ Model2ASoundBus::Frontier::Frontier(Region region_, bool write_, uint32_t addres
     : rt::Fatal(describe(region_, write_, address_, data_, mask_)), region(region_),
       write(write_), address(address_), data(data_), mask(mask_) {}
 
-Model2ASoundBus::Model2ASoundBus(std::span<const uint8_t> program, std::span<const uint8_t> samples)
-    : program_(program), samples_(samples)
+Model2ASoundBus::Model2ASoundBus(std::span<const uint8_t> program, std::span<const uint8_t> samples,
+                               SoundImageSource *source)
+    : program_(program), samples_(samples), source_(source)
 {
-    if (program.size() != PROGRAM_BYTES || samples.size() != SAMPLE_BYTES)
+    if ((source_ ? source_->size(SoundImage::Program) : program.size()) != PROGRAM_BYTES ||
+        (source_ ? source_->size(SoundImage::Samples) : samples.size()) != SAMPLE_BYTES)
         throw rt::Fatal("Model2A Rally sound requires 512 KiB program and 8 MiB samples");
     reset();
 }
 
 void Model2ASoundBus::reset()
 {
-    std::copy_n(program_.begin(), 16, ram_.begin());
+    if (source_) {
+        for (unsigned i = 0; i < 16; i += 2) {
+            const uint16_t value = source_->read16_be(SoundImage::Program, i);
+            ram_[i] = uint8_t(value >> 8);
+            ram_[i + 1] = uint8_t(value);
+        }
+    } else {
+        std::copy_n(program_.begin(), 16, ram_.begin());
+    }
 }
 
 uint16_t Model2ASoundBus::read16(uint32_t address, uint16_t mask)
@@ -58,10 +68,14 @@ uint16_t Model2ASoundBus::read16(uint32_t address, uint16_t mask)
         if (!scsp_) throw Frontier(Frontier::Region::Scsp, false, address, 0, mask);
         return scsp_->read16(uint16_t(address - 0x100000), mask) & mask;
     }
-    if (address >= 0x600000 && address < 0x680000) return word(program_, address - 0x600000) & mask;
+    if (address >= 0x600000 && address < 0x680000)
+        return (source_ ? source_->read16_be(SoundImage::Program, address - 0x600000)
+                        : word(program_, address - 0x600000)) & mask;
     // Reset bank4 at samples+0x200000 and bank5 at samples+0x600000 makes
     // Rally's three CPU sample windows one contiguous 8 MiB image.
-    if (address >= 0x800000) return word(samples_, address - 0x800000) & mask;
+    if (address >= 0x800000)
+        return (source_ ? source_->read16_be(SoundImage::Samples, address - 0x800000)
+                        : word(samples_, address - 0x800000)) & mask;
     throw Frontier(Frontier::Region::Unmapped, false, address, 0, mask);
 }
 

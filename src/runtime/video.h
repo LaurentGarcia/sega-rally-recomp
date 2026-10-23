@@ -70,6 +70,15 @@ public:
     // tile generations) and this frame's snapshot (gpu_tile_words,
     // gpu_pens). Vita uses its separate GXM tile path, also with widescreen.
     void set_external_3d(bool enabled, bool desktop = false);
+#ifdef M2_COMPACT_TILEMAP
+    // Bounded native-width hardware presentation: screen_/sys24_ are the
+    // background/foreground, with no full decoded planes or GPU snapshots.
+    void set_compact_external_3d(bool enabled);
+    bool compact_external_3d() const { return compact_external_3d_; }
+    // Recompose the last frame with the CPU rasterizer when a hardware
+    // backend rejects its packets. The next frame retains compact mode.
+    void render_compact_reference();
+#endif
     // External 3D with widescreen and the HUD at the edges: how far the
     // condition panel's overlay polygons move (0 = not at all), and which.
     int gpu_hud_shift() const { return external_3d_ && hud_on_ ? margin_ : 0; }
@@ -145,8 +154,18 @@ public:
     }
 #endif
 #else
-    const std::vector<uint32_t> &background_layer() const { return background_gpu_; }
-    const std::vector<uint32_t> &foreground_layer() const { return foreground_gpu_; }
+    const std::vector<uint32_t> &background_layer() const {
+#ifdef M2_COMPACT_TILEMAP
+        if (compact_external_3d_) return screen_;
+#endif
+        return background_gpu_;
+    }
+    const std::vector<uint32_t> &foreground_layer() const {
+#ifdef M2_COMPACT_TILEMAP
+        if (compact_external_3d_) return sys24_;
+#endif
+        return foreground_gpu_;
+    }
 #endif
     uint64_t background_generation() const { return background_generation_; }
     uint64_t foreground_generation() const { return foreground_generation_; }
@@ -244,6 +263,7 @@ private:
     std::array<std::array<uint16_t, 512>, 4> compact_pixels_{};
     std::array<std::array<uint8_t, 512>, 4> compact_flags_{};
     std::array<int, 4> compact_keys_{{-1, -1, -1, -1}};
+    bool compact_external_3d_ = false, compact_reference_done_ = false;
     void tile_row(int layer, int y, const uint16_t *&pixels, const uint8_t *&flags);
 #endif
 #ifdef M2_DC_SPEED

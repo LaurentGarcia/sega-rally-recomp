@@ -27,6 +27,12 @@ inline Glyph glyph(char c) {
     case '8': return {14,17,17,14,17,17,14}; case '9': return {14,17,17,15,1,1,14};
     case ':': return {0,4,4,0,4,4,0}; case '-': return {0,0,0,31,0,0,0};
     case '/': return {1,1,2,4,8,16,16}; case '.': return {0,0,0,0,0,12,12};
+    case '+': return {0,4,4,31,4,4,0}; case '|': return {4,4,4,4,4,4,4};
+    case '>': return {16,8,4,2,4,8,16}; case '<': return {1,2,4,8,4,2,1};
+    case '[': return {14,8,8,8,8,8,14}; case ']': return {14,2,2,2,2,2,14};
+    case '=': return {0,0,31,0,31,0,0}; case '%': return {25,25,2,4,8,19,19};
+    case '_': return {0,0,0,0,0,0,31}; case '(': return {2,4,8,8,8,4,2};
+    case ')': return {8,4,2,2,2,4,8}; case '*': return {0,21,14,31,14,21,0};
     default: return {};
     }
 }

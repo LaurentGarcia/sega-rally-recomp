@@ -41,13 +41,27 @@ public:
     // or canceled token is harmless. Replacement receives a fresh global order.
     void cancel(Token token);
     Token reschedule_at(Token token, uint64_t deadline_ns, Callback callback);
-    void advance(uint64_t target_ns);
+    void advance(uint64_t target_ns) {
+        // Most instruction/bus boundaries precede the next device event.
+        // Equality must take the slow path, including an event at UINT64_MAX.
+        // Keep invalid/backward/reentrant advances on the checked path too.
+        if (!advancing_ && target_ns >= now_ns_ && target_ns < next_deadline_ns_) {
+            now_ns_ = target_ns;
+            return;
+        }
+        advance_events(target_ns);
+    }
 
 private:
     using Key = std::pair<uint64_t, uint64_t>;
     uint64_t now_ns_ = 0, insertion_ = 0;
+    // UINT64_MAX also represents an empty queue: advance at that timestamp
+    // intentionally uses the checked path, which distinguishes the two.
+    uint64_t next_deadline_ns_ = UINT64_MAX;
     bool advancing_ = false;
     std::map<Key, Callback> events_;
+    void advance_events(uint64_t target_ns);
+    void refresh_deadline();
 };
 
 // Pinned screen_device startup/phase for model2_screen's fixed raw timing.

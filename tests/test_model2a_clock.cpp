@@ -153,6 +153,54 @@ void randomized_queue_contract()
     CHECK(!clock.next_deadline());
 }
 
+void deadline_guard_transitions()
+{
+    Model2AClock clock;
+    std::vector<unsigned> order;
+    clock.advance(10); // Empty queue, then install an already-due event.
+    clock.schedule_at(10, [&](uint64_t) { order.push_back(1); });
+    clock.advance(10);
+    CHECK(order == std::vector<unsigned>({1}));
+
+    const auto first = clock.schedule_at(20, [&](uint64_t) { order.push_back(99); });
+    const auto second = clock.schedule_at(30, [&](uint64_t) { order.push_back(99); });
+    clock.cancel(first);
+    clock.advance(29);
+    CHECK(order.size() == 1 && clock.next_deadline() == 30);
+    clock.reschedule_at(second, 40, [&](uint64_t) { order.push_back(3); });
+    clock.schedule_at(35, [&](uint64_t time) {
+        CHECK(time == 35 && clock.next_deadline() == 40);
+        order.push_back(2);
+        clock.schedule_after(0, [&](uint64_t same) {
+            CHECK(same == 35);
+            order.push_back(4);
+        });
+        throw std::runtime_error("deadline cache after callback mutation");
+    });
+    bool threw = false;
+    try { clock.advance(50); }
+    catch (const std::runtime_error &) { threw = true; }
+    CHECK(threw && clock.now_ns() == 35 && clock.next_deadline() == 35);
+    clock.advance(35);
+    clock.advance(39);
+    CHECK(order == std::vector<unsigned>({1, 2, 4}));
+    clock.advance(40);
+    CHECK(order == std::vector<unsigned>({1, 2, 4, 3}) && !clock.next_deadline());
+
+    const auto maximum = std::numeric_limits<uint64_t>::max();
+    clock.advance(maximum - 1);
+    clock.schedule_at(maximum, [&](uint64_t time) { CHECK(time == maximum); order.push_back(5); });
+    clock.advance(maximum - 1);
+    CHECK(order.size() == 4);
+    clock.advance(maximum);
+    CHECK(order.back() == 5 && order.size() == 5 && !clock.next_deadline());
+    clock.advance(maximum); // Empty queue shares the maximum deadline sentinel.
+    bool backward = false;
+    try { clock.advance(maximum - 1); }
+    catch (const rt::Fatal &) { backward = true; }
+    CHECK(backward && clock.now_ns() == maximum);
+}
+
 void overflow_and_lifetime()
 {
     const uint64_t maximum = std::numeric_limits<uint64_t>::max();
@@ -344,6 +392,7 @@ int main()
     queue_order_and_replacement();
     callbacks_zero_and_reentrancy();
     randomized_queue_contract();
+    deadline_guard_transitions();
     overflow_and_lifetime();
     screen_phase_and_latches();
     screen_callback_insertion_order();

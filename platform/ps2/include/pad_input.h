@@ -1,5 +1,5 @@
 #pragma once
-#include "controls.h"
+#include "pad_state.h"
 
 namespace ps2 {
 class PadInput {

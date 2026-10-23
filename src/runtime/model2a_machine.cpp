@@ -164,8 +164,8 @@ struct Model2AMachine::Impl {
 #ifdef M2_SRALLY_SOUND
         if (options.sound) {
             sound = std::make_unique<snd::Model2ASound>(clock,
-                snd::Model2ASound::Images{std::move(images.sound_program), std::move(images.sound_samples)},
-                [this] { return sound_random(); });
+                snd::Model2ASound::Images{std::move(images.sound_program), std::move(images.sound_samples), images.sound_rom},
+                [this] { return sound_random(); }, options.sound_buffer_frames);
             sound->on_midi_tx = [this](bool level) { uart_chip->write_rxd(level); };
             sound->midi_in(uart_chip->txd_level());
             uart_chip->write_rxd(true);

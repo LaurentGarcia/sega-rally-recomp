@@ -8,7 +8,10 @@
 namespace snd {
 class Model2ASound {
 public:
-    struct Images { std::vector<uint8_t> program, samples; };
+    struct Images {
+        std::vector<uint8_t> program, samples;
+        SoundImageSource *rom = nullptr; // Host-owned; must outlive this board.
+    };
     enum class Status { Running, MissingCode, RuntimeError };
     struct Stats {
         Status status = Status::Running;

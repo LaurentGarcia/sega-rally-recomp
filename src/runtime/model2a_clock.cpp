@@ -57,6 +57,7 @@ Model2AClock::Token Model2AClock::schedule_at(uint64_t deadline_ns, Callback cal
     const Token token{deadline_ns, insertion_ + 1};
     events_.emplace(Key{token.deadline_ns, token.insertion}, std::move(callback));
     insertion_ = token.insertion;
+    if (deadline_ns < next_deadline_ns_) next_deadline_ns_ = deadline_ns;
     return token;
 }
 
@@ -69,7 +70,13 @@ Model2AClock::Token Model2AClock::schedule_after(uint64_t delay_ns, Callback cal
 
 void Model2AClock::cancel(Token token)
 {
-    if (token.insertion) events_.erase(Key{token.deadline_ns, token.insertion});
+    if (token.insertion && events_.erase(Key{token.deadline_ns, token.insertion}))
+        refresh_deadline();
+}
+
+void Model2AClock::refresh_deadline()
+{
+    next_deadline_ns_ = events_.empty() ? UINT64_MAX : events_.begin()->first.first;
 }
 
 Model2AClock::Token Model2AClock::reschedule_at(Token token, uint64_t deadline_ns, Callback callback)
@@ -80,7 +87,7 @@ Model2AClock::Token Model2AClock::reschedule_at(Token token, uint64_t deadline_n
     return replacement;
 }
 
-void Model2AClock::advance(uint64_t target_ns)
+void Model2AClock::advance_events(uint64_t target_ns)
 {
     if (advancing_) {
         if (target_ns == now_ns_) return;
@@ -91,6 +98,9 @@ void Model2AClock::advance(uint64_t target_ns)
     try {
         while (!events_.empty() && events_.begin()->first.first <= target_ns) {
             auto event = events_.extract(events_.begin());
+            // A callback may schedule/cancel events, throw or inspect the
+            // clock. Publish the remaining queue before invoking it.
+            refresh_deadline();
             now_ns_ = event.key().first;
             event.mapped()(now_ns_);
         }

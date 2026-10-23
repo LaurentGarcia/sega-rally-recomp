@@ -195,13 +195,13 @@ void Cpu68k::dev_w(uint32_t addr, uint16_t data, uint16_t mem_mask) {
 
 void Cpu68k::fatal(const std::string &what) const {
     char b[64];
-    std::snprintf(b, sizeof b, " (sound 68000, pc %06x)", pc);
+    std::snprintf(b, sizeof b, " (sound 68000, pc %06x)", unsigned(pc));
     throw rt::Fatal(what + b);
 }
 
 void Cpu68k::odd(uint32_t addr) const {
     char b[64];
-    std::snprintf(b, sizeof b, "word access at odd address %06x", addr);
+    std::snprintf(b, sizeof b, "word access at odd address %06x", unsigned(addr));
     fatal(b);
 }
 

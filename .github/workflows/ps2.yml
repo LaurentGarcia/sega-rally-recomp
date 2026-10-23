@@ -1,9 +1,9 @@
 name: PS2 portability and bringup
 on:
   push:
-    paths: ['platform/ps2/**', 'platform/segarally/stage_data.py', 'src/runtime/**', 'src/app/gpu/model2_frame.h', 'src/trace/trace.h', 'scripts/segarally_recompile.py', 'config/segarally_*.json', 'tests/test_ps2*.py', 'tests/test_model2a_paged_rom.cpp', 'tests/test_video_gpu_storage.cpp', 'tests/test_video_compact.cpp', '.github/workflows/ps2.yml']
+    paths: ['platform/ps2/**', 'platform/segarally/stage_data.py', 'src/runtime/**', 'src/app/gpu/model2_*', 'src/trace/trace.h', 'scripts/segarally_recompile.py', 'scripts/segarally_sound_recompile.py', 'config/segarally_*.json', 'tests/test_ps2*.py', 'tests/test_model2a_paged_rom.cpp', 'tests/test_model2_scsp.cpp', 'tests/test_video_gpu_storage.cpp', 'tests/test_video_compact.cpp', '.github/workflows/ps2.yml']
   pull_request:
-    paths: ['platform/ps2/**', 'platform/segarally/stage_data.py', 'src/runtime/**', 'src/app/gpu/model2_frame.h', 'src/trace/trace.h', 'scripts/segarally_recompile.py', 'config/segarally_*.json', 'tests/test_ps2*.py', 'tests/test_model2a_paged_rom.cpp', 'tests/test_video_gpu_storage.cpp', 'tests/test_video_compact.cpp', '.github/workflows/ps2.yml']
+    paths: ['platform/ps2/**', 'platform/segarally/stage_data.py', 'src/runtime/**', 'src/app/gpu/model2_*', 'src/trace/trace.h', 'scripts/segarally_recompile.py', 'scripts/segarally_sound_recompile.py', 'config/segarally_*.json', 'tests/test_ps2*.py', 'tests/test_model2a_paged_rom.cpp', 'tests/test_model2_scsp.cpp', 'tests/test_video_gpu_storage.cpp', 'tests/test_video_compact.cpp', '.github/workflows/ps2.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -19,6 +19,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_ps2*.py' -v
       - name: Run the portable presentation and controller smoke test
         run: python3 platform/ps2/build_ps2.py smoke --output build/ps2-ci
+      - name: Verify the native rewrite source boundary without arcade runtime
+        run: python3 platform/ps2/build_ps2.py smoke --target native-port --output build/ps2-native-ci
   ee-cross-build:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -40,5 +42,9 @@ jobs:
         run: python3 platform/ps2/build_ps2.py build --backend docker --container-platform linux/amd64 --output build/ps2-ci --jobs 2
       - name: Inspect EE entry point and static RAM footprint
         run: python3 platform/ps2/build_ps2.py report --backend docker --container-platform linux/amd64 --output build/ps2-ci
+      - name: Cross-link the original IOP SPU2 PCM fixture
+        run: python3 platform/ps2/build_ps2.py build --target audio-fixture --backend docker --container-platform linux/amd64 --output build/ps2-audio-ci --jobs 2
+      - name: Enforce the native rewrite boundary and cross-link its bootstrap
+        run: python3 platform/ps2/build_ps2.py build --target native-port --backend docker --container-platform linux/amd64 --output build/ps2-native-ci --jobs 2
       # No ROMs, generated game core, signing secrets or artifact publication.
       # This job proves cross-linking; console execution is a separate test.

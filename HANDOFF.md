@@ -1,5 +1,173 @@
 # Handoff
 
+## Native PS2 rewrite boundary and hardware foundations (2026-10-23)
+
+The current direction is a complete native PS2 reimplementation. The previous
+translated machine remains a separate reference target, not the architecture
+of the new game. This is an explicit PS2 exception in the design document.
+`native-port` must not link generated i960/TGP/68000 code, interpreters, Model 2
+buses/devices/scheduling, SCSP/DSP or the arcade frame adapter. Keep future
+recovery tools and asset conversion offline. Do not turn the reference probe
+back into the main port or substitute generic invented driving physics.
+
+The native target has a fixed source inventory, transitive include checks,
+forbidden-symbol checks and a source-drift guard after linking. It rejects
+core manifests, generated/build source, symlink escapes and opaque include
+macros. The independent renderer accepts native vertices/materials and packed
+four-bit textures. It shares only direct PS2 platform facilities: GS/GIF,
+validated final XYZ packing on VU0, controller state and original IOP PCM
+transport. `pad_state.h` separates physical input from cabinet/runtime types.
+CI now cross-links both the native bootstrap and the original audio fixture.
+
+The bootstrap displays original diagnostic geometry and a readable 40-column,
+23-line architecture page. Select + Start toggles the page and consumes both
+buttons until both are released. The left stick moves diagnostic geometry;
+Cross gates an original quiet 440 Hz tone. Audio refill follows the 48 kHz IOP
+queue, not display cadence: the maximum 1,412 input frames fit the 2,048-frame
+buffer. This is not a playable game or a game-performance benchmark.
+
+The frozen native-003 ELF is
+c8e4ae54b132df5ab75ab0dc103ee131a6de4592328c8c76c669ceac31d45eb6.
+Its file occupies 2,020,964 bytes, PT_LOAD residency is 445,480 bytes, and
+32,060,376 bytes remain above the load high-water mark for heap/stack. Dynamic
+allocations are not included. All 24 project source/header hashes match its
+build report. Both native-002 and the final native-003 ran for 17 seconds in Play
+0.72: readable page, two submitted triangles, PCM transport initialized and
+zero sampled underrun frames through frame 960 in the final run. Its 2,457,600-tick steady
+diagnostic loops equal one modeled 60 Hz display interval; this says nothing
+about completed-game speed or physical-console performance. Captures and logs
+are in build/ps2/emulator/native-bootstrap-{002,003}-*.
+
+Two independently authored native leaves now use typed value objects:
+
+- `race_progress` decrements a positive signed countdown and increments two
+  wrapping counters plus selected entries in two 64-entry banks. Invalid
+  native indices reject atomically. All 32,768 private original-program cases
+  match, covering 735,250 instructions and 163,840 ordered writes; fingerprint
+  5acab57d56227b63. Actual lap meaning and call cadence remain unproven.
+- `car_pose` publishes twenty raw payload words, an opaque progress word and
+  the observed flag merge into a distinct render pose. All 65,536 flag-byte
+  pairs with randomized payloads match 3,670,016 original instructions and
+  1,572,864 writes; fingerprint f77a27e7080bcf13. This does not establish axis
+  conventions, numeric interpretation, geometry transforms or car physics.
+
+Both compare complete surrounding memory against the owner's verified
+Revision B program, SHA256 bcea5800ff9ec4a2cb0feb69f667f6cceb1aa033eff7fc68d74642316de16439.
+Portable tests and sanitizers pass. The native target compiles the modules but
+does not invent a gameplay caller; unused functions may be linker-eliminated.
+The host oracle/interpreter stays outside that target. Contracts, original
+function hashes, offsets and reproducible commands live beside the native
+sources. Private evidence is under build/ps2-native-{progress,pose}-oracle-001.
+Both standalone native EE fixtures also executed in Play: 121 progress
+boundary/rejection checks plus repeated updates, and all 65,536 pose flag
+pairs. ELF/source/log identities are bound by
+build/ps2-native-leaves-ee-validation-001/result.json. These are emulated-EE
+tests, not physical-console or connected-gameplay validation.
+
+Next in order: recover and compare car integration, collision/course data and
+camera math; convert private assets into native layouts; connect a validated
+race loop, opponents, menus and native sound events. Candidate function leads
+are car update 0x2bcf0, yaw 0x2f3c0, motion 0x304f0, integration 0x2cce0,
+contact 0x2f8a0, velocity 0x30e00, camera 0x1fdc0 and spline pose 0x422b0.
+These are leads, not recovered contracts. Earlier lifted null guards and
+nonfinite workarounds are not original-program ground truth. Complete-course
+replays and physical PS2 tests remain necessary. VU1 is inactive; VU0 currently
+packs final coordinates only, with no TGP/transform offload claim.
+
+### Reference probe work preserved from before the native pivot
+
+The direct GS path replaces shaded RGBA texture uploads with indexed PSMT4
+textures and independent CLUTs in the same 512 KiB cache budget. A captured
+Lancia scene at frame 1634 drops texture traffic from 84,713,472 to 560,128
+bytes plus 7,680 cold palette bytes; frame 1357 drops 93,134,848 to 1,016,832
+bytes plus 8,768 palette bytes. Both preserve all 2,073,288 viewport pixels
+of the earlier native GS renderer. Emulator render measurements improve by
+8.95 and 6.48 times respectively; these are neither full-game speed nor
+physical-hardware measurements. The nearest GS result is still different
+from the CPU reference: MAE 12.2414 and 7.5407 out of 255 respectively.
+Evidence: build/ps2-gs-indexed-001/real-scene-validation.json.
+
+Strip uploads reduce staging from 768 KiB to 64 KiB. Compact layers reuse two
+existing video buffers; lazy CPU raster saves 1,310,720 bytes until needed.
+Fallback composes captured layers with the reference's cached geometry frame
+instead of rereading live tile state. All 1,634 continuous host frame records
+match the existing reference CSV, SHA256
+e4ac3d14e3849d118febc2eb85e4062c3741022fd8e02da7a4f2bca48c74f9cd.
+Scalar and VU0 final packing match 295,872 tested components and both captured
+real-scene images exactly. Three native/debug/reference/status/fallback cycles
+also preserve all viewport pixels and caches; evidence is under
+build/ps2-native-transitions-002. DMA ownership is explicit; timeout/recovery
+and useful preparation/transfer overlap remain unimplemented.
+
+An original bounded IOP RPC server sends PCM through open SDK libsd to SPU2.
+It has a 16 KiB queue and 4 KiB DMA buffer, zero-fills underruns, and resamples
+44.1 kHz input to 48 kHz using integer phase. No audsrv code is copied. The
+separate reference target can now enable paged 68000/SCSP sound. A 16.528-second
+original UART replay matches all 728,884 stereo frames with zero drops;
+22,784 scalar samples are nonzero. The ROM-free SPU2 test consumed 48,001
+nonzero frames, but also recorded 56,959 underrun silence frames. The native
+rewrite reuses transport only, not that arcade sound implementation.
+
+The frozen combined reference/audio ELF is
+26920bb516df0728c71c8b2b1666fc4edeb482c5d954a289879a56925ff727d4,
+with 17,764,288 resident bytes and a 14,741,568-byte heap/stack ceiling. Its
+50-second Play run matched all seven host checkpoint fields at frames 1–3,
+but frame 3 took about 4,178 ms and the audio queue mostly delivered silence.
+Known allocation was 11,954,632 bytes in a 12,259,392-byte arena, not a peak.
+This established integration, not acceptable gameplay/audio speed. Later
+debug-only reference-main edits are not represented by that frozen ELF.
+
+The reference board clock now caches the earliest event deadline while
+preserving callback order, equality, UINT64_MAX, reentry and exception rules.
+Boundary tests, 12,000 random operations, sanitizers and all 1,634 host records
+match. The no-event EE microbenchmark improves about 2.5–2.9 times; no broader
+game speed claim follows. Further scheduler optimization stopped at the
+native-rewrite pivot.
+
+### Findings not to re-propose
+
+- Tiny overlays are illegible on the PS2 output. Keep the large optional page
+  and printable logs; turning it off must refresh even during a black boot.
+- Keying textures by shading uploads tens of megabytes per scene. Keep index
+  identity separate from CLUT identity. The small fixture uses 512 index plus
+  128 palette bytes: 640 bytes, not the initially reported 576.
+- Play's macOS OpenGL backend did not implement the needed destination-alpha
+  behavior. Vulkan restores the expected checker result with the same ELF;
+  this is an emulator backend, not a Vulkan dependency in the PS2 program.
+- Play may capture the previous submission. Present the final scene again
+  before comparing it; the final transition regression then matches exactly.
+- Compact fallback initially differed at host frame 325 because it recomposed
+  live tile state and discarded cached geometry. Reusing the saved layers and
+  once-per-geometry raster fixes that specific divergence and the full replay.
+- Add GS origin before VU conversion to fixed point; adding it after truncation
+  is wrong for negative fractions. Do not infer IEEE arithmetic parity.
+- A benchmark callback captured too much state and measured allocation cost.
+  Only the corrected no-event result is used; the revised recurring-event
+  fixture is compiled but not claimed executed.
+- A per-display fixed sample count drifts across PAL/NTSC. Queue-based refill
+  fixes diagnostic pacing, but long render stalls can still underrun. RPC
+  queue-full waits are bounded; a completely stuck synchronous SIF RPC is not.
+- Source identities taken only before compilation can become stale during
+  parallel edits. The build now rejects input drift after linking.
+- The supplied PS2 Linux index led to the public Sony-authored programming
+  guide and Toshiba TX79 manual. The latter describes related C790 hardware,
+  not an interchangeable EE: its cache/FPU properties must not become PS2
+  constants. Public Linux development advice supports explicit DMA ownership
+  and concurrent VU work, not a Linux runtime dependency. A subsequent explicit
+  instruction requested all manuals from the named collection. The local-study
+  exception is recorded in rules.md; all 16 PDFs, controller spec and README
+  (17,971,685 bytes; 2,470 PDF pages) are downloaded and searchable locally.
+  The repository clone is under ignored build/ps2/references and excluded from
+  VS Code repository discovery. Manuals and extracts are not redistributed.
+  References and limits are in the hardware notes.
+
+Final local checks pass: 56 PS2 tests, 13 source-release-gate tests, portable
+smoke fingerprint 7fc55e0bfbc7af31 and the native source-boundary smoke. The
+native smoke checks dependencies only; it explicitly does not execute the ELF.
+
+All ROMs, generated game C++, private oracle data, captures, IRX/ELF files and
+build reports remain ignored local artifacts. No PS2 game release is ready.
+
 ## PlayStation 2 architecture and game-core bring-up (2026-10-23)
 
 The experimental `port/ps2` branch adds an open-PS2SDK host with direct GS/GIF

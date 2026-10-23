@@ -60,6 +60,12 @@ legal problem, or hours re-deriving something already established.
    search result or repository turns out to contain it, close it and say so.
    Everything here comes from our own analysis of legally owned ROMs, MAME,
    public documentation, and the hardware.
+   The explicitly requested PS2 hardware-manual study is a narrow exception:
+   documents in `DarrenRainey/PS2-Programming-Docs` may be downloaded and
+   consulted locally for the native PS2 port. This does not authorize importing
+   SDK implementation code or redistributing the manuals in this repository.
+   Keep the collection and searchable extracts under ignored `build/ps2/docs`;
+   record hardware findings and their validation separately.
 9. **Every third-party component is recorded** in `THIRD_PARTY.md` with its
    upstream URL, commit, licence and what was changed. "Copied from MAME" is
    not a record; a commit hash is. **Check licence compatibility before

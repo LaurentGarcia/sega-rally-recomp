@@ -63,10 +63,12 @@ an original touch interface with a safe-area-aware Pit Stop menu. See the
 [iPhone build guide and current limits](docs/iphone.md). It is not an App Store
 or TestFlight release.
 
-**PlayStation 2 development:** an experimental homebrew port uses direct GS/DMA,
-DualShock input and a bounded ROM cache. The hardware bring-up and actual-game
-core probe are separate targets; neither is a finished PS2 player. See the
-[PS2 architecture, build instructions and validation limits](docs/ps2.md).
+**PlayStation 2 development:** a [native rewrite](docs/ps2-native-rewrite.md)
+targets the EE, VU, GS and IOP/SPU2 directly. Its independent bootstrap excludes
+the arcade CPU and device models; two recovered game routines have passed
+private original-program comparisons. Physics, collision and the race loop
+remain to be migrated. The translated game-core probe stays a separate
+behavioral reference. See the [PS2 build guide and limits](docs/ps2.md).
 
 `v0.1.0-rc.1` remains a separate experimental source prerelease. Developers can
 use the [source build guide](docs/getting-started.md#build-from-source-instead).

@@ -367,6 +367,15 @@ guest addresses and bytes, independently of platform-specific speed options.
 EE/VU optimization and IOP/SPU2 audio require measured validation. The current
 scope and build commands are in [PS2 development](ps2.md).
 
+The subsequent PS2 direction is a native game rewrite with no arcade CPU,
+device or bus emulation in the shipping executable. The translated Model 2
+machine remains a separate offline oracle. The new target has a fixed source
+boundary, typed game systems, native asset formats and direct PS2 hardware
+adapters. Independent semantic implementations are checked against original
+behavior before integration; generic replacement physics is not a fidelity
+substitute. This is an explicit PS2 exception to the generated-game runtime
+architecture above; see [native rewrite](ps2-native-rewrite.md).
+
 **Rally distribution update, 15 October 2026.** The requested deliverable is a
 prebuilt game executable, rather than a compiler bootstrap requiring developer
 tools. Its original runtime importer verifies the player's ZIP and prepares

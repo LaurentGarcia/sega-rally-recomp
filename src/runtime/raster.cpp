@@ -109,9 +109,9 @@ struct Raster::Extra {
 #endif
 };
 
-#ifdef M2_DC_MEMORY
-// The Dreamcast: the CPU rasterizer's buffers (1.25 MB) only once it renders
-// (the PVR draws the 3D there).
+#if defined(M2_DC_MEMORY) || defined(M2_COMPACT_TILEMAP)
+// Hardware-rendered targets need the CPU buffers only for reference rendering
+// or a rejected native frame. Delay the 1.25 MiB allocation until that work.
 Raster::Raster() {
 #else
 Raster::Raster() : dest_(512 * 512), fill_(512 * 512) {
@@ -137,7 +137,7 @@ uint64_t Raster::hash(int minx, int maxx, int miny, int maxy) const {
     uint64_t h = 0xcbf29ce484222325ULL;
     for (int y = miny; y <= maxy; y++)
         for (int x = minx; x <= maxx; x++) {
-            const u32 px = dest_[size_t(y) * size_t(stride_) + size_t(x)];
+            const u32 px = dest_.empty() ? 0 : dest_[size_t(y) * size_t(stride_) + size_t(x)];
             for (int b = 0; b < 4; b++) {
                 h ^= (px >> (8 * b)) & 0xff;
                 h *= 0x100000001b3ULL;
@@ -149,7 +149,7 @@ uint64_t Raster::hash(int minx, int maxx, int miny, int maxy) const {
 void Raster::render(const std::vector<GeoPoly> &polys, int windows, const VideoMem &mem, int crtc_x, int crtc_y,
                     int render_x, int render_y, int clip_minx, int clip_maxx, int clip_miny, int clip_maxy) {
     mem_ = &mem;
-#ifdef M2_DC_MEMORY
+#if defined(M2_DC_MEMORY) || defined(M2_COMPACT_TILEMAP)
     if (dest_.empty()) {
         dest_.assign(size_t(stride_) * 512, 0u);
         fill_.assign(size_t(stride_) * 512, u8(0));

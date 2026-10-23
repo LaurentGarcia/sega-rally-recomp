@@ -17,6 +17,7 @@
 // Timer attosecond delays round upward to ns; recurring sample phase uses
 // an absolute rational index and never accumulates rounded periods.
 #include "runtime/model2_scsp.h"
+#include "runtime/scsp_pan_table.h"
 #include "runtime/model2_scsp_dsp.h"
 #include <algorithm>
 #include <cmath>
@@ -250,8 +251,7 @@ struct Model2Scsp::Impl {
 
 	s32 m_EG_TABLE[0x400];
 
-	int m_LPANTABLE[0x10000];
-	int m_RPANTABLE[0x10000];
+	ScspPanTable m_PANTABLE;
 
 	int m_TimPris[3];
 	int m_TimCnt[3];
@@ -435,8 +435,6 @@ struct Model2Scsp::Impl {
 	std::fill(std::begin(m_RINGBUF), std::end(m_RINGBUF), 0);
 	std::fill(std::begin(m_MidiStack), std::end(m_MidiStack), 0);
 	std::fill(std::begin(m_MidiOutStack), std::end(m_MidiOutStack), 0);
-	std::fill(std::begin(m_LPANTABLE), std::end(m_LPANTABLE), 0);
-	std::fill(std::begin(m_RPANTABLE), std::end(m_RPANTABLE), 0);
 	std::fill(std::begin(m_TimPris), std::end(m_TimPris), 0);
 	std::fill(std::begin(m_ARTABLE), std::end(m_ARTABLE), 0);
 	std::fill(std::begin(m_DRTABLE), std::end(m_DRTABLE), 0);
@@ -792,8 +790,8 @@ void Model2Scsp::Impl::init()
 		else
 			fSDL = 0.0;
 
-		m_LPANTABLE[i] = FIX((4.0f * LPAN * TL * fSDL));
-		m_RPANTABLE[i] = FIX((4.0f * RPAN * TL * fSDL));
+		m_PANTABLE.set(uint16_t(i), FIX((4.0f * LPAN * TL * fSDL)),
+		               FIX((4.0f * RPAN * TL * fSDL)));
 	}
 
 	m_ARTABLE[0] = m_DRTABLE[0] = 0;    //Infinite time
@@ -1398,12 +1396,12 @@ inline s32 Model2Scsp::Impl::UpdateSlot(SCSP_SLOT *slot)
 		if (!SDIR(slot))
 		{
 			u16 Enc = ((TL(slot)) << 0x0) | (0x7 << 0xd);
-			*m_RBUFDST = (sample * m_LPANTABLE[Enc]) >> (SHIFT + 1);
+			*m_RBUFDST = (sample * m_PANTABLE.left(Enc)) >> (SHIFT + 1);
 		}
 		else
 		{
 			u16 Enc = (0 << 0x0) | (0x7 << 0xd);
-			*m_RBUFDST = (sample * m_LPANTABLE[Enc]) >> (SHIFT + 1);
+			*m_RBUFDST = (sample * m_PANTABLE.left(Enc)) >> (SHIFT + 1);
 		}
 	}
 
@@ -1442,12 +1440,12 @@ void Model2Scsp::Impl::DoMasterSamples(Stream &stream)
 				// near-silence.)
 				u16 eff_tl = SDIR(slot) ? 0 : TL(slot);
 				Enc = ((eff_tl) << 0x0) | ((IMXL(slot)) << 0xd);
-				m_DSP.SetSample((sample*m_LPANTABLE[Enc]) >> (SHIFT-2), ISEL(slot), IMXL(slot));
+				m_DSP.SetSample((sample*m_PANTABLE.left(Enc)) >> (SHIFT-2), ISEL(slot), IMXL(slot));
 				u16 dir_tl = SDIR(slot) ? 0 : TL(slot);
 				Enc = ((dir_tl) << 0x0) | ((DIPAN(slot)) << 0x8) | ((DISDL(slot)) << 0xd);
 				{
-					smpl += (sample * m_LPANTABLE[Enc]) >> SHIFT;
-					smpr += (sample * m_RPANTABLE[Enc]) >> SHIFT;
+					smpl += (sample * m_PANTABLE.left(Enc)) >> SHIFT;
+					smpr += (sample * m_PANTABLE.right(Enc)) >> SHIFT;
 				}
 			}
 
@@ -1470,8 +1468,8 @@ void Model2Scsp::Impl::DoMasterSamples(Stream &stream)
 			if (EFSDL(slot))
 			{
 				u16 Enc = ((EFPAN(slot)) << 0x8) | ((EFSDL(slot)) << 0xd);
-				smpl += (m_DSP.EFREG[i] * m_LPANTABLE[Enc]) >> SHIFT;
-				smpr += (m_DSP.EFREG[i] * m_RPANTABLE[Enc]) >> SHIFT;
+				smpl += (m_DSP.EFREG[i] * m_PANTABLE.left(Enc)) >> SHIFT;
+				smpr += (m_DSP.EFREG[i] * m_PANTABLE.right(Enc)) >> SHIFT;
 			}
 		}
 
@@ -1482,8 +1480,8 @@ void Model2Scsp::Impl::DoMasterSamples(Stream &stream)
 			u16 Enc = EFSDL(slot) ? ((EFPAN(slot)) << 0x8) | ((EFSDL(slot)) << 0xd) : (((DIPAN(slot)) << 0x8) | ((DISDL(slot)) << 0xd));
 			{
 				m_DSP.EXTS[i] = s32(stream.get(i, s) * 32768.0);
-				smpl += (m_DSP.EXTS[i] * m_LPANTABLE[Enc]) >> SHIFT;
-				smpr += (m_DSP.EXTS[i] * m_RPANTABLE[Enc]) >> SHIFT;
+				smpl += (m_DSP.EXTS[i] * m_PANTABLE.left(Enc)) >> SHIFT;
+				smpr += (m_DSP.EXTS[i] * m_PANTABLE.right(Enc)) >> SHIFT;
 			}
 		}
 

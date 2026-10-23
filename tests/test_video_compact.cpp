@@ -1,6 +1,7 @@
 // Deterministic CPU compositor differential: normal/window/split modes,
 // line scrolling, both categories, transparent pens, wraps and RAM changes.
 #include "runtime/video.h"
+#include <cassert>
 #include <cstdio>
 #include <vector>
 
@@ -40,6 +41,20 @@ int main() {
                     video.tile_memory_w(); video.character_memory_w();
                     video.set_wide_margin(wide ? 40 : 0);
                     video.frame_start(); video.screen_update(polygons, 0, memory);
+#ifdef M2_COMPACT_TILEMAP
+                    if (!wide) {
+                        const auto reference = video.screen();
+                        video.set_compact_external_3d(true);
+                        video.frame_start(); video.screen_update(polygons, 0, memory);
+                        const auto &back = video.background_layer(), &front = video.foreground_layer();
+                        assert(back.size() == reference.size() && front.size() >= reference.size());
+                        for (size_t pixel = 0; pixel < reference.size(); ++pixel)
+                            assert((front[pixel] ? front[pixel] : back[pixel]) == reference[pixel]);
+                        video.render_compact_reference();
+                        assert(video.compact_external_3d() && video.screen() == reference);
+                        video.set_compact_external_3d(false);
+                    }
+#endif
                     std::printf("%u,%016llx\n", ++frame, static_cast<unsigned long long>(video.screen_hash()));
                 }
 }

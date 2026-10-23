@@ -41,6 +41,11 @@ public:
 };
 
 struct Cpu68k {
+    // A supplied board bus owns its RAM; only the original Model 1 map needs
+    // the legacy 64 KiB allocation. The bus must remain installed for life.
+    explicit Cpu68k(AddressSpace *address_space = nullptr)
+        : ram(address_space ? 0 : 0x10000, 0), bus(address_space) {}
+
     uint32_t d[8] = {}, a[8] = {};
     uint32_t other_sp = 0;          // USP while supervisor, SSP while user
     uint32_t pc = 0;
@@ -49,7 +54,7 @@ struct Cpu68k {
     int irq_line = 0;               // level asserted on IPL (autovectored)
     bool nmi_pending = false;       // host records a transition to level7
 
-    std::vector<uint8_t> ram = std::vector<uint8_t>(0x10000, 0); // 0xf00000-0xf0ffff
+    std::vector<uint8_t> ram; // 0xf00000-0xf0ffff
     const uint8_t *rom = nullptr;   // 0x000000-0x03ffff, big-endian bytes; 0x080000-0x09ffff mirrors 0x020000
     Devices *dev = nullptr;
     AddressSpace *bus = nullptr;   // caller-owned; must outlive this CPU

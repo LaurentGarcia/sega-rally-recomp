@@ -87,6 +87,10 @@ void Video::ensure_gpu_buffers() {
 }
 
 void Video::set_external_3d(bool enabled, bool desktop) {
+#ifdef M2_COMPACT_TILEMAP
+    if (compact_external_3d_) render_done_ = false;
+    compact_external_3d_ = false;
+#endif
     if (enabled == external_3d_ && desktop == desktop_) return;
     external_3d_ = enabled;
     desktop_ = desktop;
@@ -121,6 +125,41 @@ void Video::set_external_3d(bool enabled, bool desktop) {
 }
 
 #ifdef M2_COMPACT_TILEMAP
+void Video::set_compact_external_3d(bool enabled) {
+    if (enabled == compact_external_3d_) return;
+    if (enabled) {
+        set_external_3d(false);
+        if (margin_) set_wide_margin(0);
+    }
+    compact_external_3d_ = enabled;
+    render_done_ = false;
+}
+
+void Video::render_compact_reference() {
+    if (!compact_external_3d_ || !gpu_polys_ || compact_reference_done_) return;
+    // The tile layers have already been composed at screen-update time.
+    // Re-reading live tile/palette memory here can observe a later bus write.
+    // Keep the reference's once-per-geometrizer-frame raster cache as well.
+    profile_ = {};
+    if (!render_done_ && !gpu_polys_->empty()) {
+        const auto before = ticks();
+        raster_.render(*gpu_polys_, gpu_windows_, gpu_mem_, crtc_x_, crtc_y_,
+                       render_x_, render_y_, 0, W - 1, 0, H - 1);
+        profile_.raster = ticks() - before;
+        render_done_ = true;
+    }
+    const auto before = ticks();
+    for (int y = 0; y < H; ++y)
+        for (int x = 0; x < W; ++x) {
+            const auto at = size_t(y) * W + size_t(x);
+            if (render_done_)
+                if (const auto p = raster_.pixels()[size_t(y) * size_t(raster_.stride()) + size_t(x)]) screen_[at] = p;
+            if (sys24_[at]) screen_[at] = sys24_[at];
+        }
+    profile_.composite = ticks() - before;
+    compact_reference_done_ = true;
+}
+
 void Video::tile_row(int layer, int y, const uint16_t *&pixels, const uint8_t *&flags) {
     y &= 511;
     if (external_3d_) {
@@ -1020,6 +1059,18 @@ void Video::screen_update(const std::vector<GeoPoly> &polys, int windows, const 
     }
 #endif
     rendered_now_ = false;
+#ifdef M2_COMPACT_TILEMAP
+    if (compact_external_3d_) {
+        // Preserve the exact CPU tile layers around native hardware 3D. The
+        // existing two buffers are sufficient; no full-plane GPU copies.
+        before = ticks();
+        std::fill(sys24_.begin(), sys24_.end(), 0u);
+        for (int layer = 3; layer >= 0; --layer) draw(sys24_, (layer << 1) | 1, 0);
+        profile_.tile_draw += ticks() - before;
+        compact_reference_done_ = false;
+        return;
+    }
+#endif
     if (external_3d_) {
         // Save the exact two System-24 layers separately. The Vita frontend
         // draws background -> GPU 3D -> foreground. No CPU polygon pixels are
@@ -1225,6 +1276,9 @@ void Video::fill_margins() {
 }
 
 void Video::set_wide_margin(int margin) {
+#ifdef M2_COMPACT_TILEMAP
+    if (compact_external_3d_) margin = 0;
+#endif
 #ifdef M2_VITA_RENDER_OPT
     margin = std::clamp(margin, 0, 200);
 #else

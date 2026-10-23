@@ -11,7 +11,7 @@ binary pin; separately observed repository heads do not establish which
 source revision built every installed library.
 
 [PS2SDK](https://github.com/ps2dev/ps2sdk) supplies draw, graph, DMA, packet,
-controller, fileXio and embedded IOP modules. The installed SDK `LICENSE` is
+controller, fileXio, open libsd/freesd audio and embedded IOP modules. The installed SDK `LICENSE` is
 AFL-2.0, SHA256
 `1ecee940922a6886baccddd9133d17f1ce677d32c5a954fac8e48224f2766fe8`.
 The inspected public API/source reference is
@@ -21,6 +21,10 @@ copied into the project's BSD source. Binary distributions must retain the
 SDK license and source reference. Our source license does not replace its
 terms. Open IOP modules are embedded locally with the SDK's `bin2c` tool;
 generated module arrays and resulting ELFs remain outside source Git.
+The PCM queue/RPC server in `platform/ps2/iop` is original code using that
+public libsd API. It does not link or copy audsrv. The public gsKit texture
+implementation at `8ef73d05f022d14b3ded7c70cba670fe333ed61a` was consulted for
+PSMT4 CLUT transfer layout only; no gsKit code or dependency was added.
 
 PS2dev build scripts at observed
 [`594e2b21863a574e1923927f6349cceb87c88109`](https://github.com/ps2dev/ps2dev/tree/594e2b21863a574e1923927f6349cceb87c88109)
