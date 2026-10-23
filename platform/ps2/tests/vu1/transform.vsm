@@ -1,0 +1,63 @@
+; Original numerical fixture. No drawing, game data or SDK sample code.
+; Bank offsets in qwords: matrix0..3, scale4, offset5, count6, returned TOP7,
+; positions8..103, clip104..199, perspective200..295, fixed296..391.
+        .vu
+        .align 4
+        .global fixture_vu1_begin
+        .global fixture_vu1_end
+        .global fixture_vu1_dual
+        .global fixture_vu1_repeat2
+fixture_vu1_begin:
+        nop                         iaddiu vi07,vi00,1
+fixture_iteration:
+        nop                         xtop vi01
+        nop                         lq vf01,0(vi01)
+        nop                         lq vf02,1(vi01)
+        nop                         lq vf03,2(vi01)
+        nop                         lq vf04,3(vi01)
+        nop                         lq vf05,4(vi01)
+        nop                         lq vf06,5(vi01)
+        nop                         ilw.x vi06,6(vi01)
+        nop                         isw.x vi01,7(vi01)
+        nop                         iaddiu vi02,vi01,8
+        nop                         iaddiu vi03,vi01,104
+        nop                         iaddiu vi04,vi01,200
+        nop                         iaddiu vi05,vi01,296
+        nop                         ibeq vi06,vi00,fixture_done
+        nop                         nop
+fixture_vertex:
+        nop                         lqi vf10,(vi02++)
+        mulax.xyzw ACC,vf01,vf10x    nop
+        madday.xyzw ACC,vf02,vf10y   nop
+        maddaz.xyzw ACC,vf03,vf10z   nop
+        maddw.xyzw vf11,vf04,vf10w   nop
+        nop                         div Q,vf00w,vf11w
+        nop                         sqi vf11,(vi03++)
+        nop                         waitq
+        mulq.xyzw vf12,vf11,Q       nop
+        mul.xyzw vf13,vf12,vf05     sqi vf12,(vi04++)
+        add.xyzw vf13,vf13,vf06     iaddi vi06,vi06,-1
+        ftoi4.xyzw vf14,vf13        nop
+        nop                         sqi vf14,(vi05++)
+        nop                         ibne vi06,vi00,fixture_vertex
+        nop                         nop
+        nop                         iaddi vi07,vi07,-1
+        nop                         nop
+        nop                         ibne vi07,vi00,fixture_iteration
+        nop                         nop
+fixture_done:
+        nop[e]                      nop
+        nop                         nop
+; Artificial, bounded cooperation workload, not a game performance kernel.
+; Play 0.72 drains short microprograms synchronously at launch. Repeating the
+; exact transform lets the EE observe pending VU1 work while exercising VU0.
+fixture_vu1_dual:
+        nop                         iaddiu vi07,vi00,1024
+        nop                         b fixture_iteration
+        nop                         nop
+fixture_vu1_repeat2:
+        nop                         iaddiu vi07,vi00,2
+        nop                         b fixture_iteration
+        nop                         nop
+fixture_vu1_end:
+        .align 4

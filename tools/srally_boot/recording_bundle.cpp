@@ -24,7 +24,14 @@ void valid_hash(const std::string &s) {
 std::array<bool, 10> bits(const Machine::Options &o) {
     return {o.tgp,o.io,o.comm,o.control,o.video,o.screen,o.uart,o.external_video,o.sound,o.instruction_boundary_hook};
 }
-Machine::Options options(const std::array<bool, 10> &b) { return {b[0],b[1],b[2],b[3],b[4],b[5],b[6],b[7],b[8],b[9]}; }
+Machine::Options options(const std::array<bool, 10> &b) {
+    // The v1 format has ten named flags, independent of Options member order.
+    Machine::Options o;
+    o.tgp=b[0];o.io=b[1];o.comm=b[2];o.control=b[3];o.video=b[4];
+    o.screen=b[5];o.uart=b[6];o.external_video=b[7];o.sound=b[8];
+    o.instruction_boundary_hook=b[9];
+    return o;
+}
 auto image_refs(const Machine::Images &i) {
     return std::array<const std::vector<uint8_t> *, 8>{&i.program,&i.main_data,&i.tgp_tables,&i.copro_data,&i.polygons,&i.textures,&i.sound_program,&i.sound_samples};
 }
@@ -33,6 +40,7 @@ auto image_refs(Machine::Images &i) {
 }
 void config(const Machine::Options &o) {
     if (!(o.io && o.screen && o.video && o.tgp && o.control) || (o.sound && !o.uart)) fail("unsupported recording Machine configuration");
+    if (o.sound_buffer_frames != Machine::kAudioRate) fail("v1 recording requires the default sound buffer capacity");
     static_assert(sizeof(float) == 4 && std::numeric_limits<float>::is_iec559);
     if (std::endian::native != std::endian::little) fail("PCM format requires little-endian IEEE binary32");
 }
@@ -206,7 +214,12 @@ std::vector<uint8_t> read_bounded(const std::filesystem::path &path,uint64_t max
 }
 struct StartupIdentity::Data { Manifest manifest; std::vector<uint8_t> assets; };
 StartupIdentity identify_startup(const Machine::Images &images,Machine::Options opts,std::span<const uint8_t> assets,const std::filesystem::path &exe) {
-    config(opts);if(assets.empty()||assets.size()>REPORT_LIMIT)fail("assets report is missing/oversize");
+    config(opts);
+    if(images.sound_rom)fail("v1 recording cannot identify an external sound image provider");
+#ifdef M2_PAGED_ROM
+    if(images.rom)fail("v1 recording cannot identify an external ROM provider");
+#endif
+    if(assets.empty()||assets.size()>REPORT_LIMIT)fail("assets report is missing/oversize");
     auto data=std::make_shared<StartupIdentity::Data>();data->manifest.opts=opts;data->assets.assign(assets.begin(),assets.end());
     data->manifest.assets=digest(assets);data->manifest.executable=digest_file(exe,EXECUTABLE_LIMIT);
     uint64_t total=0;const auto refs=image_refs(images);

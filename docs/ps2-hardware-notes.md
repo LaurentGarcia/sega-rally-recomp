@@ -65,6 +65,9 @@ collection is recorded as a narrow local-study exception in rules.md. All 16
 PDFs, the controller specification and README were downloaded and made
 searchable; the source repository is cloned under ignored build/ps2/references.
 No manual or SDK implementation is included in the public source tree.
+The [architecture study](ps2-architecture-study.md) binds the clone revision,
+lists every document and records the resulting implementation and validation
+decisions.
 
 ## Keep texture indices resident; shade with CLUTs
 

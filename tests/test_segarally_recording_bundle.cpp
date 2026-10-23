@@ -12,6 +12,9 @@
 namespace {
 namespace rec=srally::recording;namespace hi=srally::host_input;
 using Machine=rt::Model2AMachine;unsigned checks=0;uint64_t generated_calls=0;
+constexpr Machine::Options legacy_flags{true,true,false,true,true,true,true,true,true,true};
+static_assert(legacy_flags.sound&&legacy_flags.instruction_boundary_hook&&legacy_flags.sound_buffer_frames==44100,
+              "new options must preserve the original ten-boolean aggregate contract");
 constexpr uint32_t FRAME_END=(rt::Model2AScreen::FRAME_NS+rt::Model2AScreen::VBLANK_NS)/40;
 void require(bool b,const char*s){++checks;if(!b)throw std::runtime_error(s);}
 template<class F>void rejects(F f){bool bad=false;try{f();}catch(const std::exception&){bad=true;}require(bad,"invalid recording accepted");}
@@ -57,9 +60,48 @@ void capture(Fixture&f,bool sound,unsigned fault=0){
     if(sound&&!fault)require(nonzero>0,"coupled SCSP test PCM was entirely silent");
     if(!fault)require(m.save_backup()[0]==0x44,"fixture did not mutate final backup");
     writer.finish(m,fault==2?rec::TerminalKind::Fault:fault?rec::TerminalKind::Frontier:rec::TerminalKind::Quit);
+    const auto restored=rec::preflight_bundle(f.bundle,f.data,f.exe).options();
+    require(restored.instruction_boundary_hook==o.instruction_boundary_hook&&restored.sound_buffer_frames==Machine::kAudioRate,
+        "v1 option decoding changed the boundary hook or default audio capacity");
     const auto summary=rec::replay_bundle(f.bundle,f.data,f.exe);
     require(summary.records==(fault?1u:3u)&&summary.frontier==bool(fault)&&summary.terminal==hi::Witness::of(m.stats())&&
         summary.kind==(fault==2?rec::TerminalKind::Fault:fault?rec::TerminalKind::Frontier:rec::TerminalKind::Quit),"same-Machine recording replay summary differs");
+}
+void unsupported_capacity(const std::filesystem::path&exe){
+    for(bool sound:{false,true}){
+        const auto i=images(sound);auto o=options(sound);
+        const std::string assets="{\"scope\":\"synthetic identity_only\"}\n";
+        for(size_t capacity:{size_t(0),size_t(1),size_t(1024),size_t(Machine::kAudioRate+1)}){
+            o.sound_buffer_frames=capacity;
+            rejects([&]{rec::identify_startup(i,o,{reinterpret_cast<const uint8_t*>(assets.data()),assets.size()},exe);});
+        }
+    }
+}
+void external_provider(const std::filesystem::path&exe){
+    struct SoundProvider final:snd::SoundImageSource{
+        mutable unsigned accesses=0;
+        uint32_t size(snd::SoundImage)const override{++accesses;return 0;}
+        uint16_t read16_be(snd::SoundImage,uint32_t)override{++accesses;return 0;}
+    }sound_provider;
+#ifdef M2_PAGED_ROM
+    struct RomProvider final:rt::RomSource{
+        mutable unsigned accesses=0;
+        uint32_t size(rt::RomRegion)const override{++accesses;return 0;}
+        const uint8_t *page(rt::RomRegion,uint32_t)override{++accesses;return nullptr;}
+    }rom_provider;
+#endif
+    const std::string report="{\"scope\":\"synthetic identity_only\"}\n";
+    const std::span<const uint8_t> assets{reinterpret_cast<const uint8_t*>(report.data()),report.size()};
+    for(bool sound:{false,true}){
+        auto i=images(sound);i.sound_rom=&sound_provider;
+        rejects([&]{rec::identify_startup(i,options(sound),assets,exe);});
+        require(sound_provider.accesses==0,"v1 capture must reject unrepresented sound providers without reading them");
+#ifdef M2_PAGED_ROM
+        i.sound_rom=nullptr;i.rom=&rom_provider;
+        rejects([&]{rec::identify_startup(i,options(sound),assets,exe);});
+        require(rom_provider.accesses==0,"v1 capture must reject unrepresented ROM providers without reading them");
+#endif
+    }
 }
 void integrity(Fixture&f,bool sound){
     for(const char*name:{"complete.txt","manifest.txt","resumes.txt","observations.txt","eeprom.initial.bin","backup.initial.bin","eeprom.final.bin","backup.final.bin","assets.json"})f.unchanged_cpu_reject(f.bundle/name);
@@ -141,6 +183,8 @@ void run(Env&e){if(e.s.boundary())return;auto&c=e.c;c.begin_instruction();if(c.p
 namespace rt::tgpgen{extern const uint32_t program_crc32=0,program_words=0;void run(Tgp&,uint64_t){throw TgpFatal("synthetic capture must not execute TGP");}}
 int main(int argc,char**argv){try{
     require(argc>0,"missing executable identity");const auto exe=std::filesystem::canonical(argv[0]);
+    unsupported_capacity(exe);
+    external_provider(exe);
     for(bool sound:{false,true}){Fixture f(exe);capture(f,sound);integrity(f,sound);observation_truth(f,false);}
     {Fixture f(exe);capture(f,true,1);observation_truth(f,true);}{Fixture f(exe);capture(f,true,2);}incomplete(exe);invalid_finish(exe,false);invalid_finish(exe,true);
     std::printf("Recording bundle same-Machine/PCM/seeds/preflight/fault: %u checks passed\n",checks);return 0;

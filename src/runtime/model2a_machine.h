@@ -26,10 +26,11 @@ public:
         bool tgp = true, io = true, comm = true, control = true;
         bool video = true, screen = true, uart = true, external_video = false;
         bool sound = false; // Diagnostic 68000 instruction-boundary timing.
-        size_t sound_buffer_frames = 44100; // Bounded capture; default remains one second.
         // Requires an enabled runtime and separately verified generated chunks.
         // False retains the original one-instruction outer loop for comparison.
         bool instruction_boundary_hook = false;
+        // Append new options to preserve the original ten-boolean aggregate order.
+        size_t sound_buffer_frames = 44100; // Bounded capture; default remains one second.
     };
     enum class Reason { Frame, Budget, MissingCode, DeviceAccess, RuntimeError };
     struct RunResult {

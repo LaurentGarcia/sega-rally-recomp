@@ -8,7 +8,7 @@
 #include <libsd.h>
 #include "pcm_ring.h"
 
-IRX_ID("rally_pcm", 1, 0);
+IRX_ID("rally_pcm", 1, 1);
 static RallyPcmRing ring;
 static int16_t dma_buffer[RALLY_PCM_DMA_FRAMES * 4] __attribute__((aligned(64)));
 static RallyPcmPacket request __attribute__((aligned(16)));
@@ -16,9 +16,15 @@ static RallyPcmReply reply __attribute__((aligned(16)));
 static SifRpcDataQueue_t rpc_queue;
 static SifRpcServerData_t rpc_server;
 static int transfer_sema = -1, audio_tid = -1, started = 0;
+static volatile uint32_t dma_completions, dma_serviced, late_service_events;
 
 static int transfer_done(void *unused) {
     (void)unused;
+    /* The open driver has already rearmed the next half before this callback.
+       If the previous completion is still unserviced, its half was reused
+       before the worker refilled it. Count the observation, not guessed loss. */
+    if (dma_completions != dma_serviced) ++late_service_events;
+    ++dma_completions;
     iSignalSema(transfer_sema);
     return 1;
 }
@@ -30,8 +36,13 @@ static void audio_thread(void *unused) {
         unsigned idle;
         WaitSema(transfer_sema);
         CpuSuspendIntr(&state);
-        idle = 1u - ((sceSdBlockTransStatus(1, 0) >> 24) & 1u);
-        rally_pcm_render(&ring, dma_buffer + idle * RALLY_PCM_DMA_FRAMES * 2);
+        /* A callback can post a second semaphore token before this worker
+           observes the latest half. Never dequeue twice for the same half. */
+        if (dma_serviced != dma_completions) {
+            idle = 1u - ((sceSdBlockTransStatus(1, 0) >> 24) & 1u);
+            rally_pcm_render(&ring, dma_buffer + idle * RALLY_PCM_DMA_FRAMES * 2);
+            dma_serviced = dma_completions;
+        }
         CpuResumeIntr(state);
     }
 }
@@ -42,6 +53,7 @@ static int start_audio(void) {
     int state;
     CpuSuspendIntr(&state);
     rally_pcm_reset(&ring);
+    dma_completions = dma_serviced = late_service_events = 0;
     CpuResumeIntr(state);
     if (started) return 0;
     if (sceSdInit(0) < 0) return -1; // Cold initialization of the open driver.
@@ -60,8 +72,9 @@ static int start_audio(void) {
     sceSdSetParam(1 | SD_PARAM_MVOLR, 0x3fff);
     sceSdSetParam(1 | SD_PARAM_AVOLL, 0x7fff);
     sceSdSetParam(1 | SD_PARAM_AVOLR, 0x7fff);
-    sceSdSetParam(1 | SD_PARAM_BVOLL, 0x3fff);
-    sceSdSetParam(1 | SD_PARAM_BVOLR, 0x3fff);
+    /* Input volume is signed Q15; master direct volume above is signed Q14. */
+    sceSdSetParam(1 | SD_PARAM_BVOLL, 0x7fff);
+    sceSdSetParam(1 | SD_PARAM_BVOLR, 0x7fff);
     sceSdSetTransCallback(1, transfer_done);
     if (sceSdBlockTrans(1, SD_TRANS_WRITE | SD_TRANS_LOOP, (u8 *)dma_buffer, sizeof(dma_buffer), 0) < 0) {
         sceSdSetTransCallback(1, 0); TerminateThread(audio_tid);
@@ -96,6 +109,7 @@ static void *dispatch(int function, void *buffer, int bytes) {
     CpuSuspendIntr(&state);
     reply.queued = ring.queued; reply.consumed = ring.consumed;
     reply.silent_frames = ring.silent_frames; reply.blocks = ring.blocks;
+    reply.late_service_events = late_service_events;
     CpuResumeIntr(state);
     return &reply;
 }

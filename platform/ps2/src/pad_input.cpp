@@ -44,23 +44,43 @@ PadSnapshot PadInput::poll() {
     if (!opened_) return out;
     const int state = padGetState(0, 0);
     if (state != PAD_STATE_STABLE && state != PAD_STATE_FINDCTP1) {
-        if (state == PAD_STATE_DISCONN) requested_analog_ = false;
-        status_ = "CONNECT PAD PORT 1";
+        if (state == PAD_STATE_DISCONN) requested_analog_ = analog_pending_ = false;
+        status_ = analog_pending_ && state == PAD_STATE_EXECCMD ?
+            "WAITING FOR ANALOG MODE" : "CONNECT PAD PORT 1";
         return out;
+    }
+    if (analog_pending_) {
+        const int request = padGetReqState(0, 0);
+        if (request == PAD_RSTAT_BUSY) {
+            status_ = "WAITING FOR ANALOG MODE";
+            return out;
+        }
+        analog_pending_ = false;
+        if (request != PAD_RSTAT_COMPLETE) {
+            status_ = "ANALOG REQUEST RETRY";
+            return out;
+        }
+        requested_analog_ = true;
     }
     if (!requested_analog_) {
         const int count = padInfoMode(0, 0, PAD_MODETABLE, -1);
         for (int i = 0; i < count; ++i) {
             if (padInfoMode(0, 0, PAD_MODETABLE, i) == PAD_TYPE_DUALSHOCK) {
-                requested_analog_ = padSetMainMode(0, 0, PAD_MMODE_DUALSHOCK, PAD_MMODE_LOCK) == 1;
-                if (!requested_analog_) status_ = "ANALOG REQUEST RETRY";
+                // Accepted means queued, not applied. The IOP can later
+                // reject the request; only completion confirms this mode.
+                analog_pending_ = padSetMainMode(0, 0, PAD_MMODE_DUALSHOCK, PAD_MMODE_LOCK) == 1;
+                status_ = analog_pending_ ? "WAITING FOR ANALOG MODE" : "ANALOG REQUEST RETRY";
                 return out;
             }
         }
-        // A digital-only controller needs no mode change. A rejected analog
-        // request returns above with the flag clear so the next stable poll retries.
-        requested_analog_ = true;
-        return out;
+        if (count > 0) {
+            // A known mode table without DualShock needs no mode change.
+            requested_analog_ = true;
+            return out;
+        }
+        // Zero can mean the IOP is still negotiating capabilities. Read any
+        // valid input now, but retry metadata on subsequent polls; legacy
+        // digital pads with no table remain usable too.
     }
     padButtonStatus raw{};
     if (!padRead(0, 0, &raw)) { status_ = "PAD READ FAILED"; return out; }

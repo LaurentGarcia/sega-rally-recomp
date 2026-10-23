@@ -73,16 +73,25 @@ that scene or a ROM-free hardware test.
 | --- | --- | --- |
 | [Race progress counters](../platform/ps2/native/race_progress.md) | Positive-only timer decrement, two wrapping counters and two bounded counter banks | 32,768 cases; 735,250 original instructions |
 | [Car pose publication](../platform/ps2/native/car_pose.md) | Copy raw pose values and merge observed persistent flags into a distinct render state | 65,536 cases; 3,670,016 original instructions |
+| [Bounded angle fold](../platform/ps2/native/angle_fold.md) | One correction around ±pi within a specified finite domain, using exact integer arithmetic and explicit final rounding | 16,844,326 cases; 328,030,729 original instructions |
 
-Both components have portable boundary tests, sanitizer checks and standalone
+All three components have portable boundary tests, sanitizer checks and standalone
 EE fixtures executed successfully in Play: 121 progress boundary/rejection
 checks plus repeated updates, and all 65,536 pose flag pairs with raw-value
-and repeated-publication checks. The original-program comparisons run on the host against the
+and repeated-publication checks. The angle fixture passed 36,262 EE checks;
+the exhaustive folded interval is covered by its host original-program oracle.
+The original-program comparisons run on the host against the
 owner's verified Revision B image; the reference interpreter and memory
 adapters are not part of the native executable. The components are compiled
 by the native target but remain unconnected to its diagnostic loop and may
-be removed by linker garbage collection. Neither establishes car physics,
+be removed by linker garbage collection. None establishes car physics,
 coordinate conventions, collision, caller cadence or a complete race system.
+The [car integration dependency map](../platform/ps2/native/car_integration_recovery.md)
+records the remaining data and arithmetic contracts. The larger integrator
+is not recovered merely because its angle helper matches.
+
+The [hardware study](ps2-architecture-study.md) records the complete local
+manual collection, specific constraints and the executed VU1 experiments.
 
 ## Build and check
 
@@ -108,12 +117,17 @@ moves the original checkerboard test geometry; holding Cross submits a quiet
 original 440 Hz tone. PCM refill follows the IOP queue independently of
 PAL/NTSC display cadence. No game files or reference-probe `rally.cfg` are read.
 
-The frozen `native-003` ELF (SHA-256
-`c8e4ae54b132df5ab75ab0dc103ee131a6de4592328c8c76c669ceac31d45eb6`)
+The frozen `native-004` ELF (SHA-256
+`8e089ac653569c56606ea66b453ad57a4ea6193050798e16866339b0a144f84a`)
 ran for 17 seconds in Play 0.72 with its HLE BIOS and Vulkan renderer. The
 readable diagnostic page, two submitted triangles, initialized PCM transport
-and sampled zero-underrun counter were observed through frame 960. Most
-sampled loops took 2,457,600 modeled bus ticks, or one 60 Hz display interval.
-That is diagnostic-loop timing in an emulator, not game or physical-console
-performance. Controller interaction, audible output and actual hardware still
-require separate validation.
+and zero ring-empty/late-service counters were observed at all 19 checkpoints
+through frame 960. That is a diagnostic loop in an emulator, not game or
+physical-console performance. Controller interaction, measured speaker output
+and actual hardware still require separate validation.
+
+The subsequent `native-005` ELF includes a controller-negotiation status-label
+correction and passed cross-linking, source and symbol checks. Its SHA-256 is
+`b6495ccdc3498c1d948d3103e900c1c7d2feee725c09e5e42be7a52ad7cec5ce`;
+its load segments occupy 450,088 bytes before dynamic allocation. It has not
+been executed; the earlier runtime evidence applies specifically to native-004.

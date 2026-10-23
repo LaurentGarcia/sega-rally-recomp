@@ -50,7 +50,8 @@ NATIVE_TOOLKIT_SOURCES = (
     "platform/ps2/src/audio_output.cpp", "platform/ps2/src/vu0_pack.cpp",
 )
 NATIVE_SOURCES = ["platform/ps2/native/main.cpp", "platform/ps2/native/race_progress.cpp",
-                  "platform/ps2/native/car_pose.cpp", *NATIVE_TOOLKIT_SOURCES]
+                  "platform/ps2/native/car_pose.cpp", "platform/ps2/native/angle_fold.cpp",
+                  *NATIVE_TOOLKIT_SOURCES]
 NATIVE_TOOLKIT_HEADERS = {
     "audio_output.h", "pcm_protocol.h", "pcm_resampler.h", "pcm_ring.h",
     "native_display.h", "pad_input.h", "pad_state.h", "debug_controls.h", "storage.h", "vu0_pack.h", "diagnostic_font.h",

@@ -99,8 +99,8 @@ int main() {
                 "\n"
                 "[NATIVE PCM] -> [IOP] -> [SPU2]\n"
                 "AUDIO %s / QUEUE %lu FR\n"
-                "UNDERRUN SILENCE %lu FR\n"
-                "\n"
+                "RING EMPTY SILENCE %lu FR\n"
+                "DMA LATE SERVICE %lu EVENTS\n"
                 "FRAME %u / PREVIOUS %llu MS\n"
                 "GS TRI %lu / TEX %llu B / CLUT %llu B\n"
                 "NO ARCADE CPU OR DEVICE CORES\n"
@@ -111,7 +111,8 @@ int main() {
                 "HOLD CROSS FOR A QUIET TEST TONE\n"
                 "EMULATOR TIMING IS NOT CONSOLE SPEED",
                 audio_ready ? "ON" : "UNAVAILABLE", static_cast<unsigned long>(audio_stats.queued),
-                static_cast<unsigned long>(audio_stats.silent_frames), frame,
+                static_cast<unsigned long>(audio_stats.silent_frames),
+                static_cast<unsigned long>(audio_stats.late_service_events), frame,
                 static_cast<unsigned long long>(previous_ticks * 1000 / kBUSCLK),
                 static_cast<unsigned long>(gs.triangles),
                 static_cast<unsigned long long>(gs.texture_bytes),

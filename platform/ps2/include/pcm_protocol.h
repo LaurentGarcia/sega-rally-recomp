@@ -3,7 +3,7 @@
 #include <stdint.h>
 
 #define RALLY_PCM_RPC 0x53525043u
-#define RALLY_PCM_VERSION 1u
+#define RALLY_PCM_VERSION 2u
 #define RALLY_PCM_PACKET_FRAMES 256u
 #define RALLY_PCM_RING_FRAMES 4096u
 #define RALLY_PCM_DMA_FRAMES 512u
@@ -15,5 +15,5 @@ typedef struct {
 typedef struct {
     uint32_t version;
     int32_t status;
-    uint32_t accepted, queued, consumed, silent_frames, blocks, reserved;
+    uint32_t accepted, queued, consumed, silent_frames, blocks, late_service_events;
 } RallyPcmReply;

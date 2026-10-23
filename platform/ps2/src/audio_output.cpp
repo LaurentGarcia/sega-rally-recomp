@@ -33,6 +33,7 @@ struct AudioOutput::Impl {
             return fail("IOP PCM server rejected request");
         stats.queued = reply.queued; stats.consumed = reply.consumed;
         stats.silent_frames = reply.silent_frames; stats.blocks = reply.blocks;
+        stats.late_service_events = reply.late_service_events;
         return true;
     }
     bool send() {

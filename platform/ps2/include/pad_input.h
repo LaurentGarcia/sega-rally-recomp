@@ -18,7 +18,7 @@ public:
     PadSnapshot poll();
     const char *status() const { return status_; }
 private:
-    bool opened_ = false, requested_analog_ = false;
+    bool opened_ = false, requested_analog_ = false, analog_pending_ = false;
     const char *status_ = "NOT INITIALIZED";
     alignas(64) unsigned char buffer_[256]{};
 };

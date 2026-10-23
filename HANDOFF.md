@@ -1,5 +1,143 @@
 # Handoff
 
+## PS2 manual study, native arithmetic and service fixes (2026-10-23)
+
+The completed native foundation was pushed as 69b4726 after the exact tree and
+source archive passed the export gate. The requested hardware collection is
+cloned at build/ps2/references/PS2-Programming-Docs, revision
+b13fb347ceebd3f71a0ce978adb15b60c64ed6ec. All 18 repository files match the
+local manifest: 16 PDFs, the pad specification and README (17,971,685 bytes;
+2,470 PDF pages). docs/ps2-architecture-study.md records the reading map,
+specific references and intended measurements. The manuals and searchable
+extracts remain local, under the explicit named-collection study exception.
+
+The car integrator lead at ROM 0x2cce0 spans 6,508 bytes and 1,299 decoded
+instructions. Its 133 TGP stores and 52 reads are static sites, not per-update
+counts. Descriptor/tuning inputs, contact-query semantics, units, cadence and
+mixed-precision arithmetic remain unresolved. The new dependency map records
+these gaps instead of labeling a generic vehicle simulation as recovered code.
+
+Its one-step angle-folding helper is now independently implemented for finite
+binary32 inputs bounded by round32(2*pi). Accepted values within ±pi preserve
+their original bits; the outer interval receives one exact correction with
+explicit ties-to-even rounding. Larger/nonfinite values reject unchanged.
+This uses integer arithmetic only, with no guest CPU/FPU/device runtime.
+The actual integrator caller bounds remain unproven, so it stays disconnected.
+All 16,844,326 private original-program comparisons match (328,030,729
+instructions; fingerprint 256956588cf6bc50), including every nontrivial folded
+input of both signs. Portable/sanitizer tests pass. A standalone EE fixture
+passed 36,262 checks in Play; object disassembly contains no COP1 arithmetic.
+Evidence: build/ps2-native-angle-validation-001/result.json.
+
+The manual study exposed a real SPU2 gain error: PCM input volume uses Q15,
+whereas master direct volume uses Q14. BVOL is corrected from 0x3fff to
+0x7fff; master remains 0x3fff. The IOP server now counts delivered completions
+that find the prior half unserviced, separately from empty-ring silence. A
+completion-generation guard also prevents stale semaphore wakeups from
+dequeueing new PCM into an already refilled half. Protocol version 2 uses the
+existing reserved reply word and rejects older modules. Actual-server mock
+tests cover gain registers, callback ordering, stale wakes, wraparound,
+channel layout, restart and all initialization cleanup failures; sanitizers
+pass. Counters cannot detect a suppressed interrupt or prove audible quality.
+Synchronous SIF RPC can still wait indefinitely if the IOP itself stops.
+
+The pad adapter now distinguishes an accepted mode request from completed
+configuration. It waits for completion, retries eventual failures, resets
+pending state on disconnect, and retries missing mode metadata while allowing
+valid digital input. Real adapter/mocked-SDK tests and sanitizers pass.
+The native diagnostic page shows ring-empty silence and DMA late service as
+separate values. Physical controller/audio behavior remains unverified.
+
+The frozen native-004 build includes all three recovered modules and these
+platform fixes. Its SHA256 is
+8e089ac653569c56606ea66b453ad57a4ea6193050798e16866339b0a144f84a;
+file size is 2,021,548 bytes, resident load segments occupy 445,992 bytes, and
+the heap/stack ceiling is 32,059,864 bytes excluding dynamic allocation. All
+26 source/header hashes and the forbidden-runtime symbol audit pass. The
+game systems are still not connected to its diagnostic loop.
+
+Native-004 executed for 17 seconds in Play through sampled frame 960, with
+empty guest stderr, zero ring-empty silence and zero delivered late-service
+events at all 19 sampled checkpoints. The original nonzero audio fixture also
+submitted and consumed all 48,001 frames through the updated IOP module;
+that fixture intentionally ran out of input and recorded 56,959 silent frames.
+Measured speaker amplitude remains unverified. Runtime evidence is bound in
+build/ps2-native-004/runtime-validation.json and
+build/ps2/validation/audio-spu2-002.json. A subsequent status-only pad fix
+labels SDK EXECCMD negotiation correctly and has its own mocked-state check.
+The resulting native-005 ELF cross-links with all 26 input hashes and the
+symbol audit verified: SHA256
+b6495ccdc3498c1d948d3103e900c1c7d2feee725c09e5e42be7a52ad7cec5ce,
+2,024,916 file bytes, 450,088 resident bytes and 32,055,768 bytes of heap/stack
+ceiling before dynamic allocation. It has not been executed. Do not attach
+native-004 runtime evidence to this later artifact.
+
+Additional findings: the EE standard library correctly reports a non-IEEE
+FPU, so the angle helper asserts the required storage properties instead of
+is_iec559. Do not relax its arithmetic proof or replace it with native float
+subtraction. DMA completion alone is not a VU/GS completion fence. The first
+isolated VU1 experiment checks exact matrix cases and whole-memory bank guards
+before any PATH1 drawing or production integration.
+
+The original VU1 experiment subsequently passed 168 microprogram runs,
+13,608 vertices and 430,080 complete-memory checks in Play, fingerprint
+232e0bdb6fed9a5f. Its original sources are promoted under platform/ps2/tests/vu1
+with a pinned standalone assembler/build helper and six output/source-boundary
+tests. The promoted ELF is byte-identical to the executed experiment,
+8e26bd695aae5729727236cbd05ac47d001f709c7d766da17837e37135948366.
+It proves selected dyadic transforms/projection/packing and bank ownership,
+including alternate-bank transfer overlap; it performs no XGKICK drawing and
+does not enable VU1 in the game. Play 0.72 lacks TOP/TOPS MMIO read cases;
+the fixture verifies XTOP values actually stored by VU1 and all memory instead.
+Do not reinterpret the initial unsupported-read assertion as a geometry error.
+The CP0 Count register increments every CPU clock, as the EE core manual
+states on pages 70/72; do not use the initially assumed half-clock conversion.
+
+The foundation's general desktop CI exposed a recording compatibility bug:
+inserting sound_buffer_frames before instruction_boundary_hook shifted the
+existing ten-boolean aggregate initializer. All four desktop jobs failed the
+same two recording tests with a noncanonical manifest. The capacity member
+now follows the original fields, with a compile-time compatibility check;
+v1 decoding also assigns named flags. The recorder rejects nondefault capacity
+and external image providers, which v1 cannot represent or identify. Default
+bundle/reference checks pass (181 and 23 checks); an isolated M2_PAGED_ROM
+variant passes 185 checks including provider rejection before access.
+Evidence: build/ps2/validation/recording-ci-regression-001.json. Fresh remote
+CI remains necessary. Existing full-core artifacts retain their historical
+source identities; generated source caches and the separate native target
+are unaffected by this header correction.
+
+PS2 CI now cross-links the original dual-VU fixture with the pinned host
+toolchain in addition to its existing portable, audio and native-bootstrap
+checks. A cross-build does not replace the separately recorded execution.
+The local PS2 host suite passes all 64 tests in 21.626 seconds; its log
+is build/ps2/validation/manual-study-tests-002.log. The VU numerical cases use
+clip W values of 1, 2 and 4; general perspective rounding is not established.
+The helper subsequently gained an explicit dual-unit opt-in check; all seven
+helper tests pass with that addition.
+
+The first combined VU test preserved 12,400 VU0 components and 692,224 VU1
+memory words across baseline/cooperation checks, but observed no outstanding
+activity at VU0 entry. Play 0.72 executes up to 100 quotas of 5,000 VU
+instructions synchronously at launch. A bounded repeated entry was added
+only as a diagnostic: a two-iteration control passes, while the 1,024-iteration
+control times out before any VU0 conversion call. Its MARK is 106 rather than
+107, VIF status 0xc4 and command 0x14000025. Review found no demonstrated bank
+or repeat-loop defect; the cause remains unresolved and is not labeled an
+emulator bug. Raw busy snapshots are not established physical-idle evidence.
+The default fixture runs the validated baseline; --dual-unit selects the
+unresolved test without changing its timeout. Do not claim cooperation,
+simultaneous hardware execution or performance gains. Repeated outputs may
+hide transient errors, and vertex totals describe requested work only.
+The current default baseline was independently rebuilt and executed with
+168 submissions, 430,080 memory comparisons and the unchanged fingerprint
+232e0bdb6fed9a5f. Its ELF is
+build/ps2-vu1-baseline-final-001/vu1-transform.elf, SHA256
+d185235be35d70a5611409c8614bd1ca18739636fa2209996bb1e9b5306c78d6.
+Next: resolve the isolated long-entry failure and validate general projection,
+clipping and bounded PATH1 submission before production VU1 integration;
+continue car/collision contract recovery independently.
+
 ## Native PS2 rewrite boundary and hardware foundations (2026-10-23)
 
 The current direction is a complete native PS2 reimplementation. The previous

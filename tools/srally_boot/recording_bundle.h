@@ -21,6 +21,8 @@ private:
 // Computes identities from actual loaded bytes and the actual executable file.
 // assets.json is opaque identity_only source evidence, not authentication of
 // the upstream generation. No caller-supplied digest is accepted here.
+// The v1 format requires resident images and the default sound-buffer capacity;
+// external image providers are not represented by its captured identities.
 StartupIdentity identify_startup(const Machine::Images &images, Machine::Options options,
     std::span<const uint8_t> assets_report, const std::filesystem::path &executable);
 class Recorder {

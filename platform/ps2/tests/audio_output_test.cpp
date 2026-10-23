@@ -12,11 +12,11 @@ static void check(bool condition, const char *message) {
     if (!condition) throw std::runtime_error(message);
 }
 static RallyPcmRing ring;
-static unsigned stops, writes, modules;
+static unsigned stops, writes, modules, late_services;
 static uint64_t ticks;
 static bool full, partial, module_failure, bind_missing, rpc_failure;
 static void reset() {
-    rally_pcm_reset(&ring); stops = writes = modules = 0; ticks = 0;
+    rally_pcm_reset(&ring); stops = writes = modules = late_services = 0; ticks = 0;
     full = partial = module_failure = bind_missing = rpc_failure = false;
 }
 extern "C" {
@@ -51,6 +51,7 @@ int SifCallRpc(SifRpcClientData_t *, unsigned command, int, void *request, int r
     } else check(command == RALLY_PCM_STATS, "unknown PCM operation");
     reply.queued = ring.queued; reply.consumed = ring.consumed;
     reply.silent_frames = ring.silent_frames; reply.blocks = ring.blocks;
+    reply.late_service_events = late_services;
     std::memcpy(response, &reply, sizeof(reply));
     return 0;
 }
@@ -66,6 +67,9 @@ int main() {
             check(audio.stats().submitted_frames == 1024, "partial packet should stay bounded on EE");
             check(audio.flush(), "flush after querying stats");
             check(audio.stats().submitted_frames == 1088 && ring.queued == 1088, "stats lost partial packet");
+            late_services = 3;
+            check(audio.stats().late_service_events == 3 && audio.stats().silent_frames == 0,
+                  "DMA worker lateness must remain distinct from ring starvation");
             for (unsigned i = 0; i < ring.queued; ++i)
                 check(ring.samples[i * 2] == 16384 && ring.samples[i * 2 + 1] == -16384, "PCM content/channel order");
         }

@@ -9,6 +9,22 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 
 class Ps2AudioTests(unittest.TestCase):
+    def test_actual_iop_gain_service_and_lifetime(self):
+        compiler = shutil.which("clang") or shutil.which("cc")
+        if not compiler:
+            self.skipTest("C11 compiler required")
+        with tempfile.TemporaryDirectory(prefix="rally-ps2-audio-iop-") as temporary:
+            output = Path(temporary) / "audio_iop_test"
+            command = [compiler, "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
+                       "-I" + str(ROOT / "platform/ps2/tests/audio_iop_sdk"),
+                       "-I" + str(ROOT / "platform/ps2/include"),
+                       str(ROOT / "platform/ps2/tests/audio_iop_test.c"), "-o", str(output)]
+            result = subprocess.run(command, capture_output=True, text=True, timeout=120)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            result = subprocess.run([str(output)], capture_output=True, text=True, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("actual IOP gain, DMA service telemetry and failure cleanup checks passed", result.stdout)
+
     def test_compact_pan_table_and_actual_scsp(self):
         compiler = shutil.which("clang++") or shutil.which("c++")
         if not compiler:

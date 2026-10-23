@@ -14,6 +14,7 @@ void check(bool value, const char *message) {
 struct FakeSdk {
     int module_result = 0, init_result = 1, open_result = 1;
     int state = PAD_STATE_STABLE, mode_result = 1;
+    int request_state = PAD_RSTAT_COMPLETE, mode_count = 1;
     int opens = 0, closes = 0, requests = 0, reads = 0;
     bool dualshock = true;
     void *dma_buffer = nullptr;
@@ -51,9 +52,10 @@ int padPortClose(int port, int slot) {
     return 1;
 }
 int padGetState(int, int) { return sdk.state; }
+int padGetReqState(int, int) { return sdk.request_state; }
 int padInfoMode(int, int, int mode, int index) {
     check(mode == PAD_MODETABLE, "queries supported modes");
-    return index == -1 ? 1 : (sdk.dualshock ? PAD_TYPE_DUALSHOCK : PAD_TYPE_DIGITAL);
+    return index == -1 ? sdk.mode_count : (sdk.dualshock ? PAD_TYPE_DUALSHOCK : PAD_TYPE_DIGITAL);
 }
 int padSetMainMode(int, int, int mode, int lock) {
     check(mode == PAD_MMODE_DUALSHOCK && lock == PAD_MMODE_LOCK, "requests locked analog mode");
@@ -106,6 +108,50 @@ int main() {
             check(sdk.requests == 4, "reconnected controller renegotiates mode");
         }
         check(sdk.closes == 1 && !sdk.dma_buffer, "owned DMA port closed before scope exits");
+
+        reset();
+        {
+            ps2::PadInput pad;
+            check(pad.initialize(), "asynchronous controller initialization");
+            sdk.request_state = PAD_RSTAT_BUSY;
+            pad.poll();
+            check(!pad.poll().connected && sdk.requests == 1 && sdk.reads == 0,
+                  "accepted busy request is neither resubmitted nor treated as complete");
+            sdk.state = PAD_STATE_EXECCMD; // libpad maps stable+busy to this state.
+            check(!pad.poll().connected && sdk.requests == 1 && sdk.reads == 0 &&
+                  std::strcmp(pad.status(), "WAITING FOR ANALOG MODE") == 0,
+                  "SDK executing state remains neutral and reports negotiation");
+            sdk.state = PAD_STATE_STABLE;
+            sdk.request_state = PAD_RSTAT_FAILED;
+            check(!pad.poll().connected && sdk.requests == 1, "later request failure remains neutral");
+            pad.poll();
+            check(sdk.requests == 2, "failed asynchronous request retried");
+            sdk.request_state = PAD_RSTAT_COMPLETE;
+            check(pad.poll().analog && sdk.requests == 2, "completed retry enables analog input");
+            sdk.state = PAD_STATE_DISCONN;
+            pad.poll();
+            sdk.state = PAD_STATE_STABLE;
+            sdk.request_state = PAD_RSTAT_BUSY;
+            pad.poll();
+            sdk.state = PAD_STATE_DISCONN;
+            pad.poll();
+            sdk.state = PAD_STATE_STABLE;
+            pad.poll();
+            check(sdk.requests == 4, "disconnect discards pending mode request");
+        }
+
+        reset(); sdk.mode_count = 0; sdk.dualshock = false;
+        {
+            ps2::PadInput pad;
+            check(pad.initialize(), "unknown-capabilities initialization");
+            const auto digital = pad.poll();
+            check(digital.connected && !digital.analog && sdk.requests == 0,
+                  "digital input works without a mode table");
+            sdk.mode_count = 1; sdk.dualshock = true;
+            pad.poll();
+            check(sdk.requests == 1, "late mode table triggers analog negotiation");
+            check(pad.poll().analog, "late capability negotiation completes");
+        }
 
         reset(); sdk.dualshock = false;
         {
