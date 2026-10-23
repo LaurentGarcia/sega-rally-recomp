@@ -1,5 +1,38 @@
 # Handoff
 
+## Local generated-output cleanup (2026-10-22)
+
+The requested space recovery removed 14,996 generated files occupying
+23,270,944,768 allocated bytes (21.67 GiB). The build directory is now 5.8 GiB;
+the volume reports about 31 GiB available. Removed outputs comprise 1,383 old
+compiled binaries, 4,083 compiler artifacts, 6,076 raw captures/caches, 2,884
+marked generated C++ files and 570 game-image copies whose SHA256 matched
+preserved canonical files. No source checkout or Git store was removed.
+
+Main already matched the published d496852 commit before cleanup. All 89
+repository/worktree HEADs, Git-store paths, status outputs and staged/unstaged
+diff hashes match the pre-cleanup inventory. The 77 working copies with
+unfinished edits remain local; those changes have not been merged or published.
+All 184 untracked regular files and 1,407 pre-hashed ignored source candidates
+retain their hashes. Two additional source candidates retain their recorded
+type/size; three symlinks retain their type/length. Those five entries had no
+pre-cleanup content/target hash, so no stronger comparison is claimed.
+
+Current public Preview 4 and private Mac/iPhone/Windows/Linux installers,
+original ROM archives, saves, canonical native generation and the current Mac
+player/assets were excluded from deletion. The installed Mac app is untouched.
+PNG witnesses, replay inputs, manifests, logs and numeric summaries remain.
+Earlier entries describing old executables or raw video/audio captures as
+retained are historical: the deletion manifest now determines their local
+availability. Historical build caches need removed outputs regenerated;
+deleted duplicate images can be restored from the recorded identical file.
+
+The ignored audit directory is build/maintenance/disk-cleanup-2026-10-22. It
+contains the reviewed file-level plan, hashes and canonical replacement paths,
+deletion log, space measurements and post-cleanup source verification. This is
+maintenance only; physical iPhone testing and the remaining game-fidelity
+work are still pending.
+
 ## Signed iPhone touch preview and Xcode ownership fix (2026-10-18)
 
 The complete arm64/iOS 15 app now compiles, links and is development-signed
