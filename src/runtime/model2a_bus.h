@@ -5,6 +5,7 @@
 #pragma once
 
 #include "runtime/cpu.h"
+#include "runtime/rom_source.h"
 #include <functional>
 #include <vector>
 
@@ -26,7 +27,11 @@ public:
         uint32_t reference_gap_last_write = 0;
         uint64_t irq_reset_writes = 0;
     };
-    Model2ABus(std::vector<uint8_t> program, std::vector<uint8_t> main_data);
+    Model2ABus(std::vector<uint8_t> program, std::vector<uint8_t> main_data
+#ifdef M2_PAGED_ROM
+               , RomSource *rom = nullptr
+#endif
+    );
     const Diagnostics &diagnostics() const { return diagnostics_; }
     std::vector<uint8_t> save_backup() const { return backup_; }
     void load_backup(const std::vector<uint8_t> &image) {
@@ -53,6 +58,13 @@ public:
 private:
     struct Mapping { uint8_t *data; size_t available; bool read_only; bool burst; };
     Mapping mapping(uint32_t address);
+#ifdef M2_PAGED_ROM
+    // Mapping metadata never requests a page: burst queries and ignored ROM
+    // writes must not perform storage I/O or invalidate a cached pointer.
+    struct RomMapping { RomRegion region; uint32_t offset, available; };
+    static RomMapping rom_mapping(uint32_t address);
+    RomSource *rom_ = nullptr; // Host-owned; outlives this bus.
+#endif
     uint32_t read(uint32_t address, unsigned width);
     void write(uint32_t address, unsigned width, uint32_t value);
     Diagnostics diagnostics_;

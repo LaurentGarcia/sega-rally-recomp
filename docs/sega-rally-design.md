@@ -32,6 +32,17 @@ cross-API pixel identity and full arcade fidelity are not established by this.
 
 ## Required end state
 
+The 2026-10-23 PlayStation 2 request adds an experimental homebrew target.
+It follows the same generated-game/native-board/platform separation. The
+PS2's fixed-function Graphics Synthesizer cannot run the shared desktop
+shaders: its explicit renderer exception uses GS/GIF/DMA while retaining
+shared geometry, priority, frame contracts and the CPU rasterizer as a test
+reference. A platform-neutral `M2_PAGED_ROM` path exposes unchanged ROM
+addresses through bounded storage pages; it does not select Dreamcast speed
+shortcuts. The desktop path remains resident. VU geometry and IOP/SPU2 audio
+are optimization work requiring separate correctness and timing evidence.
+See [PS2 development](ps2.md); compilation is not hardware or game certification.
+
 - Generate Sega Rally's native game code reproducibly from verified user ROMs.
 - Execute the actual game control flow, including menus, races, and results.
 - Preserve geometry command, polygon-priority, texture, audio, timing, and input

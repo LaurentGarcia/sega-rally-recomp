@@ -1,11 +1,10 @@
-// M2_DC_MEMORY builds only (platform/dreamcast): the ROM regions read through
-// pages the frontend supplies from a small cache, instead of whole images
-// held in memory (16 MB of RAM, 44 MB of ROM). The board, geometrizer and TGP
-// board ask for a 4 KB page at a time. Desktop builds do not define
-// M2_DC_MEMORY and never include this.
+// Optional paged ROM access for hosts with limited memory. M2_PAGED_ROM
+// enables the shared interface without Dreamcast-specific fast paths. The
+// board, geometrizer and TGP ask for 4 KiB pages from a frontend-owned cache.
+// M2_DC_MEMORY retains the existing Dreamcast build contract.
 #pragma once
 
-#ifdef M2_DC_MEMORY
+#if defined(M2_DC_MEMORY) || defined(M2_PAGED_ROM)
 #include <cstdint>
 #include <utility>
 

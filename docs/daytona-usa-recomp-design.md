@@ -358,6 +358,15 @@ Correctness is proven by lockstep differential testing against MAME, frame by fr
 
 ## Platform layer & build
 
+**Rally PS2 update, 23 October 2026.** The experimental PlayStation 2 host
+uses the open PS2SDK, direct Graphics Synthesizer commands and GIF DMA.
+Its fixed-function renderer is an explicit exception to the common desktop
+shader requirement; it must still preserve the shared geometry/priority
+contracts and be compared against the CPU reference. ROM paging preserves
+guest addresses and bytes, independently of platform-specific speed options.
+EE/VU optimization and IOP/SPU2 audio require measured validation. The current
+scope and build commands are in [PS2 development](ps2.md).
+
 **Rally distribution update, 15 October 2026.** The requested deliverable is a
 prebuilt game executable, rather than a compiler bootstrap requiring developer
 tools. Its original runtime importer verifies the player's ZIP and prepares

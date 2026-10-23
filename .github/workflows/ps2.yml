@@ -1,0 +1,44 @@
+name: PS2 portability and bringup
+on:
+  push:
+    paths: ['platform/ps2/**', 'platform/segarally/stage_data.py', 'src/runtime/**', 'src/app/gpu/model2_frame.h', 'src/trace/trace.h', 'scripts/segarally_recompile.py', 'config/segarally_*.json', 'tests/test_ps2*.py', 'tests/test_model2a_paged_rom.cpp', 'tests/test_video_gpu_storage.cpp', 'tests/test_video_compact.cpp', '.github/workflows/ps2.yml']
+  pull_request:
+    paths: ['platform/ps2/**', 'platform/segarally/stage_data.py', 'src/runtime/**', 'src/app/gpu/model2_frame.h', 'src/trace/trace.h', 'scripts/segarally_recompile.py', 'config/segarally_*.json', 'tests/test_ps2*.py', 'tests/test_model2a_paged_rom.cpp', 'tests/test_video_gpu_storage.cpp', 'tests/test_video_compact.cpp', '.github/workflows/ps2.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  portable-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check bounded asset storage, shared memory bus and build boundaries
+        run: python3 -m unittest discover -s tests -p 'test_ps2*.py' -v
+      - name: Run the portable presentation and controller smoke test
+        run: python3 platform/ps2/build_ps2.py smoke --output build/ps2-ci
+  ee-cross-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Pull the immutable official PS2dev compiler image
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          import subprocess
+          lock = json.loads(Path('platform/ps2/toolchain.lock.json').read_text())
+          image = lock['platforms']['linux/amd64']['image']
+          subprocess.run(['docker', 'pull', '--platform', 'linux/amd64', image], check=True)
+          PY
+      - name: Cross-link the ROM-free GS and controller bringup ELF
+        run: python3 platform/ps2/build_ps2.py build --backend docker --container-platform linux/amd64 --output build/ps2-ci --jobs 2
+      - name: Inspect EE entry point and static RAM footprint
+        run: python3 platform/ps2/build_ps2.py report --backend docker --container-platform linux/amd64 --output build/ps2-ci
+      # No ROMs, generated game core, signing secrets or artifact publication.
+      # This job proves cross-linking; console execution is a separate test.

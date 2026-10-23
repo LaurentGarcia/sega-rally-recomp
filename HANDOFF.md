@@ -1,5 +1,118 @@
 # Handoff
 
+## PlayStation 2 architecture and game-core bring-up (2026-10-23)
+
+The experimental `port/ps2` branch adds an open-PS2SDK host with direct GS/GIF
+DMA presentation, double buffering, cabinet input mapping, embedded open IOP
+controller/storage modules and a bounded read-only game pack. It follows the
+design's Platform layer & build and Reference & validation contracts. The
+fixed-function GS renderer is a documented exception to the desktop shader
+path. VU geometry, native textured game rendering, SPU2 sound, real-console
+validation and playable speed remain unfinished. Desktop releases are unchanged.
+
+The ROM-free hardware diagnostic cross-links for the EE and boots in Play!
+0.72 with synthetic geometry explicitly labeled as such. The actual 82-source
+game-core target links the generated i960/TGP programs and shared Model 2A
+devices, without a stub game loop. It currently uses the CPU reference
+renderer, disables sound and shows observed startup/error checkpoints. Play!
+now displays the game's own SOUND INITIALIZE screen. The EE checkpoint
+fields at frames 1, 2, 3 and 60 exactly match the host reference. Only these
+four sampled checkpoints were compared; this does not establish a playable
+race. The CPU reference path advances at roughly 0.33 game frames per second
+in Play!, independently of its display refresh counter. Local test tools,
+captures, private packs and ELFs remain under ignored build directories.
+No PS2 player release is published.
+
+The pinned arm64 PS2dev image is
+6b7c60ca61f40905e0aa22c0939707d91b6df2d5d8995f45c803c14031f06015,
+with GCC 15.2.0; the amd64 image is separately pinned for source-only CI.
+The build driver records source identities, toolchain, ELF load segments and
+limitations. Per-source transitive include fingerprints avoid both stale
+objects and scanning all old worktrees. SDK source/license provenance is in
+THIRD_PARTY.md; no proprietary SDK or external BIOS is used.
+
+Eight verified images occupy 107,741,184 bytes. The private page-deduplicated
+pack occupies 29,491,200 bytes and reconstructs all eight SHA256-identical
+images. The game probe uses a 512 KiB ROM cache; program/data mirrors, ignored
+ROM writes, short-image padding, TGP reads and geometry checks retain their
+resident semantics. `M2_PAGED_ROM` does not enable Dreamcast timing/checksum
+shortcuts. CPU-only Video no longer allocates external-renderer layer copies.
+The optional `M2_COMPACT_TILEMAP` uses four decoded rows instead of full
+tilemap planes; it must keep the exact reference pixels and allocate full
+planes when switching to an external renderer.
+
+The current core ELF SHA256 is
+c6976f7f59b6b851bd59b180a2d5d263c39acf6eb446c8cf65a8052e2b95b81e.
+Loaded segments occupy 16,786,584 bytes, leaving 15,719,272 bytes above the
+SDK's 1 MiB load origin for heap and stack. Known persistent allocations are
+at least 13,246,204 bytes, with a 262,144-byte constructor table copy. Actual
+EE allocator checkpoints at machine construction and completed frames 1/60
+report 13,263,920 allocated bytes in a 13,577,064-byte arena. These are not
+runtime peaks. Lazy GPU scratch saves 1,564,672 bytes on CPU-only hosts;
+compact tile storage saves another 3,844,080 bytes. Native GS status sprites
+remove the old 761,856-byte temporary diagnostic image. Busiest-scene memory,
+SDK/stack use and FIFO growth still need measurement.
+
+The original canonical generation correctly failed the changed runtime
+boundary-source contract. Fresh generation in build/ps2/native passes the
+audit; all 56 generated i960/TGP source files are byte-identical to the old
+generation. No old audit was rewritten. A 1,634-frame real-game host run with
+paged images and a 512 KiB cache matches resident instruction/cycle counts,
+board time, PC, registers and screen hashes on every frame. This is host
+equivalence, not a full-race or PS2 floating-point certification. Evidence,
+exact EE object sizes and conservative heap budgets are in
+build/ps2/validation. Build and portable checks are in the PS2 workflow.
+The sparse EE checkpoint comparator records input hashes, fails malformed,
+missing-reference, duplicate, out-of-order or mismatched rows, and writes a
+new partial-evidence report without overwriting earlier observations. The
+core-final-001 report matches the final ELF run's four recorded frames;
+its 250-second capture shows the actual game boot text. Guest stderr is empty,
+and core-final-001-runtime.json binds the ELF, logs and private capture hashes.
+Final controller-fixed host-source and memory evidence is recorded separately
+in comparison-controller-final-1634.json and
+ee-memory-budget-controller-final.json. Previous ELF reports are preserved.
+
+Review fixes preserve loader-provided host modules by probing host transport
+before the optional IOP reset. The TGP table's exact 262,144-byte size is
+checked before allocation, preventing oversized malformed packs from
+consuming EE memory. Pack eviction tests exceed the actual cache capacity.
+The build driver's default output now receives the same resolved-path check
+as explicit output, rejecting symlink escapes. Both CI trigger filters cover
+all bring-up sources and transitive project headers, including Model2Frame
+and Trace. Dedicated regressions cover these review findings.
+The pad adapter closes its opened IOP port before releasing its DMA buffer,
+cannot be copied or moved, and retries rejected analog-mode requests. Mocked
+SDK tests exercise successful/failed initialization, disconnect/reconnect,
+digital pads, analog retry and exception unwinding; ASan/UBSan also pass.
+Physical controller behavior remains untested.
+Final local checks pass: 35 PS2 pack/core/build/checkpoint/pad tests, 13 source
+release-gate tests, the 64-case compact compositor comparison and the
+144-case Model2Frame fingerprint f4d290e762fc3523. The portable bring-up
+smoke fingerprint remains 7fc55e0bfbc7af31. These checks do not replace
+destination-console tests.
+
+Findings not to re-propose: an ELF fitting below 32 MiB does not prove its
+heap fits. The first executable used 16,777,496 loaded bytes and could not fit
+the desktop-style runtime. Global `-fno-inline` made the measured executable
+114,048 bytes larger; representative `-Oz` and `-fno-jump-tables` trials gave
+identical objects to `-Os`. None is accepted as a speed improvement. EE
+newlib's int32_t is long, requiring explicit raster template types and printf
+casts; `usleep` is unavailable and SDK `DelayThread` is used. Play! guest
+stdout is disabled by default: enable iop.fileio.stdlogging in its local
+portable config. Also disable ui.pausewhenfocuslost for unattended tests.
+Earlier apparent pack/frame stalls were confounded by focus pauses, sparse
+logging and a one-submission delay in static GS status presentation; those
+observations did not prove a pack fault or exhausted memory. Some PNG
+previews appeared black despite identical decoded status pixels. Use pixel
+comparison, guest logs and timestamps before diagnosing a crash. Continuous
+game-frame uploads now display actual game pixels in the same emulator.
+
+Next in order: extend observed boot into gameplay; profile EE execution and
+memory peaks; implement ordered native textured GS rendering and validated
+VU geometry batches; add IOP/SPU2 audio; validate physical console storage,
+controller, full races and restarts. VU offload and a player release are not
+claimed by the current boot result.
+
 ## Local generated-output cleanup (2026-10-22)
 
 The requested space recovery removed 14,996 generated files occupying

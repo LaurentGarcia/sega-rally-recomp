@@ -95,7 +95,11 @@ struct Model2AMachine::Impl {
 #endif
 
     Impl(Images images, Options opts) : options(opts),
-        bus(std::move(images.program), std::move(images.main_data)),
+        bus(std::move(images.program), std::move(images.main_data)
+#ifdef M2_PAGED_ROM
+            , images.rom
+#endif
+        ),
         cpu(&bus), schedule(cpu), env{cpu, schedule}
     {
         if (options.video && !options.tgp) throw Fatal("Model2A video requires TGP");
@@ -186,7 +190,11 @@ struct Model2AMachine::Impl {
 #endif
 #ifdef M2_SRALLY_TGP
         if (options.tgp) {
-            tgp = std::make_unique<TgpBoard>(images.tgp_tables, images.copro_data);
+#ifdef M2_PAGED_ROM
+            if (images.rom) tgp = std::make_unique<TgpBoard>(images.tgp_tables, *images.rom);
+            else
+#endif
+                tgp = std::make_unique<TgpBoard>(images.tgp_tables, images.copro_data);
             tgp_model = std::make_unique<NativeTgpModel>(*tgp);
             bus.add_model(tgp_model.get());
         }
@@ -195,7 +203,11 @@ struct Model2AMachine::Impl {
 #endif
 #ifdef M2_SRALLY_VIDEO
         if (options.video) {
-            geo = std::make_unique<Geo>(images.polygons, images.textures, tgp->buffer_data());
+#ifdef M2_PAGED_ROM
+            if (images.rom) geo = std::make_unique<Geo>(*images.rom, tgp->buffer_data());
+            else
+#endif
+                geo = std::make_unique<Geo>(images.polygons, images.textures, tgp->buffer_data());
             video = std::make_unique<Model2AVideo>(Model2AVideo::Hooks{
                 [this] {
 #ifdef M2_SRALLY_SCREEN

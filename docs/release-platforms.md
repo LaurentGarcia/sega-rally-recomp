@@ -19,6 +19,10 @@ The distribution work targets these four platforms:
 | Windows, x86-64 | SDL GPU Vulkan default; direct Vulkan opt-in | Public ROM-import ZIP; private data-inclusive ZIP stays local | Full game cross-compile/link, dependency checks and Wine startup/import pass, including eight imported image identities. The user's earlier PC audio confirmation applies to the preceding SDL package. New direct Vulkan GPU, controller and full-race validation remain open. |
 | Linux, x86-64 | SDL GPU Vulkan default; direct Vulkan opt-in | Public ROM-import archive; earlier private data-inclusive archive stays local | Native Wayland and X11 included. Three 2,800-frame Wayland/software Vulkan game comparisons pass, including a separate hide/restore diagnostic. Fresh extraction/import repeats the direct run without source/build mounts. Dummy-audio shortfalls remain recorded; physical GPU and speaker output remain untested. |
 
+An additional [PlayStation 2 development target](ps2.md) is in bring-up. Its
+local ELF artifacts are hardware diagnostics and a game-core probe, not a
+fifth released player. PS2 optimization and physical validation remain open.
+
 The personal game package contains the owner's local game data and generated
 game instructions. It stays local. The requested public player executable also
 contains statically recompiled game instructions, but no ROM archive or extracted

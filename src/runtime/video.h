@@ -69,16 +69,7 @@ public:
     // itself from the decoded pixmaps (system24_pixels, system24_flags, the
     // tile generations) and this frame's snapshot (gpu_tile_words,
     // gpu_pens). Vita uses its separate GXM tile path, also with widescreen.
-    void set_external_3d(bool enabled, bool desktop = false) {
-        if (enabled == external_3d_ && desktop == desktop_) return;
-        external_3d_ = enabled;
-        desktop_ = desktop;
-#ifndef M2_VITA_RENDER_OPT
-        if (enabled && !desktop && margin_) set_wide_margin(0);
-#endif
-        gpu_front_margin_ = -1;
-        render_done_ = false;
-    }
+    void set_external_3d(bool enabled, bool desktop = false);
     // External 3D with widescreen and the HUD at the edges: how far the
     // condition panel's overlay polygons move (0 = not at all), and which.
     int gpu_hud_shift() const { return external_3d_ && hud_on_ ? margin_ : 0; }
@@ -244,6 +235,17 @@ private:
     uint8_t gamma_[256];
     std::vector<uint16_t> pixmap_[4];
     std::vector<uint8_t> flags_[4];
+#ifdef M2_COMPACT_TILEMAP
+#if defined(M2_DC_SPEED) || defined(M2_VITA_RENDER_OPT)
+#error "M2_COMPACT_TILEMAP uses the reference CPU tile compositor"
+#endif
+    // CPU composition consumes one 512-pixel source row at a time. Full
+    // planes are allocated only if an external renderer requests them.
+    std::array<std::array<uint16_t, 512>, 4> compact_pixels_{};
+    std::array<std::array<uint8_t, 512>, 4> compact_flags_{};
+    std::array<int, 4> compact_keys_{{-1, -1, -1, -1}};
+    void tile_row(int layer, int y, const uint16_t *&pixels, const uint8_t *&flags);
+#endif
 #ifdef M2_DC_SPEED
     // Per layer and row of tiles (8 pixmap rows), how many of its 64 tiles
     // are of each category, and how many of those have an opaque pixel:
@@ -283,6 +285,7 @@ private:
     bool scroll_mode(int &sx, int &sy) const;
 #endif
     std::vector<uint32_t> background_gpu_, foreground_gpu_;
+    void ensure_gpu_buffers();
     uint64_t background_generation_ = 0, foreground_generation_ = 0, system24_texture_generation_ = 0;
     bool system24_source_dirty_ = true;
     std::vector<uint64_t> system24_tile_generations_;

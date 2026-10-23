@@ -19,7 +19,7 @@ class TgpBoard : public TgpBus {
 public:
     // tables: copro_tgp_tables (0x40000 bytes); copro_data: 0x800000 bytes.
     TgpBoard(const std::vector<uint8_t> &tables, const std::vector<uint8_t> &copro_data);
-#ifdef M2_DC_MEMORY
+#if defined(M2_DC_MEMORY) || defined(M2_PAGED_ROM)
     // copro_data read through pages (RomRegion::CoproData), not copied.
     TgpBoard(const std::vector<uint8_t> &tables, RomSource &rom);
 #endif
@@ -64,7 +64,7 @@ private:
 
     Tgp tgp_;
     std::vector<uint32_t> tables_, copro_data_;
-#ifdef M2_DC_MEMORY
+#if defined(M2_DC_MEMORY) || defined(M2_PAGED_ROM)
     RomSource *rom_ = nullptr;
 #endif
 #ifdef M2_FAST_TGP

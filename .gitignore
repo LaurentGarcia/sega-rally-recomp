@@ -62,6 +62,10 @@ compile_commands.json
 *.pdb
 *.obj
 *.lib
+*.elf
+*.irx
+*.rpk
+*.srp
 .ninja_deps
 .ninja_log
 shadercache/

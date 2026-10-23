@@ -48,7 +48,7 @@ TgpBoard::TgpBoard(const std::vector<uint8_t> &tables, const std::vector<uint8_t
     for (auto &w : buffer_) w = 0x07800f0f;
 }
 
-#ifdef M2_DC_MEMORY
+#if defined(M2_DC_MEMORY) || defined(M2_PAGED_ROM)
 TgpBoard::TgpBoard(const std::vector<uint8_t> &tables, RomSource &rom) : tables_(words(tables)), rom_(&rom) {
     if (tables_.size() != 0x10000 || rom.size(RomRegion::CoproData) != 0x800000)
         throw TgpFatal("bad TGP table or copro data image");
@@ -119,11 +119,10 @@ bool TgpBoard::fifo_pop(uint32_t &v) {
 }
 
 uint32_t TgpBoard::mem_r(uint32_t adr) {
-#ifdef M2_DC_MEMORY
-    if (adr & 0x800000) return rom_->dword(RomRegion::CoproData, (adr & 0x1fffff) * 4);
-#else
-    if (adr & 0x800000) return copro_data_[adr & (copro_data_.size() - 1)];
+#if defined(M2_DC_MEMORY) || defined(M2_PAGED_ROM)
+    if ((adr & 0x800000) && rom_) return rom_->dword(RomRegion::CoproData, (adr & 0x1fffff) * 4);
 #endif
+    if (adr & 0x800000) return copro_data_[adr & (copro_data_.size() - 1)];
     if (adr & 0x400000) return buffer_[adr & 0x7fff];
     return 0;
 }

@@ -14,6 +14,11 @@ public:
     struct Images {
         std::vector<uint8_t> program, main_data, tgp_tables, copro_data, polygons, textures;
         std::vector<uint8_t> sound_program, sound_samples;
+#ifdef M2_PAGED_ROM
+        // Optional host-owned ROM cache. Program/data/geometry/copro images
+        // use it; small TGP tables and sound images retain their own contract.
+        RomSource *rom = nullptr;
+#endif
     };
     struct Options {
         bool tgp = true, io = true, comm = true, control = true;

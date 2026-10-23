@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "observed_utc_date": "2026-10-23",
+  "image": "ghcr.io/ps2dev/ps2dev@sha256:5476fdfbf34d35eb644fde0a6f6533fb554a4a8171ce53dad7cd1df6077dfb05",
+  "platforms": {
+    "linux/arm64": {
+      "image": "ghcr.io/ps2dev/ps2dev@sha256:6b7c60ca61f40905e0aa22c0939707d91b6df2d5d8995f45c803c14031f06015",
+      "compressed_layer_bytes": 286504367
+    },
+    "linux/amd64": {
+      "image": "ghcr.io/ps2dev/ps2dev@sha256:14ff913d654b81cf4718e915da8b70c5b0ea4134d2d548ca87656d72dcfd8913"
+    }
+  },
+  "ps2dev_path": "/usr/local/ps2dev",
+  "compiler_prefix": "mips64r5900el-ps2-elf-",
+  "upstream": {
+    "container": "https://github.com/ps2dev/ps2dev/pkgs/container/ps2dev",
+    "build_repository": "https://github.com/ps2dev/ps2dev",
+    "build_repository_observed_head": "594e2b21863a574e1923927f6349cceb87c88109",
+    "sdk_repository": "https://github.com/ps2dev/ps2sdk",
+    "sdk_repository_observed_head": "329e2bb43287e16af16c4dde1c614e2662c24468",
+    "sdk_license": "AFL-2.0",
+    "note": "The OCI image digest pins the installed toolchain. Observed repository heads are source references, not an assertion that the image was built from those exact heads."
+  }
+}

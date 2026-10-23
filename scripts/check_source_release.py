@@ -50,7 +50,7 @@ FORBIDDEN_PARTS = {
 }
 FORBIDDEN_SUFFIX = re.compile(
     r"\.(?:zip|7z|rar|tar|gz|xz|rom|bin|ic\d+|chd|iso|png|jpe?g|gif|bmp|tga|ppm|"
-    r"wav|mp3|ogg|f32le|m2tr|m2in|apk|ipa|exe|dll|dylib|so|a|o|jar|"
+    r"wav|mp3|ogg|f32le|m2tr|m2in|apk|ipa|exe|dll|dylib|so|a|o|jar|elf|irx|rpk|srp|"
     r"pem|key|p8|p12|pfx|keystore|mobileprovision)$", re.I)
 GENERATED_NAME = re.compile(r"^(?:chunk_\d+\.(?:cpp|h)|gen_table\.(?:cpp|h)|snd_gen\.cpp)$", re.I)
 SECRET_RULES = {

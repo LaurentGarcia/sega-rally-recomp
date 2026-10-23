@@ -1,5 +1,44 @@
 # Third-party components
 
+## PlayStation 2 development toolchain
+
+The optional PS2 build uses the official [PS2dev](https://github.com/ps2dev/ps2dev)
+container. Exact multi-architecture and platform image digests are pinned in
+`platform/ps2/toolchain.lock.json`; the tested arm64 image is
+`sha256:6b7c60ca61f40905e0aa22c0939707d91b6df2d5d8995f45c803c14031f06015`.
+The installed EE compiler reports GCC 15.2.0. The image is the reproducible
+binary pin; separately observed repository heads do not establish which
+source revision built every installed library.
+
+[PS2SDK](https://github.com/ps2dev/ps2sdk) supplies draw, graph, DMA, packet,
+controller, fileXio and embedded IOP modules. The installed SDK `LICENSE` is
+AFL-2.0, SHA256
+`1ecee940922a6886baccddd9133d17f1ce677d32c5a954fac8e48224f2766fe8`.
+The inspected public API/source reference is
+[`329e2bb43287e16af16c4dde1c614e2662c24468`](https://github.com/ps2dev/ps2sdk/tree/329e2bb43287e16af16c4dde1c614e2662c24468).
+SDK libraries/modules are linked unchanged; no SDK sample implementation is
+copied into the project's BSD source. Binary distributions must retain the
+SDK license and source reference. Our source license does not replace its
+terms. Open IOP modules are embedded locally with the SDK's `bin2c` tool;
+generated module arrays and resulting ELFs remain outside source Git.
+
+PS2dev build scripts at observed
+[`594e2b21863a574e1923927f6349cceb87c88109`](https://github.com/ps2dev/ps2dev/tree/594e2b21863a574e1923927f6349cceb87c88109)
+use MIT terms. The installed libstdc++ headers identify GPL-3.0-or-later with
+the [GCC Runtime Library Exception 3.1](https://gcc.gnu.org/onlinedocs/libstdc++/manual/license.html).
+The compiler/toolchain and newlib retain their upstream notices. No proprietary
+Sony SDK, BIOS or firmware is included in this target.
+
+The separate local [Play!](https://github.com/jpd002/Play-) emulator is used
+only for development ELF boot tests and is not linked or redistributed. The
+downloaded macOS 0.72 DMG has SHA256
+`ad9e03164a5bfe79c99e6d9d8c04db7b706a749eba29b33bef39bb7db2a36f36`.
+The inspected upstream source reference is
+`8de4a71f5215ef38e357ac77a07948eb3424448f`; its
+[core license](https://github.com/jpd002/Play-/blob/8de4a71f5215ef38e357ac77a07948eb3424448f/License.txt)
+is BSD-2-Clause. Its bundled dependencies retain their own licenses. No
+emulator implementation was copied into this project.
+
 ## Sega Rally project base and board reference
 
 This tree starts from `alphanu1/daytona-arcade-recomp` at

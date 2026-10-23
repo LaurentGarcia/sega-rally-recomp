@@ -53,7 +53,7 @@ Geo::Geo(const std::vector<uint8_t> &polygons, const std::vector<uint8_t> &textu
     geo_.polygon_rom_mask = uint32_t(polygon_rom_.size() - 1);
 }
 
-#ifdef M2_DC_MEMORY
+#if defined(M2_DC_MEMORY) || defined(M2_PAGED_ROM)
 Geo::Geo(RomSource &rom, uint32_t *buffer) : buffer_(buffer) {
     const uint32_t polygon_words = rom.size(RomRegion::Polygons) / 4, texels = rom.size(RomRegion::Textures) / 2;
     if (!polygon_words || (polygon_words & (polygon_words - 1)) || !texels || (texels & (texels - 1)))
@@ -336,7 +336,7 @@ void Geo::model2_3d_process_polygon(raster_state *raster, uint32_t attr)
 	if (raster->command_buffer[0] & 0x800000)
 		tp = GeoPtr16{raster->texture_ram, 0x10000, raster->command_buffer[0] & 0xffff};
 	else
-#ifdef M2_DC_MEMORY
+#if defined(M2_DC_MEMORY) || defined(M2_PAGED_ROM)
 		tp = GeoPtr16{raster->texture_rom, raster->texture_rom_mask + 1, raster->command_buffer[0] & raster->texture_rom_mask, raster->rom};
 #else
 		tp = GeoPtr16{raster->texture_rom, raster->texture_rom_mask + 1, raster->command_buffer[0] & raster->texture_rom_mask};
@@ -365,7 +365,7 @@ void Geo::model2_3d_process_polygon(raster_state *raster, uint32_t attr)
 	if (raster->command_buffer[1] & 0x800000)
 		th = GeoPtr16{raster->texture_ram, 0x10000, raster->command_buffer[1] & 0xffff};
 	else
-#ifdef M2_DC_MEMORY
+#if defined(M2_DC_MEMORY) || defined(M2_PAGED_ROM)
 		th = GeoPtr16{raster->texture_rom, raster->texture_rom_mask + 1, raster->command_buffer[1] & raster->texture_rom_mask, raster->rom};
 #else
 		th = GeoPtr16{raster->texture_rom, raster->texture_rom_mask + 1, raster->command_buffer[1] & raster->texture_rom_mask};
@@ -1581,7 +1581,7 @@ GeoPtr Geo::geo_object_data(geo_state *geo, uint32_t opcode, GeoPtr input)
 	else if (oba & 0x00800000)
 	{
 		/* Polygon ROM */
-#ifdef M2_DC_MEMORY
+#if defined(M2_DC_MEMORY) || defined(M2_PAGED_ROM)
 		obp = GeoPtr{geo->polygon_rom, geo->polygon_rom_mask + 1, oba & geo->polygon_rom_mask, geo->rom};
 #else
 		obp = GeoPtr{geo->polygon_rom, geo->polygon_rom_mask + 1, oba & geo->polygon_rom_mask};
@@ -1972,8 +1972,8 @@ GeoPtr Geo::geo_test(geo_state *geo, uint32_t opcode, GeoPtr input)
 
 		for (j = 0; j < count; j++)
 		{
-#ifdef M2_DC_MEMORY
-			data = geo->rom->dword(RomRegion::Polygons, address++ * 4);
+#if defined(M2_DC_MEMORY) || defined(M2_PAGED_ROM)
+			data = geo->rom ? geo->rom->dword(RomRegion::Polygons, address++ * 4) : geo->polygon_rom[address++];
 #else
 			data = geo->polygon_rom[address++];
 #endif

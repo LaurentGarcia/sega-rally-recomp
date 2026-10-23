@@ -32,7 +32,11 @@ std::string access_message(uint32_t address, unsigned width, bool write, uint32_
 Model2AAccess::Model2AAccess(uint32_t a, unsigned w, bool wr, uint32_t v)
     : Fatal(access_message(a, w, wr, v)), address(a), value(v), width(w), write(wr) {}
 
-Model2ABus::Model2ABus(std::vector<uint8_t> program, std::vector<uint8_t> data)
+Model2ABus::Model2ABus(std::vector<uint8_t> program, std::vector<uint8_t> data
+#ifdef M2_PAGED_ROM
+                     , RomSource *rom
+#endif
+)
     : program_(std::move(program)), data_(std::move(data)), ram_(0x40000),
       work_(0x100000), buffer_(0x20000), cpu_control_(0x38), backup_(0x4000, 0xff)
 {
@@ -40,8 +44,19 @@ Model2ABus::Model2ABus(std::vector<uint8_t> program, std::vector<uint8_t> data)
     // ROM regions. The high data window aliases +16 MiB of the same region.
     if (program_.size() > 0x200000 || data_.size() > 0x2400000)
         throw Fatal("Model 2A ROM image exceeds its mapped region");
-    program_.resize(0x200000, 0);
-    data_.resize(0x2400000, 0);
+#ifdef M2_PAGED_ROM
+    rom_ = rom;
+    if (rom_) {
+        if (!program_.empty() || !data_.empty())
+            throw Fatal("paged Model2A ROMs cannot also have resident images");
+        if (rom_->size(RomRegion::Program) > 0x200000 || rom_->size(RomRegion::MainData) > 0x2400000)
+            throw Fatal("paged Model2A ROM image exceeds its mapped region");
+    } else
+#endif
+    {
+        program_.resize(0x200000, 0);
+        data_.resize(0x2400000, 0);
+    }
     // model2a_state inherits model2_state::machine_reset's display-list end
     // pattern; fresh backup1 NVRAM uses DEFAULT_ALL_1, not cleared RAM.
     for (size_t offset = 0; offset < buffer_.size(); offset += 4) {
@@ -51,6 +66,19 @@ Model2ABus::Model2ABus(std::vector<uint8_t> program, std::vector<uint8_t> data)
         buffer_[offset + 3] = 0x07;
     }
 }
+
+#ifdef M2_PAGED_ROM
+Model2ABus::RomMapping Model2ABus::rom_mapping(uint32_t address)
+{
+    if (address <= 0x001fffff)
+        return {RomRegion::Program, address, 0x200000 - address};
+    if (address >= 0x02000000 && address <= 0x03ffffff)
+        return {RomRegion::MainData, address - 0x02000000, 0x04000000 - address};
+    if (address >= 0x06000000 && address <= 0x06ffffff)
+        return {RomRegion::MainData, address - 0x06000000 + 0x1000000, 0x07000000 - address};
+    return {RomRegion::Program, 0, 0};
+}
+#endif
 
 Model2ABus::Mapping Model2ABus::mapping(uint32_t address)
 {
@@ -101,6 +129,26 @@ uint32_t Model2ABus::read(uint32_t address, unsigned width)
         ++diagnostics_.reference_gap_reads;
         return 0;
     }
+#ifdef M2_PAGED_ROM
+    if (rom_) {
+        const auto m = rom_mapping(address);
+        if (m.available) {
+            if (m.available < width) throw Model2AAccess(address, width, false, 0);
+            const uint32_t size = rom_->size(m.region);
+            uint32_t result = 0;
+            // Also handles a deliberately unaligned bus access crossing a
+            // page. Bytes beyond a short image retain resident zero padding.
+            for (unsigned i = 0; i < width; ++i) {
+                const uint32_t offset = m.offset + i;
+                if (offset < size) {
+                    const auto *p = rom_->page_fast(m.region, offset >> RomSource::kPageBits);
+                    result |= uint32_t(p[offset & (RomSource::kPageSize - 1)]) << (8 * i);
+                }
+            }
+            return result;
+        }
+    }
+#endif
     Mapping m = mapping(address);
     if (!m.data || m.available < width) throw Model2AAccess(address, width, false, 0);
     uint32_t result = 0;
@@ -134,6 +182,15 @@ void Model2ABus::write(uint32_t address, unsigned width, uint32_t value)
         diagnostics_.reference_gap_last_write = value;
         return;
     }
+#ifdef M2_PAGED_ROM
+    if (rom_) {
+        const auto m = rom_mapping(address);
+        if (m.available) {
+            if (m.available < width) throw Model2AAccess(address, width, true, value);
+            return; // ROM writes are ignored without loading a page.
+        }
+    }
+#endif
     Mapping m = mapping(address);
     if (!m.data || m.available < width) throw Model2AAccess(address, width, true, value);
     if (m.read_only) return;
@@ -158,6 +215,9 @@ uint16_t Model2ABus::flags(uint32_t address) {
     // repeat the same address and consume/produce one word per access.
     if ((address >= 0x00804000 && address <= 0x00807fff) ||
         (address >= 0x00880000 && address <= 0x00883fff)) return Cpu::BURST;
+#ifdef M2_PAGED_ROM
+    if (rom_ && rom_mapping(address).available) return Cpu::BURST;
+#endif
     return mapping(address).burst ? Cpu::BURST : 0;
 }
 

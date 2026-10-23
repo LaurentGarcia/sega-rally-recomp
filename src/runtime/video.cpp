@@ -31,15 +31,10 @@ Video::Video(const uint8_t *tile_ram, const uint8_t *char_ram)
 #ifdef M2_DC_SPEED
       // (The Dreamcast composes 16-bit layers: the 32-bit ones only if a
       // frame is ever drawn without external 3D, allocated then.)
-      screen16_(size_t(kLayerStride) * H), sys24_16_(size_t(kLayerStride) * (H + 4)),
+      screen16_(size_t(kLayerStride) * H), sys24_16_(size_t(kLayerStride) * (H + 4)) {
 #else
-      screen_(size_t(W) * H), sys24_(size_t(W) * (H + 4)),
+      screen_(size_t(W) * H), sys24_(size_t(W) * (H + 4)) {
 #endif
-#ifndef M2_DC_MEMORY
-      // (Not on the Dreamcast: its layers are screen_ and sys24_ themselves.)
-      background_gpu_(size_t(W) * H), foreground_gpu_(size_t(W) * H),
-#endif
-      gpu_tile_words_(kGpuTileWords), gpu_pens_(kGpuPens) {
     static uint64_t instances = 0;
     instance_ = ++instances;
     for (auto &p : pens_) p = rgb(0, 0, 0); // palette_device starts black
@@ -48,12 +43,14 @@ Video::Video(const uint8_t *tile_ram, const uint8_t *char_ram)
     for (auto &p : pens1555_) p = argb1555(rgb(0, 0, 0));
 #endif
     for (int i = 0; i < 256; i++) gamma_[i] = uint8_t(std::max((double(i) - 64.0) * 255.0 / 191.0, 0.0));
+#ifndef M2_COMPACT_TILEMAP
     for (int l = 0; l < 4; l++) pixmap_[l].assign(512 * 512, 0), flags_[l].assign(512 * 512, 0);
     system24_tile_generations_.resize(4 * 4096);
 #ifndef M2_VITA_RENDER_OPT
     dec_chars_.resize(0x80000);
     dec_char_dirty_.resize(0x4000);
     dec_tiles_.resize(4 * 4096);
+#endif
 #endif
 #ifdef M2_VITA_RENDER_OPT
     character_copy_.resize(0x80000);
@@ -63,6 +60,98 @@ Video::Video(const uint8_t *tile_ram, const uint8_t *char_ram)
     background_.resize(size_t(W) * (H + 4));
 #endif
 }
+
+void Video::ensure_gpu_buffers() {
+#ifdef M2_COMPACT_TILEMAP
+    system24_tile_generations_.resize(4 * 4096);
+    dec_chars_.resize(0x80000);
+    dec_char_dirty_.resize(0x4000);
+    dec_tiles_.resize(4 * 4096);
+    for (int layer = 0; layer < 4; ++layer) {
+        if (pixmap_[layer].empty()) {
+            pixmap_[layer].resize(512 * 512);
+            flags_[layer].resize(512 * 512);
+            dec_valid_ = false;
+        }
+    }
+#endif
+#ifndef M2_DC_MEMORY
+    // The CPU renderer needs neither layer copies nor GPU register snapshots.
+    // Dreamcast external presentation already consumes screen_ and sys24_.
+    const size_t pixels = size_t(width()) * H;
+    if (background_gpu_.size() != pixels) background_gpu_.assign(pixels, 0u);
+    if (foreground_gpu_.size() != pixels) foreground_gpu_.assign(pixels, 0u);
+#endif
+    gpu_tile_words_.resize(kGpuTileWords);
+    gpu_pens_.resize(kGpuPens);
+}
+
+void Video::set_external_3d(bool enabled, bool desktop) {
+    if (enabled == external_3d_ && desktop == desktop_) return;
+    external_3d_ = enabled;
+    desktop_ = desktop;
+#ifndef M2_VITA_RENDER_OPT
+    if (enabled && !desktop && margin_) set_wide_margin(0);
+#endif
+    if (enabled) {
+        ensure_gpu_buffers();
+    } else {
+        std::vector<uint32_t>().swap(background_gpu_);
+        std::vector<uint32_t>().swap(foreground_gpu_);
+        std::vector<uint16_t>().swap(gpu_tile_words_);
+        std::vector<uint32_t>().swap(gpu_pens_);
+        std::vector<uint32_t>().swap(gpu_front_source_);
+#ifdef M2_COMPACT_TILEMAP
+        for (int layer = 0; layer < 4; ++layer) {
+            std::vector<uint16_t>().swap(pixmap_[layer]);
+            std::vector<uint8_t>().swap(flags_[layer]);
+        }
+        std::vector<uint64_t>().swap(system24_tile_generations_);
+        std::vector<uint8_t>().swap(dec_chars_);
+        std::vector<uint8_t>().swap(dec_char_dirty_);
+        std::vector<uint16_t>().swap(dec_tiles_);
+        dec_valid_ = false;
+        compact_keys_.fill(-1);
+#endif
+    }
+    ++background_generation_;
+    ++foreground_generation_;
+    gpu_front_margin_ = -1;
+    render_done_ = false;
+}
+
+#ifdef M2_COMPACT_TILEMAP
+void Video::tile_row(int layer, int y, const uint16_t *&pixels, const uint8_t *&flags) {
+    y &= 511;
+    if (external_3d_) {
+        pixels = pixmap_[layer].data() + size_t(y) * 512;
+        flags = flags_[layer].data() + size_t(y) * 512;
+        return;
+    }
+    const size_t slot = size_t(y & 3);
+    const int key = layer * 512 + y;
+    if (compact_keys_[slot] != key) {
+        auto &row = compact_pixels_[slot];
+        auto &category = compact_flags_[slot];
+        for (uint32_t tx = 0; tx < 64; ++tx) {
+            const uint16_t value = tile(uint32_t(layer) * 0x1000 + uint32_t(y >> 3) * 64 + tx);
+            const uint32_t code = value & 0x3fff;
+            const uint16_t color = uint16_t(((value >> 7) & 0xff) * 16);
+            const uint8_t cat = (value & 0x8000) ? 1 : 0;
+            for (uint32_t x = 0; x < 8; ++x) {
+                const uint32_t b = code * 32 + uint32_t(y & 7) * 4 + (x >> 1);
+                const uint8_t byte = char_ram_[b ^ 1];
+                const uint8_t pixel = (x & 1) ? (byte & 0x0f) : (byte >> 4);
+                row[tx * 8 + x] = uint16_t(color + pixel);
+                category[tx * 8 + x] = uint8_t(cat | (pixel ? PIXEL_LAYER0 : 0));
+            }
+        }
+        compact_keys_[slot] = key;
+    }
+    pixels = compact_pixels_[slot].data();
+    flags = compact_flags_[slot].data();
+}
+#endif
 
 void Video::palette_w(uint32_t offset, const uint8_t *palram, const uint8_t *colorxlat) {
     const uint16_t palcolor = le16(palram, offset);
@@ -313,8 +402,10 @@ void Video::update_tile_cache() {
 // layer's pixmap to the bitmap through the 8-pixel window mask.
 M2_PIXEL_TEMPLATE void Video::draw_rect(std::vector<M2_PIXEL> &dm, const uint16_t *mask, uint16_t tpri, int flags, int win, int L, int sx,
                       int sy, int xx1, int yy1, int xx2, int yy2 M2_PENS) {
+#ifndef M2_COMPACT_TILEMAP
     const uint16_t *source = &pixmap_[L][size_t(sy) * 512 + size_t(sx)];
     const uint8_t *trans = &flags_[L][size_t(sy) * 512 + size_t(sx)];
+#endif
     M2_PIXEL *dest = &dm[size_t(yy1) * size_t(dw_) + size_t(xx1)];
     tpri |= PIXEL_LAYER0;
     mask += yy1 * 4;
@@ -325,6 +416,13 @@ M2_PIXEL_TEMPLATE void Video::draw_rect(std::vector<M2_PIXEL> &dm, const uint16_
         mask++;
     }
     for (int y = 0; y < yy2; y++) {
+#ifdef M2_COMPACT_TILEMAP
+        const uint16_t *source;
+        const uint8_t *trans;
+        tile_row(L, sy + y, source, trans);
+        source += sx;
+        trans += sx;
+#endif
 #ifdef M2_DC_SPEED
         // A row where no tile of this category has an opaque pixel draws
         // nothing (unless drawing opaque).
@@ -392,8 +490,10 @@ M2_PIXEL_TEMPLATE void Video::draw_rect(std::vector<M2_PIXEL> &dm, const uint16_
             llx -= 128;
             cur_x = 0;
         }
+#ifndef M2_COMPACT_TILEMAP
         source += 512;
         trans += 512;
+#endif
         dest += dw_;
         mask += 4;
     }
@@ -452,11 +552,20 @@ M2_PIXEL_TEMPLATE void Video::tilemap_draw(std::vector<M2_PIXEL> &dm, int L, int
         }
     }
 #else
-    for (int y = std::max(miny, 0); y <= std::min(maxy, H - 1); y++)
+    for (int y = std::max(miny, 0); y <= std::min(maxy, H - 1); y++) {
+#ifdef M2_COMPACT_TILEMAP
+        const uint16_t *pixels;
+        const uint8_t *trans;
+        tile_row(L, y + sy, pixels, trans);
+#else
+        const auto *pixels = pixmap_[L].data() + size_t((y + sy) & 511) * 512;
+        const auto *trans = flags_[L].data() + size_t((y + sy) & 511) * 512;
+#endif
         for (int x = std::max(minx, 0); x <= std::min(maxx, dw_ - 1); x++) {
-            const size_t i = size_t((y + sy) & 511) * 512 + size_t((x + sx) & 511);
-            if ((flags_[L][i] & mask) == value) dm[size_t(y) * size_t(dw_) + size_t(x)] = M2_PEN[pixmap_[L][i]];
+            const size_t i = size_t((x + sx) & 511);
+            if ((trans[i] & mask) == value) dm[size_t(y) * size_t(dw_) + size_t(x)] = M2_PEN[pixels[i]];
         }
+    }
 #endif
 }
 
@@ -689,6 +798,15 @@ void Video::screen_update(const std::vector<GeoPoly> &polys, int windows, const 
 #ifdef M2_VITA_RENDER_OPT
     update_tile_cache();
 #else
+#ifdef M2_COMPACT_TILEMAP
+    if (!external_3d_) {
+        // RAM is stable for one screen_update. Drop keys each time so raw
+        // replay writes and tracked machine writes have identical behavior.
+        compact_keys_.fill(-1);
+        dec_valid_ = false;
+        character_memory_touched_ = tile_memory_touched_ = false;
+    } else
+#endif
     decode_layers();
 #endif
     if (system24_source_dirty_) {
@@ -1118,8 +1236,7 @@ void Video::set_wide_margin(int margin) {
     set_raster_hud_moves();
     screen_.assign(size_t(width()) * H, 0u);
 #ifndef M2_DC_MEMORY
-    background_gpu_.assign(screen_.size(), 0u);
-    foreground_gpu_.assign(screen_.size(), 0u);
+    if (external_3d_) ensure_gpu_buffers();
 #endif
     ++background_generation_; ++foreground_generation_;
     raster_.set_wide_margin(margin_);
