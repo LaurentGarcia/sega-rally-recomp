@@ -46,15 +46,17 @@ BRINGUP_LIBRARIES = ["draw", "graph", "dma", "packet", "patches", "pad", "m"]
 NATIVE_TOOLKIT_SOURCES = (
     "platform/ps2/src/native_display.cpp",
     "platform/ps2/src/native_frame.cpp",
+    "platform/ps2/src/native_geometry.cpp",
     "platform/ps2/src/pad_input.cpp", "platform/ps2/src/storage.cpp",
     "platform/ps2/src/audio_output.cpp", "platform/ps2/src/vu0_pack.cpp",
 )
 NATIVE_SOURCES = ["platform/ps2/native/main.cpp", "platform/ps2/native/race_progress.cpp",
                   "platform/ps2/native/car_pose.cpp", "platform/ps2/native/angle_fold.cpp",
+                  "platform/ps2/native/orientation.cpp",
                   *NATIVE_TOOLKIT_SOURCES]
 NATIVE_TOOLKIT_HEADERS = {
     "audio_output.h", "pcm_protocol.h", "pcm_resampler.h", "pcm_ring.h",
-    "native_display.h", "pad_input.h", "pad_state.h", "debug_controls.h", "storage.h", "vu0_pack.h", "diagnostic_font.h",
+    "native_display.h", "native_geometry.h", "pad_input.h", "pad_state.h", "debug_controls.h", "storage.h", "vu0_pack.h", "diagnostic_font.h",
 }
 NATIVE_IOP_SOURCES = ("platform/ps2/iop/pcm_server.c", "platform/ps2/iop/imports.c")
 LIMITATIONS = [

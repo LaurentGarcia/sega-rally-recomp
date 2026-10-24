@@ -65,7 +65,7 @@ or TestFlight release.
 
 **PlayStation 2 development:** a [native rewrite](docs/ps2-native-rewrite.md)
 targets the EE, VU, GS and IOP/SPU2 directly. Its independent bootstrap excludes
-the arcade CPU and device models; three recovered game routines have passed
+the arcade CPU and device models; four recovered native components have passed
 private original-program comparisons. Physics, collision and the race loop
 remain to be migrated. The translated game-core probe stays a separate
 behavioral reference. See the [PS2 build guide and limits](docs/ps2.md).

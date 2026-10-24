@@ -1,5 +1,90 @@
 # Handoff
 
+## PS2 transfer completion, geometry and orientation (2026-10-24)
+
+Checkpoint b6f0064 is published on port/ps2; all six remote workflows passed,
+including every desktop compiler, PS2 native/audio/vector cross-builds, Metal,
+Vulkan and Vita. The push response eventually timed out after publication;
+GitHub's ref and a fresh fetch independently confirmed the exact commit, and
+the local remote-tracking branch is synchronized. Its exact tree/archive
+passed build/ps2/validation/manual-study-source-001.json.
+
+The subsequent long VU1 timeout is now isolated to Play 0.72's final-qword
+VIF/DMA resume path. A stalled command can remain in the prefetched final
+qword after QWC reaches zero and STR clears; later DMA resume is gated by STR
+and CountTicks does not drain the retained VIF buffer. Appending one optional
+qword of VIF NOPs after the unchanged FLUSHE/MARK allows the same microcode,
+workload and timeout to finish. This is an emulator transport diagnostic,
+not a requirement of PS2 hardware. The no-padding failure remains preserved.
+Primary-source functions and exact hashes are recorded in
+build/ps2-vif-tail-study/source-findings.json. No emulator implementation was
+modified or imported.
+
+The padded fixture passes 300 VU1 submissions, 700,416 complete-memory word
+comparisons and 12,400 independent VU0 fixed-coordinate checks. Fingerprints
+are 03ca33026fb14bc9 (VU1) and a7a419b86e81da5f (VU0). Its ELF SHA256 is
+c8b537fac69c78b5adb2042278b6688d306f1738b5d308d9ac978a1c7353cb48.
+Eight samples retain a pending MARK before and after VU0 work. This proves
+work before pipeline completion, not simultaneous instruction issue or speed.
+Play's CFC2 VPU-STAT case explicitly returns architectural zero, so busy-state
+observation is separately INCONCLUSIVE. The 1,794,216 requested repeated
+vertex evaluations are neither unique cases nor measured throughput; checking
+final outputs can miss transient errors overwritten by later repetitions.
+Evidence: build/ps2-dual-vu-resume-001/runtime-validation.json. The default
+baseline also reran successfully with its unchanged ELF and fingerprint;
+see build/ps2-vu1-resume-baseline-001/runtime-validation.json. Select both
+--dual-unit and --trailing-nop-qword to reproduce the passing combined test.
+
+A fourth typed native component recovers the integrator's final orientation
+tail at ROM 0x2e560..0x2e638. It folds all three bounded channels, then clamps
+only first/third to signed round32(pi/8), with the observed strict binary64
+threshold. Integer bit operations preserve exact final values and atomic
+rejection. Pitch/yaw/roll names, axis conventions and caller bounds/cadence
+remain unproven; it stays disconnected from the diagnostic loop.
+The private original-tail comparison passed 294,300 evaluations (294,260
+unique triples), 882,900 channel operations and 25,111,815 original instructions;
+fingerprint 40f5b5992d4371cc. Host tests and sanitizers pass 321,331 checks.
+A standalone EE fixture passed 27,031 checks in Play during a 17.084-second
+run, ELF cc3fbf750b7876d10caf39017d75842bd78a29fc10cd99901ab54a61312bd21b.
+Evidence: build/ps2-native-orientation-validation-001/result.json.
+
+The new original native geometry reference clips seven homogeneous planes,
+interpolates raw texel UV before reciprocal depth and emits ordered native
+triangles through fixed scratch/output staging. Invalid data, insufficient
+capacity and numerical failures leave caller storage unchanged. This explicit
+platform convention is not a recovered game camera/projection contract.
+Host tests and ASan/UBSan pass 280,831 checks, including 20,000 triangles
+against an independent exact rational barycentric oracle. The EE fixture
+passes 322 selected checks with the matching fingerprint fe8dc06b88de7a24;
+ELF b74b7e906f5d7c45377795f259a46b380b28c9160ade6d43de3658c1fbbd171b.
+Disassembly confirms software-double helpers and a 2,304-byte own stack frame
+before callees. Its cost is unmeasured; it remains outside the active renderer.
+Evidence: build/ps2/validation/native-geometry-001.json; contract and VU output
+budget: docs/ps2-native-geometry.md. Do not fit 96 input vertices plus worst-case
+clipping expansion into a 96-output-vertex bank: it holds 32 output triangles,
+or only four input triangles at the eight-fan worst case.
+
+The final local PS2 suite passes all 68 tests in 22.174 seconds. Both new
+modules are in the native source inventory; main remains unchanged. The
+inventory-only driver update reproduces the executed padded VU ELF byte for
+byte in build/ps2-dual-vu-inventory-002, so no additional numerical run was
+needed for that artifact. The initial sandboxed attempt lacked Docker socket
+access; its failed output remains preserved separately.
+
+The native-006 bootstrap cross-links with 30 verified project input hashes
+and a passing forbidden-runtime symbol audit. ELF SHA256:
+52ab97be39d4897c48e637f25a4deb780c183b613628514c56516cf497deeb18;
+2,024,916 file bytes, 450,088 resident bytes before dynamic allocations.
+It ran for 17.249 seconds in Play, with 19 samples through frame 960: two
+diagnostic triangles, initialized audio and zero sampled ring-empty/late-service
+events; guest stderr was empty. The owned process was reaped. macOS window
+capture failed with 'could not create image from window'; do not claim a new
+screenshot. The last successful native-004 capture was shown with that label.
+Visual/gameplay content remains unchanged: diagnostic page and original test
+geometry, no car/course or connected native race loop. Exact runtime evidence
+is build/ps2-native-006/runtime-validation.json. Physical PS2, interactive
+controller behavior and audible output remain separate checks.
+
 ## PS2 manual study, native arithmetic and service fixes (2026-10-23)
 
 The completed native foundation was pushed as 69b4726 after the exact tree and

@@ -51,7 +51,7 @@ def load_build_helpers():
     return module
 
 
-def build(output: Path, dual_unit: bool = False) -> dict:
+def build(output: Path, dual_unit: bool = False, trailing_nop_qword: bool = False) -> dict:
     # Revalidate immediately before creating anything or starting Docker.
     output = resolve_output(output)
     initial = fingerprints()
@@ -61,8 +61,10 @@ def build(output: Path, dual_unit: bool = False) -> dict:
     report = {"schema": 1, "scope": "original ROM-free VIF1/VU1 transform/readback fixture",
               "status": "build_failed", "source_sha256": initial,
               "mode": "dual_unit_diagnostic" if dual_unit else "baseline_numerical",
-              "compiler_defines": ["_EE"] + (["RALLY_DUAL_VU_TEST=1"] if dual_unit else []),
+              "compiler_defines": ["_EE"] + (["RALLY_DUAL_VU_TEST=1"] if dual_unit else [])
+                                  + (["RALLY_VIF_TRAILING_NOP=1"] if trailing_nop_qword else []),
               "dual_unit_enabled": dual_unit,
+              "trailing_nop_qword": trailing_nop_qword,
               "dual_unit_scope": "Optional VU0 final XYZ conversion before the outstanding VIF1/VU1 completion fence",
               "limitations": ["No game or drawing", "No XGKICK", "No physical console validation",
                               "Cross-compilation does not prove execution or numerical results"]}
@@ -77,6 +79,8 @@ def build(output: Path, dual_unit: bool = False) -> dict:
                     "-I" + runner.sdk + "/common/include", "-I" + runner.path(HERE.parent / "include")]
         if dual_unit:
             compile_flags.append("-DRALLY_DUAL_VU_TEST=1")
+        if trailing_nop_qword:
+            compile_flags.append("-DRALLY_VIF_TRAILING_NOP=1")
         runner.run([*compile_flags, "-c", runner.path(SOURCES[0]),
                     "-o", "/out/fixture.o"], "compile")
         runner.run([*compile_flags, "-c", runner.path(SOURCES[2]),
@@ -106,9 +110,11 @@ def main(argv=None) -> int:
                         help="New or empty directory beneath build/; previous evidence is never overwritten")
     parser.add_argument("--dual-unit", action="store_true",
                         help="Enable the separate, artificial-load VU0/VU1 cooperation diagnostic")
+    parser.add_argument("--trailing-nop-qword", action="store_true",
+                        help="Append one diagnostic VIF NOP qword after every unchanged fence/MARK")
     args = parser.parse_args(argv)
     try:
-        report = build(resolve_output(args.output), args.dual_unit)
+        report = build(resolve_output(args.output), args.dual_unit, args.trailing_nop_qword)
     except (OSError, ValueError, RuntimeError) as error:
         print("VU1 fixture build failed: " + str(error), file=sys.stderr)
         return 1

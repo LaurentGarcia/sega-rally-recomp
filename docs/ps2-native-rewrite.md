@@ -74,12 +74,16 @@ that scene or a ROM-free hardware test.
 | [Race progress counters](../platform/ps2/native/race_progress.md) | Positive-only timer decrement, two wrapping counters and two bounded counter banks | 32,768 cases; 735,250 original instructions |
 | [Car pose publication](../platform/ps2/native/car_pose.md) | Copy raw pose values and merge observed persistent flags into a distinct render state | 65,536 cases; 3,670,016 original instructions |
 | [Bounded angle fold](../platform/ps2/native/angle_fold.md) | One correction around ±pi within a specified finite domain, using exact integer arithmetic and explicit final rounding | 16,844,326 cases; 328,030,729 original instructions |
+| [Orientation finalization](../platform/ps2/native/orientation.md) | Fold all three channels, then bound first/third to signed pi/8; atomic rejection outside the recovered domain | 294,300 evaluations, 294,260 unique triples; 25,111,815 original instructions |
 
-All three components have portable boundary tests, sanitizer checks and standalone
+All four components have portable boundary tests, sanitizer checks and standalone
 EE fixtures executed successfully in Play: 121 progress boundary/rejection
 checks plus repeated updates, and all 65,536 pose flag pairs with raw-value
 and repeated-publication checks. The angle fixture passed 36,262 EE checks;
 the exhaustive folded interval is covered by its host original-program oracle.
+Orientation finalization passed 27,031 EE checks; its axis meanings and live
+caller domain remain unproven. It recovers a tail region of the integrator,
+not an additional standalone original function.
 The original-program comparisons run on the host against the
 owner's verified Revision B image; the reference interpreter and memory
 adapters are not part of the native executable. The components are compiled
@@ -92,6 +96,10 @@ is not recovered merely because its angle helper matches.
 
 The [hardware study](ps2-architecture-study.md) records the complete local
 manual collection, specific constraints and the executed VU1 experiments.
+The [native clipping reference](ps2-native-geometry.md) provides bounded
+homogeneous clipping and ordered triangle output. Its selected EE checks
+pass, but it uses unmeasured software-double arithmetic and remains outside
+the active draw loop. It does not establish recovered game projection.
 
 ## Build and check
 
@@ -117,17 +125,17 @@ moves the original checkerboard test geometry; holding Cross submits a quiet
 original 440 Hz tone. PCM refill follows the IOP queue independently of
 PAL/NTSC display cadence. No game files or reference-probe `rally.cfg` are read.
 
-The frozen `native-004` ELF (SHA-256
-`8e089ac653569c56606ea66b453ad57a4ea6193050798e16866339b0a144f84a`)
-ran for 17 seconds in Play 0.72 with its HLE BIOS and Vulkan renderer. The
-readable diagnostic page, two submitted triangles, initialized PCM transport
-and zero ring-empty/late-service counters were observed at all 19 checkpoints
-through frame 960. That is a diagnostic loop in an emulator, not game or
-physical-console performance. Controller interaction, measured speaker output
-and actual hardware still require separate validation.
+The frozen `native-006` ELF (SHA-256
+`52ab97be39d4897c48e637f25a4deb780c183b613628514c56516cf497deeb18`)
+ran for 17.249 seconds in Play 0.72 with its HLE BIOS and Vulkan renderer.
+Guest logs recorded two submitted triangles, initialized PCM transport and
+zero ring-empty/late-service counters at all 19 checkpoints through frame 960.
+All 30 project input hashes and the forbidden-runtime symbol audit pass;
+load segments occupy 450,088 bytes before dynamic allocation.
 
-The subsequent `native-005` ELF includes a controller-negotiation status-label
-correction and passed cross-linking, source and symbol checks. Its SHA-256 is
-`b6495ccdc3498c1d948d3103e900c1c7d2feee725c09e5e42be7a52ad7cec5ce`;
-its load segments occupy 450,088 bytes before dynamic allocation. It has not
-been executed; the earlier runtime evidence applies specifically to native-004.
+Its visible content is still the original diagnostic geometry and status
+page. The recovered game components and clipping reference remain unconnected
+to the active loop. Window capture failed on this run; the last successful
+visual capture is native-004. These are bootstrap checks in an emulator,
+not gameplay or physical-console performance. Controller interaction,
+measured speaker output and actual hardware require separate validation.

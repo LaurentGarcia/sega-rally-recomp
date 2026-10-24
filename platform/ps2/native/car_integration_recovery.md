@@ -54,9 +54,11 @@ and uses divisors at `+0x50` through `+0x5c`. This alone does not prove units,
 mass/inertia interpretation, gravity scale, axis order or integration timestep.
 
 At the end, three explicit calls fold the orientation values once around pi.
-The first and third values then have separate bounds involving pi/8. Those
-post-fold bounds have not been included in the new angle component. The
-middle angle is not subjected to that same final bound. Calling these axes
+The first and third values then have separate bounds involving pi/8. The
+[orientation finalization component](orientation.md) now composes the three
+folds and those bounds, with an explicit restricted input domain and private
+original-tail comparison. The middle angle is not subjected to that same
+final bound. Calling these axes
 pitch, yaw and roll remains a hypothesis until their coordinate transforms and
 recorded car states establish the mapping.
 
@@ -79,5 +81,7 @@ by the explicit dyadic proof, avoiding that uncertainty for its result alone.
    established; compare recorded full-course behavior afterward.
 
 The recovered [angle operation](angle_fold.md) is a real dependency with an
-explicit restricted contract and exhaustive folded-interval comparison. It
-does not yet make the car integration routine native or the rewrite playable.
+explicit restricted contract and exhaustive folded-interval comparison. The
+[orientation tail](orientation.md) adds the established three-channel order
+and asymmetric bounds. These components do not yet make the car integration
+routine native or the rewrite playable.

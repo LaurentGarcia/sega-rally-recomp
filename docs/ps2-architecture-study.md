@@ -148,13 +148,13 @@ untested.
 
 ## Validation order
 
-The immediate work is the confirmed audio correction, isolated VU1 numerical
-execution, and recovery of actual car mathematics. Each proceeds with original
-fixtures and retained private original-program comparisons. Then add bounded
-native mesh submission, clipping and PATH1 rendering, followed by carefully
-measured overlap. Complete game replays and a physical PS2 remain the final
-tests; manual peak rates and emulator display counters are not game-speed
-certification.
+The audio correction, isolated VU1 numerical execution and selected recovered
+car operations now have recorded tests. The bounded
+[clipping reference](ps2-native-geometry.md) also passes selected EE checks;
+its software-double cost is unmeasured. Next come the remaining game contracts,
+measured native mesh submission and PATH1 rendering. Complete game replays
+and a physical PS2 remain the final tests; manual peak rates and emulator
+display counters are not game-speed certification.
 
 ## Executed VU1 experiment
 
@@ -189,7 +189,7 @@ has no cases for those reads. Bank verification instead uses addresses written b
 VU1's XTOP instruction and complete memory/sentinel comparisons, keeping the
 actual ownership test.
 
-## Cooperation diagnostic: unresolved
+## Cooperation diagnostic and transfer completion
 
 The first combined run preserved 12,400 independently checked VU0 output
 components and all VU1 data, but observed no outstanding work at VU0 entry.
@@ -197,27 +197,44 @@ Play's [launch implementation](https://github.com/jpd002/Play-/blob/0.72/Source/
 executes up to 100 quotas of 5,000 instructions before returning to the EE.
 Submission order alone therefore did not establish overlap.
 
-A separate bounded stress entry repeats the same transforms. A two-iteration
-control passes; a 1,024-iteration control reaches the existing 300-million
-CP0-tick timeout before any VU0 conversion runs. This isolates that failure
-from VU0 conversion, but its cause remains unresolved. The default fixture
-keeps the passing baseline; reproduce the unresolved diagnostic explicitly:
+A separate bounded stress entry repeats the same transforms. The initial
+two-iteration control passed, but a 1,024-iteration control timed out before
+any VU0 conversion. Investigation isolated a Play 0.72 transport issue: its
+[VIF reader](https://github.com/jpd002/Play-/blob/0.72/Source/ee/Vif.cpp)
+can retain a waiting command inside the final prefetched qword after its
+[DMA channel](https://github.com/jpd002/Play-/blob/0.72/Source/ee/Dmac_Channel.cpp)
+reaches QWC zero and clears STR. The later resume path requires STR, while
+VIF CountTicks does not process the retained buffer.
+
+One optional qword of VIF NOPs after FLUSHE/MARK leaves unread DMA payload
+for the resume path. With that single change, the same microcode, numerical
+workload and 300-million CP0-tick timeout complete successfully. This padding
+is an emulator diagnostic option, not a PS2 hardware requirement. Reproduce:
 
 ```sh
-python3 platform/ps2/tools/build_vu1_fixture.py --dual-unit \
+python3 platform/ps2/tools/build_vu1_fixture.py --dual-unit --trailing-nop-qword \
   --output build/ps2-dual-vu-check
 ```
 
-The timeout is retained. No cooperation, simultaneous execution or speedup
-claim follows from these results. Busy-register snapshots are diagnostic
-observations, not proof of physical instruction issue. Repeated final outputs
-also cannot detect transient corruption overwritten by a later iteration;
-the vertex counter records requested work, not measured execution. Production
-VU1 rendering remains disabled pending the required numerical and ownership
-validation.
+The combined numerical fixture passes **300 VU1 submissions, 700,416 full-memory
+word comparisons and 12,400 VU0 fixed-coordinate checks**. Fingerprints are
+`03ca33026fb14bc9` and `a7a419b86e81da5f` respectively. Its ELF SHA-256 is
+`c8b537fac69c78b5adb2042278b6688d306f1738b5d308d9ac978a1c7353cb48`.
+Eight samples retain a pending completion MARK before and after VU0 work:
+VU0 executes while the submitted pipeline is incomplete.
+
+That does not establish simultaneous instruction issue or a speedup. Play's
+[CFC2 VPU-STAT implementation](https://github.com/jpd002/Play-/blob/0.72/Source/ee/COP_VU.cpp)
+returns architectural zero rather than VU state, so busy observation remains
+explicitly inconclusive. The 1,794,216 requested repeated vertex evaluations
+are neither unique test cases nor measured throughput. Repeated final outputs
+cannot detect transient corruption overwritten by a later iteration. Production
+VU1 rendering remains disabled; this experiment performs no drawing/XGKICK
+and has not been tested on a physical PS2.
 
 The current default baseline was rebuilt and executed independently: ELF
 SHA-256 `d185235be35d70a5611409c8614bd1ca18739636fa2209996bb1e9b5306c78d6`,
 168 submissions, 430,080 complete-memory comparisons and the unchanged
-fingerprint `232e0bdb6fed9a5f`. The optional diagnostic's unresolved result
-does not replace this baseline execution record.
+fingerprint `232e0bdb6fed9a5f`. The unpadded long-control failure remains
+preserved as the discriminator; neither it nor the optional padded path
+replaces this baseline execution record.

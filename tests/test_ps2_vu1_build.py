@@ -80,7 +80,15 @@ class Vu1BuildBoundaryTests(unittest.TestCase):
                         patch.object(BUILDER, "build", return_value={"elf": {}}) as build, \
                         redirect_stdout(io.StringIO()):
                     self.assertEqual(BUILDER.main(arguments), 0)
-                build.assert_called_once_with(output, enabled)
+                build.assert_called_once_with(output, enabled, False)
+
+    def test_padding_control_is_explicit_and_independent(self):
+        output = self.root / "build/fixture"
+        with patch.object(BUILDER, "resolve_output", return_value=output), \
+                patch.object(BUILDER, "build", return_value={"elf": {}}) as build, \
+                redirect_stdout(io.StringIO()):
+            self.assertEqual(BUILDER.main(["--dual-unit", "--trailing-nop-qword"]), 0)
+        build.assert_called_once_with(output, True, True)
 
 
 if __name__ == "__main__":
