@@ -5,6 +5,15 @@ model. No generic car physics or mechanically lifted implementation is used.
 It follows the governing design's PS2 native-rewrite exception and its
 requirement to prove arithmetic before optimization.
 
+The original map below covers one integration route. Actual driving observation
+now distinguishes it from the alternate selected by object field `+0xe8`.
+The dispatcher calls `0x2cce0` for value zero and `0x2e650` for value one;
+value two takes an inline path. These values do not yet establish car type or
+player/AI identity. In the bounded nineteen-event Lancia driving replay,
+frames 2200 through 2800 reached the alternate and its shared velocity/blend
+1,202 times, but never entered the first integrator. Native work must follow
+this executed path rather than assume every static label is the live caller.
+
 ## Verified identity and dependencies
 
 The address-only integrator lead is Revision B ROM `0x2cce0`, 6,508 bytes,
@@ -19,7 +28,7 @@ has executed during a race.
 | `0x30e00` | `0x2cdd4` | Prior velocity-step address label; mutates the same object |
 | `0x2f8a0` | `0x2ce54` | Prior contact-solve label; receives object plus candidate vectors |
 | `0x30320` | `0x2d294` | Calls `0x2b0b0`, with a conditional `0x30380` path; the latter also exchanges TGP data |
-| `0x2abc0` | `0x2d2d4` | Table-query dependency receiving the pointer stored at `0x214354` and the object's signed halfword at `+0x88` |
+| `0x2abc0` | `0x2d2d4` | Query preparation receiving the descriptor selector stored at `0x214354` and the object's signed halfword at `+0x88`; see [neighborhood recovery](contact_neighborhood.md) |
 | `0x30140` | `0x2d328` | Four-iteration contact loop; calls `0x2acc0`, updates per-slot values and packed result bits |
 | `0x27b28` | `0x2e568`, `0x2e578`, `0x2e588` | One-step angle folding; first isolated arithmetic component |
 
@@ -68,6 +77,20 @@ replacing the whole routine with fused VU arithmetic would change the contract.
 The reference interpreter's general host-double limitation still applies.
 The bounded angle leaf is exceptional: its intermediate subtraction is exact
 by the explicit dyadic proof, avoiding that uncertainty for its result alone.
+
+The shared velocity helper now has an independently recovered
+[planar direction blend](direction_blend.md), and the contact-query preparation
+has a typed [cyclic neighborhood selector](contact_neighborhood.md). Their
+isolated original-program and EE checks do not implement the surrounding
+transforms, intersection search or force calculations.
+
+The alternate's orientation update is different from the first integrator's
+three-fold/pi-over-eight tail. It folds a stack-resident candidate triple, then
+uses wrapped differences and separate smoothing/step rules. The existing
+`finalize_orientation` function must not be substituted for this path. Its
+arithmetic boundaries and live input domain require separate recovery; the
+[executed-path dependency note](velocity_step_recovery.md) records the next
+boundaries and corrects an earlier attribution beyond the alternate's return.
 
 ## Next validation boundary
 

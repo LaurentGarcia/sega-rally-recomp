@@ -1,6 +1,12 @@
 #include "runtime/model2a_machine.h"
 #include "runtime/model2a_clock.h"
 #include "runtime/gen_support.h"
+#ifdef RALLY_OFFLINE_DRIVING_CAPTURE
+#if defined(_EE) || defined(RALLY_PS2_EE)
+#error "Driving capture belongs only in the offline host reference"
+#endif
+#include "platform/ps2/tools/driving_capture.h"
+#endif
 #ifdef M2_SRALLY_CONTROL
 #include "runtime/model2a_control.h"
 #endif
@@ -306,6 +312,11 @@ struct Model2AMachine::Impl {
             // Only a known generated label calls here. Record its attempted
             // instruction before live-word guards, never a missing target.
             self.previous_dispatch = self.cpu.m_IP;
+#ifdef RALLY_OFFLINE_DRIVING_CAPTURE
+        if (action == BoundaryAction::Continue)
+            ::ps2::offline::observe_driving_instruction(self.cpu,self.schedule.count,
+                                                       self.frames_rendered,self.clock.now_ns());
+#endif
         return action;
     }
 #endif

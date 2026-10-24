@@ -84,8 +84,10 @@ that scene or a ROM-free hardware test.
 | [Car pose publication](../platform/ps2/native/car_pose.md) | Copy raw pose values and merge observed persistent flags into a distinct render state | 65,536 cases; 3,670,016 original instructions |
 | [Bounded angle fold](../platform/ps2/native/angle_fold.md) | One correction around ±pi within a specified finite domain, using exact integer arithmetic and explicit final rounding | 16,844,326 cases; 328,030,729 original instructions |
 | [Orientation finalization](../platform/ps2/native/orientation.md) | Fold all three channels, then bound first/third to signed pi/8; atomic rejection outside the recovered domain | 294,300 evaluations, 294,260 unique triples; 25,111,815 original instructions |
+| [Planar direction blend](../platform/ps2/native/direction_blend.md) | Explicit rounded dot/weight/interpolation for bounded component pairs; no EE floating arithmetic dependency | 305,824 cases; 5,607,871 original instructions |
+| [Contact neighborhood](../platform/ps2/native/contact_neighborhood.md) | Ordered cyclic indices from an explicit count and signed segment; no intersection or forces | 524,288 query-preparation cases; eight separate firmware count queries |
 
-All four components have portable boundary tests, sanitizer checks and standalone
+The first four components have portable boundary tests, sanitizer checks and standalone
 EE fixtures executed successfully in Play: 121 progress boundary/rejection
 checks plus repeated updates, and all 65,536 pose flag pairs with raw-value
 and repeated-publication checks. The angle fixture passed 36,262 EE checks;
@@ -93,6 +95,9 @@ the exhaustive folded interval is covered by its host original-program oracle.
 Orientation finalization passed 27,031 EE checks; its axis meanings and live
 caller domain remain unproven. It recovers a tail region of the integrator,
 not an additional standalone original function.
+The direction blend also passed a 6,032-case EE probe and atomic rejection
+tests; the neighborhood passed 1,179,642 EE boundary checks. These execute
+standalone native arithmetic in Play, not a connected driving loop.
 The original-program comparisons run on the host against the
 owner's verified Revision B image; the reference interpreter and memory
 adapters are not part of the native executable. The components are compiled
@@ -100,8 +105,18 @@ by the native target but remain unconnected to its diagnostic loop and may
 be removed by linker garbage collection. None establishes car physics,
 coordinate conventions, collision, caller cadence or a complete race system.
 The [car integration dependency map](../platform/ps2/native/car_integration_recovery.md)
-records the remaining data and arithmetic contracts. The larger integrator
-is not recovered merely because its angle helper matches.
+records the remaining data and arithmetic contracts and the alternate route
+actually reached by the driving replay. That route has different orientation
+smoothing; the existing three-channel finalizer cannot stand in for it. Neither
+complete integrator is recovered merely because its smaller helpers match.
+
+The separate [driving observer](../platform/ps2/tools/driving_capture.md) now
+records that actual route using the existing cabinet replay. All 2,850 captured
+and observer-disabled frame checkpoints match; both new native components agree
+with all 32 sampled live calls. Two observed objects each update once per frame
+in that bounded window. Their player/AI ownership and full caller domains remain
+unproven. The native PS2 application still does not connect these components
+into driving gameplay.
 
 The [hardware study](ps2-architecture-study.md) records the complete local
 manual collection, specific constraints and the executed VU1 experiments.
@@ -143,14 +158,16 @@ GS geometry with depth testing. Left/Right step the orbit; L1/R1 change distance
 Both vector units are inactive for its solid triangles. Recovered game systems,
 original textures, collision, driving and game audio remain unconnected.
 
-The latest source-bound `native-010` build reproduces the executed `native-009`
+The latest source-bound `native-013` build reproduces the executed `native-011`
 ELF byte for byte (SHA-256
-`1464d12f8ca51588dfbcd4fd5e6c636e69b84927b1b40481a46bcc8106a5fb8f`).
-The 10.062-second Play 0.72 HLE/Vulkan run visibly rendered the private six-object
+`2338119372579ee7012ec95fcd43f5210d8382cb112d6f4dbce9d3fc8f050158`).
+The 10.212-second Play 0.72 HLE/Vulkan run visibly rendered the private six-object
 car mesh, with flat study shading and a diagnostic caption. All 1,040 triangles
-were submitted and guest stderr was empty. The 34-source dependency audit and
-forbidden-runtime symbol check pass; load segments occupy 592,304 bytes before
+were submitted and guest stderr was empty. The 38-source dependency audit and
+forbidden-runtime symbol check pass; load segments occupy 593,080 bytes before
 dynamic allocation. Earlier native-008 runs also checked the no-asset bootstrap.
+The new direction and neighborhood components have separate EE fixture evidence;
+they remain unused and are discarded from this diagnostic ELF by the linker.
 
 A separate original depth fixture passed 206,609 quantization checks and read
 512 exact RGB samples from GS memory with zero mismatches, covering solid and
@@ -158,6 +175,6 @@ textured draw ordering, the diagnostic page and depth clearing on return.
 This validates those sampled regions in Play, not original-game image fidelity
 or physical PS2 behavior. The visible car is a static study: the emulator's
 frame-rate overlay is not a native gameplay or console performance measurement.
-Private records remain under `build/ps2-native-010/` and
+Private records remain under `build/ps2-native-013/` and
 `build/ps2-native-depth-wrapper-004/`. Controller interaction, speaker output
 and physical hardware still need separate validation.

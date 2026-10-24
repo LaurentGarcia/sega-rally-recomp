@@ -33,7 +33,7 @@ might later discard. A folder name alone does not confer permission.
 | Role | Current files | Permitted project dependencies |
 | --- | --- | --- |
 | Engine | Native display, frame validation, clipping, VU0 packing, pad hardware, storage, PCM transport and IOP module | Explicit engine inventory only |
-| Rally game | Recovered progress, pose, angle-fold and orientation components | Own game role and engine |
+| Rally game | Recovered progress, pose, angle-fold, orientation, direction-blend and contact-neighborhood components | Own game role and engine |
 | Geometry study | `native_mesh`, `native_scene`, captured-view transforms and fitted camera | Own study role and engine |
 | Rally application | `platform/ps2/native/main.cpp` | Rally game, study and engine |
 | Original demo | `platform/ps2/samples/engine_demo/main.cpp` | Demo and engine |

@@ -1,5 +1,130 @@
 # Handoff
 
+## Native driving contracts and actual caller recovery (2026-10-24)
+
+Checkpoint 48294f1 is published and all five triggered workflows passed,
+including the previously pending general Build. The next work follows the
+governing native-runtime exception: typed game behavior and separate offline
+original-program evidence, with no arcade processor/device runtime in the
+native target. These changes do not connect a playable race loop.
+
+Two additional game components are independently recovered. The planar
+direction blend preserves the original rounded dot, upper-capped weight and
+separately rounded interpolation for component pairs in [-1,1]. Original
+bounded integer dyadic arithmetic avoids EE floating behavior, preserves signed
+zero/subnormals and allows output aliasing; outside-domain inputs reject without
+mutation. It is neither normalization nor a conventional clamped interpolation.
+The private original-instruction comparison passes 305,824 cases, 303,888 unique
+quadruples and 5,607,871 instructions, fingerprint 07c477eae4944c20. The first
+oracle attempt omitted RAM burst semantics for a four-word store and repeatedly
+wrote one address; correcting the adapter resolved that test-harness defect.
+
+The contact-neighborhood leaf selects cyclic previous/current/next indices for
+explicit counts 1..65,535 and signed-halfword inputs. This is query preparation,
+not intersection, height, normals or forces. Its private full-query differential
+passes 524,288 cases and 10,529,461 instructions, fingerprint 874c2bf9c8bbc6d6.
+The prior map incorrectly called global 0x214354 a pointer: it is a selector into
+eight inspected 12-byte descriptors. Actual command-7 firmware queries confirm
+counts 300 for selectors 0..4 and 10 for 5..7, each with one coprocessor-data word
+read; 216 reference instructions total, fingerprint 4669617b8d3deeef. No descriptor
+or firmware bytes belong in Git. Final private count report is
+build/ps2-native-contact-count-final-001/result.json.
+
+Both leaves passed actual EE execution in Play 0.72 HLE. Direction: 6,032 probe
+cases (dd9701872b4776e2) and 36 invalid-input cases, two aliases each; ELF
+5e33018d3b606d200a13e1ca1147d9f891a69411441e8239c5dff0d1254b1794,
+1,224,704 file bytes, 179,040 load-segment memory bytes. Contact: 1,179,642 checks
+(219618ade1210792); ELF
+c8dc243bdac15cf98b3287ea20af63cb7e5703abe9a5f0aedf595154f0cd0e48,
+1,222,516 file bytes, 177,000 load-segment memory bytes. Private runtime reports
+bind frozen sources/headers, build reports, ELF and guest logs under
+build/ps2-native-direction-ee-001 and build/ps2-native-contact-ee-001. Both guest
+stderr logs are empty. The contact fixture produced no result in its first
+12.077-second observation; a 45.199-second run obtained PASS. Direction's
+observation lasted 12.033 seconds. These are bounded emulator windows, not
+measured fixture completion times or physical-console performance.
+
+The new host-only observer uses the real nineteen-event Lancia cabinet replay,
+the verified Revision B program/asset pack and the existing exact instruction
+boundary. Reads are bounded to ordinary RAM, never device/FIFO reads. A separate
+host executable records input events, per-frame checkpoints and private images;
+neither its observer nor converted data is linked into the native executable.
+
+The first capture failed with zero primary-integrator entries despite visible
+race countdown and driving. The second observed 545,813,594 instruction boundaries
+but zero entries at both the original-ROM and relocated primary addresses. This
+was a sampling-scope error, not proof the game lacked driving work. Coverage 003
+established the branch: object+0xe8=0 calls 0x2cce0; 1 calls 0x2e650; 2 uses an
+inline path; other values take another branch. Across completed frames 2200..2800,
+the alternate and shared velocity/blend each ran 1,202 times; the primary and its
+orientation tail ran zero times. All 2,850 enabled/disabled frame checkpoints
+matched. Capture 003 correctly remains failed as a primary-call capture despite
+that observer comparison. Do not label branch values as car type or player/AI
+without additional evidence.
+
+The alternate's first return is 0x2eee4. Initial analysis accidentally extended
+past it into the next function and misattributed a later orientation region;
+the corrected routine spans 0x2e650..0x2eee7. Its actual orientation region
+0x2ecb4..0x2edff folds a stack candidate triple, then uses wrapped differences,
+binary64 smoothing and a separate middle-channel step. It does not have the
+primary's pi/8 bounds. The middle-step constant was loosely compared with
+pi/180 but is not equal to it; no units claim follows. Exact identities/math
+are in platform/ps2/native/velocity_step_recovery.md. The existing finalize_orientation
+must not be substituted. A new primary-tail capture adapter was tested on
+synthetic records, then retained only in ignored
+build/ps2-native-orientation-capture-study-001 because this replay does not
+exercise its contract. It is not shipped or counted as live validation.
+
+Query observation also needed correction: a fixed return site cannot pair
+queries from nested helpers or the alternate caller. The observer now follows
+each actual saved return PC/frame pointer. Native contact/direction comparators
+require complete event sequences and the successful observer-comparison report
+with exact capture hashes before accepting live evidence. A diagnostic capture
+without its completion marker or successful parity report is not valid input.
+
+Capture 004 passed the complete 2,850-frame enabled/disabled comparison. Its
+private validation.json and cadence-summary.json bind all original/generated
+inputs, executable, checkpoints and captures. The 1,202 completed alternate
+calls belong to two objects, 0x500100 and 0x500200, each once per completed frame
+2200..2800 with selector 1. This is not two simulation substeps or a 120 Hz claim.
+Five other observed objects use selector 3; player/AI ownership remains unknown.
+The 32 detailed calls produce 288 events and no primary-orientation events.
+object_words is a 0x400-byte raw RAM window, not a proven object size; addresses
+are 0x100 apart. Optional out-of-range dependency blocks are omitted. These
+snapshots are not a complete integrator input schema.
+
+All 32 live blend groups (29 distinct inputs) agree bit-for-bit with the native
+component and isolated original execution. Every sampled component is in the
+supported domain and arithmetic control uses nearest rounding. The combined
+synthetic/live comparison executes 305,856 cases and 5,608,447 original
+instructions, fingerprint 75876bd959ec4992. All 32 live contact queries also match,
+fingerprint f04c0719a03c245f: selector 0, count 300, signed indices 12..39, return PC 0x5cd898
+in the alternate. Reports are build/ps2-native-direction-live-001/result.json and
+build/ps2-native-contact-live-001/result.json. Full caller domains, independent
+PCB fidelity, collision/intersection arithmetic and game integration remain
+unproven. Public reproduction instructions are in platform/ps2/tools/driving_capture.md.
+
+Both new modules are explicit game-role sources, separate from the shared
+engine. The native build retains its no-arcade-runtime boundary. Original EE
+fixture manifests are tracked, with CI configured to cross-link them; generated
+code, captured data/images and compiled artifacts remain private. Next work
+follows the actual alternate integrator: recover its geometry-query dependencies
+and contact results, identify the player object's inputs, then establish the alternate
+orientation arithmetic before connecting the real native driving loop.
+
+Final validation passed all 109 tests in tests/test_ps2*.py in 26.012 seconds.
+The native013 full build succeeded: ELF SHA-256
+2338119372579ee7012ec95fcd43f5210d8382cb112d6f4dbce9d3fc8f050158,
+2,274,240 file bytes and 593,080 load-segment memory bytes. The ELF is
+byte-identical to native011/012 and therefore to the already executed image.
+The unused new leaves are removed by linker garbage collection; this build
+does not establish new gameplay execution. The private identity report is
+build/ps2-native-013/runtime-validation.json. Independent documentation review
+found a stale latest-build paragraph referring to native010; it now binds the
+current native013 evidence. Final reviews found no remaining blockers.
+Publication requires the exact source-tree/archive check; remote
+CI has not yet run for this change.
+
 ## Reusable native PS2 engine boundary (2026-10-24)
 
 Checkpoint 9de64d72 is published; all six remote workflows passed, including

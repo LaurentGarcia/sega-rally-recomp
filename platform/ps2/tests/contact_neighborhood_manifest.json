@@ -1,0 +1,9 @@
+{
+  "sources": [
+    "platform/ps2/tests/contact_neighborhood_test.cpp",
+    "platform/ps2/native/contact_neighborhood.cpp"
+  ],
+  "includes": ["platform/ps2/native"],
+  "libraries": [],
+  "embed_iop_modules": false
+}
