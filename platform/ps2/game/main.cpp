@@ -10,6 +10,13 @@
 #include <cstring>
 #include <memory>
 #include <string>
+#ifdef RALLY_OFFLINE_MESH_CAPTURE
+#ifdef RALLY_PS2_EE
+#error "Object mesh capture is an offline host operation"
+#endif
+#include "platform/ps2/tools/mesh_capture.h"
+#include <charconv>
+#endif
 #ifdef RALLY_PS2_EE
 #include "gs_display.h"
 #include "pad_input.h"
@@ -180,6 +187,18 @@ int main(int argc, char **argv) {
         const bool packet_audit = std::getenv("RALLY_PS2_PACKET_AUDIT") != nullptr;
         const bool compact_reference = std::getenv("RALLY_PS2_COMPACT_REFERENCE") != nullptr;
         const char *scene_directory = std::getenv("RALLY_PS2_SCENE_DIRECTORY");
+#ifdef RALLY_OFFLINE_MESH_CAPTURE
+        const char *mesh_directory = std::getenv("RALLY_PS2_MESH_DIRECTORY");
+        unsigned mesh_frame = 1634;
+        if (const char *requested = std::getenv("RALLY_PS2_MESH_FRAME")) {
+            const std::string text(requested);
+            const auto parsed = std::from_chars(text.data(), text.data() + text.size(), mesh_frame);
+            if (parsed.ec != std::errc{} || parsed.ptr != text.data() + text.size() || !mesh_frame)
+                throw std::runtime_error("mesh capture frame must be a positive integer");
+        }
+        if (mesh_directory && (!*mesh_directory || mesh_frame > frame_limit))
+            throw std::runtime_error("mesh capture needs an output directory and a frame within the run");
+#endif
 #endif
         // Keep the first EE probe's cache bounded at 512 KiB. The pack reader
         // supports larger caches once executable/rendering peaks are measured.
@@ -266,6 +285,10 @@ int main(int argc, char **argv) {
             machine.inputs() = controls.sample(pad_state);
             const uint64_t run_started = GetTimerSystemTime();
 #endif
+#ifdef RALLY_OFFLINE_MESH_CAPTURE
+            if (mesh_directory && frame == mesh_frame)
+                ::ps2::offline::begin_mesh_capture(mesh_directory, frame);
+#endif
             const auto run = run_frame(machine
 #if defined(RALLY_PS2_EE) && defined(M2_SRALLY_SOUND)
                 , audio.get()
@@ -293,6 +316,10 @@ int main(int argc, char **argv) {
                 throw std::runtime_error(message);
             }
 #ifndef RALLY_PS2_EE
+#ifdef RALLY_OFFLINE_MESH_CAPTURE
+            if (mesh_directory && frame == mesh_frame)
+                ::ps2::offline::end_mesh_capture();
+#endif
             if (compact_reference) machine.video().render_compact_reference();
             if (scene_directory && (frame == 1357 || frame == 1634)) {
                 std::string error;

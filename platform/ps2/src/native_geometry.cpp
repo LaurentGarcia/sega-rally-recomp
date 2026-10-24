@@ -94,9 +94,10 @@ bool project(WideVertex p, Vertex &v) {
     if (!repair_roundoff(p)) return false;
     v = {float((p.x / p.w + 1) * (frame_width / 2.0)),
          float((1 - p.y / p.w) * (frame_height / 2.0)),
-         float(p.u), float(p.v), float(1 / p.w)};
+         float(p.u), float(p.v), float(1 / p.w), float(1 - p.z / p.w)};
     return normal_or_zero(v.x) && normal_or_zero(v.y) && normal_or_zero(v.u) &&
-           normal_or_zero(v.v) && normal_or_zero(v.q) &&
+           normal_or_zero(v.v) && normal_or_zero(v.q) && normal_or_zero(v.depth) &&
+           v.depth >= 0 && v.depth <= 1 &&
            v.x >= 0 && v.x <= frame_width && v.y >= 0 && v.y <= frame_height &&
            v.q >= 0x1p-16f && v.q <= 0x1p10f &&
            std::fabs(v.u) <= clip_component_limit && std::fabs(v.v) <= clip_component_limit;

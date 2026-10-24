@@ -2,7 +2,7 @@
 
 `clip_project_triangle` is an original platform operation that turns one
 homogeneous triangle into ordered triangles for the native PS2 display API.
-It is a correctness reference, currently outside the active drawing loop.
+It is a correctness reference used by the optional static mesh study.
 Its coordinate convention is explicit; it does not establish Sega Rally's
 camera, projection, clipping rules or arithmetic.
 
@@ -19,7 +19,8 @@ Clipping applies these planes in order: `w >= 1/1024`, `x >= -w`, `x <= w`,
 it is not a recovered game near distance. Raw UVs are interpolated with the
 homogeneous edge parameter before calculating `q = 1/w`. Projection maps
 y-up clip coordinates into the existing y-down 496 by 384 logical viewport,
-without a half-texel offset.
+without a half-texel offset. Output also carries normalized reverse depth
+`1 - z/w`; the native display quantizes it to unsigned 16-bit depth.
 
 Seven half-planes can grow a convex triangle to at most ten vertices, or eight
 fan triangles. Two fixed polygon buffers and local output staging require no
@@ -39,7 +40,8 @@ Intersections and projection use binary64 scratch arithmetic. EE disassembly
 confirms compiler software helpers for addition, subtraction, multiplication,
 division, comparisons and conversion. The clipper's own stack frame is
 2,304 bytes, excluding callees. Its performance is unmeasured: this is not
-an optimized VU kernel and is not enabled in the native diagnostic loop.
+an optimized VU kernel. The static mesh study prepares geometry at load time
+and when its diagnostic camera changes, then submits the prepared triangles.
 
 Run the portable test with:
 
@@ -55,7 +57,8 @@ are dyadic values in `[-8, 8]`; it does not exhaust the full API domain.
 The tests observed up to six output triangles; the capacity of eight follows
 the convex clipping bound, not that observation.
 
-A standalone EE fixture passed 322 selected exact, boundary, degeneracy and
+Before reverse-depth output was added, a standalone EE fixture passed 322
+selected exact, boundary, degeneracy and
 failure-atomicity checks in Play 0.72. Its result fingerprint matches the host:
 `fe8dc06b88de7a24`. ELF SHA-256:
 `b74b7e906f5d7c45377795f259a46b380b28c9160ade6d43de3658c1fbbd171b`.

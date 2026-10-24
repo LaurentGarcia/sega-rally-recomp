@@ -11,6 +11,9 @@
 
 #include "runtime/geo.h"
 #include "runtime/model2_priority.h"
+#ifdef RALLY_OFFLINE_MESH_CAPTURE
+#include "platform/ps2/tools/mesh_capture.h"
+#endif
 
 #include <algorithm>
 #include <bit>
@@ -1598,6 +1601,10 @@ GeoPtr Geo::geo_object_data(geo_state *geo, uint32_t opcode, GeoPtr input)
 	if (obc == 0)
 		obc = 0xfffff;
 
+#ifdef RALLY_OFFLINE_MESH_CAPTURE
+    ps2::offline::capture_mesh_object(*geo, obp, opcode, tpa, tha, oba, obc);
+#endif
+
 	switch (geo->mode & 3)
 	{
 		/* Normals present, No Specular */
@@ -1620,6 +1627,9 @@ GeoPtr Geo::geo_object_data(geo_state *geo, uint32_t opcode, GeoPtr input)
 /* Command 02: Direct Data */
 GeoPtr Geo::geo_direct_data(geo_state *geo, uint32_t opcode, GeoPtr input)
 {
+#ifdef RALLY_OFFLINE_MESH_CAPTURE
+    ps2::offline::capture_direct_geometry();
+#endif
 	raster_state *raster = geo->raster;
 	uint32_t  tpa = *input++;     /* Texture Point Address */
 	uint32_t  tha = *input++;     /* Texture Header Address */

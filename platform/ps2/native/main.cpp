@@ -1,18 +1,22 @@
-// Independent PS2-native rewrite bootstrap. Original diagnostic art/tone only;
-// the recovered race systems are not yet connected into a playable game.
+// Independent PS2-native bootstrap or owner-provided static mesh study.
+// Neither mode connects recovered race systems into a playable game.
 #include "native_display.h"
 #include "pad_input.h"
 #include "audio_output.h"
 #include "debug_controls.h"
+#include "native_scene.h"
+#include "storage.h"
 #include <kernel.h>
+#include <sifrpc.h>
 #include <timer.h>
 #include <array>
 #include <cstdio>
+#include <cstring>
 #include <exception>
 #include <memory>
 #include <stdexcept>
 
-int main() {
+int main(int argc, char **argv) {
     std::setvbuf(stdout, nullptr, _IONBF, 0);
     ps2::native::Display display;
     char page[1600]{}; // Outlives the renderer's retained diagnostic pointer.
@@ -20,10 +24,42 @@ int main() {
         if (!display.initialize()) throw std::runtime_error(display.error());
         display.set_vu0_packing(true); // Validated final XYZ conversion only.
         display.present_status("NATIVE PS2 REWRITE\nPLATFORM BOOTSTRAP\nNO ARCADE PROCESSOR CORES\nINITIALIZING INPUT AND AUDIO");
+        // Only this deliberate native mesh name selects a study implicitly.
+        // Preserve loader-provided host modules before considering IOP reset.
+        SifInitRpc(0);
+        const char *scene_path = argc > 1 ? argv[1] : nullptr;
+        if (!scene_path) {
+            if (FILE *probe = std::fopen("host:native-scene.bin", "rb")) {
+                std::fclose(probe); scene_path = "host:native-scene.bin";
+            }
+        }
+        const bool host_scene = scene_path && std::strncmp(scene_path,"host:",5)==0;
+        if (scene_path && !host_scene && std::strncmp(scene_path,"mass:",5)!=0)
+            throw std::runtime_error("NATIVE SCENE PATH MUST USE HOST: OR MASS:");
         ps2::PadInput pad;
-        // No game filesystem is opened by this ROM-free target. It owns this
-        // IOP startup; a future native asset loader must establish ownership.
-        if (!pad.initialize(true)) std::printf("PAD: %s\n", pad.status());
+        if (!pad.initialize(!host_scene)) std::printf("PAD: %s\n", pad.status());
+        ps2::native::Mesh mesh;
+        ps2::native::StudyScene study;
+        ps2::native::StudyCamera camera;
+        if (scene_path) {
+            display.present_status("STATIC GEOMETRY STUDY\nLOADING OWNER PROVIDED NATIVE MESH\nDIAGNOSTIC CAMERA / FLAT MATERIALS\nNO GAMEPLAY OR GAME CAMERA CLAIM");
+            if (!host_scene && !ps2::initialize_storage()) throw std::runtime_error(ps2::storage_error());
+            if (!ps2::wait_for_file(scene_path)) throw std::runtime_error(ps2::storage_error());
+            ps2::native::MeshError mesh_error;
+            if (!ps2::native::load_mesh_file(scene_path,mesh,mesh_error))
+                throw std::runtime_error(ps2::native::mesh_error_message(mesh_error));
+            const auto begin = GetTimerSystemTime();
+            ps2::native::StudyError scene_error;
+            if (!study.prepare(mesh,camera,scene_error))
+                throw std::runtime_error(ps2::native::study_error_message(scene_error));
+            const auto &stats=study.stats();
+            std::printf("STATIC_GEOMETRY_STUDY path=%s crc=%08lx vertices=%lu faces=%lu objects=%lu output=%lu persistent_bytes=%lu prepare_ticks=%llu\n",
+                scene_path,static_cast<unsigned long>(mesh.payload_crc32),static_cast<unsigned long>(stats.source_vertices),
+                static_cast<unsigned long>(stats.source_faces),static_cast<unsigned long>(stats.source_objects),
+                static_cast<unsigned long>(stats.output_triangles),static_cast<unsigned long>(stats.persistent_bytes),
+                static_cast<unsigned long long>(GetTimerSystemTime()-begin));
+            display.set_caption("STATIC GEOMETRY STUDY\nDIAGNOSTIC CAMERA / FLAT SHADING");
+        }
         ps2::AudioOutput audio;
         const bool audio_ready = audio.initialize();
         if (!audio_ready) std::printf("AUDIO UNAVAILABLE: %s\n", audio.error());
@@ -43,18 +79,33 @@ int main() {
         std::array<ps2::native::Triangle, 2> triangles;
         for (auto &triangle : triangles) triangle.material = &material;
         ps2::DebugPageToggle debug_toggle;
-        bool diagnostics = true;
+        bool diagnostics = scene_path == nullptr;
+        uint16_t previous_buttons = 0;
         uint32_t tone_phase = 0;
         std::array<float, 4096> pcm{};
         ps2::AudioOutput::Stats audio_stats{};
         uint64_t previous_ticks = 0;
-        std::puts("NATIVE PORT: direct EE program, native vertices/textures, VU0 XYZ, GIF/GS, IOP/SPU2");
+        std::puts(scene_path ? "NATIVE STUDY: direct EE transform/clip, solid GIF/GS Z16S; VU0/VU1 inactive for scene" :
+                              "NATIVE PORT: direct EE program, native vertices/textures, VU0 XYZ, GIF/GS, IOP/SPU2");
         std::puts("NATIVE PORT: no arcade processor, bus, board scheduler or sound synthesizer linked");
-        std::puts("NATIVE PORT: original diagnostic content; gameplay systems are not connected");
+        std::puts(scene_path ? "NATIVE STUDY: owner-provided mesh; diagnostic camera/lighting, no connected gameplay" :
+                              "NATIVE PORT: original diagnostic content; gameplay systems are not connected");
         for (unsigned frame = 1;; ++frame) {
             const auto started = GetTimerSystemTime();
             auto input = pad.poll();
             if (debug_toggle.update(input)) diagnostics = !diagnostics;
+            const auto pressed = input.buttons & ~previous_buttons;
+            previous_buttons = input.buttons;
+            if (scene_path && (pressed & (ps2::Left|ps2::Right|ps2::L1|ps2::R1))) {
+                if (pressed & ps2::Left) camera.yaw -= .15f;
+                if (pressed & ps2::Right) camera.yaw += .15f;
+                if (camera.yaw > 3.141593f) camera.yaw -= 6.2831853f;
+                if (camera.yaw < -3.141593f) camera.yaw += 6.2831853f;
+                if ((pressed & ps2::L1) && camera.distance > 1.75f) camera.distance -= .25f;
+                if ((pressed & ps2::R1) && camera.distance < 11.75f) camera.distance += .25f;
+                ps2::native::StudyError error;
+                if (!study.prepare(mesh,camera,error)) throw std::runtime_error(ps2::native::study_error_message(error));
+            }
             const float offset = input.connected ? (float(input.steer) - 128.f) * 0.375f : 0.f;
             triangles[0].vertices = {{{100.f + offset, 100.f, 0.f, 0.f, 1.f},
                                       {396.f + offset, 100.f, 32.f, 0.f, 1.f},
@@ -86,7 +137,31 @@ int main() {
                 }
             }
             const auto &gs = display.stats(); // Last completed native frame.
-            std::snprintf(page, sizeof(page),
+            if (scene_path) {
+                const auto &s=study.stats();
+                std::snprintf(page,sizeof(page),
+                    "STATIC GEOMETRY STUDY\n"
+                    "OWNER PROVIDED MODEL SPACE MESH\n"
+                    "CAPTURED OBJECT TO REFERENCE VIEW\n"
+                    "DIAGNOSTIC FIT / ORBIT CAMERA\n"
+                    "FLAT COLORS / STUDY LIGHTING\n"
+                    "NATIVE CLIP / PROJECT / GS Z16S\n"
+                    "NO RECOVERED GAME CAMERA CLAIM\n"
+                    "NO GAMEPLAY OR DRIVING PHYSICS\n\n"
+                    "VERTICES %lu / OBJECTS %lu\n"
+                    "SOURCE FACES %lu / DRAW %lu\n"
+                    "SCENE STORAGE %lu BYTES\n"
+                    "MESH CRC %08lX / FRAME %u\n"
+                    "VU0/VU1 INACTIVE FOR SOLID STUDY\n\n"
+                    "SELECT+START TOGGLE THIS PAGE\n"
+                    "LEFT/RIGHT STEP DIAGNOSTIC ORBIT\n"
+                    "L1/R1 STEP DIAGNOSTIC DISTANCE\n"
+                    "HOLD CROSS FOR QUIET TEST TONE\n"
+                    "EMULATOR TIMING IS NOT CONSOLE SPEED",
+                    static_cast<unsigned long>(s.source_vertices),static_cast<unsigned long>(s.source_objects),
+                    static_cast<unsigned long>(s.source_faces),static_cast<unsigned long>(s.output_triangles),
+                    static_cast<unsigned long>(s.persistent_bytes),static_cast<unsigned long>(mesh.payload_crc32),frame);
+            } else std::snprintf(page, sizeof(page),
                 "NATIVE PS2 REWRITE - PLATFORM CHECK\n"
                 "GAME SYSTEMS NOT YET CONNECTED\n"
                 "\n"
@@ -118,7 +193,8 @@ int main() {
                 static_cast<unsigned long long>(gs.texture_bytes),
                 static_cast<unsigned long long>(gs.palette_bytes));
             display.set_debug_page(diagnostics ? page : nullptr);
-            if (!display.present({triangles, 0xff101923u})) throw std::runtime_error(display.error());
+            if (!display.present(scene_path ? study.frame() : ps2::native::Frame{triangles, 0xff101923u}))
+                throw std::runtime_error(display.error());
             previous_ticks = GetTimerSystemTime() - started;
             if (frame <= 3 || frame % 60 == 0)
                 std::printf("NATIVE_FRAME frame=%u ticks=%llu frequency=%u triangles=%lu audio=%u\n%s\n",
@@ -127,6 +203,7 @@ int main() {
         }
     } catch (const std::exception &failure) {
         display.set_debug_page(nullptr);
+        display.set_caption(nullptr);
         std::printf("NATIVE PORT ERROR: %s\n", failure.what());
         if (display.present_status(failure.what())) while (true) SleepThread();
         return 1;

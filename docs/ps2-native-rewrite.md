@@ -98,8 +98,10 @@ The [hardware study](ps2-architecture-study.md) records the complete local
 manual collection, specific constraints and the executed VU1 experiments.
 The [native clipping reference](ps2-native-geometry.md) provides bounded
 homogeneous clipping and ordered triangle output. Its selected EE checks
-pass, but it uses unmeasured software-double arithmetic and remains outside
-the active draw loop. It does not establish recovered game projection.
+pass, but it uses software-double arithmetic with unmeasured console cost.
+The optional [static geometry study](ps2-native-scene.md) connects it to native
+mesh transforms and GS submission. That diagnostic camera does not establish
+recovered game projection or connect the recovered race components.
 
 ## Build and check
 
@@ -119,23 +121,34 @@ checks its source boundary; it does not execute the ELF. The build report
 records source hashes, toolchain identity, static memory and symbol checks.
 
 Load the ELF through a PS2 homebrew loader or a PS2 development emulator.
-The startup page explicitly identifies original diagnostic content and
-unconnected game systems. Select + Start toggles that page. The left stick
-moves the original checkerboard test geometry; holding Cross submits a quiet
-original 440 Hz tone. PCM refill follows the IOP queue independently of
-PAL/NTSC display cadence. No game files or reference-probe `rally.cfg` are read.
+Without an explicit mesh path or `host:native-scene.bin`, it shows the original
+platform diagnostic. Select + Start toggles that page; the left stick moves
+the checkerboard test geometry and holding Cross submits a quiet original
+440 Hz tone. PCM refill follows the IOP queue independently of PAL/NTSC cadence.
+The reference-probe `rally.cfg` and arcade asset pack are not used.
 
-The frozen `native-006` ELF (SHA-256
-`52ab97be39d4897c48e637f25a4deb780c183b613628514c56516cf497deeb18`)
-ran for 17.249 seconds in Play 0.72 with its HLE BIOS and Vulkan renderer.
-Guest logs recorded two submitted triangles, initialized PCM transport and
-zero ring-empty/late-service counters at all 19 checkpoints through frame 960.
-All 30 project input hashes and the forbidden-runtime symbol audit pass;
-load segments occupy 450,088 bytes before dynamic allocation.
+An explicitly supplied native mesh selects the [static geometry study](ps2-native-scene.md).
+That mode loads model-local vertices and captured affine transforms, applies a
+diagnostic fit/orbit camera, clips triangles on the EE and submits flat native
+GS geometry with depth testing. Left/Right step the orbit; L1/R1 change distance.
+Both vector units are inactive for its solid triangles. Recovered game systems,
+original textures, collision, driving and game audio remain unconnected.
 
-Its visible content is still the original diagnostic geometry and status
-page. The recovered game components and clipping reference remain unconnected
-to the active loop. Window capture failed on this run; the last successful
-visual capture is native-004. These are bootstrap checks in an emulator,
-not gameplay or physical-console performance. Controller interaction,
-measured speaker output and actual hardware require separate validation.
+The latest source-bound `native-010` build reproduces the executed `native-009`
+ELF byte for byte (SHA-256
+`1464d12f8ca51588dfbcd4fd5e6c636e69b84927b1b40481a46bcc8106a5fb8f`).
+The 10.062-second Play 0.72 HLE/Vulkan run visibly rendered the private six-object
+car mesh, with flat study shading and a diagnostic caption. All 1,040 triangles
+were submitted and guest stderr was empty. The 34-source dependency audit and
+forbidden-runtime symbol check pass; load segments occupy 592,304 bytes before
+dynamic allocation. Earlier native-008 runs also checked the no-asset bootstrap.
+
+A separate original depth fixture passed 206,609 quantization checks and read
+512 exact RGB samples from GS memory with zero mismatches, covering solid and
+textured draw ordering, the diagnostic page and depth clearing on return.
+This validates those sampled regions in Play, not original-game image fidelity
+or physical PS2 behavior. The visible car is a static study: the emulator's
+frame-rate overlay is not a native gameplay or console performance measurement.
+Private records remain under `build/ps2-native-010/` and
+`build/ps2-native-depth-wrapper-004/`. Controller interaction, speaker output
+and physical hardware still need separate validation.

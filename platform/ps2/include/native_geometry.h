@@ -39,6 +39,8 @@ struct ClipResult {
 // half-planes can grow a convex triangle to at most ten vertices/eight fans.
 // UVs are interpolated as raw texel coordinates before q=1/w is calculated.
 // Output maps to the y-down 496x384 logical viewport, with no half-texel bias.
+// Optional native reverse depth is 1-z/w (far0/near1); it does not impose
+// recovered arcade priority and only affects Frame::depth_test submissions.
 // Material identity and fan order are preserved; there is no face sorting or
 // backface culling. Exactly zero projected-area fans are omitted.
 //

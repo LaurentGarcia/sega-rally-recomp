@@ -48,5 +48,9 @@ jobs:
         run: python3 platform/ps2/build_ps2.py build --target native-port --backend docker --container-platform linux/amd64 --output build/ps2-native-ci --jobs 2
       - name: Cross-link the original VU0 and VU1 numerical fixture
         run: python3 platform/ps2/tools/build_vu1_fixture.py --dual-unit --trailing-nop-qword --output build/ps2-vu1-ci
+      - name: Cross-link the original native GS depth readback fixture
+        run: python3 platform/ps2/tools/build_native_depth_fixture.py --container-platform linux/amd64 --output build/ps2-native-depth-ci
+      - name: Cross-link the native mesh framebuffer capture fixture without assets
+        run: python3 platform/ps2/tools/build_native_depth_fixture.py --scene-capture --container-platform linux/amd64 --output build/ps2-native-scene-ci
       # No ROMs, generated game core, signing secrets or artifact publication.
       # This job proves cross-linking; console execution is a separate test.

@@ -18,8 +18,11 @@ Native input -> EE game systems -> native geometry -> VU work -> GIF -> GS
 ```
 
 The game systems and mixer in that diagram are the destination architecture;
-the executable currently connects original diagnostic content only. VU0 final
-XYZ packing works; VU1 geometry processing remains to be implemented.
+the executable currently connects platform diagnostics and an optional
+[static mesh study](ps2-native-scene.md). VU0 final XYZ packing works for textured
+diagnostics. The solid mesh study uses EE transforms/clipping and direct
+GIF/GS submission; both VUs are inactive for that path. Standalone VU1 numerical
+experiments have passed, but production VU1 geometry remains to be integrated.
 
 The measurements below come from the separate translated reference probe:
 

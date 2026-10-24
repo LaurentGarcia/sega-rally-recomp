@@ -51,6 +51,7 @@ bool valid(const std::array<Triangle, clip_triangle_capacity> &output, std::size
             CHECK(v.x >= 0 && v.x <= 496 && v.y >= 0 && v.y <= 384);
             CHECK(v.q >= 0x1p-16f && v.q <= 1024);
             CHECK(std::isfinite(v.u) && std::isfinite(v.v));
+            CHECK(std::isfinite(v.depth) && v.depth >= 0 && v.depth <= 1);
         }
     }
     return true;
@@ -64,6 +65,7 @@ bool exact_cases() {
     const Vertex expected[] = {{124, 288, 0, 0, 1}, {372, 288, 1, 0, 1}, {248, 96, .5f, 1, 1}};
     for (unsigned i = 0; i < 3; ++i) {
         CHECK(same(output[0].vertices[i], expected[i])); hash(output[0].vertices[i]);
+        CHECK(output[0].vertices[i].depth == .5f);
     }
     CHECK(area(output[0]) < 0); // y-up clip space becomes y-down screen space.
     std::swap(triangle.vertices[1], triangle.vertices[2]);
@@ -113,6 +115,7 @@ bool exact_cases() {
     CHECK(result.status == ClipStatus::success && result.count == 1);
     const Vertex corners[] = {{0, 0, 0, 0, 1}, {496, 0, 8, 0, 1}, {496, 384, 8, 8, 1}};
     for (unsigned i = 0; i < 3; ++i) CHECK(same(output[0].vertices[i], corners[i]));
+    CHECK(output[0].vertices[0].depth == 1 && output[0].vertices[1].depth == 0 && output[0].vertices[2].depth == 0);
 
     // On-plane endpoints next to outside vertices must not produce duplicate
     // corner fans. Two outside vertices leave only one boundary point.
@@ -234,7 +237,7 @@ bool failure_cases() {
 // are multiples of 1/4 in [-8,8]; 1024-scaled determinants/products fit int64.
 struct Constraint { std::int64_t a, b, c; };
 struct RationalPoint { std::int64_t s, t, denominator; };
-struct OracleVertex { double x, y, u, v, q; };
+struct OracleVertex { double x, y, u, v, q, depth; };
 std::vector<OracleVertex> oracle(const ClipTriangle &triangle) {
     std::array<Constraint, 10> planes{{{1, 0, 0}, {0, 1, 0}, {-1, -1, 1}}};
     std::int64_t distances[3][7]{};
@@ -277,10 +280,11 @@ std::vector<OracleVertex> oracle(const ClipTriangle &triangle) {
         const auto &a = triangle.vertices[0], &b = triangle.vertices[1], &c = triangle.vertices[2];
         const double x = a.x + (b.x - double(a.x)) * s + (c.x - double(a.x)) * t;
         const double y = a.y + (b.y - double(a.y)) * s + (c.y - double(a.y)) * t;
+        const double z = a.z + (b.z - double(a.z)) * s + (c.z - double(a.z)) * t;
         const double w = a.w + (b.w - double(a.w)) * s + (c.w - double(a.w)) * t;
         result.push_back({(x / w + 1) * 248, (1 - y / w) * 192,
             a.u + (b.u - double(a.u)) * s + (c.u - double(a.u)) * t,
-            a.v + (b.v - double(a.v)) * s + (c.v - double(a.v)) * t, 1 / w});
+            a.v + (b.v - double(a.v)) * s + (c.v - double(a.v)) * t, 1 / w, 1-z/w});
     }
     return result;
 }
@@ -315,7 +319,8 @@ bool randomized_oracle() {
                 for (const auto &r : reference)
                     if (std::fabs(v.x - r.x) < .0001 && std::fabs(v.y - r.y) < .0001 &&
                         std::fabs(v.u - r.u) < .00001 && std::fabs(v.v - r.v) < .00001 &&
-                        std::fabs(v.q - r.q) < std::max(.00001, std::fabs(r.q) * .000001)) match = true;
+                        std::fabs(v.q - r.q) < std::max(.00001, std::fabs(r.q) * .000001) &&
+                        std::fabs(v.depth-r.depth) < .00001) match = true;
                 CHECK(match);
             }
         }

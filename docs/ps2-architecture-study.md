@@ -26,7 +26,7 @@ Page numbers refer to the downloaded PDF unless a printed page is specified.
 | EE Core User's Manual | 180 | pp.24–29, 130–136, 163–165: issue restrictions, cache coherency and non-IEEE arithmetic |
 | EE Core Instruction Set | 408 | CACHE, PREF, LQ/SQ and SYNC reference; validate actual compiler output before assembly changes |
 | EE Programming | 9 | Cache misses, packed stores and parallel work; advice must be measured on our workload |
-| GS User's Manual | 176 | pp.43, 60, 77, 145: texture coherency, STQ register order and completion |
+| GS User's Manual | 176 | pp.43, 60, 77, 145: texture coherency, STQ register order and completion; printed pp.26, 68: color/depth format compatibility and depth-test state |
 | GS Supplement | 22 | pp.6–10: texture pages, primitive size and repeated pixel access |
 | VU User's Manual | 368 | pp.18–19, 26–29, 44–55, 129, 195–196: memories, arithmetic, pipeline and transfer lifetimes |
 | VU instruction companion | 128 | XGKICK p.125 and instruction scheduling constraints; cross-check assembler encodings |
@@ -123,6 +123,16 @@ Budget upload bytes, cache misses, primitives and waits independently. Retain
 game-required primitive order; a texture-sorting optimization must not change
 the image. DOT3 and other repeated-pass effects remain optional future work,
 after the native game and its base image are established.
+
+The GS User's Manual v6, section 2.5.4 (printed page 26), groups framebuffer
+and depth storage formats. A PSMCT32 framebuffer can use PSMZ16S; plain
+PSMZ16 is an incompatible pairing. A sixteen-bit depth allocation therefore
+needs both the 16S memory layout and its matching ZBUF register encoding.
+Section 3.7.4 (printed page 68) also requires ZTE to remain enabled. A pass
+that omits depth testing uses ALWAYS together with ZMSK=1, rather than ZTE=0.
+Static scene depth testing, its clear, and diagnostic-page transitions must
+respect these constraints. Such depth ordering is a native scene-study choice;
+it does not establish the original game's priority ordering.
 
 ## IOP/SPU2: distinguish queue starvation from late service
 

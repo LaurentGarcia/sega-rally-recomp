@@ -1,5 +1,136 @@
 # Handoff
 
+## Native PS2 model-space geometry study (2026-10-24)
+
+Checkpoint 1a426ba is published on port/ps2. All five triggered workflows
+passed, including every desktop compiler and source gate, PS2, Metal and both
+Vulkan workflows; Vita was correctly excluded by path filtering.
+
+The next native milestone connects an owner-provided static mesh to the EE
+transform/clip path and direct GIF/GS renderer. It remains a geometry study:
+flat diagnostic colors and lighting, fitted/orbit camera, no recovered game
+camera, textures, collision, driving, race progression or game audio. Both VUs
+are inactive for these solid triangles. The original checkerboard mode keeps
+its validated VU0 final-XYZ conversion. The native fixed inventory, transitive
+include checks and ELF symbol audit still exclude the arcade runtime.
+
+An opt-in host-only geometry hook captures object-local source words before
+transform/focus/culling, preserving each captured affine transform separately.
+A bounded independent decoder reconstructs hidden connectors, all link modes
+and face topology. The exporter re-derives its records from raw words, verifies
+ROM-backed streams against the owner's polygon image and writes the explicit
+version-one mesh format. The complete 1,634-frame capture run matches every
+capture-disabled reference checkpoint. Private final capture evidence is
+build/ps2/native-mesh-final-001/capture-validation.json; workflow and limitations
+are in platform/ps2/tools/mesh_capture.md. No capture or mesh belongs in Git.
+
+The capture contains 56 objects (52 ROM-backed, four RAM-backed), 7,494 raw
+points and 5,816 source triangles, with no direct/empty exclusions. Ordinals
+1..6 form a recognizable body/interior/four-wheel subset: 1,302 vertices,
+1,040 triangles, six objects and 32,808 bytes. SHA256:
+1def378046fcc070e7fd6e11b7a888b3b342df7eb9d019e50f5ad68eba547d73.
+A host software preview was shown explicitly as a host preview, not a PS2
+screenshot or proof of the exact car identity. Whole-capture export correctly
+rejects object42's out-of-domain background coordinates; do not present this
+selected subset as complete course recovery.
+
+The transactional loader caps vertices/faces/objects, exact payload size,
+indices, partitions, CRC and numeric encodings before publication. Its 4,527
+host/sanitizer checks include independent serialized fixtures, all truncations,
+corruption and allocation failure. Scene preparation separately validates typed
+meshes, transforms captured view-space bounds, fits a diagnostic camera and
+clips into at most 16,384 triangles; capacity failure does not truncate or
+replace the previous scene. Host projection and failure checks plus sanitizer
+runs pass. New geometry output includes normalized reverse depth.
+
+GS manual v6 printed p26 rejects CT32+Z16; the correct 16-bit pairing is
+PSMCT32+PSMZ16S. The implementation uses this pair, ZTE=1, and masked ALWAYS
+for painter/debug work. A depth scene clears to zero then uses GEQUAL. VRAM
+allocation is 3,424,256 bytes at NTSC448 and 3,833,856 at PAL512. The exact
+integer depth quantizer passed 206,609 host/EE checks with fingerprint
+ce7160f9d89dd495. Depth001 executed all visual phases, but all sixteen macOS
+window captures failed, so these logs alone establish no GS pixel result.
+
+Review caught a status-caption bug before the car run: the persistent scene
+caption could cover an error page. present_status now bypasses decoration.
+Native007 was built but never run; native008 includes this correction. The
+same correction leaves depth002 byte-identical to the executed depth001 ELF
+because its unused status function is removed by the linker.
+
+Native008 ELF SHA256:
+4410bb1563dabb27dad013ecf89ae17bbd9623f9479f9b500799add64f8c63c7.
+It is 2,272,456 file bytes with 592,048 load-segment bytes before dynamic
+allocations; all 34 project input hashes and the symbol audit pass. In Play
+0.72 HLE/Vulkan it loaded and submitted all 1,040 car triangles through frame
+1,080 in a bounded 20.198-second run; guest stderr was empty. Scene persistent
+storage is 1,324,224 bytes, excluding retained mesh and other services. Initial
+preparation took 52,295,680 emulated bus ticks; repeated static submissions
+must not be described as game performance or physical console speed.
+
+The same ELF passed the no-asset bootstrap regression for 17.135 seconds,
+through frame960, with two triangles, initialized audio and zero sampled
+ring-empty/late-service events. Both owned processes were reaped. All three
+window captures failed with 'could not create image from window'. Exact frozen
+source, ELF, asset and run bindings are in build/ps2-native-008/runtime-validation.json.
+The private study mesh was restored to Play's host:native-scene.bin afterwards.
+
+All 74 portable PS2 tests passed in 23.728 seconds before the final display-only
+status correction. Independent final review found no loader/scene, offline-hook
+or source-boundary blocker. Physical PS2, interactive pad/speaker behavior and
+full-game fidelity are still unverified. The next work is actual GS pixel
+inspection, original material/texture recovery, and typed collision/camera/car
+contracts before connecting a native race loop. Do not re-propose captured
+frame playback or substitute generic physics as recovered gameplay.
+
+Final validation supersedes the earlier capture limitation. Native009 produced
+a successful window capture visibly showing the car body/wheels and study
+caption in Play, in a 10.062-second run with empty stderr. Native010 binds the
+final 34 input hashes and reproduces that exact ELF, SHA256
+1464d12f8ca51588dfbcd4fd5e6c636e69b84927b1b40481a46bcc8106a5fb8f;
+2,273,340 file bytes, 592,304 resident bytes before dynamic allocation. Evidence:
+build/ps2-native-010/runtime-validation.json. The emulator's visible 59f/s
+counter is repeated static rendering, not measured native gameplay throughput.
+
+The optional Display readback uses bounded GS local-to-host/VIF1 reverse DMA,
+FINISH fencing, cache synchronization, exact completion and empty FIFO checks.
+It returns pixels only on success. A timeout stops owned DMA and quarantines
+the reverse bus; it never flips direction with unread data or permits another
+draw. If DMA cannot stop, its buffers remain allocated until restart. Independent
+protocol review caught and corrected the initially proposed unconditional
+BUSDIR restoration: stopping DMA does not imply the GS FIFO has drained.
+
+The first two transfer attempts correctly rejected D_CTRL=0; the other captured
+settings were D_PCR=4, D_ENABLER=0 and D_STAT=0x00200004. SDK channel initialization
+does not set DMAE, and Play0.72 resets it to zero while allowing draw transfers.
+The standalone fixtures now explicitly set that bit, preserving other settings;
+the production readback gate remains unchanged. The new wrapper's first
+sandboxed attempts lacked Docker socket access; approved retries succeeded.
+
+The final depth fixture passed all 206,609 quantization checks and 512 exact RGB
+samples with zero mismatches, fingerprint d1d172cf244cce83. Solid/textured
+regions passed opposite draw orders, the diagnostic page, far-only blue after
+clearing, and reversed draw orders returning near red. Five invalid readback
+requests preserve output. Executed ELF SHA256:
+415047e1bbd1eafeceb1e0f76af9ffa0afc3b155763ec7b8ae9d2ebf39706264.
+Evidence: build/ps2-native-depth-wrapper-004/runtime-validation.json. This is
+sampled original-region validation in Play, not whole-image/game fidelity.
+
+The separate scene fixture successfully read a complete 640x448 GS framebuffer
+in 640x16 strips and wrote a private PPM, with the same mesh CRC/counts. It ran
+for 12.081 seconds with empty stderr; the car is visible in both raw GS output
+and the corresponding window capture. Executed ELF SHA256:
+d99a1246e53a81310335fbcfb4be422b65debf9d12b9ef47ee89a99acb060ffa.
+Exact file/run/input bindings are in
+build/ps2-native-scene-wrapper-003/runtime-validation.json. This diagnostic
+image precedes TV filtering and is not published. The existing output remains
+in Play's host directory; the fixture deliberately refuses to overwrite it.
+
+build_native_depth_fixture.py provides fixed depth/scene inventories, confined
+new output directories, pinned tools and input/manifest drift checks. Both
+modes cross-link locally and are now cross-built by PS2 CI. Portable frame,
+geometry and scene tests were rerun successfully after the readback API change.
+README and PS2 entrypoints now distinguish the static study from gameplay.
+
 ## PS2 transfer completion, geometry and orientation (2026-10-24)
 
 Checkpoint b6f0064 is published on port/ps2; all six remote workflows passed,

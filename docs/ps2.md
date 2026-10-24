@@ -3,7 +3,8 @@
 **Current direction:** a [native PS2 rewrite](ps2-native-rewrite.md) with no
 arcade processor/device emulation in its executable. The translated game-core
 probe described below remains the separate behavioral reference. The new
-`native-port` target is a platform bootstrap; game systems are being recovered
+`native-port` target includes platform diagnostics and an optional
+[static mesh study](ps2-native-scene.md); game systems are being recovered
 and rewritten before it can be called playable.
 
 This is an experimental homebrew port, not a finished PS2 player. Its targets
@@ -11,7 +12,7 @@ have different purposes:
 
 | Target | Runtime | Purpose |
 | --- | --- | --- |
-| `native-port` | Independently written game systems and direct PS2 platform code | Current rewrite; original diagnostic content, no connected gameplay yet |
+| `native-port` | Independently written game systems and direct PS2 platform code | Current rewrite; platform diagnostics or private static mesh study, no connected gameplay |
 | `core-probe` | Translated i960/TGP/68000 code and shared Model 2A devices | Separate behavioral and hardware comparison tool |
 | `bringup` / `audio-fixture` | ROM-free PS2 hardware diagnostics | Display, controller and PCM output checks |
 
