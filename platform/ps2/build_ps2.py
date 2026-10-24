@@ -43,25 +43,29 @@ BRINGUP_SOURCES = [
     "src/runtime/raster.cpp",
 ]
 BRINGUP_LIBRARIES = ["draw", "graph", "dma", "packet", "patches", "pad", "m"]
-NATIVE_TOOLKIT_SOURCES = (
+ENGINE_SOURCES = (
     "platform/ps2/src/native_display.cpp",
     "platform/ps2/src/native_frame.cpp",
     "platform/ps2/src/native_geometry.cpp",
-    "platform/ps2/src/native_mesh.cpp",
-    "platform/ps2/src/native_scene.cpp",
     "platform/ps2/src/pad_input.cpp", "platform/ps2/src/storage.cpp",
     "platform/ps2/src/audio_output.cpp", "platform/ps2/src/vu0_pack.cpp",
 )
-NATIVE_SOURCES = ["platform/ps2/native/main.cpp", "platform/ps2/native/race_progress.cpp",
-                  "platform/ps2/native/car_pose.cpp", "platform/ps2/native/angle_fold.cpp",
-                  "platform/ps2/native/orientation.cpp",
-                  *NATIVE_TOOLKIT_SOURCES]
-NATIVE_TOOLKIT_HEADERS = {
+STUDY_SOURCES = ("platform/ps2/src/native_mesh.cpp", "platform/ps2/src/native_scene.cpp")
+GAME_SOURCES = ("platform/ps2/native/race_progress.cpp", "platform/ps2/native/car_pose.cpp",
+                "platform/ps2/native/angle_fold.cpp", "platform/ps2/native/orientation.cpp")
+# Preserve the existing native-port object order while the demo omits study code.
+NATIVE_TOOLKIT_SOURCES = (*ENGINE_SOURCES[:3], *STUDY_SOURCES, *ENGINE_SOURCES[3:])
+NATIVE_SOURCES = ["platform/ps2/native/main.cpp", *GAME_SOURCES, *NATIVE_TOOLKIT_SOURCES]
+ENGINE_DEMO_SOURCES = ["platform/ps2/samples/engine_demo/main.cpp", *ENGINE_SOURCES]
+ENGINE_HEADERS = {
     "audio_output.h", "pcm_protocol.h", "pcm_resampler.h", "pcm_ring.h",
-    "native_display.h", "native_geometry.h", "native_mesh.h", "native_scene.h",
+    "native_display.h", "native_geometry.h",
     "pad_input.h", "pad_state.h", "debug_controls.h", "storage.h", "vu0_pack.h", "diagnostic_font.h",
 }
+STUDY_HEADERS = {"native_mesh.h", "native_scene.h"}
+NATIVE_TOOLKIT_HEADERS = ENGINE_HEADERS | STUDY_HEADERS
 NATIVE_IOP_SOURCES = ("platform/ps2/iop/pcm_server.c", "platform/ps2/iop/imports.c")
+NATIVE_TARGETS = ("native-port", "engine-demo")
 LIMITATIONS = [
     "Development ELF, not a playable Sega Rally release.",
     "Compilation and ELF inspection do not establish PS2 hardware execution.",
@@ -93,7 +97,24 @@ def relative(path: Path) -> str:
     return str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path)
 
 
-def project_headers(sources: list[Path], includes: list[Path]) -> list[Path]:
+def native_source_path(value: str | Path) -> Path:
+    """Preserve the declared identity before resolving a reviewed native file.
+
+    Merely classifying the resolved destination would let an engine source
+    become an otherwise allowed game source in the native-port target.
+    """
+    original = ROOT / value
+    declared = Path(os.path.abspath(original))
+    # Resolve the original spelling: collapsing symlink/.. first can identify
+    # a different file than the compiler's actual include lookup.
+    resolved = original.resolve()
+    if resolved != declared:
+        raise ValueError("Native PS2 redirected reviewed path is forbidden: " + relative(declared) + " -> " + relative(resolved))
+    return declared
+
+
+def project_headers(sources: list[Path], includes: list[Path], *,
+                    reject_redirected: bool = False) -> list[Path]:
     """Follow project include dependencies without scanning ignored worktrees.
 
     SDK and standard-library headers are supplied by the pinned toolchain.
@@ -104,7 +125,8 @@ def project_headers(sources: list[Path], includes: list[Path]) -> list[Path]:
     visited, headers = set(), set()
     pattern = re.compile(r'^\s*#\s*include\s*(["<])([^">\n]+)[">]', re.MULTILINE)
     while pending:
-        path = pending.pop().resolve()
+        declared = pending.pop()
+        path = native_source_path(declared) if reject_redirected else declared.resolve()
         if path in visited:
             continue
         visited.add(path)
@@ -112,7 +134,7 @@ def project_headers(sources: list[Path], includes: list[Path]) -> list[Path]:
             roots = [path.parent, *includes] if opening == '"' else includes
             candidate = next((root / name for root in roots if (root / name).is_file()), None)
             if candidate is not None:
-                candidate = candidate.resolve()
+                candidate = native_source_path(candidate) if reject_redirected else candidate.resolve()
                 headers.add(candidate)
                 pending.append(candidate)
     return sorted(headers - {path.resolve() for path in sources})
@@ -133,19 +155,46 @@ def verify_source_snapshot(fingerprints: dict[str, str]) -> None:
         raise RuntimeError("Build inputs changed during compilation; rerun incrementally: " + ", ".join(sorted(changed)))
 
 
-def validate_native_boundary(paths: list[Path]) -> dict:
+def native_roles() -> dict[str, str]:
+    """Reviewed files only; a new file cannot silently inherit directory trust."""
+    roles = {name: "engine" for name in (*ENGINE_SOURCES, *NATIVE_IOP_SOURCES)}
+    roles.update({"platform/ps2/include/" + name: "engine" for name in ENGINE_HEADERS})
+    roles.update({name: "study" for name in STUDY_SOURCES})
+    roles.update({"platform/ps2/include/" + name: "study" for name in STUDY_HEADERS})
+    roles.update({name: "game" for name in GAME_SOURCES})
+    roles.update({str(Path(name).with_suffix(".h")): "game" for name in GAME_SOURCES})
+    roles["platform/ps2/native/main.cpp"] = "native_app"
+    roles["platform/ps2/samples/engine_demo/main.cpp"] = "demo_app"
+    return roles
+
+
+def engine_header_paths() -> list[Path]:
+    # Include unused public headers in both applications' boundary and identity.
+    return [ROOT / "platform/ps2/include" / name for name in sorted(ENGINE_HEADERS)]
+
+
+def validate_native_boundary(paths: list[Path], target: str = "native-port",
+                             includes: list[Path] | None = None) -> dict:
     """Only original native game code and explicitly reviewed PS2 services.
 
     Check resolved paths, including transitive project headers and IOP files;
     a toolkit symlink cannot import the archived machine or generated code.
     """
+    if target not in NATIVE_TARGETS:
+        raise ValueError("Unknown native target: " + target)
+    includes = includes if includes is not None else [ROOT / "platform/ps2/include", ROOT / "platform/ps2/native"]
+    # Inspect each header's own closure as well as every translation unit. This
+    # prevents an application from laundering an engine->game include through
+    # its otherwise permitted aggregate dependency set or an unused source.
+    paths = sorted({native_source_path(path) for path in paths})
+    paths = sorted(set(paths + project_headers([path for path in paths if path.is_file()], includes,
+                                               reject_redirected=True)))
+    roles = native_roles()
+    permitted = {"engine", "demo_app"} if target == "engine-demo" else {"engine", "study", "game", "native_app"}
     rejected = []
     for path in paths:
         name = relative(path.resolve())
-        native = name.startswith("platform/ps2/native/") and path.suffix in (".h", ".hpp", ".cpp", ".c", ".S")
-        toolkit = name in NATIVE_TOOLKIT_SOURCES or name in NATIVE_IOP_SOURCES
-        header = name.startswith("platform/ps2/include/") and name[len("platform/ps2/include/"):] in NATIVE_TOOLKIT_HEADERS
-        if not (native or toolkit or header):
+        if roles.get(name) not in permitted:
             rejected.append(name)
         elif path.is_file():
             # The dependency walk resolves literal includes. Macro-selected
@@ -155,8 +204,36 @@ def validate_native_boundary(paths: list[Path]) -> dict:
                     raise ValueError("Native PS2 target forbids opaque include directives: " + name)
     if rejected:
         raise ValueError("Native PS2 target forbids reference-machine/generated dependencies: " + ", ".join(sorted(set(rejected))))
-    return {"execution_model": "native_ps2_rewrite_bootstrap", "translated_processors_linked": False,
-            "arcade_machine_runtime_linked": False, "checked_project_files": sorted(set(relative(p.resolve()) for p in paths))}
+    allowed = {"engine": {"engine"}, "study": {"study", "engine"}, "game": {"game", "engine"},
+               "native_app": {"native_app", "game", "study", "engine"}, "demo_app": {"demo_app", "engine"}}
+    for source in paths:
+        source_name = relative(source)
+        role = roles[source_name]
+        if not source.is_file():
+            continue
+        for header in project_headers([source], includes, reject_redirected=True):
+            name = relative(header)
+            if roles[name] not in allowed[role]:
+                raise ValueError(f"Native PS2 dependency direction forbidden: {source_name} ({role}) -> {name} ({roles[name]})")
+    return {"execution_model": "original_ps2_engine_demo" if target == "engine-demo" else "native_ps2_rewrite_bootstrap",
+            "translated_processors_linked": False, "arcade_machine_runtime_linked": False,
+            "checked_project_files": [relative(path) for path in paths],
+            "project_file_roles": {relative(path): roles[relative(path)] for path in paths},
+            "dependency_directions_checked": True,
+            "limitations": ["Application bootstraps may call the external PS2SDK directly; no lifecycle facade is enforced.",
+                            "This is a project-source dependency check, not a sandbox or proof of general program behavior."]}
+
+
+def shared_engine_manifest(fingerprints: dict[str, str]) -> dict:
+    roles = native_roles()
+    sources = {name: value for name, value in sorted(fingerprints.items()) if roles.get(name) == "engine"}
+    return {"schema": 1, "source_sha256": sources,
+            "manifest_sha256": hashlib.sha256(json.dumps(sources, sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
+            "scope": "Shared engine source identity; does not imply identical compiler flags, objects or runtime behavior"}
+
+
+def elf_name(target: str) -> str:
+    return "ps2-engine-demo.elf" if target == "engine-demo" else "segarally-ps2-" + target + ".elf"
 
 
 def validate_native_symbols(symbols: str) -> None:
@@ -282,12 +359,14 @@ class Runner:
 
 
 def build_spec(args: argparse.Namespace) -> dict:
-    if args.target == "native-port":
+    if args.target in NATIVE_TARGETS:
         if args.core_manifest:
-            raise ValueError("native-port uses a fixed original-source inventory; --core-manifest is forbidden")
-        return {"sources": NATIVE_SOURCES, "includes": ["platform/ps2/native", "platform/ps2/include"],
+            raise ValueError(args.target + " uses a fixed original-source inventory; --core-manifest is forbidden")
+        demo = args.target == "engine-demo"
+        return {"sources": ENGINE_DEMO_SOURCES if demo else NATIVE_SOURCES,
+                "includes": ["platform/ps2/include"] if demo else ["platform/ps2/native", "platform/ps2/include"],
                 "libraries": ["draw", "graph", "dma", "packet", "patches", "pad", "fileXio", "m"],
-                "defines": ["RALLY_NATIVE_PS2=1"], "compile_flags": [], "embed_iop_modules": True,
+                "defines": ["PS2_ENGINE_DEMO=1"] if demo else ["RALLY_NATIVE_PS2=1"], "compile_flags": [], "embed_iop_modules": True,
                 "iop_modules": ["sio2man", "padman", "iomanX", "fileXio", "bdm", "bdmfs_fatfs", "usbd", "usbmass_bd", "libsd", "rally_pcm"],
                 "pcm_transport": True}
     if args.target == "audio-fixture":
@@ -318,10 +397,11 @@ def build_spec(args: argparse.Namespace) -> dict:
 
 
 def build(args: argparse.Namespace, report: dict) -> None:
+    spec = build_spec(args)
+    source_path = native_source_path if args.target in NATIVE_TARGETS else project_path
+    sources = [source_path(value) for value in spec["sources"]]
     runner = Runner(args)
     report["toolchain"] = runner.identity()
-    spec = build_spec(args)
-    sources = [project_path(value) for value in spec["sources"]]
     includes = [project_path(value) for value in spec["includes"]]
     for source in sources:
         if not source.is_file():
@@ -330,13 +410,16 @@ def build(args: argparse.Namespace, report: dict) -> None:
     # A frontend header edit must not rebuild every generated i960 chunk.
     dependencies = {source: project_headers([source], includes) for source in sources}
     headers = sorted({header for values in dependencies.values() for header in values})
+    if args.target in NATIVE_TARGETS:
+        headers = sorted(set(headers + engine_header_paths()))
     fingerprints = {relative(p): digest(p) for p in sorted(set(sources + headers))}
     if spec.get("pcm_transport"):
         iop_sources = [HERE / "iop/pcm_server.c", HERE / "iop/imports.c"]
         iop_headers = project_headers(iop_sources, [HERE / "include"])
         fingerprints.update({relative(p): digest(p) for p in iop_sources + iop_headers})
-    if args.target == "native-port":
-        report["native_source_boundary"] = validate_native_boundary([ROOT / name for name in fingerprints])
+    if args.target in NATIVE_TARGETS:
+        report["native_source_boundary"] = validate_native_boundary([ROOT / name for name in fingerprints], args.target, includes)
+        report["shared_engine"] = shared_engine_manifest(fingerprints)
     report["source_sha256"] = fingerprints
     report["compile_dependencies"] = {relative(source): [relative(p) for p in headers]
                                       for source, headers in dependencies.items()}
@@ -382,7 +465,7 @@ def build(args: argparse.Namespace, report: dict) -> None:
                 runner.run([runner.tool("gcc"), "-D_EE", "-G0", "-O2", "-c",
                             runner.path(generated), "-o", runner.path(obj)], "compile-" + module)
                 objects.append(obj)
-        elf = args.output / ("segarally-ps2-" + args.target + ".elf")
+        elf = args.output / elf_name(args.target)
         link = [runner.tool("g++"), "-G0", "-" + args.optimization,
                 "-T" + runner.sdk + "/ee/startup/linkfile", "-L" + runner.sdk + "/ee/lib",
                 "-Wl,-zmax-page-size=128", "-Wl,--gc-sections",
@@ -390,7 +473,7 @@ def build(args: argparse.Namespace, report: dict) -> None:
         link += [runner.path(p) for p in objects]
         link += ["-Wl,--start-group", *["-l" + value for value in spec["libraries"]], "-Wl,--end-group"]
         runner.run(link, "link")
-        if args.target == "native-port":
+        if args.target in NATIVE_TARGETS:
             symbols = runner.run([runner.tool("nm"), "--defined-only", "--demangle", runner.path(elf)], "native-symbol-boundary")
             validate_native_symbols(symbols)
             report["native_source_boundary"]["defined_symbol_audit_passed"] = True
@@ -433,17 +516,18 @@ def build_pcm_module(runner: Runner) -> Path:
 
 
 def smoke(args: argparse.Namespace, report: dict) -> None:
-    if args.target == "native-port":
+    if args.target in NATIVE_TARGETS:
         # The native bootstrap has its own portable unit tests. This command
         # checks its complete source boundary without executing a reference
         # rasterizer or requiring the cross compiler.
         spec = build_spec(args)
-        sources = [project_path(name) for name in spec["sources"]] + [ROOT / name for name in NATIVE_IOP_SOURCES]
+        sources = [native_source_path(name) for name in [*spec["sources"], *NATIVE_IOP_SOURCES]]
         includes = [project_path(name) for name in spec["includes"]]
-        headers = project_headers(sources, includes)
-        report["native_source_boundary"] = validate_native_boundary(sources + headers)
+        headers = sorted(set(project_headers(sources + engine_header_paths(), includes) + engine_header_paths()))
+        report["native_source_boundary"] = validate_native_boundary(sources + headers, args.target, includes)
         report.update(status="native_source_boundary_passed", executable_run=False,
                       source_sha256={relative(path): digest(path) for path in sources + headers})
+        report["shared_engine"] = shared_engine_manifest(report["source_sha256"])
         print("Native PS2 source boundary passed; this command does not execute gameplay or rendering.")
         return
     # The scene assertions run on the development host, not a PS2 emulator.
@@ -477,7 +561,7 @@ def smoke(args: argparse.Namespace, report: dict) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("build", "smoke", "report"))
-    parser.add_argument("--target", choices=("bringup", "audio-fixture", "native-port", "core-probe"), default="bringup")
+    parser.add_argument("--target", choices=("bringup", "audio-fixture", "native-port", "engine-demo", "core-probe"), default="bringup")
     parser.add_argument("--backend", choices=("docker", "native"), default="docker")
     parser.add_argument("--output", type=project_path, default=ROOT / "build/ps2-bringup")
     parser.add_argument("--ps2dev", type=Path, default=Path(os.environ.get("PS2DEV", "/usr/local/ps2dev")))
@@ -507,7 +591,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             runner = Runner(args)
             report["toolchain"] = runner.identity()
-            elf = args.output / ("segarally-ps2-" + args.target + ".elf")
+            elf = args.output / elf_name(args.target)
             report["elf"] = inspect_elf(elf) if elf.exists() else None
             report["status"] = "inspected" if elf.exists() else "toolchain_ready_no_elf"
             print(json.dumps(report, indent=2))

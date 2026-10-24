@@ -70,6 +70,9 @@ private original-program comparisons. An optional [static mesh study](docs/ps2-n
 loads recovered object geometry with diagnostic shading; it is not driving
 gameplay. Physics, collision and the race loop remain to be migrated.
 The translated game-core probe stays a separate behavioral reference. See the [PS2 build guide and limits](docs/ps2.md).
+The shared [PS2 engine architecture](docs/ps2-engine-architecture.md) keeps
+hardware services independent of Rally rules and includes an original engine-only
+demo as a second application.
 
 `v0.1.0-rc.1` remains a separate experimental source prerelease. Developers can
 use the [source build guide](docs/getting-started.md#build-from-source-instead).

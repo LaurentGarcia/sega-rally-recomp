@@ -10,6 +10,6 @@ enum Button : uint16_t {
 struct PadSnapshot {
     bool connected = false, analog = false;
     uint16_t buttons = 0;
-    uint8_t steer = 128;
+    uint8_t left_x = 128; // Physical left-stick horizontal axis,0..255; center128.
 };
 } // namespace ps2

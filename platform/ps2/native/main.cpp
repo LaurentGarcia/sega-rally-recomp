@@ -106,7 +106,7 @@ int main(int argc, char **argv) {
                 ps2::native::StudyError error;
                 if (!study.prepare(mesh,camera,error)) throw std::runtime_error(ps2::native::study_error_message(error));
             }
-            const float offset = input.connected ? (float(input.steer) - 128.f) * 0.375f : 0.f;
+            const float offset = input.connected ? (float(input.left_x) - 128.f) * 0.375f : 0.f;
             triangles[0].vertices = {{{100.f + offset, 100.f, 0.f, 0.f, 1.f},
                                       {396.f + offset, 100.f, 32.f, 0.f, 1.f},
                                       {100.f + offset, 284.f, 0.f, 32.f, 1.f}}};

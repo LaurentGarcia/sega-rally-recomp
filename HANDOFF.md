@@ -1,5 +1,130 @@
 # Handoff
 
+## Reusable native PS2 engine boundary (2026-10-24)
+
+Checkpoint 9de64d72 is published; all six remote workflows passed, including
+the general compiler matrix, source gate, PS2, Metal, both Vulkan checks and
+Vita. Its final native car image and GS framebuffer capture remain private.
+
+The PS2 service layer is now explicitly intended for additional games, with
+Rally as one consumer. The governing Platform layer & build exception and
+new docs/ps2-engine-architecture.md record this decision, service ownership,
+current limits and the sequence for further extraction. Existing source paths
+are retained; the build now assigns reviewed engine, game, study and application
+roles and checks dependency direction before linker garbage collection can
+hide an unused import. The original engine-demo application may use only its
+own role and the engine. Offline recovery and captured-reference-view mesh
+semantics remain outside that engine.
+
+Both applications record the same complete engine source/header/IOP identity.
+CI checks both targets and compares that shared manifest. This is source
+identity, not a claim of identical compiler settings, objects or runtime cost.
+Direct external SDK calls remain permitted in application startup; this gate
+is not a general isolation/security proof or an enforced lifecycle facade.
+
+Independent review found a real first-pass boundary hole: resolving a declared
+engine source symlink to an already allowed game source could erase its role.
+Two regression cases reproduced acceptance in direct validation and native
+smoke. Declared inventory identities must be checked before resolution, not
+only the resolved dependency union. This finding is distinct from the already
+covered engine-header-to-game-header indirection case.
+
+Further review reproduced a second hole involving a symlink followed by `..`:
+lexical normalization before physical resolution can check a different header
+from the compiler. The gate now compares original spelling resolution against
+the normalized declared identity. Fifteen focused engine-boundary tests cover
+the accepted inventories and rejected directions/redirects, including unused
+units and headers. Do not replace these checks with a union of resolved files.
+
+The original sample constructs its own animated PSMT4 checker cube, uses the
+bounded clipper, VU0 final XYZ and direct GS Z16S, and opens the shared pad/PCM
+services. It imports no Rally leaves, captured meshes or external assets.
+Left stick X/Left/Right rotate, Square toggles automatic rotation, L1/R1 change
+distance, Cross supplies a quiet original tone, and Select+Start toggles the
+information page. Animation time is a sample policy, not recovered game timing.
+PadSnapshot's physical axis is now left_x; cabinet steering stays in its adapter.
+The field rename preserves byte layout and input behavior. Mocked pad tests
+pass and the original portable bringup smoke keeps hash 7fc55e0bfbc7af31.
+
+The preliminary engine-demo-001 build succeeded before the renderer resource
+fix: ELF 550d90be1b7bf4e935f61a50e1f26bc6a3086952000f0ff159c4e229ae0ee3c9,
+2,077,636 file bytes and 460,456 resident bytes before dynamic allocations. It
+was not executed and must not be cited as the final resource-contract build.
+
+The resource review identified two concrete reuse hazards. Texture cache keys
+retain address/dimensions/generation even after caller storage is freed; a new
+asset at the same address and generation can select stale VRAM. Explicit
+invalidation is needed before reusing that identity. A second Display could
+also reset the process-wide VRAM allocator under an active owner; initialization
+and failure cleanup need a single-owner contract. These are resource-lifetime
+fixes, not a new scene graph or general allocator framework.
+
+Both resource fixes are implemented. Display initialization is caller-serialized,
+idempotent after success and limited to one GS/GIF/VRAM owner. Failed setup frees
+CPU buffers and releases the lease for retry. Fatal reverse-transfer retirement
+quarantines subsequent Display instances; that fatal branch was reviewed, not
+fault-injected. invalidate_textures() clears index-cache identity before storage
+reuse; copied-content CLUT entries remain valid. Normal generation updates keep
+working, and the frame rendering path is unchanged.
+
+The original resource fixture uses link-time SDK wrappers only in its private
+test link, with no production injection hooks. Play 0.72 HLE/Vulkan completed
+464 checks, 24 injected initialization failures and 320 exact GS pixel samples,
+fingerprint a6f9c6418b875dc3. Failures cover packet/staging allocation, GIF setup,
+every VRAM allocation class and video-mode setup, followed by retry and owner
+replacement. The first build attempt was sandbox-denied; the approved second
+build succeeded and ran. Later helper review found that post-link source or
+manifest drift could leave a success status in a failing report. The helper now
+records build_failed; regression tests exercise both drift cases and success.
+The final resource003 rebuild is byte-identical to executed resource002:
+49e3c25755910cd71c6254e51c413af86d2299b421d3a580c29299ebf0fbfc9b.
+
+Final engine-demo003 ELF:
+c1b90b77cd2a3288cb9a1bf1c2bbafcdd556fd43c5304caf0bf17ac29c0564e9,
+2,084,180 file bytes and 467,888 load-segment memory bytes. It is byte-identical
+to executed demo002. The 12.237-second engine-demo-001 run reached logged frame
+660 with 12 triangles and initialized audio; later sampled frames reused cached
+texture/palettes without upload. Its actual window capture shows the original
+checker cube. No interactive pad or speaker test was performed.
+
+Final native012 ELF:
+2338119372579ee7012ec95fcd43f5210d8382cb112d6f4dbce9d3fc8f050158,
+2,274,240 file bytes and 593,080 load-segment memory bytes. It is byte-identical
+to executed native011. The 10.212-second engine-native-car-001 run submitted
+1,040 static car triangles through logged frame 480 with initialized audio.
+Both applications have the identical 21-input shared engine manifest:
+8bfba3e1904f90f61cec9230f3ea3f2a66013a37a6a7257d8dbe9055be1094e2.
+Resident figures exclude dynamic allocations; emulator cadence is not game or
+physical-console performance. All runs were bounded, stopped and reaped, with
+empty guest stderr and successful window captures.
+
+The scene005 fixture rebuilt with the final driver is byte-identical to executed
+scene004 (90e24fe6616a41d773444a57460cd21de5a947c9efbd4203218d05ae06ebffc3).
+The engine-car-regression-001 run completed in 10.263 seconds and read back the
+entire 640x448 RGB car frame. Its 860,175-byte PPM is byte-identical to the prior
+published scene003 result, SHA256:
+800d51d7ec0d6f9fb425a253cfac61a40e156a7e569705ab4c42ac0ebacbe0ce.
+Private runtime-validation.json files in final demo003, native012, resource003
+and scene005 directories bind final source/build inputs, exact executed ELF
+identity, emulator reports, logs and captures. No game capture is exported.
+
+The final portable PS2 suite passed 94 tests in 23.439 seconds; private log:
+build/ps2/validation/engine-reuse-tests-002.log. The earlier 90-test suite passed
+before the second redirect case and three late-drift orchestration tests were
+added; the 94-test result supersedes it. CI now cross-builds the second app,
+compares both engine manifests and cross-builds the resource fixture. These
+checks establish engine reuse and regression evidence, not finished Rally
+gameplay, texture recovery, VU1 production integration or console validation.
+
+Known architectural limits remain explicit: logical 496x384 viewport, partial
+physical controller state, 44.1 kHz float input with 48 kHz output, blocking SDK
+waits, and startup-dependent IOP reset ownership. The current study's RLYMESH
+and captured object_to_reference_view matrices are not renamed into a generic
+world-space asset format. Centralized reset/session ownership, configurable
+viewport, full controls and native-rate transport require separate validated
+changes. Do not add an ECS/plugin/task framework without a real consumer need.
+
+
 ## Native PS2 model-space geometry study (2026-10-24)
 
 Checkpoint 1a426ba is published on port/ps2. All five triggered workflows

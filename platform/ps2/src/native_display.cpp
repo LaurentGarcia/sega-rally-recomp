@@ -26,6 +26,10 @@ static_assert(depth_storage_format == GS_PSMZ_16S && depth_register_format == GS
 namespace {
 constexpr unsigned upload_bytes = 65536, texture_slots = 14, palette_slots = 256;
 constexpr std::uint32_t dma_running = 1u << 8, vif_reverse = 1u << 23;
+// Display calls/lifetimes are caller-serialized. A failed transport poisons the
+// global GS lease even after its C++ object dies: the reverse bus may be held.
+const void *display_owner = nullptr;
+bool display_quarantined = false;
 // Fixed diagnostic bound in CP0 Count ticks; no claim about emulator wall time.
 constexpr std::uint32_t readback_tick_limit = 300000000;
 std::uint32_t count_ticks() {
@@ -87,6 +91,13 @@ struct Display::Impl {
         bool valid = false;
     } palettes[palette_slots];
     std::uint64_t texture_age = 0, palette_age = 0;
+
+    void free_buffers() {
+        if (packet) packet_free(packet);
+        packet = nullptr;
+        std::free(staging);
+        staging = nullptr;
+    }
 
     void submit(qword_t *end) {
         dma_channel_send_normal(DMA_CHANNEL_GIF, packet->data, int(end - packet->data), 0, 0);
@@ -217,10 +228,8 @@ Display::~Display() {
     if (!impl_) return;
     // A platform that cannot stop its owned DMA must not receive into freed
     // memory. Retain these bounded allocations on that fatal diagnostic path.
-    if (!impl_->retain_dma_memory) {
-        if (impl_->packet) packet_free(impl_->packet);
-        std::free(impl_->staging);
-    }
+    if (!impl_->retain_dma_memory) impl_->free_buffers();
+    if (display_owner == impl_) display_owner = nullptr;
     delete impl_;
 }
 const char *Display::error() const { return impl_ ? impl_->failure : "NATIVE DISPLAY ALLOCATION FAILED"; }
@@ -229,46 +238,70 @@ const Stats &Display::stats() const { static const Stats empty; return impl_ ? i
 void Display::set_vu0_packing(bool enabled) { if (impl_) impl_->use_vu0 = enabled && vu0_pack_available(); }
 void Display::set_debug_page(const char *text) { if (impl_) impl_->debug = text; }
 void Display::set_caption(const char *text) { if (impl_) impl_->caption = text; }
+void Display::invalidate_textures() noexcept {
+    if (!impl_) return;
+    for (auto &slot : impl_->textures) {
+        slot.valid = false;
+        slot.key = {};
+        slot.age = 0;
+    }
+    impl_->texture_age = 0;
+}
 
 bool Display::initialize() {
     if (!impl_) return false;
     auto &d = *impl_;
     if (d.transport_failed) return false;
     if (d.ready) return true;
+    if (display_quarantined) {
+        d.failure = "NATIVE GS TRANSPORT QUARANTINED; RESTART REQUIRED";
+        return false;
+    }
+    if (display_owner) {
+        d.failure = "NATIVE GS ALREADY OWNED BY ANOTHER DISPLAY";
+        return false;
+    }
+    display_owner = impl_;
+    const auto failed = [&d](const char *message) {
+        d.free_buffers();
+        display_owner = nullptr;
+        d.failure = message;
+        return false;
+    };
     d.height = graph_get_region() == GRAPH_MODE_PAL ? 512 : 448;
     d.packet = packet_init(256, PACKET_NORMAL);
     d.staging = static_cast<std::uint32_t *>(memalign(128, upload_bytes));
-    if (!d.packet || !d.staging) { d.failure = "NATIVE GS BUFFER ALLOCATION FAILED"; return false; }
-    dma_channel_initialize(DMA_CHANNEL_GIF, nullptr, 0);
+    if (!d.packet || !d.staging) return failed("NATIVE GS BUFFER ALLOCATION FAILED");
+    if (dma_channel_initialize(DMA_CHANNEL_GIF, nullptr, 0) < 0)
+        return failed("NATIVE GIF INITIALIZATION FAILED");
     dma_channel_fast_waits(DMA_CHANNEL_GIF);
     graph_vram_clear();
     for (auto &frame : d.frames) {
         const int address = graph_vram_allocate(640, d.height, GS_PSM_32, GRAPH_ALIGN_PAGE);
-        if (address < 0) { d.failure = "NATIVE FRAMEBUFFER VRAM EXHAUSTED"; return false; }
+        if (address < 0) return failed("NATIVE FRAMEBUFFER VRAM EXHAUSTED");
         frame.address = address; frame.width = 640; frame.height = d.height; frame.psm = GS_PSM_32;
     }
     const int depth = graph_vram_allocate(640, d.height, depth_storage_format, GRAPH_ALIGN_PAGE);
-    if (depth < 0) { d.failure = "NATIVE DEPTH VRAM EXHAUSTED"; return false; }
+    if (depth < 0) return failed("NATIVE DEPTH VRAM EXHAUSTED");
     d.depth.address = depth;
     const int font = graph_vram_allocate(128, 64, GS_PSM_32, GRAPH_ALIGN_BLOCK);
-    if (font < 0) { d.failure = "NATIVE FONT VRAM EXHAUSTED"; return false; }
+    if (font < 0) return failed("NATIVE FONT VRAM EXHAUSTED");
     d.font.address = font; d.font.width = 128; d.font.psm = GS_PSM_32;
     d.font.info = {7, 6, TEXTURE_COMPONENTS_RGBA, TEXTURE_FUNCTION_DECAL};
     for (auto &slot : d.textures) {
         const int address = graph_vram_allocate(256, 256, GS_PSM_4, GRAPH_ALIGN_BLOCK);
-        if (address < 0) { d.failure = "NATIVE TEXTURE VRAM EXHAUSTED"; return false; }
+        if (address < 0) return failed("NATIVE TEXTURE VRAM EXHAUSTED");
         slot.buffer.address = address; slot.buffer.width = 256; slot.buffer.psm = GS_PSM_4;
     }
     for (auto &slot : d.palettes) {
         const int address = graph_vram_allocate(8, 8, GS_PSM_32, GRAPH_ALIGN_BLOCK);
-        if (address < 0) { d.failure = "NATIVE CLUT VRAM EXHAUSTED"; return false; }
+        if (address < 0) return failed("NATIVE CLUT VRAM EXHAUSTED");
         slot.buffer.address = address; slot.buffer.psm = GS_PSM_32;
         slot.buffer.storage_mode = CLUT_STORAGE_MODE1; slot.buffer.load_method = CLUT_LOAD;
     }
     d.depth.enable = DRAW_ENABLE; d.depth.mask = 1; d.depth.method = ZTEST_METHOD_ALLPASS; d.depth.zsm = depth_register_format;
-    if (graph_initialize(d.frames[0].address, 640, d.height, GS_PSM_32, 0, 0) < 0) {
-        d.failure = "NATIVE VIDEO MODE FAILED"; return false;
-    }
+    if (graph_initialize(d.frames[0].address, 640, d.height, GS_PSM_32, 0, 0) < 0)
+        return failed("NATIVE VIDEO MODE FAILED");
     draw_disable_blending();
     lod_t lod{}; lod.calculation = LOD_USE_K; lod.mag_filter = LOD_MAG_NEAREST; lod.min_filter = LOD_MIN_NEAREST;
     for (auto &frame : d.frames) {
@@ -388,6 +421,7 @@ ReadbackStatus Display::readback_rect(unsigned x, unsigned y, unsigned width,
     const auto retire = [&d, &fail](ReadbackStatus status, const char *message, bool stopped) {
         d.ready = false;
         d.transport_failed = true;
+        display_quarantined = true;
         d.retain_dma_memory = !stopped;
         return fail(stopped ? status : ReadbackStatus::cleanup_failed,
                     stopped ? message : "READBACK DMA STOP FAILED; MEMORY RETAINED, RESTART REQUIRED");

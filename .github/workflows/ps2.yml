@@ -21,6 +21,8 @@ jobs:
         run: python3 platform/ps2/build_ps2.py smoke --output build/ps2-ci
       - name: Verify the native rewrite source boundary without arcade runtime
         run: python3 platform/ps2/build_ps2.py smoke --target native-port --output build/ps2-native-ci
+      - name: Verify the independent original application's engine boundary
+        run: python3 platform/ps2/build_ps2.py smoke --target engine-demo --output build/ps2-engine-ci
   ee-cross-build:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -46,11 +48,26 @@ jobs:
         run: python3 platform/ps2/build_ps2.py build --target audio-fixture --backend docker --container-platform linux/amd64 --output build/ps2-audio-ci --jobs 2
       - name: Enforce the native rewrite boundary and cross-link its bootstrap
         run: python3 platform/ps2/build_ps2.py build --target native-port --backend docker --container-platform linux/amd64 --output build/ps2-native-ci --jobs 2
+      - name: Cross-link the original application without Rally game or study code
+        run: python3 platform/ps2/build_ps2.py build --target engine-demo --backend docker --container-platform linux/amd64 --output build/ps2-engine-ci --jobs 2
+      - name: Compare both applications' shared engine source identities
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          native = json.loads(Path('build/ps2-native-ci/build-native-port.json').read_text())
+          demo = json.loads(Path('build/ps2-engine-ci/build-engine-demo.json').read_text())
+          assert native['status'] == demo['status'] == 'cross_compiled'
+          assert native['shared_engine'] == demo['shared_engine']
+          print('Shared engine source manifest:', demo['shared_engine']['manifest_sha256'])
+          PY
       - name: Cross-link the original VU0 and VU1 numerical fixture
         run: python3 platform/ps2/tools/build_vu1_fixture.py --dual-unit --trailing-nop-qword --output build/ps2-vu1-ci
       - name: Cross-link the original native GS depth readback fixture
         run: python3 platform/ps2/tools/build_native_depth_fixture.py --container-platform linux/amd64 --output build/ps2-native-depth-ci
       - name: Cross-link the native mesh framebuffer capture fixture without assets
         run: python3 platform/ps2/tools/build_native_depth_fixture.py --scene-capture --container-platform linux/amd64 --output build/ps2-native-scene-ci
+      - name: Cross-link the original GS resource lifetime and failure fixture
+        run: python3 platform/ps2/tools/build_native_resource_fixture.py --container-platform linux/amd64 --output build/ps2-native-resources-ci
       # No ROMs, generated game core, signing secrets or artifact publication.
       # This job proves cross-linking; console execution is a separate test.

@@ -87,7 +87,7 @@ PadSnapshot PadInput::poll() {
     out.connected = true;
     const unsigned mode = raw.mode >> 4;
     out.analog = mode == PAD_TYPE_ANALOG || mode == PAD_TYPE_DUALSHOCK;
-    out.steer = out.analog ? raw.ljoy_h : 128;
+    out.left_x = out.analog ? raw.ljoy_h : 128;
     const unsigned down = unsigned(raw.btns) ^ 0xffffu;
     const struct { unsigned sdk; uint16_t ours; } bindings[] = {
         {PAD_LEFT, Left}, {PAD_RIGHT, Right}, {PAD_CROSS, Cross}, {PAD_SQUARE, Square},

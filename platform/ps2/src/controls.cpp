@@ -12,7 +12,7 @@ rt::Model2AIO::Inputs CabinetControls::sample(const PadSnapshot &pad) {
     if (pressed & L1) gear_ = std::max(0, gear_ - 1);
     result.in1 = uint8_t(0x8f | gears[gear_]);
     if (!pad.connected) return result;
-    const int axis = pad.analog ? int(pad.steer) - 128 : 0;
+    const int axis = pad.analog ? int(pad.left_x) - 128 : 0;
     constexpr int deadzone = 16;
     int steer = 128;
     if (axis < -deadzone) steer += (axis + deadzone) * 128 / (128 - deadzone);

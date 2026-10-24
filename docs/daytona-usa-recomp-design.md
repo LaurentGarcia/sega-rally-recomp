@@ -376,6 +376,13 @@ behavior before integration; generic replacement physics is not a fidelity
 substitute. This is an explicit PS2 exception to the generated-game runtime
 architecture above; see [native rewrite](ps2-native-rewrite.md).
 
+The native PS2 service layer is also intended for additional games. Keep its
+hardware and rendering contracts independent of Rally semantics and captured
+reference-view asset adapters. Explicit source roles and a separate original
+sample enforce this direction; see [PS2 engine architecture](ps2-engine-architecture.md).
+Reuse does not relax original-game parity requirements or make diagnostic
+geometry a substitute for recovered gameplay.
+
 **Rally distribution update, 15 October 2026.** The requested deliverable is a
 prebuilt game executable, rather than a compiler bootstrap requiring developer
 tools. Its original runtime importer verifies the player's ZIP and prepares

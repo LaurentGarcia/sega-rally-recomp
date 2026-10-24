@@ -13,8 +13,12 @@ have different purposes:
 | Target | Runtime | Purpose |
 | --- | --- | --- |
 | `native-port` | Independently written game systems and direct PS2 platform code | Current rewrite; platform diagnostics or private static mesh study, no connected gameplay |
+| `engine-demo` | Shared native PS2 engine and original sample content | Independent animated cube and service demonstration; no Rally sources or assets |
 | `core-probe` | Translated i960/TGP/68000 code and shared Model 2A devices | Separate behavioral and hardware comparison tool |
 | `bringup` / `audio-fixture` | ROM-free PS2 hardware diagnostics | Display, controller and PCM output checks |
+
+The [reusable engine guide](ps2-engine-architecture.md) describes the shared
+service boundary, ownership contracts and how to build the original sample.
 
 Build and run the current rewrite using the
 [native target instructions](ps2-native-rewrite.md#build-and-check). The

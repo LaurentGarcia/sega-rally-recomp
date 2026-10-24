@@ -310,6 +310,7 @@ class BuildBoundaryTests(unittest.TestCase):
             with mock.patch.object(driver, "ROOT", root), \
                  mock.patch.object(driver, "NATIVE_SOURCES", ["platform/ps2/native/main.cpp"]), \
                  mock.patch.object(driver, "NATIVE_IOP_SOURCES", ()), \
+                 mock.patch.object(driver, "ENGINE_HEADERS", set()), \
                  mock.patch.object(driver.subprocess, "run", side_effect=AssertionError("unexpected compiler/reference execution")), \
                  contextlib.redirect_stdout(io.StringIO()):
                 driver.smoke(args, report)
@@ -371,6 +372,9 @@ class BuildBoundaryTests(unittest.TestCase):
                 bridge.symlink_to(forbidden)
                 with self.assertRaisesRegex(ValueError, "model2a_machine.h"):
                     driver.validate_native_boundary([main, bridge])
+                with self.assertRaisesRegex(ValueError, "model2a_machine.h"):
+                    driver.validate_native_boundary([main])
+                main.write_text("int main() { return 0; }\n")
                 allowed = driver.validate_native_boundary([main])
                 self.assertFalse(allowed["translated_processors_linked"])
                 self.assertFalse(allowed["arcade_machine_runtime_linked"])
@@ -417,7 +421,7 @@ class BuildBoundaryTests(unittest.TestCase):
             self.assertEqual(list(outside.iterdir()), [])
 
     def test_ci_triggers_cover_bringup_sources_and_transitive_project_headers(self):
-        sources = [ROOT / name for name in driver.BRINGUP_SOURCES + driver.NATIVE_SOURCES + list(driver.NATIVE_IOP_SOURCES)]
+        sources = [ROOT / name for name in driver.BRINGUP_SOURCES + driver.NATIVE_SOURCES + driver.ENGINE_DEMO_SOURCES + list(driver.NATIVE_IOP_SOURCES)]
         dependencies = sources + driver.project_headers(sources, [ROOT / "platform/ps2/include", ROOT / "platform/ps2/native", ROOT / "src"])
         workflow = (ROOT / ".github/workflows/ps2.yml").read_text()
         for event in ("push", "pull_request"):

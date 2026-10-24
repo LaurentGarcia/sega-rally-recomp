@@ -24,6 +24,15 @@ textures, mesh buffers, sound samples and music remain user-supplied/private;
 removing machine emulation does not make the original game's assets original
 project content.
 
+## Reusable engine boundary
+
+The [PS2 engine architecture](ps2-engine-architecture.md) defines shared services
+for additional games. The build checks dependency direction for every project
+source/header: engine code cannot import Rally rules, the captured-scene study
+or offline recovery tools. The `engine-demo` target uses the same engine inventory
+with original content and no game-specific sources. Build reports record both
+applications' shared engine source identity.
+
 ## Architecture
 
 ```text

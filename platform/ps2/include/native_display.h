@@ -56,21 +56,33 @@ enum class ReadbackStatus {
     gif_timeout, finish_timeout, receive_timeout, fifo_timeout, cleanup_failed
 };
 // Materials and assets remain caller-owned through present(). Increment the
-// texture generation after editing bytes. Width/height: powers of two8..256.
+// texture generation after editing bytes. Before releasing or reusing texture
+// storage, call Display::invalidate_textures(): an address and generation can
+// otherwise identify a different asset when an allocator recycles that address.
+// Width/height: powers of two8..256.
 // Vertex q must be positive; abs(u/v) and q are limited to1,000,000.
 bool valid_frame(const Frame &frame, const char *&failure);
 // Caller passes a validated [0,1] value. Nearest integer, far0 and near65535.
 std::uint16_t reverse_depth16(float depth) noexcept;
 // Pure PS2 platform renderer. No board, instruction-set or arcade video types.
+// Calls and lifetimes are serialized by the caller. One initialized Display
+// owns the process-global GS/GIF state and SDK VRAM allocator at a time.
 class Display {
 public:
     Display();
     ~Display();
     Display(const Display &) = delete;
     Display &operator=(const Display &) = delete;
+    // Idempotent after success. Rejection of a second owner touches no hardware.
+    // Failed setup releases its CPU buffers/lease so initialization can retry.
+    // A retired transport requires process restart, including after destruction.
     bool initialize();
     bool present(const Frame &frame);
     bool present_status(const char *message);
+    // Between calls, forget all cached texture identities. The next use uploads
+    // its index bytes; copied-content CLUT entries remain valid. No allocation,
+    // transfer or stats/error change. present() completes GS work before return.
+    void invalidate_textures() noexcept;
     // Optional diagnostic, never used by present(). Reads the completed physical
     // 640 x output_height() framebuffer in row order, raw GS 0xAABBGGRR words
     // (alpha retains the GS0..0x80 convention). No allocation. Byte count must

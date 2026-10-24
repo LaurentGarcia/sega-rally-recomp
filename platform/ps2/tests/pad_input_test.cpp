@@ -99,7 +99,7 @@ int main() {
             sdk.mode_result = 1;
             check(!pad.poll().connected && sdk.requests == 3, "accepted request awaits stable reading");
             const auto snapshot = pad.poll();
-            check(snapshot.connected && snapshot.analog && snapshot.steer == 17 &&
+            check(snapshot.connected && snapshot.analog && snapshot.left_x == 17 &&
                   snapshot.buttons == ps2::Cross && sdk.requests == 3, "accepted mode read without resubmission");
             sdk.state = PAD_STATE_DISCONN;
             check(!pad.poll().connected, "disconnect neutralizes input");
@@ -159,7 +159,7 @@ int main() {
             check(pad.initialize(), "digital controller initialization");
             pad.poll();
             const auto snapshot = pad.poll();
-            check(snapshot.connected && !snapshot.analog && snapshot.steer == 128 &&
+            check(snapshot.connected && !snapshot.analog && snapshot.left_x == 128 &&
                   sdk.requests == 0, "digital-only device remains usable without mode request");
         }
         check(sdk.closes == 1, "digital controller closes once");
