@@ -85,5 +85,11 @@ jobs:
         run: python3 platform/ps2/build_ps2.py build --target core-probe --core-manifest platform/ps2/tests/contact_search_manifest.json --container-platform linux/amd64 --output build/ps2-contact-search-ci --jobs 2
       - name: Cross-link the main-car pose publication fixture
         run: python3 platform/ps2/build_ps2.py build --target core-probe --core-manifest platform/ps2/tests/main_car_pose_manifest.json --container-platform linux/amd64 --output build/ps2-main-car-pose-ci --jobs 2
+      - name: Cross-link the rounded contact cross-product fixture
+        run: python3 platform/ps2/build_ps2.py build --target core-probe --core-manifest platform/ps2/tests/rounded_cross_product_manifest.json --container-platform linux/amd64 --output build/ps2-rounded-cross-ci --jobs 2
+      - name: Cross-link the rounded affine point-transform fixture
+        run: python3 platform/ps2/build_ps2.py build --target core-probe --core-manifest platform/ps2/tests/rounded_affine_transform_manifest.json --container-platform linux/amd64 --output build/ps2-rounded-affine-ci --jobs 2
+      - name: Cross-link the native contact-result fixture with original synthetic normal data
+        run: python3 platform/ps2/build_ps2.py build --target core-probe --core-manifest platform/ps2/tests/contact_result_manifest.json --container-platform linux/amd64 --output build/ps2-contact-result-ci --jobs 2
       # No ROMs, generated game core, signing secrets or artifact publication.
       # This job proves cross-linking; console execution is a separate test.

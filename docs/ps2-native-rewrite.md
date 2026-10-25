@@ -92,6 +92,9 @@ that scene or a ROM-free hardware test.
 | [Cabinet steering byte](../platform/ps2/native/cabinet_steering.md) | Center, saturate and convert all 256 byte values with exact result bits | Exhaustive 256-byte comparison and 32 sampled live calls |
 | [Cabinet steering filter](../platform/ps2/native/cabinet_steering_filter.md) | Stateful rounded input filter and sign-flipped result, including gradual underflow | 68,160 evaluations including 18,432 sequence updates and 32 live calls |
 | [Main-car pose publication](../platform/ps2/native/main_car_pose.md) | Return an independent render value containing 22 unchanged words; explicit external state and no flag merge | 77,208 distinct inputs; 3,242,736 original instructions |
+| [Rounded cross product](../platform/ps2/native/rounded_cross_product.md) | Three bounded, separately rounded product differences with alias-safe atomic output | 110,084 evaluations, including all 36 captured calls; 2,642,016 original firmware instructions |
+| [Affine point transform](../platform/ps2/native/rounded_affine_transform.md) | Explicit matrix columns and translation-first point transformation; separately rounded products and sums | 84,273 evaluations; 2,696,736 original firmware instructions |
+| [Contact-result interpretation](../platform/ps2/native/contact_result.md) | Miss/plane/edge status, bounded gap arithmetic and an explicit private normal lookup asset | 40,530 evaluations, including 138 captured replies; original CPU and normalization firmware |
 
 The first four components have portable boundary tests, sanitizer checks and standalone
 EE fixtures executed successfully in Play: 121 progress boundary/rejection
@@ -112,6 +115,12 @@ updates, plus 2,560 rejection checks.
 Course-contact search passed 192 EE selection cases and ten boundary checks.
 Main-car pose publication passed 2,184 EE cases and 48,048 raw-word checks;
 its original-program proof is isolated, with no live paired helper capture yet.
+Rounded cross product passed 6,208 EE cases plus 180 atomic-rejection checks.
+Affine point transformation passed 4,065 EE cases plus 720 atomic-rejection
+checks. Both include alias checks and a fused-arithmetic discriminator; the
+affine fixture also distinguishes translation-first ordering.
+Contact-result interpretation passed 2,440 EE cases, 34 atomic-rejection checks
+and three interpolation guards using an original synthetic normal table.
 The original-program comparisons run on the host against the
 owner's verified Revision B image; the reference interpreter and memory
 adapters are not part of the native executable. The components are compiled
@@ -128,16 +137,22 @@ its smaller helpers match. The [main vehicle callback](../platform/ps2/native/ma
 is a third, separate path that consumes cabinet steering. That callback and its
 remaining geometry/force dependencies must be recovered to drive the main car.
 Its [four-point candidate-contact pass](../platform/ps2/native/main_contact_pass_recovery.md)
-now has a bounded dependency study; transforms, interpreted replies and response
-aggregation still require native recovery and captured comparisons.
+has a bounded dependency study. Explicit point transformation, cross products
+and interpreted replies are recovered separately; matrix construction,
+per-contact response and aggregation still require native recovery and comparison.
 
 The separate [driving observer](../platform/ps2/tools/driving_capture.md) now
-records those routes using the existing cabinet replay. Capture 007 passes all
+records those routes using the existing cabinet replay. Capture 009 passes all
 2,850 enabled/disabled frame checkpoints. It records 1,202 complete alternate
 calls and 34 detailed groups, plus 601 complete main-object cabinet-filter calls
 with 32 detailed pairs. Callback records and matching published steering values
 associate the cabinet input with object `0x500000`; the alternate calls belong
 to two different objects, each updating once per frame in the observed window.
+Its separate main-contact stream records 601 complete passes and 2,404 complete
+query/result pairs, with 26 detailed passes and all 36 cross operations in the
+observed window. Native result interpretation matches all 104 sampled main
+replies and 34 alternate replies, including 13 edge and 125 plane results.
+No miss occurred in those samples; miss behavior is covered synthetically.
 This is bounded host-reference evidence, not independent arcade-board fidelity
 or a full-course proof. The native PS2 application still does not connect these
 components into driving gameplay.

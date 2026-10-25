@@ -1,5 +1,127 @@
 # Handoff
 
+## Native contact transforms, reply interpretation and main-pass capture (2026-10-24)
+
+The preceding e6957c4 checkpoint is published and all triggered workflows now
+pass, including the full desktop Build matrix, PS2, source export, Metal and
+both Vulkan workflows. This batch continues the typed native-runtime recovery;
+no generated arcade processor code or device model enters the PS2 application.
+The native driving loop remains unconnected and physical PS2 testing is pending.
+
+Rounded cross product now has explicit three-component inputs, separately
+rounded products/subtractions, a finite +/-2^20 input domain, gradual underflow,
+signed-zero preservation, atomic rejection and three alias modes. Its original
+firmware comparison passes 110,048 synthetic evaluations / 110,032 unique inputs
+and 2,641,152 instructions, fingerprint 428bbf5526cd241b. The independently written
+bounded integer arithmetic matches the portable float reference and passes
+ASan/UBSan. The standalone EE fixture executed in Play 0.72 HLE: 6,208 cases,
+fingerprint 408f01a4e8d06ea5, 180 atomic-rejection checks and a fused-arithmetic
+discriminator. ELF 96251ba4dd8fa8a00a8dc46746ece7fe665d2400e9d5ee3a47bd8f843f50361d
+has 1,226,020 file bytes / 180,192 resident bytes; its 20.18-second observation is
+not measured completion time. Empty guest stderr and current source/build/ELF
+identities are bound in build/ps2-native-rounded-cross-ee-001/runtime-validation.json.
+
+Rounded affine transformation accepts explicit matrix columns, translation and
+point values. Every scalar must be finite within +/-2^20. Translation is the
+first accumulator value; each product and subsequent sum rounds separately.
+There is no geometry store or matrix stack. Five alias modes and 720 atomic
+rejection evaluations pass. The portable reference and original command 48
+match 84,273 evaluations / 2,696,736 instructions, fingerprint 7005cd920cda465e.
+All 32,768 zero-sign combinations, selected boundaries and 50,000 random inputs
+are covered; the full binary32 input domain is not exhausted. ASan/UBSan passes.
+The standalone EE fixture passes 4,065 cases, fingerprint eb07dfee53139c87, plus
+order/fusion guards and rejections. Its executed ELF is
+93035e5363e73de1cfae54d4988fd5d485aa83752d2f5bea4bccd422d048619b,
+1,226,380 file bytes / 180,576 resident bytes; Play observed 20.181 seconds with
+empty stderr. Source-bound proof is under
+build/ps2-native-rounded-affine-ee-001/runtime-validation.json. The valid
+original-oracle report is build/ps2-native-rounded-affine-oracle-002/result.json.
+Attempt 001 stopped one instruction late because the generated hook runs after
+an instruction, causing a rejected extra FIFO read. The oracle now stops after
+the return at 46b and checks its destination 46c; production arithmetic did not
+change for this harness fix. Independent arithmetic/oracle review found no blocker.
+
+A separate main-contact observer stream now covers entry, complete transformed
+points, all four query/reply/result sequences, response vectors, aggregate cross
+operands/results and the actual saved caller-frame return. It reads only bounded
+ordinary RAM/current registers and never adds FIFO or device reads. Existing
+alternate streams retain their behavior. Saved frames work through interrupts;
+all incomplete or mismatched phases reject capture publication. Independent
+review and synthetic malformed/cached/spilled-frame tests passed.
+
+Capture 008 passed all 2,850 enabled/disabled frame checkpoints and recorded 601
+complete main passes and 2,404 complete query/result adapters. It sampled 17 passes
+but none of 36 crosses: cadence located those operations in frames 2571..2579.
+The strict cross consumer correctly rejected 008 as empty. Capture 009 adds only
+that observed nine-frame sampling window; it also passes all 2,850 checkpoints,
+with 26 detailed passes / 878 events and all 36 crosses sampled. These comparisons
+are bounded host-reference observer checks, not independent PCB fidelity.
+Original firmware, generated code, all captures and executable artifacts stay
+private under ignored build/. The public tests use original synthetic inputs.
+
+All 36 sampled cross operations match the native function, isolated original
+firmware and captured three-word outputs. The combined comparison passes
+110,084 evaluations / 110,068 unique inputs, with 2,642,016 original instructions
+and fingerprint 61cedd9373797928. All 26 sampled parent passes are complete;
+the 36 operations cover the nine active frames. Their inputs contain no
+subnormals, so that coverage remains synthetic. The larger response is unconnected.
+
+The contact-result EE fixture also passes: 2,440 cases with fingerprint
+82d33d3b52e3a7d4, 34 atomic-rejection checks and three interpolation guards.
+Its private normal table is original synthetic test data, not the game's table.
+Executed ELF 0ba20976d1f98c579f3acce88cd49163efd8297e05536bf9f18ea1a24c2f2028
+has 1,238,196 file bytes / 186,720 resident bytes. Play's 20.122-second observation
+produced exact PASS lines and empty guest stderr. Both window-image attempts
+failed; no image capture or measured completion-time claim follows. The
+source/build/ELF/guest-log identities are bound in
+build/ps2-native-contact-result-ee-001/runtime-validation.json.
+
+Native017 integrates the three additional source/header pairs in the game role
+and passes its 56-file dependency-direction and forbidden-symbol audits. All
+recorded project inputs match the final compiled sources. The diagnostic still
+has ELF 2338119372579ee7012ec95fcd43f5210d8382cb112d6f4dbce9d3fc8f050158,
+2,274,240 file bytes / 593,080 resident bytes: these disconnected leaves are
+linker-discarded, so this is not a new gameplay runtime result. The 21-file
+shared engine identity remains
+8bfba3e1904f90f61cec9230f3ea3f2a66013a37a6a7257d8dbe9055be1094e2.
+CI cross-links all three new standalone fixtures using synthetic data only.
+
+The typed contact-result adapter implements status-only misses, plane gap and
+normal interpolation, and edge determinant/division with raw direction copying.
+Only arithmetic inputs are bounded; unused raw payloads and miss preservation
+retain all bits. Negative divisors are admitted. The plane normal reads an
+explicit immutable 8,192-pair asset (64 KiB), with exact original table indexing
+and slope-sign decoding performed offline. A production asset-loading path is
+still pending. Native code has no emulated ports, registers or original table.
+
+Final source-bound comparison passes 40,530 cases, including all 138 captured
+results (104 main and 34 alternate): 125 live plane and 13 live edge paths,
+with miss behavior covered synthetically. All five output words match native,
+original CPU/normal instructions and captured outputs. The combined totals are
+2,505,270 CPU instructions and 341,350 normalization instructions, fingerprint
+c898451d51b72992. Evidence is build/ps2-native-contact-result-live-002/result.json.
+Its initial live parser assumed the earlier globals window and a serial query
+loop; actual main captures have a narrow selector block and pipelined queries.
+The parser now accepts exactly one verified selector representation, preserves
+the observed sequence and rejects ambiguous data. Review also added exact
+parent/child point, slot, frame, saved-return and rounding-mode checks. Seven
+new arithmetic/capture tests and independent reviews found no remaining blocker.
+
+The shared selector-helper change required a fresh cross-product proof:
+build/ps2-native-rounded-cross-live-002/result.json binds the final helper and
+retains the same 36 live matches and combined fingerprint. The final portable
+PS2 suite passes all 155 tests in 30.219 seconds; its complete output is
+build/ps2/validation/contact-response-tests-001.log. All three new EE fixtures
+and the native target bind the unchanged compiled sources. Full per-contact
+response, matrix construction and aggregate updates remain the next recovery
+work; these proofs do not connect native driving or certify a complete race.
+
+The next command 0x58 study corrects one dependency label: primitive 0x1ab uses
+firmware-initialized internal constants, with no external normal-table access.
+Its exact pipeline arithmetic remains under study. A generic square root must
+not replace the pinned reference behavior without a separate bounded proof;
+no command 0x58 native implementation or reference-runtime change is included.
+
 ## Main-car publication and candidate-contact boundary (2026-10-24)
 
 Checkpoint 0fae93e is published. Its PS2 portable/cross-build jobs, exact source

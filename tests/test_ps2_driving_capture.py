@@ -206,6 +206,93 @@ class DrivingCaptureTests(unittest.TestCase):
                 self.assertIn("new directory below ignored build",result.stderr)
             self.assertFalse((Path(external)/"capture").exists())
 
+    def test_main_pass_has_independent_four_slot_pipeline_and_exact_cross_blocks(self):
+        for mode in ("main-valid","main-spilled","main-no-cross"):
+            with self.subTest(mode=mode):
+                path,result=self.run_case(mode)
+                self.assertEqual(result.returncode,0,result.stderr)
+                marker=json.loads((path/"capture.json").read_text())
+                self.assertEqual((marker["main_calls"],marker["main_completions"],marker["main_samples"]),(1,1,1))
+                self.assertEqual([marker[name] for name in ("main_queries","main_query_completions",
+                    "main_contacts","main_contact_completions")],[4]*4)
+                crosses=0 if mode=="main-no-cross" else 4
+                self.assertEqual((marker["main_cross_pairs"],marker["main_sampled_cross_pairs"]),(crosses,crosses))
+                events=[json.loads(line) for line in (path/"main-contact.jsonl").read_text().splitlines()]
+                self.assertEqual(len(events),31+2*crosses)
+                self.assertEqual(marker["main_events"],len(events))
+                self.assertEqual([events[0]["event"],events[1]["event"],events[-1]["event"]],
+                                 ["main_entry","main_prequery","main_return"])
+                self.assertEqual(events[-1]["pc"],events[0]["return_frame"]["pc"])
+                self.assertEqual(events[0]["return_frame"]["pc"],0x5d421c)
+                self.assertNotEqual(events[0]["registers"][2],0x5d421c)
+                self.assertEqual([event["instructions"] for event in events],
+                                 sorted(set(event["instructions"] for event in events)))
+                self.assertEqual(len((path/"main-contact-cadence.jsonl").read_text().splitlines()),2)
+                self.assertEqual(marker["events"],10)  # Existing alternate stream remains independent.
+                for kind,index_key in (("query_pre","query_index"),("contact_pre","contact_index"),
+                                       ("response_post","contact_index"),("cross_pre","cross_index")):
+                    self.assertEqual([e[index_key] for e in events if e["event"]==kind],
+                                     list(range(crosses if kind=="cross_pre" else 4)))
+                for event in events:
+                    self.assertEqual(event["parent_return_frame"],events[0]["return_frame"])
+                    self.assertEqual(event["object"],0x210000)
+                    if event["event"] in ("query_pre","contact_pre"):
+                        proof=event["return_frame"]
+                        self.assertEqual(proof["frame_pointer"],0x500400)
+                        self.assertEqual(proof["words"][2],proof["pc"])
+                        self.assertNotEqual(proof["pc"],event["registers"][2])
+                        self.assertEqual(proof["source"],"ordinary_ram" if mode=="main-spilled" else "register_cache")
+                    blocks={block["name"]:block for block in event["blocks"]}
+                    self.assertEqual(blocks["candidate_position"]["address"],0x220000)
+                    self.assertEqual(blocks["candidate_orientation"]["address"],0x220020)
+                    self.assertEqual(len(blocks["result_slots"]["words"]),36)
+                    if event["event"]=="main_prequery":
+                        self.assertEqual(blocks["query_points"]["words"],list(range(1000,1012)))
+                        self.assertEqual(blocks["transformed_offsets"]["words"],list(range(2000,2012)))
+                    if event["event"]=="contact_reply":
+                        i=event["contact_index"]
+                        reply=blocks["contact_reply_prefix"]["words"]+blocks["contact_reply_tail"]["words"]+[event["registers"][21]]
+                        self.assertEqual(reply,list(range(100*i,100*i+17)))
+                    if event["event"]=="contact_post":
+                        i=event["contact_index"]
+                        self.assertEqual(blocks["contact_output"]["address"],0x2138d0+36*i)
+                        self.assertEqual(blocks["contact_output"]["words"],list(range(4000+100*i,4008+100*i)))
+                    if event["event"].startswith("cross_"):
+                        i=event["cross_index"]
+                        self.assertEqual(blocks["cross_left"]["words"],list(range(2000+3*i,2003+3*i)))
+                        self.assertEqual(blocks["cross_right"]["words"],list(range(3000+3*i,3003+3*i)))
+                        self.assertEqual(blocks["cross_result"]["address"],0x5004d0)
+                        if event["event"]=="cross_post":
+                            self.assertEqual(blocks["cross_result"]["words"],list(range(5000+100*i,5003+100*i)))
+
+    def test_main_pass_rejects_missing_boundaries_wrong_identity_and_non_ram(self):
+        for suffix in ("bad-position","bad-orientation","bad-stack","bad-caller","nested","timeout",
+                       "prequery-object","no-prequery","duplicate-prequery","query-point","query-lane",
+                       "query-return","duplicate-query","query-no-count","query-duplicate-count","query-wrong-frame",
+                       "contact-slot","contact-point","contact-return","contact-no-reply","contact-duplicate-reply",
+                       "contact-wrong-frame","response-index","response-missing","cross-offset","cross-pointer",
+                       "cross-object","cross-frame","cross-no-pre","cross-duplicate-pre","cross-no-post",
+                       "cross-partial","return-frame","incomplete"):
+            with self.subTest(suffix=suffix):
+                path,result=self.run_case("main-"+suffix)
+                self.assertNotEqual(result.returncode,0,result.stdout)
+                self.assertFalse((path/"capture.json").exists())
+                self.assertFalse((path/"main-contact.jsonl").exists())
+
+    def test_main_aggregate_window_is_sampled_without_expanding_every_frame(self):
+        for mode,sampled in (("main-aggregate-window",True),("main-before-aggregate-window",False)):
+            with self.subTest(mode=mode):
+                path,result=self.run_case(mode)
+                self.assertEqual(result.returncode,0,result.stderr)
+                marker=json.loads((path/"capture.json").read_text())
+                self.assertEqual(marker["main_calls"],1)
+                self.assertEqual(marker["main_samples"],int(sampled))
+                self.assertEqual(marker["main_cross_pairs"],4)
+                self.assertEqual(marker["main_sampled_cross_pairs"],4 if sampled else 0)
+                events=[json.loads(line) for line in (path/"main-contact.jsonl").read_text().splitlines()]
+                self.assertEqual(len(events),39 if sampled else 0)
+                if sampled: self.assertTrue(all(event["frame"]==2571 for event in events))
+
     def test_new_region_failures_never_seal_a_capture(self):
         cases={
             "orientation-bad-pointer":"input frame or object mismatch",

@@ -65,8 +65,8 @@ or TestFlight release.
 
 **PlayStation 2 development:** a [native rewrite](docs/ps2-native-rewrite.md)
 targets the EE, VU, GS and IOP/SPU2 directly. Its independent bootstrap excludes
-the arcade CPU and device models. Recovered steering, orientation and
-course-contact routines have private original-program comparisons and standalone
+the arcade CPU and device models. Recovered steering, orientation,
+course-contact and contact-transform routines have private original-program comparisons and standalone
 EE tests. An optional [static mesh study](docs/ps2-native-scene.md)
 loads recovered object geometry with diagnostic shading; it is not driving
 gameplay. The complete car update, collision response and race loop remain to be migrated.

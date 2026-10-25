@@ -1,0 +1,9 @@
+{
+  "sources": [
+    "platform/ps2/tests/contact_result_test.cpp",
+    "platform/ps2/native/contact_result.cpp"
+  ],
+  "includes": ["platform/ps2/native", "platform/ps2/tests"],
+  "libraries": [],
+  "embed_iop_modules": false
+}

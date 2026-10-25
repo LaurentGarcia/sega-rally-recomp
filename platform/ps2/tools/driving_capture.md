@@ -66,6 +66,8 @@ adjacent objects may share that window.
 | `callbacks.jsonl` | Dispatcher ROM `0x2aba8`: actual `g0` object and `g4` callback, without additional memory reads |
 | `steering.jsonl` | Independently paired cabinet steering entry/output, byte input, return identity, AC and integer registers; no inferred object |
 | `steering-filter.jsonl` | Full filter entry/output with the input word, previous/current history and output registers |
+| `main-contact.jsonl` | Separately sampled main candidate contact passes, including their four query/result slots and optional aggregate cross operations |
+| `main-contact-cadence.jsonl` | Every bounded main-pass entry/return, object, frame and completed cross-pair count |
 | Detailed events | All 32 integer registers, AC, raw bits of four floating registers, object window and named RAM blocks |
 | `code-coverage.jsonl` | Nonzero instruction counts for the bounded ROM `0x20000..0x3ffff` analysis region and its relocated copy |
 
@@ -123,6 +125,27 @@ The callback stream records `0x500000 -> 0x5d3f40` 601 times, while each object
 caller analysis must establish their meaning. The capture passes observation
 parity, not the complete native vehicle implementation.
 
+Capture 008 added the independent main stream and passed the same full replay.
+Its cadence located 36 aggregate cross operations in nine main passes at frames
+2,571 through 2,579, between the original snapshot checkpoints. It therefore
+established execution cadence but recorded no detailed cross operands. Capture
+009 explicitly added that bounded observed window to main sampling, preserving
+008 unchanged. It passed all 2,850 exact checkpoints and records 601 complete
+main passes, 2,404 query/adapter pairs, 26 detailed passes (878 events), and all
+36 aggregate cross pairs. All six older detailed/cadence/selector/callback/
+steering/filter streams remain byte-identical to capture 007.
+
+The final private report is `build/ps2/driving-capture-009/validation.json`,
+SHA-256 `d704254e2536fb19bca05a971aba7447224a9ba73bb25663a2e239e1ac7afd90`.
+The main stream SHA-256 is
+`e6845aae16d47a88592e37adad91a02c9d723d565b511c735e09ff13379023dd`.
+The combined streams use 7,739,713 bytes, below the unchanged 16 MiB cap.
+All 120 source-input hashes and recorded file hashes matched when the run was
+sealed. Subsequent build-inventory changes do not rewrite that frozen evidence.
+The observation result alone does not prove the contact pass or its arithmetic
+has been implemented natively; the separate component consumers make narrower
+numerical claims.
+
 ## Contact result
 
 The events are `contact_pre` at ROM `0x2acc0`, `contact_reply` at `0x2adac`,
@@ -169,6 +192,56 @@ AC. The current frame and saved caller return identity must agree across the
 pair. Sampling and pair limits match the independent leaf stream. These
 observations do not equate the filter's output with a complete vehicle model.
 
+## Main candidate contact pass
+
+The separate main stream observes the inspected
+[main candidate contact pass](../native/main_contact_pass_recovery.md), ROM
+`0x34380..0x34cd8`. It uses its own `call_id` and context; none of its records is
+silently added to the older alternate-object stream. `main_entry` captures the
+object in entry `g0`, candidate position at entry `g1`, candidate orientation at
+entry `g2`, and the actual saved caller return. The return must resume ROM
+`0x3521c` with the original caller frame. Ownership still depends on the separate
+main-callback analysis, rather than the stream's name alone.
+
+`main_prequery` at ROM `0x346d8` follows all four point stores. From that boundary
+onwards the snapshots include twelve-word `transformed_offsets`, `query_points`
+and `response_vectors` blocks at main `fp+0x70`, `fp+0x40` and `fp+0xa0`.
+The response vectors are raw scratch contents until each response has executed;
+their inclusion does not imply they are already initialized at prequery.
+The candidate triples retain their original addresses throughout the pass.
+Other named blocks are the four nine-word-spaced `result_slots` at `0x2138d0`,
+three `feedback` words at `0x213960`, `feedback_enable` at `0x2142c8`, and the
+course selector and object-pointer globals. The ninth word of each result slot
+is spacing, not part of the adapter's eight-word output.
+
+Each of the four queries has `query_pre/count/post` events with `query_index`;
+each adapter invocation has `contact_pre/reply/post` with `contact_index` and
+the same raw 17-word reply reconstruction described above. The observer checks
+the actual pipelined order: query zero, adapter zero, query one, response zero,
+and so on. `response_post` occurs at ROM `0x34a30`, before the loop index is
+incremented. Query returns must be ROM `0x346dc` or `0x34728`; adapter returns
+must be `0x34710`, all in the saved main frame. Every event carries a
+`parent_return_frame`; helper events additionally bind their own saved caller
+proof in `return_frame`. Child `r2` is diagnostic only.
+
+The aggregate path can skip cross operations or execute four. `cross_pre` at
+ROM `0x34a88` follows the original zeroing of both middle operands;
+`cross_post` at `0x34b04` follows all three result stores. `cross_index` follows
+the observed byte offset in `g7`: 0, 12, 24 and 36. The three-word
+`cross_left`, `cross_right` and `cross_result` blocks are at main
+`fp+0x70+12*i`, `fp+0xa0+12*i` and `fp+0xd0`. Pre-entry `g5` must equal
+`fp+0x40+12*i`; `r13` must retain the parent object. These are raw observed
+operands/results for a separate numerical comparison, not a native contact
+response implementation. No extra FIFO or geometry-state reads occur.
+
+`main_return` requires all four query/count/adapter/reply/response groups to
+complete, plus either zero or four complete cross pairs. Marker fields
+`main_calls`, `main_completions`, `main_samples`, `main_events`,
+`main_queries`, `main_query_completions`, `main_contacts`,
+`main_contact_completions`, `main_cross_pairs` and `main_sampled_cross_pairs`
+describe the distinct populations. The replay tool also requires at least one
+complete sampled main pass before it can report success.
+
 ## Limits and tests
 
 Runs are limited to 10,000 rendered frames; the observation endpoints may differ
@@ -176,9 +249,12 @@ by at most 1,200 frames. Cadence is limited to 16,384 calls; selector and callba
 streams each to 16,384 records; steering and its full filter are each limited
 to 16,384 calls. At most four calls at each selected input/60-frame
 checkpoint receive detailed snapshots, with 128 detailed calls and 4,096 events
-overall. Frame 2,752 is additionally sampled to diagnose a previously unmatched
+in the alternate stream. Main passes have a separate 16,384-call limit,
+32 detailed samples (the first call at each selected frame), and 4,096-event
+limit. Main sampling additionally includes the observed aggregate-operation
+window at frames 2,571 through 2,579. Frame 2,752 is additionally sampled to diagnose a previously unmatched
 contact return; it does not establish special game semantics. The combined
-cadence/detail/selector/callback/steering/filter streams are capped at
+cadence/detail/selector/callback/steering/filter/main streams are capped at
 16 MiB. Code coverage uses a fixed 65,536-counter array. At most three private
 reference images are written. An outer call must return within two million
 completed instructions. Process timeouts also bound compilation and both runs.
@@ -192,5 +268,7 @@ bus that rejects all writes and device accesses. Tests cover raw values,
 original/relocated PCs, saved pointer identity, ordered orientation/contact
 boundaries, duplicate suppression, overflow and invalid ranges, unfinished
 calls, no completion marker on failure, saved cached/spilled return frames,
-interrupt-altered child `r2`, independent steering/filter identity and
-output-directory confinement.
+interrupt-altered child `r2`, independent steering/filter identity,
+four-slot main query pipelining, exact cross block mapping, optional no-cross
+passes, and output-directory confinement. Missing, duplicated or mismatched
+main boundaries and non-RAM arguments cannot seal a successful capture.

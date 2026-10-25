@@ -142,6 +142,8 @@ def main():
         marker=json.loads((capture / "capture.json").read_text())
         if marker.get("complete") is not True or not marker.get("completed_calls"):
             raise ValueError("capture has no complete original-game caller evidence")
+        if not marker.get("main_completions") or not marker.get("main_samples"):
+            raise ValueError("capture has no complete sampled main contact pass")
         report.update(status="passed",exact_checkpoint_match=True,matched_frames=args.frames,capture_summary=marker,
                       baseline_sha256=digest(output / "baseline.csv"),captured_sha256=digest(output / "captured.csv"),
                       capture_files_sha256={path.name:digest(path) for path in sorted(capture.iterdir()) if path.is_file()})

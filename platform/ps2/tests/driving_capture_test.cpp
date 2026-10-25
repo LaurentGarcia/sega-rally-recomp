@@ -50,12 +50,96 @@ int main(int argc,char **argv) {
         saved_return(cpu.m_r[0]&~63u,cpu.m_r[2],mode=="all-spilled");
         if (mode=="outer-interrupted-entry") cpu.m_r[2]=0x5cbce0;
         const std::uint32_t relocation=mode=="rom" ? 0 : 0x59f000;
-        const unsigned frame=mode=="unselected" ? 2301 : 2300;
+        unsigned frame=mode=="unselected" ? 2301 : 2300;
         std::uint64_t instruction=1;
         const auto observe=[&](std::uint32_t pc) {
             cpu.m_IP=pc+relocation;cpu.reference_cycles=instruction*3;
             ps2::offline::observe_driving_instruction(cpu,instruction++,frame,123456);
         };
+        if (mode.starts_with("main-")) {
+            if (mode=="main-aggregate-window") frame=2571;
+            if (mode=="main-before-aggregate-window") frame=2570;
+            constexpr std::uint32_t main_fp=0x500400,helper_fp=0x500600,object=0x210000;
+            cpu.m_r[16]=object;cpu.m_r[17]=0x220000;cpu.m_r[18]=0x220020;
+            cpu.m_r[0]=0x500200;cpu.m_r[31]=main_fp;
+            saved_return(0x500200,relocation+0x3521c,mode=="main-spilled");
+            cpu.m_r[2]=relocation+0x34380; // IRQ diagnostic RIP differs from actual saved caller RIP.
+            if (mode=="main-bad-position") cpu.m_r[17]=0x900000;
+            if (mode=="main-bad-orientation") cpu.m_r[18]=0xfffffff8;
+            if (mode=="main-bad-stack") cpu.m_r[31]=0x5ffff0;
+            if (mode=="main-bad-caller") cpu.m_rcache[0][2]+=4;
+            observe(0x34380);
+            if (mode=="main-nested") observe(0x34380);
+            if (mode=="main-timeout") { instruction+=2000001;observe(0x34394); }
+            cpu.m_r[13]=object;
+            for (unsigned i=0;i<12;++i) {
+                bus.values[main_fp+0x40+4*i]=1000+i;
+                bus.values[main_fp+0x70+4*i]=2000+i;
+                bus.values[main_fp+0xa0+4*i]=3000+i;
+            }
+            if (mode=="main-prequery-object") cpu.m_r[13]+=0x100;
+            if (mode!="main-no-prequery") observe(0x346d8);
+            if (mode=="main-duplicate-prequery") observe(0x346d8);
+            const auto query=[&](unsigned i) {
+                cpu.m_r[18]=main_fp+0x40+12*i;cpu.m_r[19]=0;
+                cpu.m_r[0]=main_fp;cpu.m_r[31]=helper_fp;
+                const auto resume=i ? 0x34728u : 0x346dcu;
+                saved_return(main_fp,relocation+resume,mode=="main-spilled");
+                cpu.m_r[2]=relocation+0x2abc0;
+                if (mode=="main-query-point") cpu.m_r[18]+=4;
+                if (mode=="main-query-lane") cpu.m_r[19]=1;
+                if (mode=="main-query-return") cpu.m_rcache[0][2]+=4;
+                observe(0x2abc0);
+                if (mode=="main-duplicate-query") observe(0x2abc0);
+                if (mode!="main-query-no-count") observe(0x2ac08);
+                if (mode=="main-query-duplicate-count") observe(0x2ac08);
+                cpu.m_r[31]=mode=="main-query-wrong-frame" ? main_fp+0x40 : main_fp;
+                observe(resume);
+            };
+            query(0);
+            for (unsigned i=0;i<4;++i) {
+                cpu.m_r[16]=main_fp+0x40+12*i;cpu.m_r[17]=0x2138d0+36*i;
+                cpu.m_r[0]=main_fp;cpu.m_r[31]=helper_fp;
+                saved_return(main_fp,relocation+0x34710,mode=="main-spilled");
+                cpu.m_r[2]=relocation+0x2acc0;
+                if (mode=="main-contact-slot") cpu.m_r[17]+=4;
+                if (mode=="main-contact-point") cpu.m_r[16]+=4;
+                if (mode=="main-contact-return") cpu.m_rcache[0][2]+=4;
+                observe(0x2acc0);
+                for (unsigned j=0;j<12;++j) bus.values[helper_fp+0x60+4*j]=100*i+j;
+                for (unsigned j=0;j<4;++j) bus.values[helper_fp+0x50+4*j]=100*i+12+j;
+                cpu.m_r[21]=100*i+16;
+                if (mode!="main-contact-no-reply") observe(0x2adac);
+                if (mode=="main-contact-duplicate-reply") observe(0x2adac);
+                for (unsigned j=0;j<8;++j) bus.values[0x2138d0+36*i+4*j]=4000+100*i+j;
+                cpu.m_r[16]=0xdeadbeef;cpu.m_r[17]=0xcafebabe;
+                cpu.m_r[31]=mode=="main-contact-wrong-frame" ? main_fp+0x40 : main_fp;
+                observe(0x34710);
+                if (i<3) query(i+1); // Original pipelined query order.
+                cpu.m_r[5]=i;cpu.m_r[13]=object;
+                if (mode=="main-response-index") cpu.m_r[5]=4;
+                if (mode!="main-response-missing") observe(0x34a30);
+            }
+            if (mode!="main-no-cross") for (unsigned i=0;i<4;++i) {
+                cpu.m_r[23]=12*i;cpu.m_r[21]=main_fp+0x40+12*i;
+                if (mode=="main-cross-offset") cpu.m_r[23]=48;
+                if (mode=="main-cross-pointer") cpu.m_r[21]+=4;
+                if (mode=="main-cross-object") cpu.m_r[13]+=0x100;
+                if (mode=="main-cross-frame") cpu.m_r[31]+=0x40;
+                if (mode!="main-cross-no-pre") observe(0x34a88);
+                if (mode=="main-cross-duplicate-pre") observe(0x34a88);
+                for (unsigned j=0;j<3;++j) bus.values[main_fp+0xd0+4*j]=5000+100*i+j;
+                if (mode!="main-cross-no-post") observe(0x34b04);
+                if (mode=="main-cross-partial") break;
+            }
+            cpu.m_r[31]=mode=="main-return-frame" ? 0x500240 : 0x500200;
+            if (mode!="main-incomplete") observe(0x3521c);
+            // Resume the pre-existing synthetic stream, proving both can coexist.
+            cpu.m_r[16]=object;cpu.m_r[17]=0x220000;cpu.m_r[2]=0x5cafec;
+            cpu.m_r[0]=0x500000;cpu.m_r[31]=0x500040;cpu.m_r[15]=object;
+            saved_return(cpu.m_r[0],cpu.m_r[2]);
+            if (mode=="main-aggregate-window" || mode=="main-before-aggregate-window") frame=2580;
+        }
         if (mode.starts_with("filter")) {
             bus.values[0x2142c0]=0x3e000000;bus.values[0x202050]=0x12345680;
             observe(0x39a90);

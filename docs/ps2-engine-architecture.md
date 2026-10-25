@@ -33,7 +33,7 @@ might later discard. A folder name alone does not confer permission.
 | Role | Current files | Permitted project dependencies |
 | --- | --- | --- |
 | Engine | Native display, frame validation, clipping, VU0 packing, pad hardware, storage, PCM transport and IOP module | Explicit engine inventory only |
-| Rally game | Recovered progress, pose, angle-fold, both orientation contracts, direction blend, contact neighborhood/projection/search and cabinet steering/filter | Own game role and engine |
+| Rally game | Recovered progress, both pose publications, angle-fold, orientation, direction blend, contact search/result interpretation, rounded cross/affine transforms and cabinet steering/filter | Own game role and engine |
 | Geometry study | `native_mesh`, `native_scene`, captured-view transforms and fitted camera | Own study role and engine |
 | Rally application | `platform/ps2/native/main.cpp` | Rally game, study and engine |
 | Original demo | `platform/ps2/samples/engine_demo/main.cpp` | Demo and engine |
@@ -86,11 +86,13 @@ All 94 portable PS2 tests passed. These bounded emulator checks do not establish
 physical-console performance, interactive controller behavior or audible output.
 Fatal reverse-transfer quarantine was reviewed but not fault-injected.
 
-The subsequent native-game recovery checkpoint passes 138 portable PS2 tests
-and adds five standalone EE fixtures. Its 48-file native application audit
-passes while the same 21 engine input hashes remain unchanged. Steering,
-orientation and course-contact semantics stay in the game role; the new
-components are not yet connected to driving gameplay.
+Subsequent native-game recovery adds standalone EE fixtures for steering,
+orientation, course contact, point transforms and contact-result interpretation.
+The current native application audit passes across 56 project files while the
+same 21 engine input hashes remain unchanged. These recovered semantics stay
+in the game role and are not yet connected to driving gameplay. The latest
+test counts and source-bound evidence are recorded in `HANDOFF.md` and the
+[native rewrite guide](ps2-native-rewrite.md).
 
 To start another game, add its own application and typed game-state modules,
 register their explicit source/header role and link the shared engine inventory.

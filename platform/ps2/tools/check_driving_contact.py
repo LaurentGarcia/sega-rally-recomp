@@ -97,7 +97,13 @@ def query_rows(events):
             return_pc, caller_fp = saved_return(event)
             if return_pc not in QUERY_RETURN_PCS:
                 raise ValueError("Query saved return address is not a verified direct caller")
-            if selector >= 8 or block(event, "globals", 0x214100, 192)[149] != selector:
+            selector_blocks = [b for b in event.get("blocks", []) if isinstance(b, dict) and
+                               b.get("name") in ("globals", "course_selector")]
+            if len(selector_blocks) != 1:
+                raise ValueError("Missing or ambiguous observed course selector")
+            observed_selector = block(event, "course_selector", 0x214354, 1)[0] if \
+                selector_blocks[0]["name"] == "course_selector" else block(event, "globals", 0x214100, 192)[149]
+            if selector >= 8 or observed_selector != selector:
                 raise ValueError("Query selector differs from verified descriptor domain/global")
             block(event, "query_descriptors", 0x5dcac0, 24)
             block(event, "query_point", regs[18], 3)

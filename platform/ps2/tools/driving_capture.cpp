@@ -44,9 +44,18 @@ struct SteeringFilter {
     ReturnFrame returning;
     bool detailed=false;
 };
+struct MainPass {
+    std::uint64_t id=0,instructions=0;
+    std::uint32_t object=0,frame_pointer=0,position=0,orientation=0;
+    ReturnFrame returning,query_return;
+    Contact contact;
+    std::uint32_t query_frame=0,query_point=0;
+    unsigned queries=0,query_completions=0,contacts=0,contact_completions=0,responses=0,crosses=0;
+    bool detailed=false,prepared=false,query_count=false,cross_pending=false;
+};
 struct Capture {
     std::filesystem::path path;
-    std::ofstream events, cadence, selectors, callbacks, steering, steering_filters;
+    std::ofstream events, cadence, selectors, callbacks, steering, steering_filters,main_events,main_cadence;
     unsigned first = 0, last = 0, detailed = 0, events_count = 0, completed = 0;
     std::uint64_t calls = 0, last_count = ~std::uint64_t{}, selected_frame = ~std::uint64_t{};
     unsigned frame_samples = 0;
@@ -66,6 +75,11 @@ struct Capture {
     Steering steering_call;
     ReturnFrame outer_return,query_return_frame;
     SteeringFilter filter;
+    MainPass main;
+    unsigned main_calls=0,main_completions=0,main_samples=0,main_event_count=0;
+    unsigned main_queries=0,main_query_completions=0,main_contacts=0,main_contact_completions=0;
+    unsigned main_cross_pairs=0,main_sampled_cross_pairs=0;
+    std::uint64_t main_selected_frame=~std::uint64_t{};
     // Original and relocated forms of the bounded car-code analysis region.
     std::array<std::uint64_t, 2*0x8000> code_counts{};
     Call call;
@@ -165,6 +179,187 @@ void filter_snapshot(Capture &capture,const rt::Cpu &cpu,const char *event,
         << ",\"words\":[" << cpu.bus->read_dword(0x202050) << "]}]}";
     write(capture,capture.steering_filters,out.str());
 }
+void main_cadence(Capture &capture,const rt::Cpu &cpu,const char *event,
+                  std::uint64_t instructions,std::uint64_t frame,std::uint64_t ns) {
+    const auto &main=capture.main;
+    std::ostringstream out;
+    out << "{\"event\":\"" << event << "\",\"call_id\":" << main.id
+        << ",\"object\":" << main.object << ",\"frame\":" << frame
+        << ",\"instructions\":" << instructions << ",\"cycles\":" << cpu.reference_cycles
+        << ",\"board_ns\":" << ns << ",\"pc\":" << cpu.m_IP
+        << ",\"cross_pairs\":" << main.crosses << '}';
+    write(capture,capture.main_cadence,out.str());
+}
+void main_snapshot(Capture &capture,const rt::Cpu &cpu,const char *event,
+                   std::uint64_t instructions,std::uint64_t frame,std::uint64_t ns) {
+    const auto &main=capture.main;
+    if (!main.detailed) return;
+    if (++capture.main_event_count>4096) throw std::runtime_error("main contact event limit exceeded");
+    const std::string_view kind(event);
+    std::ostringstream out;
+    out << "{\"schema\":1,\"event\":\"" << event << "\",\"call_id\":" << main.id
+        << ",\"object\":" << main.object << ",\"frame\":" << frame
+        << ",\"instructions\":" << instructions << ",\"cycles\":" << cpu.reference_cycles
+        << ",\"board_ns\":" << ns << ",\"pc\":" << cpu.m_IP << ",\"ac\":" << cpu.m_AC
+        << ",\"main_frame_pointer\":" << main.frame_pointer << ",\"registers\":";
+    integers(out,cpu.m_r);
+    out << ",\"return_frame\":";
+    return_frame(out,kind.starts_with("query_") ? main.query_return :
+                     kind.starts_with("contact_") ? main.contact.returning : main.returning);
+    out << ",\"parent_return_frame\":";return_frame(out,main.returning);
+    if (kind.starts_with("query_")) out << ",\"query_index\":" << main.queries-1;
+    if (kind.starts_with("contact_")) out << ",\"contact_index\":" << main.contacts-1;
+    if (kind=="response_post") out << ",\"contact_index\":" << main.responses;
+    if (kind.starts_with("cross_")) out << ",\"cross_index\":" << main.crosses;
+    std::array<std::uint64_t,4> fp{};
+    for (unsigned i=0;i<4;++i) fp[i]=std::bit_cast<std::uint64_t>(cpu.m_fp[i]);
+    out << ",\"fp_bits\":";integers(out,fp);
+    out << ",\"object_words\":";integers(out,words(cpu,main.object,256));
+    out << ",\"blocks\":[";
+    bool first=true;
+    const auto block=[&](const char *name,std::uint32_t address,unsigned count) {
+        if (!first) out << ',';first=false;
+        out << "{\"name\":\"" << name << "\",\"address\":" << address << ",\"words\":";
+        integers(out,words(cpu,address,count));out << '}';
+    };
+    block("candidate_position",main.position,3);
+    block("candidate_orientation",main.orientation,3);
+    block("query_stage_global",0x20a280,16);
+    block("query_descriptors",0x5dcac0,24);
+    block("course_selector",0x214354,1);
+    block("object_pointer_globals",0x2140c0,16);
+    block("result_slots",0x2138d0,36);
+    block("feedback",0x213960,3);
+    block("feedback_enable",0x2142c8,1);
+    if (main.prepared) {
+        block("transformed_offsets",main.frame_pointer+0x70,12);
+        block("query_points",main.frame_pointer+0x40,12);
+        block("response_vectors",main.frame_pointer+0xa0,12);
+    }
+    if (kind.starts_with("query_")) block("query_point",main.query_point,3);
+    if (kind.starts_with("contact_")) {
+        block("contact_point",main.contact.point,3);
+        block("contact_output",main.contact.output,8);
+        if (kind=="contact_reply") {
+            block("contact_reply_prefix",main.contact.frame_pointer+0x60,12);
+            block("contact_reply_tail",main.contact.frame_pointer+0x50,4);
+        }
+    }
+    if (kind.starts_with("cross_")) {
+        block("cross_left",main.frame_pointer+0x70+12*main.crosses,3);
+        block("cross_right",main.frame_pointer+0xa0+12*main.crosses,3);
+        block("cross_result",main.frame_pointer+0xd0,3);
+    }
+    out << "]}";write(capture,capture.main_events,out.str());
+}
+void observe_main(Capture &capture,const rt::Cpu &cpu,std::uint64_t instructions,
+                  std::uint64_t frame,std::uint64_t ns) {
+    auto &main=capture.main;
+    const auto pc=original_pc(cpu.m_IP);
+    if (pc==0x34380 && frame>=capture.first && frame<=capture.last) {
+        if (main.id) throw std::runtime_error("nested main contact pass");
+        if (++capture.main_calls>16384) throw std::runtime_error("main contact call limit exceeded");
+        if (!ram(cpu.m_r[16],1024) || !ram(cpu.m_r[17],12) || !ram(cpu.m_r[18],12) ||
+            !ram(cpu.m_r[31],0x114))
+            throw std::runtime_error("main contact arguments require bounded ordinary RAM");
+        const auto returning=caller_return(cpu);
+        if (original_pc(returning.pc)!=0x3521c) throw std::runtime_error("main contact caller return mismatch");
+        main={};main.id=capture.main_calls;main.instructions=instructions;
+        main.object=cpu.m_r[16];main.position=cpu.m_r[17];main.orientation=cpu.m_r[18];
+        main.frame_pointer=cpu.m_r[31];main.returning=returning;
+        // Capture008 cadence located the aggregate path in these nine replay frames.
+        // Keep the observed window explicit rather than infer physical contact states.
+        const bool selected=frame%60==0 || frame==2300 || frame==2500 || frame==2501 ||
+                            frame==2600 || frame==2601 || frame==2700 || frame==2701 || frame==2752 ||
+                            (frame>=2571 && frame<=2579);
+        main.detailed=selected && capture.main_selected_frame!=frame && capture.main_samples<32;
+        if (main.detailed) { ++capture.main_samples;capture.main_selected_frame=frame; }
+        main_cadence(capture,cpu,"main_entry",instructions,frame,ns);
+        main_snapshot(capture,cpu,"main_entry",instructions,frame,ns);
+        return;
+    }
+    if (!main.id) return;
+    if (instructions-main.instructions>2000000) throw std::runtime_error("main contact exceeded bounded instruction count");
+    if (main.contact.return_pc && cpu.m_IP==main.contact.return_pc) {
+        if (cpu.m_r[31]!=main.contact.caller_fp || !main.contact.reply_seen)
+            throw std::runtime_error("main contact result return frame or reply mismatch");
+        main_snapshot(capture,cpu,"contact_post",instructions,frame,ns);
+        ++main.contact_completions;++capture.main_contact_completions;main.contact={};
+    }
+    if (main.query_return.pc && cpu.m_IP==main.query_return.pc) {
+        if (cpu.m_r[31]!=main.query_return.frame_pointer || !main.query_count)
+            throw std::runtime_error("main query return frame or count mismatch");
+        main_snapshot(capture,cpu,"query_post",instructions,frame,ns);
+        ++main.query_completions;++capture.main_query_completions;main.query_return={};
+    }
+    if (cpu.m_IP==main.returning.pc) {
+        if (cpu.m_r[31]!=main.returning.frame_pointer || !main.prepared || main.query_return.pc ||
+            main.contact.return_pc || main.cross_pending || main.queries!=4 || main.query_completions!=4 ||
+            main.contacts!=4 || main.contact_completions!=4 || main.responses!=4 || (main.crosses!=0 && main.crosses!=4))
+            throw std::runtime_error("main contact return has incomplete or mismatched boundaries");
+        main_snapshot(capture,cpu,"main_return",instructions,frame,ns);
+        main_cadence(capture,cpu,"main_return",instructions,frame,ns);
+        ++capture.main_completions;main={};return;
+    }
+    switch(pc) {
+    case 0x346d8:
+        if (main.prepared || cpu.m_r[31]!=main.frame_pointer || cpu.m_r[13]!=main.object)
+            throw std::runtime_error("main prequery frame or sequence mismatch");
+        main.prepared=true;main_snapshot(capture,cpu,"main_prequery",instructions,frame,ns);break;
+    case 0x2abc0: {
+        if (!main.prepared || main.query_return.pc || main.contact.return_pc || main.queries>=4 ||
+            main.queries!=main.contacts || cpu.m_r[18]!=main.frame_pointer+0x40+12*main.queries || cpu.m_r[19]!=0)
+            throw std::runtime_error("main query sequence or point mismatch");
+        const auto returning=caller_return(cpu);
+        if (returning.frame_pointer!=main.frame_pointer ||
+            original_pc(returning.pc)!=(main.queries ? 0x34728u : 0x346dcu))
+            throw std::runtime_error("main query saved caller mismatch");
+        main.query_return=returning;main.query_frame=cpu.m_r[31];main.query_point=cpu.m_r[18];main.query_count=false;
+        ++main.queries;++capture.main_queries;main_snapshot(capture,cpu,"query_pre",instructions,frame,ns);break;
+    }
+    case 0x2ac08:
+        if (!main.query_return.pc || main.query_count || cpu.m_r[31]!=main.query_frame)
+            throw std::runtime_error("main query count frame or sequence mismatch");
+        main.query_count=true;main_snapshot(capture,cpu,"query_count",instructions,frame,ns);break;
+    case 0x2acc0: {
+        if (main.contact.return_pc || main.query_return.pc || main.contacts>=4 ||
+            main.query_completions!=main.contacts+1 || main.responses!=main.contacts ||
+            cpu.m_r[16]!=main.frame_pointer+0x40+12*main.contacts ||
+            cpu.m_r[17]!=0x2138d0+36*main.contacts || !ram(cpu.m_r[31],0x90))
+            throw std::runtime_error("main contact result sequence or argument mismatch");
+        const auto returning=caller_return(cpu);
+        if (returning.frame_pointer!=main.frame_pointer || original_pc(returning.pc)!=0x34710)
+            throw std::runtime_error("main contact result saved caller mismatch");
+        main.contact={};main.contact.returning=returning;main.contact.return_pc=returning.pc;
+        main.contact.caller_fp=returning.frame_pointer;main.contact.frame_pointer=cpu.m_r[31];
+        main.contact.point=cpu.m_r[16];main.contact.output=cpu.m_r[17];
+        ++main.contacts;++capture.main_contacts;main_snapshot(capture,cpu,"contact_pre",instructions,frame,ns);break;
+    }
+    case 0x2adac:
+        if (!main.contact.return_pc || main.contact.reply_seen || cpu.m_r[31]!=main.contact.frame_pointer)
+            throw std::runtime_error("main contact reply frame or sequence mismatch");
+        main.contact.reply_seen=true;main_snapshot(capture,cpu,"contact_reply",instructions,frame,ns);break;
+    case 0x34a30:
+        if (cpu.m_r[31]!=main.frame_pointer || cpu.m_r[13]!=main.object || main.responses>=4 ||
+            cpu.m_r[5]!=main.responses || main.contact_completions!=main.responses+1)
+            throw std::runtime_error("main response frame or sequence mismatch");
+        main_snapshot(capture,cpu,"response_post",instructions,frame,ns);++main.responses;break;
+    case 0x34a88:
+    case 0x34b04:
+        if (cpu.m_r[31]!=main.frame_pointer || cpu.m_r[13]!=main.object || main.responses!=4 ||
+            main.crosses>=4 || cpu.m_r[23]!=12*main.crosses ||
+            (pc==0x34a88 ? (main.cross_pending || cpu.m_r[21]!=main.frame_pointer+0x40+12*main.crosses) : !main.cross_pending))
+            throw std::runtime_error("main cross frame, operand or sequence mismatch");
+        main_snapshot(capture,cpu,pc==0x34a88 ? "cross_pre" : "cross_post",instructions,frame,ns);
+        main.cross_pending=pc==0x34a88;
+        if (pc==0x34b04) {
+            ++main.crosses;++capture.main_cross_pairs;
+            if (main.detailed) ++capture.main_sampled_cross_pairs;
+        }
+        break;
+    default:break;
+    }
+}
 [[noreturn]] void contact_failure(Capture &capture,const rt::Cpu &cpu,const char *reason,
                                   std::uint64_t instructions,std::uint64_t frame) {
     const auto &contact=capture.contact;
@@ -263,7 +458,10 @@ void begin_driving_capture(const char *directory,unsigned first,unsigned last) {
     capture->callbacks.open(path/"callbacks.jsonl.tmp");
     capture->steering.open(path/"steering.jsonl.tmp");
     capture->steering_filters.open(path/"steering-filter.jsonl.tmp");
-    if (!capture->events||!capture->cadence||!capture->selectors||!capture->callbacks||!capture->steering||!capture->steering_filters)
+    capture->main_events.open(path/"main-contact.jsonl.tmp");
+    capture->main_cadence.open(path/"main-contact-cadence.jsonl.tmp");
+    if (!capture->events||!capture->cadence||!capture->selectors||!capture->callbacks||!capture->steering||!capture->steering_filters||
+        !capture->main_events||!capture->main_cadence)
         throw std::runtime_error("cannot open driving capture");
     active=std::move(capture);
 }
@@ -278,6 +476,7 @@ void observe_driving_instruction(const rt::Cpu &cpu,std::uint64_t instructions,
     if (cpu.m_IP==0x2cce0) ++capture.rom_entries;
     if (cpu.m_IP==relocation+0x2cce0) ++capture.ram_entries;
     const auto pc=original_pc(cpu.m_IP);
+    observe_main(capture,cpu,instructions,frame,ns);
     if (capture.contact.return_pc && (pc==0x2ae68 || pc==0x2aeb4 || pc==0x2aec0)) {
         capture.contact.last_ret_pc=cpu.m_IP;capture.contact.last_ret_pfp=cpu.m_r[0];
         capture.contact.last_ret_rip=cpu.m_r[2];capture.contact.last_ret_fp=cpu.m_r[31];
@@ -454,14 +653,18 @@ void end_driving_capture() {
                  << ",\"count\":" << capture.code_counts[i] << "}\n";
     coverage.close();
     if (!coverage) throw std::runtime_error("cannot write bounded code execution coverage");
-    if (capture.call.id || capture.query_return || capture.contact.return_pc || capture.orientation.phase || capture.steering_call.return_pc || capture.filter.returning.pc ||
+    if (capture.call.id || capture.query_return || capture.contact.return_pc || capture.orientation.phase || capture.steering_call.return_pc || capture.filter.returning.pc || capture.main.id ||
         !capture.calls || !capture.detailed || capture.completed!=capture.calls ||
         capture.orientation_entries!=capture.orientation_completions || capture.contact_entries!=capture.contact_completions ||
-        capture.steering_entries!=capture.steering_completions || capture.filter_entries!=capture.filter_completions)
+        capture.steering_entries!=capture.steering_completions || capture.filter_entries!=capture.filter_completions ||
+        capture.main_calls!=capture.main_completions || capture.main_queries!=capture.main_query_completions ||
+        capture.main_contacts!=capture.main_contact_completions)
         throw std::runtime_error("driving capture has no complete bounded caller evidence");
     capture.events.close();capture.cadence.close();capture.selectors.close();capture.callbacks.close();capture.steering.close();
     capture.steering_filters.close();
-    if (!capture.events||!capture.cadence||!capture.selectors||!capture.callbacks||!capture.steering||!capture.steering_filters)
+    capture.main_events.close();capture.main_cadence.close();
+    if (!capture.events||!capture.cadence||!capture.selectors||!capture.callbacks||!capture.steering||!capture.steering_filters||
+        !capture.main_events||!capture.main_cadence)
         throw std::runtime_error("cannot finish driving capture streams");
     std::ofstream summary(capture.path/"capture.json.tmp");
     summary << "{\"schema\":1,\"complete\":true,\"first_frame\":" << capture.first
@@ -480,6 +683,12 @@ void end_driving_capture() {
         << ",\"steering_filter_entries\":" << capture.filter_entries
         << ",\"steering_filter_completions\":" << capture.filter_completions
         << ",\"steering_filter_samples\":" << capture.filter_samples
+        << ",\"main_calls\":" << capture.main_calls << ",\"main_completions\":" << capture.main_completions
+        << ",\"main_samples\":" << capture.main_samples << ",\"main_events\":" << capture.main_event_count
+        << ",\"main_queries\":" << capture.main_queries << ",\"main_query_completions\":" << capture.main_query_completions
+        << ",\"main_contacts\":" << capture.main_contacts << ",\"main_contact_completions\":" << capture.main_contact_completions
+        << ",\"main_cross_pairs\":" << capture.main_cross_pairs
+        << ",\"main_sampled_cross_pairs\":" << capture.main_sampled_cross_pairs
         << ",\"events\":" << capture.events_count << ",\"bytes\":" << capture.bytes
         << ",\"sampling\":\"up to four calls at each selected input/60-frame checkpoint; maximum128 detailed calls\"}\n";
     summary.close();if (!summary) throw std::runtime_error("cannot finish driving capture marker");
@@ -489,6 +698,8 @@ void end_driving_capture() {
     std::filesystem::rename(capture.path/"callbacks.jsonl.tmp",capture.path/"callbacks.jsonl");
     std::filesystem::rename(capture.path/"steering.jsonl.tmp",capture.path/"steering.jsonl");
     std::filesystem::rename(capture.path/"steering-filter.jsonl.tmp",capture.path/"steering-filter.jsonl");
+    std::filesystem::rename(capture.path/"main-contact.jsonl.tmp",capture.path/"main-contact.jsonl");
+    std::filesystem::rename(capture.path/"main-contact-cadence.jsonl.tmp",capture.path/"main-contact-cadence.jsonl");
     std::filesystem::rename(capture.path/"capture.json.tmp",capture.path/"capture.json");
     active.reset();
 }
