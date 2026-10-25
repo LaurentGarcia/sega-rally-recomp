@@ -57,7 +57,8 @@ GAME_SOURCES = ("platform/ps2/native/race_progress.cpp", "platform/ps2/native/ca
                 "platform/ps2/native/alternate_orientation.cpp", "platform/ps2/native/contact_projection.cpp",
                 "platform/ps2/native/cabinet_steering.cpp",
                 "platform/ps2/native/cabinet_steering_filter.cpp",
-                "platform/ps2/native/contact_search.cpp")
+                "platform/ps2/native/contact_search.cpp",
+                "platform/ps2/native/main_car_pose.cpp")
 # Preserve the existing native-port object order while the demo omits study code.
 NATIVE_TOOLKIT_SOURCES = (*ENGINE_SOURCES[:3], *STUDY_SOURCES, *ENGINE_SOURCES[3:])
 NATIVE_SOURCES = ["platform/ps2/native/main.cpp", *GAME_SOURCES, *NATIVE_TOOLKIT_SOURCES]

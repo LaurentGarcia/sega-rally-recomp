@@ -91,6 +91,7 @@ that scene or a ROM-free hardware test.
 | [Course-contact search](../platform/ps2/native/collision_query_recovery.md) | Current/next/previous segment order, first matching polygon and exact copied payload | 12,323 synthetic searches, eight retained result slots and all 34 sampled live replies |
 | [Cabinet steering byte](../platform/ps2/native/cabinet_steering.md) | Center, saturate and convert all 256 byte values with exact result bits | Exhaustive 256-byte comparison and 32 sampled live calls |
 | [Cabinet steering filter](../platform/ps2/native/cabinet_steering_filter.md) | Stateful rounded input filter and sign-flipped result, including gradual underflow | 68,160 evaluations including 18,432 sequence updates and 32 live calls |
+| [Main-car pose publication](../platform/ps2/native/main_car_pose.md) | Return an independent render value containing 22 unchanged words; explicit external state and no flag merge | 77,208 distinct inputs; 3,242,736 original instructions |
 
 The first four components have portable boundary tests, sanitizer checks and standalone
 EE fixtures executed successfully in Play: 121 progress boundary/rejection
@@ -109,6 +110,8 @@ with separate alias and atomic rejection checks. Projected contact passed
 The complete filter passed 7,168 EE evaluations, including 2,048 stateful
 updates, plus 2,560 rejection checks.
 Course-contact search passed 192 EE selection cases and ten boundary checks.
+Main-car pose publication passed 2,184 EE cases and 48,048 raw-word checks;
+its original-program proof is isolated, with no live paired helper capture yet.
 The original-program comparisons run on the host against the
 owner's verified Revision B image; the reference interpreter and memory
 adapters are not part of the native executable. The components are compiled
@@ -124,6 +127,9 @@ cannot stand in for it. Neither complete integrator is recovered merely because
 its smaller helpers match. The [main vehicle callback](../platform/ps2/native/main_vehicle_recovery.md)
 is a third, separate path that consumes cabinet steering. That callback and its
 remaining geometry/force dependencies must be recovered to drive the main car.
+Its [four-point candidate-contact pass](../platform/ps2/native/main_contact_pass_recovery.md)
+now has a bounded dependency study; transforms, interpreted replies and response
+aggregation still require native recovery and captured comparisons.
 
 The separate [driving observer](../platform/ps2/tools/driving_capture.md) now
 records those routes using the existing cabinet replay. Capture 007 passes all
@@ -176,12 +182,12 @@ GS geometry with depth testing. Left/Right step the orbit; L1/R1 change distance
 Both vector units are inactive for its solid triangles. Recovered game systems,
 original textures, collision, driving and game audio remain unconnected.
 
-The latest source-bound `native-015` build reproduces the executed `native-011`
+The latest source-bound `native-016` build reproduces the executed `native-011`
 ELF byte for byte (SHA-256
 `2338119372579ee7012ec95fcd43f5210d8382cb112d6f4dbce9d3fc8f050158`).
 The 10.212-second Play 0.72 HLE/Vulkan run visibly rendered the private six-object
 car mesh, with flat study shading and a diagnostic caption. All 1,040 triangles
-were submitted and guest stderr was empty. The 48-file dependency audit and
+were submitted and guest stderr was empty. The 50-file dependency audit and
 forbidden-runtime symbol check pass; load segments occupy 593,080 bytes before
 dynamic allocation. Earlier native-008 runs also checked the no-asset bootstrap.
 The recovered game components have separate EE fixture evidence;
@@ -193,6 +199,6 @@ textured draw ordering, the diagnostic page and depth clearing on return.
 This validates those sampled regions in Play, not original-game image fidelity
 or physical PS2 behavior. The visible car is a static study: the emulator's
 frame-rate overlay is not a native gameplay or console performance measurement.
-Private records remain under `build/ps2-native-015/` and
+Private records remain under `build/ps2-native-016/` and
 `build/ps2-native-depth-wrapper-004/`. Controller interaction, speaker output
 and physical hardware still need separate validation.

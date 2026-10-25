@@ -83,5 +83,7 @@ jobs:
         run: python3 platform/ps2/build_ps2.py build --target core-probe --core-manifest platform/ps2/tests/cabinet_steering_filter_manifest.json --container-platform linux/amd64 --output build/ps2-cabinet-steering-filter-ci --jobs 2
       - name: Cross-link the recovered course-contact search fixture
         run: python3 platform/ps2/build_ps2.py build --target core-probe --core-manifest platform/ps2/tests/contact_search_manifest.json --container-platform linux/amd64 --output build/ps2-contact-search-ci --jobs 2
+      - name: Cross-link the main-car pose publication fixture
+        run: python3 platform/ps2/build_ps2.py build --target core-probe --core-manifest platform/ps2/tests/main_car_pose_manifest.json --container-platform linux/amd64 --output build/ps2-main-car-pose-ci --jobs 2
       # No ROMs, generated game core, signing secrets or artifact publication.
       # This job proves cross-linking; console execution is a separate test.

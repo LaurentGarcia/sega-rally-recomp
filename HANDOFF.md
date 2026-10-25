@@ -1,5 +1,64 @@
 # Handoff
 
+## Main-car publication and candidate-contact boundary (2026-10-24)
+
+Checkpoint 0fae93e is published. Its PS2 portable/cross-build jobs, exact source
+export gate, Metal and both Vulkan workflows passed; the wider desktop Build
+matrix was still running at this follow-up's preparation. No Vita workflow was
+triggered for that checkpoint. Work continued directly with the distinct main
+car's publication helper instead of substituting the earlier flag-merging helper.
+
+The new make_main_car_pose accepts MainCarPoseState and four explicit external
+words and returns the existing RenderPose value type. It copies all 22 words,
+including flags and the opaque index, without modifying inputs or consulting a
+previous destination. The native interface has no mapped addresses, guest
+registers or bus behavior. Return-by-value gives an independent snapshot;
+arbitrary overlapping guest memory and observable store order are outside its
+contract. Coordinate units, physics and game-loop behavior remain unclaimed.
+
+The verified helper is ROM [0x34078,0x34130), 42 original instructions. The
+private original oracle confines fetch/data access, checks all 23 ordered reads
+and 22 ordered writes, unchanged source/external memory and surrounding guards,
+and varies source/destination word alignment. All 77,208 distinct inputs match:
+65,536 source low-halfword flag patterns with varied upper bits/old destination,
+1,408 walking-bit cases, 264 selected raw encodings and 10,000 random states.
+This is not an exhaustive full-word cross-product. The result fingerprint is
+b74eb51b13296a1c over 3,242,736 instructions, 1,775,784 reads and 1,698,576 writes.
+The final source-bound report is build/ps2-native-main-car-pose-oracle-001/result.json.
+Portable mathematical/value tests and full ASan/UBSan checks pass; independent
+production/oracle review found no blocker.
+
+The actual EE fixture passes 2,184 cases and 48,048 words, fingerprint
+d2fae2297e475353. Its ELF is
+1511a352ad80d6d98d86429565f5a46c8513867705de497c44ec6304f4f0f705,
+1,224,904 file bytes and 179,040 resident bytes. Play 0.72 HLE produced the exact
+PASS with empty guest stderr in a bounded 15.115-second observation, then was
+stopped and reaped. The source/build/ELF/log identities are bound under
+build/ps2-native-main-car-pose-ee-001/runtime-validation.json. This is not measured
+fixture completion time, physical-console evidence or a live paired helper capture.
+
+Native016 passes its 50-file dependency/symbol audit and binds current sources.
+It retains the executed static-study ELF hash
+2338119372579ee7012ec95fcd43f5210d8382cb112d6f4dbce9d3fc8f050158;
+the new helper remains disconnected and linker-discarded in that diagnostic.
+Shared engine identity remains unchanged. The helper has a source-only CI fixture.
+The final portable suite passes all 140 PS2 tests in 28.926 seconds, recorded in
+build/ps2/validation/main-car-publication-tests-001.log.
+
+The scoped main_contact_pass_recovery.md study identifies ROM 0x34380..0x34cd8
+as a four-point candidate-contact pass (2,392 bytes, 496 static sites), not a
+small result adapter. It records exact state accesses, query sequencing and
+unrecovered transforms/reply interpretation/response aggregation. The complete
+fourth point is available at the pre-call boundary 0x346d8; an earlier proposed
+capture boundary preceded its final store and was corrected in the metadata.
+Point slots are not labeled as wheels and no generic suspension is substituted.
+Firmware command 0x5b's separately rounded cross product is the smallest next
+candidate; its native implementation/differential is still pending. The larger
+normalization/square-root path depends on original tables and needs its own
+bounded contract. A future observer must capture complete main-pass inputs,
+interpreted replies and outputs before claiming its behavior recovered.
+
+
 ## Native steering, orientation and course-contact recovery (2026-10-24)
 
 The preceding checkpoint e7b58839 is published; all six triggered workflows,

@@ -49,19 +49,22 @@ Private `callback-validation.json` binds these checks to the validated capture.
 | `0x39a90` called at `0x34f8c` | Recovered [cabinet steering filter](cabinet_steering_filter.md); result stored at object `+0x74` |
 | `0x33e90` called at `0x34fb0` | Conditional render-state consumer; full effect not recovered |
 | `0x2b0b0` called at `0x34fc4` | Segment-selection helper receiving position and signed-index storage |
-| `0x351a8..0x35218` | Separately rounded additions build candidate position and orientation triples, passed with the object to `0x34380` |
+| `0x351a8..0x35218` | Separately rounded additions build candidate position and orientation triples for the [four-point contact pass](main_contact_pass_recovery.md) at `0x34380` |
 | `0x2abc0` / `0x2acc0` at `0x35704` / `0x35710` | Shared course-query preparation and result interpretation |
 | `0x37200` | Four explicit calls from the update; slot arithmetic and physical meaning still require recovery |
 | `0x37870`, `0x34ce0` | Further state/arithmetic dependencies; not replaced by generic force or drivetrain models |
 | `0x371b0`, `0x371c0`, `0x371d0` | Three calls to the recovered one-step angle fold, without the earlier integrator's final pi/8 clamps |
-| `0x34078` at `0x371dc` | Main-object pose publication, including raw flags/index words and an external four-word state group |
+| `0x34078` at `0x371dc` | Recovered [main-object pose publication](main_car_pose.md), including raw flags/index words and an external four-word state group |
 
 The last publication helper differs from the recovered `0x2bc08` operation.
 It copies full source words at `+0x10` and `+0x88` into destination `+0x50`
 and `+0x54`, and copies the four global words at `0x2138a0..0x2138ac` into
 destination `+0x40..0x4c`. The earlier helper's persistent flag merge is not a
-valid substitute. These offline addresses must become explicit typed values
-in native interfaces.
+valid substitute. The native `make_main_car_pose` operation receives explicit
+typed state and four external values, returning the existing `RenderPose`
+value type without mutating either input. Original addresses belong only to
+its offline comparison adapter. This isolated recovery does not establish
+the complete main-callback behavior.
 
 The callback contains additional geometry commands, conditional state updates,
 transcendental operations and mixed binary32/binary64 arithmetic. Units, axis

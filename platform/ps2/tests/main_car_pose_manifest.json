@@ -1,0 +1,9 @@
+{
+  "sources": [
+    "platform/ps2/native/main_car_pose.cpp",
+    "platform/ps2/tests/main_car_pose_test.cpp"
+  ],
+  "includes": ["platform/ps2/native", "platform/ps2/tests"],
+  "libraries": [],
+  "embed_iop_modules": false
+}
