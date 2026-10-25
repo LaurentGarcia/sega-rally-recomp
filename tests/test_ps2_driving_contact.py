@@ -51,6 +51,28 @@ class DrivingContactTests(unittest.TestCase):
         self.assertEqual(rows, [(300, 0, 1, 299, 0, 1), (300, 65535, 0, 0, 0, 0), (300, 299, 1, 298, 299, 0)])
         self.assertEqual([p["query_ordinal"] for p in provenance], [0, 1, 2])
 
+    def test_saved_parent_return_survives_interrupted_child_rip(self):
+        for source, index in (("register_cache", 0), ("register_cache", 3), ("ordinary_ram", -1)):
+            events = query(return_pc=0x5cd898)
+            events[0]["registers"][0] = 0x200a83
+            events[0]["registers"][2] = CHECKER.PCS["query_pre"]
+            words = [0] * 16
+            words[2] = 0x5cd898
+            events[0]["return_frame"] = {"pc": words[2], "frame_pointer": 0x200a80,
+                                            "cache_index": index, "source": source, "words": words}
+            events[2]["registers"][31] = 0x200a80
+            rows, _ = CHECKER.query_rows(events)
+            self.assertEqual(rows, [(300, 0, 1, 299, 0, 1)])
+            for field, value in (("pc", 0x5cd899), ("frame_pointer", 0x200a84),
+                                 ("source", "device"), ("cache_index", True), ("words", [0] * 15)):
+                bad = copy.deepcopy(events)
+                bad[0]["return_frame"][field] = value
+                with self.subTest(source=source, field=field), self.assertRaises(ValueError):
+                    CHECKER.query_rows(bad)
+            events[2]["registers"][31] += 64
+            with self.assertRaises(ValueError):
+                CHECKER.query_rows(events)
+
     def test_missing_duplicate_and_reordered_boundaries_are_rejected(self):
         valid = query()
         for events in ([], valid[:2], valid[1:], [valid[0], valid[2]], valid + valid,

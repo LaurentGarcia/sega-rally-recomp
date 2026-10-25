@@ -33,6 +33,36 @@ def block(event, name, address, count):
     return [integer(value, 32) for value in words]
 
 
+def saved_return(event):
+    """Validate new parent-frame evidence; retain the historical raw-RIP schema."""
+    registers = event.get("registers")
+    if not isinstance(registers, list) or len(registers) != 32:
+        raise ValueError("Saved return requires complete registers")
+    if "return_frame" not in event:
+        return integer(registers[2], 32), None
+    proof = event["return_frame"]
+    if not isinstance(proof, dict):
+        raise ValueError("Invalid caller-frame return proof")
+    pc = integer(proof.get("pc"), 32)
+    frame = integer(proof.get("frame_pointer"), 32)
+    words = proof.get("words")
+    if not isinstance(words, list) or len(words) != 16:
+        raise ValueError("Saved caller frame has wrong register count")
+    for value in words:
+        integer(value, 32)
+    if not pc or pc != words[2] or frame & 63 or frame != (integer(registers[0], 32) & ~63):
+        raise ValueError("Caller frame address/RIP differs from its proof")
+    if not ((0x200000 <= frame <= 0x240000 - 64) or (0x500000 <= frame <= 0x600000 - 64)):
+        raise ValueError("Saved caller frame is outside ordinary RAM")
+    source, index = proof.get("source"), proof.get("cache_index")
+    if source == "register_cache":
+        if type(index) is not int or not 0 <= index < 4:
+            raise ValueError("Invalid saved-register-cache source")
+    elif source != "ordinary_ram" or type(index) is not int or index != -1:
+        raise ValueError("Invalid saved-register-frame source")
+    return pc, frame
+
+
 def query_rows(events):
     """Require pre/count/post ordering; repeated queries retain their call ordinal."""
     pending = None
@@ -64,7 +94,8 @@ def query_rows(events):
             if pending is not None or len(rows) >= 16384:
                 raise ValueError("Nested or excessive query input")
             selector = regs[16]
-            if regs[2] not in QUERY_RETURN_PCS:
+            return_pc, caller_fp = saved_return(event)
+            if return_pc not in QUERY_RETURN_PCS:
                 raise ValueError("Query saved return address is not a verified direct caller")
             if selector >= 8 or block(event, "globals", 0x214100, 192)[149] != selector:
                 raise ValueError("Query selector differs from verified descriptor domain/global")
@@ -75,7 +106,8 @@ def query_rows(events):
             if regs[17] != (signed & 0xffffffff):
                 raise ValueError("Query index differs from signed object halfword")
             pending = {"call": call, "object": obj, "frame": frame, "instruction": instruction,
-                       "cursor": cursor, "selector": selector, "index": index, "regs": regs}
+                       "cursor": cursor, "selector": selector, "index": index, "regs": regs,
+                       "return_pc": return_pc, "caller_fp": caller_fp}
             continue
         if pending is None or pending["call"] != call or pending["object"] != obj or frame < pending["frame"]:
             raise ValueError("Unpaired or mismatched query boundary")
@@ -86,7 +118,7 @@ def query_rows(events):
             if not 1 <= pending["count"] <= 65535:
                 raise ValueError("Live query count is outside native supported domain")
             continue
-        if event["pc"] != pending["regs"][2]:
+        if event["pc"] != pending["return_pc"] or (pending["caller_fp"] is not None and regs[31] != pending["caller_fp"]):
             raise ValueError("Query returned to a different caller than its saved return address")
         if "count" not in pending or regs[23] != pending["count"]:
             raise ValueError("Query exit lacks its unchanged count")

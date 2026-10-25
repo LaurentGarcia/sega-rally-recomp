@@ -102,9 +102,11 @@ not be used as an exact constant, unit interpretation or timestep claim.
 The middle equality boundary follows the step path rather than the snap path.
 There is no matching pi/8 bound here.
 
-This is the next recoverable arithmetic contract, not an implemented module.
-Before implementing it, capture the candidate stack triple, current object
-triple, arithmetic-control word, and pre/post boundaries during actual calls;
-then establish the subtraction/fold domain and every binary64 rounding point.
-The current task prioritizes live validation of the already implemented shared
-direction blend.
+The independent [alternate orientation component](alternate_orientation.md)
+now implements this bounded arithmetic. It preserves every binary32/binary64
+rounding boundary with integer arithmetic and rejects unsupported inputs
+without mutation. Capture 007 records the candidate stack triple, current object
+triple, arithmetic control and pre/folded/post boundaries. All 34 sampled calls
+agree with native and isolated original execution; boundary and wrap cases have
+separate synthetic coverage. This completes that orientation region, not the
+surrounding integrator or the separate [main vehicle callback](main_vehicle_recovery.md).

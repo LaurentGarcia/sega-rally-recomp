@@ -1,0 +1,9 @@
+{
+  "sources": [
+    "platform/ps2/native/cabinet_steering.cpp",
+    "platform/ps2/tests/cabinet_steering_test.cpp"
+  ],
+  "includes": ["platform/ps2/native"],
+  "libraries": [],
+  "embed_iop_modules": false
+}

@@ -1,0 +1,11 @@
+{
+  "sources": [
+    "platform/ps2/native/contact_neighborhood.cpp",
+    "platform/ps2/native/contact_projection.cpp",
+    "platform/ps2/native/contact_search.cpp",
+    "platform/ps2/tests/contact_search_test.cpp"
+  ],
+  "includes": ["platform/ps2/native", "platform/ps2/tests"],
+  "libraries": [],
+  "embed_iop_modules": false
+}

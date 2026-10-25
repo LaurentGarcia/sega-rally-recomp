@@ -1,5 +1,144 @@
 # Handoff
 
+## Native steering, orientation and course-contact recovery (2026-10-24)
+
+The preceding checkpoint e7b58839 is published; all six triggered workflows,
+including general Build, PS2, Vita, Metal and both Vulkan workflows, passed.
+This checkpoint continues the native-runtime exception: typed game behavior,
+separate private original-code comparisons, no arcade processor/device runtime
+in the native application. The reusable engine's hardware sources are unchanged.
+The diagnostic remains a static geometry study; no playable driving loop is
+connected and no physical-console or gameplay speed claim follows.
+
+Five additional typed components are integrated: alternate orientation,
+projected contact, complete course-polygon search, cabinet byte conversion and
+its stateful steering filter. All game semantics stay in the game source role;
+reference firmware, generated code, address-based adapters and captured data
+remain offline. Exact contracts and bounds are documented beside the components.
+
+Alternate orientation now preserves the actual candidate-fold/wrapped-difference
+path with its separately rounded binary64 smoothing and middle-channel step.
+It has no pi/8 final clamp. Native integer arithmetic preserves signed zero and
+gradual underflow independently of the EE FPU. Synthetic plus live comparison
+passes 93,977 evaluations / 93,937 unique inputs, fingerprint f1d52dd19971b0f0.
+All 34 live states are within the explicit domain; 26 middle-channel snaps and
+8 steps occur, but candidate wraps are covered synthetically, not by this replay.
+The EE probe passed 3,728 cases, 3,638 accepted, fingerprint f9e5c92050970893,
+plus aliases and 60 atomic rejections. ELF ca3b1a51d0fa86f80b03db850ae21624a614382a735267024dd416ae2241562b;
+1,229,060 file bytes, 182,896 resident bytes. The 15.066-second Play observation
+and empty guest stderr are bound in its private runtime-validation.json.
+
+Projected contact preserves each rounded difference/product/cross and the
+original all-same-sign-bit acceptance rule, including signed-zero behavior.
+Its domain is three/four XZ vertices and a point bounded by +/-2^20. It does not
+repair winding, choose the nearest surface or implement collision response.
+100,774 cases match the original firmware (5,791,705 instructions), fingerprint
+128f72100657ddf0. Host mathematical and sanitizer comparisons pass. EE execution
+passed 4,870 cases (402152f180506e07) and 64 atomic rejections; ELF
+c499c0944e9a1ac557b865111661f16b0c59bc2b213cb97c71381e7d75879b2f,
+1,226,272 file bytes, 180,576 resident bytes, empty stderr in a 15.073-second
+observation. These windows are not measured completion times.
+
+The complete typed course search tries current, next, previous and returns the
+first projected match, copying all 16 geometry/coefficients words and attributes.
+A valid miss clears the result; invalid encountered input leaves output untouched.
+Its immutable spans have explicit segment/count/coordinate bounds and contain no
+command transport, mapped pointers or persistent device result cache. The CPU
+adapter's subsequent height/normal/status interpretation remains separate work.
+Synthetic original firmware comparison passes 12,323 searches, eight retained
+result slots and 3,550,622 reference instructions, fingerprint ccd788d0a091b5f8.
+This includes all 32 attribute bits, all bits together and 255-polygon late-hit
+and miss cases. Final source-bound report: build/ps2-native-contact-search-005/result.json.
+Initial harness pointer assertions confused the saved pair order and omitted
+the original 0xff800000 sign extension; actual instruction/pointer observation
+corrected the offline harness without changing native code. The earlier data
+study likewise corrected relative versus absolute subordinate asset offsets.
+The observed query argument is a result-slot selector, not a collision mask.
+
+All 34 live queries match selected native polygons and every one of their 578
+reply words against firmware and captured results. All 227 visited candidate
+predicates agree too. The native search EE fixture passed 192 selection cases
+(37f1a2cc4dd9eb9b) and ten boundary checks; ELF
+cb0ba641fe5e52fa1f0ae4387663f21bc93dcedc9f80e625130d40bb55172dfe,
+1,228,244 file bytes, 182,112 resident bytes, empty guest stderr during a
+15.090-second Play observation. Independent production review found no blocker.
+Capture-reader regression tests found a cross-stream chronology gap between
+query completion and contact entry; the final reader rejects it and all six
+new parser/provenance tests pass. The final source-bound live report is
+build/ps2-native-contact-query-live-004/result.json, with result fingerprint
+efc0379c98c1055f and predicate fingerprint f8630eb1a6dc71b0. The separate native
+host/sanitizer fixture passes 12,288 selection cases and 12 boundary checks.
+
+Cabinet byte mapping passes exhaustive original comparison for all 256 inputs
+(7,263 instructions), fingerprint 466a329bdf779c3a, and all 32 sampled live calls.
+The EE fixture reproduces the same fingerprint; ELF
+5b1ffd567726386eb29f574ae268252d6c95bb7ceea1c7afda9520fd3b965d7a,
+1,222,476 file bytes, 177,120 resident bytes, empty stderr in 12.038 seconds.
+One live leaf call includes 74 extra interrupt instructions (101 total); the
+initial reader rejected that valid span. The corrected reader records a bounded
+interrupt-inclusive span separately from the isolated 27..30-instruction cost.
+The stateful filter separately matches 68,160 evaluations / 50,001 unique inputs,
+including 18,432 sequence updates and 32 live pairs; fingerprint 359512f016c2d54d.
+The live pairs include actual subnormal decay histories. Initial EE compilation
+found a fixture portability issue: unsigned int and uint32_t have different
+underlying types on this SDK. That is a test-state declaration, not native math.
+An explicit uint32_t declaration fixes it. EE002 passes 7,168 evaluations,
+2,048 sequence updates (335d3a428df4150d), two aliases and 2,560 rejections.
+Its source-bound runtime record verifies ELF
+a8fc42139c59289663608713e70fc982a9120b4725dcf6531e80aa44045cce10,
+1,226,732 file bytes, 180,712 resident bytes and empty guest stderr during a
+20.243-second Play observation. Independent capture-reader review found a
+missing caller-frame proof/count check in the first filter adapter; the final
+reader validates all 16 saved words, RIP/frame/cache identity and completion
+counts. Final source-bound synthetic/live reports are under
+build/ps2-native-steering-filter-oracle-final-001 and
+build/ps2-native-steering-filter-live-final-001, with unchanged comparison hashes.
+
+Capture 007 passes all 2,850 enabled/disabled frame checkpoints with unchanged
+source/executable/input identities. It completes 1,202 alternate/contact/orientation
+calls, 34 detailed groups, 5,409 callback observations, 733 steering-leaf calls
+and 601 complete filter calls (32 sampled pairs for each steering stream).
+Failed captures 005/006 remain failed: an interrupt changed the child-frame r2
+that the observer incorrectly treated as a permanent return address. Actual RET
+restores the saved caller frame's RIP. The observer now validates the matching
+register-cache frame or exactly 16 whitelisted saved RAM words and derives the
+return from that frame. At call 1106/frame 2752, raw r2 is 0x5c9cc0 while actual
+caller RIP is 0x5cd8a8. Pairing, completion checks and saved-frame proof remain
+strict; the observer does not modify game state or read FIFO/device addresses.
+Ten portable observer tests and eight real-observer sanitizer scenarios pass.
+
+The callback evidence also corrects the development priority. Object 0x500000
+runs the separate ROM 0x34f40 callback once per observed frame (601 calls);
+objects 0x500100..0x500700 run the other dispatcher. All 34 detailed snapshots
+retain the main pointer/callback identity. The cabinet filter returns into that
+main callback, and its result matches main-object +0x74 in 26 snapshots across
+13 matching sampled frames. This is an input association, not an inference
+from allocation order. The main routine is 8,884 bytes / 1,713 static instruction
+sites and has its own dependencies and distinct pose-publication contract.
+See platform/ps2/native/main_vehicle_recovery.md. Recovering the alternate alone
+cannot make the controlled car native. Full main update, collision interpretation,
+forces, game geometry/camera, audio events and native-loop connection remain.
+
+The final native015 target compiles the five new components and passes its
+48-file dependency-direction and forbidden-symbol audits. Every recorded source
+hash still matches. Its 2,274,240-byte ELF remains byte-identical to the executed
+native011 static study (2338119372579ee7012ec95fcd43f5210d8382cb112d6f4dbce9d3fc8f050158),
+with 593,080 resident bytes before dynamic allocations: unused recovered leaves
+are removed by the linker. Their actual EE evidence comes from standalone
+fixtures, not the unchanged diagnostic. The 21-input shared engine manifest
+remains 8bfba3e1904f90f61cec9230f3ea3f2a66013a37a6a7257d8dbe9055be1094e2,
+matching the independent engine-demo source-bound smoke. CI cross-links all
+five new source-only native fixtures alongside existing checks. README and
+native/engine guides retain the explicit unconnected-gameplay limit.
+
+The final portable PS2 suite passes all 138 tests in 28.377 seconds; log:
+build/ps2/validation/native-car-contracts-tests-001.log. All five new native
+fixtures executed successfully in bounded Play runs, which were stopped and
+reaped. Independent arithmetic, capture-reader and architecture reviews are
+complete. Original firmware/program/data, generated references, screenshots,
+captures and compiled binaries remain excluded from the source checkpoint.
+
+
 ## Native driving contracts and actual caller recovery (2026-10-24)
 
 Checkpoint 48294f1 is published and all five triggered workflows passed,

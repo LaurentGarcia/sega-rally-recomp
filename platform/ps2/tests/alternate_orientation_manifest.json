@@ -1,0 +1,10 @@
+{
+  "sources": [
+    "platform/ps2/tests/alternate_orientation_test.cpp",
+    "platform/ps2/native/alternate_orientation.cpp",
+    "platform/ps2/native/angle_fold.cpp"
+  ],
+  "includes": ["platform/ps2/native", "platform/ps2/tests"],
+  "libraries": [],
+  "embed_iop_modules": false
+}

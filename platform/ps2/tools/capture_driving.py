@@ -116,19 +116,29 @@ def main():
             report[name+"_seconds"]=round(time.monotonic()-run_started,3)
             report[name+"_returncode"]=result.returncode
             print(name+" run complete",flush=True)
-        if (output / "captured.csv").read_bytes() != (output / "baseline.csv").read_bytes():
-            raise ValueError("capture changed one or more exact frame checkpoints")
-        if len((output / "baseline.csv").read_text().splitlines()) != args.frames+1:
-            raise ValueError("incomplete per-frame checkpoints")
         helpers.verify_source_snapshot(initial)
+        if digest(executable)!=report["executable_sha256"]:
+            raise ValueError("reference executable changed during capture")
         if digest(pack)!=identities["pack"]["sha256"] or digest(inputs)!=identities["inputs"]["sha256"]:
             raise ValueError("run input changed during capture")
         capture = output / "capture"
-        report.update(exact_checkpoint_match=True,matched_frames=args.frames,
+        captured_lines=(output / "captured.csv").read_bytes().splitlines()
+        baseline_lines=(output / "baseline.csv").read_bytes().splitlines()
+        prefix=0
+        for captured,baseline in zip(captured_lines,baseline_lines):
+            if captured!=baseline: break
+            prefix+=1
+        report.update(exact_checkpoint_match=False,matched_prefix_frames=max(0,prefix-1),
+                      captured_checkpoint_frames=max(0,len(captured_lines)-1),
+                      baseline_checkpoint_frames=max(0,len(baseline_lines)-1),
                       baseline_sha256=digest(output / "baseline.csv"),captured_sha256=digest(output / "captured.csv"),
                       capture_files_sha256={path.name:digest(path) for path in sorted(capture.iterdir()) if path.is_file()})
         if report["captured_returncode"] or report["baseline_returncode"]:
             raise ValueError("reference process reported incomplete capture or execution; inspect run logs and observation counts")
+        if (output / "captured.csv").read_bytes() != (output / "baseline.csv").read_bytes():
+            raise ValueError("capture changed one or more exact frame checkpoints")
+        if len(baseline_lines) != args.frames+1:
+            raise ValueError("incomplete per-frame checkpoints")
         marker=json.loads((capture / "capture.json").read_text())
         if marker.get("complete") is not True or not marker.get("completed_calls"):
             raise ValueError("capture has no complete original-game caller evidence")

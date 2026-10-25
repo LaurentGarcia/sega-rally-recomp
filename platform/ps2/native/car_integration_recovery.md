@@ -14,6 +14,11 @@ frames 2200 through 2800 reached the alternate and its shared velocity/blend
 1,202 times, but never entered the first integrator. Native work must follow
 this executed path rather than assume every static label is the live caller.
 
+Capture 007 also identifies a **separate main-object callback** at `0x34f40`,
+with 601 calls on object `0x500000` and a verified connection to cabinet steering.
+The [main vehicle dependency map](main_vehicle_recovery.md) records this path.
+Recovering the alternate integrator alone cannot implement the controlled car.
+
 ## Verified identity and dependencies
 
 The address-only integrator lead is Revision B ROM `0x2cce0`, 6,508 bytes,
@@ -87,10 +92,12 @@ transforms, intersection search or force calculations.
 The alternate's orientation update is different from the first integrator's
 three-fold/pi-over-eight tail. It folds a stack-resident candidate triple, then
 uses wrapped differences and separate smoothing/step rules. The existing
-`finalize_orientation` function must not be substituted for this path. Its
-arithmetic boundaries and live input domain require separate recovery; the
-[executed-path dependency note](velocity_step_recovery.md) records the next
-boundaries and corrects an earlier attribution beyond the alternate's return.
+`finalize_orientation` function must not be substituted for this path. The
+separate [alternate orientation component](alternate_orientation.md) now
+matches its original arithmetic and all 34 sampled live states within its
+explicit domain. The [executed-path dependency note](velocity_step_recovery.md)
+corrects an earlier attribution beyond the alternate's return. The surrounding
+integration and force calculations remain unrecovered.
 
 ## Next validation boundary
 
