@@ -36,7 +36,8 @@ def cross_rows(events, marker):
     """Bind every cross pair to a complete sampled parent and its saved caller."""
     kinds = {"main_entry", "main_prequery", "query_pre", "query_count", "query_post",
              "contact_pre", "contact_reply", "contact_post", "response_post",
-             "cross_pre", "cross_post", "main_return"}
+             "normalization_pre", "normalization_post", "metric_post", "step_post",
+             "aggregate_pre", "aggregate_post", "cross_pre", "cross_post", "main_return"}
     parent = None
     pending = None
     rows, provenance, seen = [], [], set()

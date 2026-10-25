@@ -43,7 +43,7 @@ explicit shared-query arguments. Offset names indicate storage, not units.
 | Object `+0x88` | Signed 16-bit segment index read for every point's neighborhood query. |
 | Object `+0x14`, `+0x1c`, `+0x3c` | Read to reconstruct candidate first/third position and middle orientation components after a response. |
 | Object `+0x2c`, `+0x34`, `+0x48` | Read and conditionally updated by response aggregation. |
-| Object `+0x50`, `+0x54`, `+0x58` | Read as response arithmetic parameters/divisors; a safe numerical domain remains to be measured. |
+| Object `+0x50`, `+0x54`, `+0x58` | Read as response arithmetic parameters/divisors. Sampled values are 1,000, 1,146 and 1,146; the bounded final-update contract is documented separately. No physical units are assigned. |
 | Global `0x214354` | Course descriptor selector read once and retained for the four queries. |
 | Global `0x2142c8` | Read to decide whether the two final feedback integers are stored. |
 | Four result slots at `0x2138d0 + 36*i`, `i=0..3` | Each is passed to the existing `0x2acc0` result adapter. That helper preserves its first three words and writes the next five; the ninth word is spacing, not part of that helper's output. |
@@ -81,13 +81,22 @@ remain disconnected from the native application; they do not implement the
 following per-contact response or complete main pass.
 
 For replies whose interpreted bit 7 is clear, the local response triple is
-zeroed. The other path performs cross-style vector arithmetic, a normalization
-with a small-length fallback, further square roots, divisions and mixed
-binary32/binary64 expressions using the reply direction/scalar and object
-parameters. The aggregate path runs only when the selected scalar accumulator
-is nonzero. It changes the object and candidate fields listed above and can
-produce feedback integers. None of those numerical/exceptional domains is
-established by the bounded polygon-search proof.
+zeroed. The other path performs cross-style vector arithmetic, normalization,
+further square roots, divisions and mixed binary32/binary64 expressions using
+the reply direction/scalar and object parameters. The isolated
+[normalization and fallback](contact_normalization.md) now has a typed native
+implementation and matches all 13 sampled calls. Construction of its input
+vector and the subsequent state-dependent scalar gain remain separate work.
+
+The aggregate path runs only when the selected response scalar is nonzero.
+Its [signed accumulation and final update](contact_aggregate.md) are now
+recovered as bounded typed operations. They match all 36 captured scalar steps
+and nine final updates, including enabled and disabled feedback. Their input
+scalar comes from the separately recovered
+[geometry metric](recovered_scalar_metric.md), which matches its 36 captured
+results. The earlier gate, full per-contact response composition and complete
+native-pass integration remain unimplemented. These component proofs do not
+extend the bounded polygon-search proof to the whole collision system.
 
 Useful review boundaries, which are regions rather than standalone functions:
 
@@ -123,8 +132,9 @@ This pass supplies zero middle components and uses the resulting signed middle
 component during accumulation. `rounded_cross_product(a,b,out)` exposes typed
 values without the unusual FIFO input ordering. Its documented finite domain,
 zero signs, alias/rejection policy, original-firmware differential and
-standalone EE execution are established separately. Recovering that operation
-does not establish the surrounding response aggregation.
+standalone EE execution are established separately. Its output now feeds the
+independently recovered scalar and accumulation contracts, but these operations
+are not yet composed into the native game.
 
 By contrast, substituting a generic host square root or a generic physics
 response for the larger pass would skip known dependencies. The separate
@@ -134,14 +144,16 @@ query points after ROM `0x346d4`, the four interpreted result slots, response
 vectors, feedback and the object fields above. Actual saved caller-frame proofs
 pair entries/returns through interrupts without additional device/FIFO reads.
 
-Private capture 009 passed all 2,850 enabled/disabled reference checkpoints.
+Private capture 010 passed all 2,850 enabled/disabled reference checkpoints.
 It observed 601 complete main passes on object `0x500000`, each with four
 query/adapter calls; 26 passes received detailed snapshots. All 36 aggregate
-cross operations were captured across frames 2,571 through 2,579. That bounded
+cross operations, 36 scalar operations, 36 accumulation steps, nine final
+updates and 13 normalization operations were captured. The aggregate work
+occurs across frames 2,571 through 2,579. That bounded
 window was chosen from capture 008's execution cadence, which had missed their
 operands between its existing sample checkpoints. The final evidence is
-`build/ps2/driving-capture-009/validation.json`, SHA-256
-`d704254e2536fb19bca05a971aba7447224a9ba73bb25663a2e239e1ac7afd90`.
+`build/ps2/driving-capture-010/validation.json`, SHA-256
+`3565df75062bf756e90842e0bc5eb24b3ba54acb51c3fb064d75774cdaf16f73`.
 These raw inputs/outputs support separate typed-component comparisons. They
 do not establish a complete native contact-pass implementation, the full
 response arithmetic domain, or native driving.

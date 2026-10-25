@@ -37,7 +37,8 @@ def main_envelopes(events, marker):
     """Require four ordered adapters inside every complete sampled main pass."""
     kinds = {"main_entry", "main_prequery", "query_pre", "query_count", "query_post",
              "contact_pre", "contact_reply", "contact_post", "response_post",
-             "cross_pre", "cross_post", "main_return"}
+             "cross_pre", "cross_post", "main_return", "normalization_pre", "normalization_post",
+             "metric_post", "step_post", "aggregate_pre", "aggregate_post"}
     parent, seen, last = None, set(), -1
     for event in events:
         if not isinstance(event, dict) or event.get("schema") != 1 or event.get("event") not in kinds:
@@ -93,6 +94,24 @@ def main_envelopes(events, marker):
                pc != 0x5d3a30 or regs[31] != fp:
                 raise ValueError("Incorrect pipelined main response boundary")
             parent["responses"] += 1
+            continue
+        extra_pcs = {"normalization_pre": 0x5d38ec, "normalization_post": 0x5d3968,
+                     "metric_post": 0x5d3b5c, "step_post": 0x5d3b84,
+                     "aggregate_pre": 0x5d3b90, "aggregate_post": 0x5d3cc0}
+        if kind in extra_pcs:
+            # These independently checked numerical regions share the main
+            # stream. Bind their parent and legal location without claiming
+            # that this adapter reader validates their numerical outputs.
+            if pc != extra_pcs[kind] or regs[31] != fp or regs[13] != obj or \
+               event.get("return_frame") != parent["proof"] or saved_return(event) != (parent["pc"], parent["caller_fp"]):
+                raise ValueError("Additional numerical boundary has a different parent")
+            if kind.startswith("normalization_"):
+                index = integer(event.get("contact_index"), 32)
+                if index != parent["responses"] or index >= 4 or parent["contacts"] != index + 1 or \
+                   parent["queries"] != min(index + 2, 4) or parent["phase"] != (0 if index == 3 else 3):
+                    raise ValueError("Normalization is outside its contact response")
+            elif parent["contacts"] != 4 or parent["responses"] != 4 or parent["phase"]:
+                raise ValueError("Aggregate numerical boundary precedes completed responses")
             continue
         sequence = ("query_pre", "query_count", "query_post", "contact_pre", "contact_reply", "contact_post")
         if kind in sequence:

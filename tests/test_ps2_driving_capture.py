@@ -218,7 +218,7 @@ class DrivingCaptureTests(unittest.TestCase):
                 crosses=0 if mode=="main-no-cross" else 4
                 self.assertEqual((marker["main_cross_pairs"],marker["main_sampled_cross_pairs"]),(crosses,crosses))
                 events=[json.loads(line) for line in (path/"main-contact.jsonl").read_text().splitlines()]
-                self.assertEqual(len(events),31+2*crosses)
+                self.assertEqual(len(events),39+4*crosses+(2 if crosses else 0))
                 self.assertEqual(marker["main_events"],len(events))
                 self.assertEqual([events[0]["event"],events[1]["event"],events[-1]["event"]],
                                  ["main_entry","main_prequery","main_return"])
@@ -290,8 +290,75 @@ class DrivingCaptureTests(unittest.TestCase):
                 self.assertEqual(marker["main_cross_pairs"],4)
                 self.assertEqual(marker["main_sampled_cross_pairs"],4 if sampled else 0)
                 events=[json.loads(line) for line in (path/"main-contact.jsonl").read_text().splitlines()]
-                self.assertEqual(len(events),39 if sampled else 0)
+                self.assertEqual(len(events),57 if sampled else 0)
                 if sampled: self.assertTrue(all(event["frame"]==2571 for event in events))
+
+    def test_main_metric_normalization_and_aggregate_snapshots_are_ordered_and_raw(self):
+        for mode in ("main-valid","main-spilled","main-no-cross","main-no-normalization"):
+            with self.subTest(mode=mode):
+                path,result=self.run_case(mode,"new-boundaries-"+mode)
+                self.assertEqual(result.returncode,0,result.stderr)
+                marker=json.loads((path/"capture.json").read_text())
+                events=[json.loads(line) for line in (path/"main-contact.jsonl").read_text().splitlines()]
+                crosses=0 if mode=="main-no-cross" else 4
+                normalizations=0 if mode=="main-no-normalization" else 4
+                for prefix,count in (("main_metric",crosses),("main_step",crosses),("main_normalization",normalizations)):
+                    self.assertEqual([marker[prefix+suffix] for suffix in ("_entries","_completions","_sampled_pairs")],[count]*3)
+                self.assertEqual([marker["main_aggregate"+suffix] for suffix in ("_entries","_completions","_samples")],
+                                 [int(bool(crosses))]*3)
+                inputs=[e for e in events if e["event"]=="cross_post"]
+                metrics=[e for e in events if e["event"]=="metric_post"]
+                steps=[e for e in events if e["event"]=="step_post"]
+                self.assertEqual([e["metric_index"] for e in inputs],list(range(crosses)))
+                self.assertEqual([e["metric_index"] for e in metrics],list(range(crosses)))
+                self.assertEqual([e["step_index"] for e in metrics],list(range(crosses)))
+                self.assertEqual([e["step_index"] for e in steps],list(range(crosses)))
+                for index,(pre,post,step) in enumerate(zip(inputs,metrics,steps)):
+                    self.assertEqual([pre["pc"],post["pc"],step["pc"]],[0x5d3b04,0x5d3b5c,0x5d3b84])
+                    self.assertLess(pre["instructions"],post["instructions"])
+                    self.assertLess(post["instructions"],step["instructions"])
+                    for event in (pre,post,step):
+                        block=next(b for b in event["blocks"] if b["name"]=="metric_cross")
+                        self.assertEqual(block["address"],0x5004d0)
+                        self.assertEqual(block["words"],list(range(5000+100*index,5003+100*index)))
+                        self.assertEqual(event["registers"][30],0)
+                        self.assertEqual(event["registers"][23],12*index)
+                        self.assertEqual(event["return_frame"],events[0]["return_frame"])
+                    self.assertEqual(post["registers"][28],7000+index)
+                    self.assertEqual(post["registers"][21],5001+100*index)
+                    self.assertEqual(step["registers"][11],8000+index)
+                normal=[e for e in events if e["event"].startswith("normalization_")]
+                self.assertEqual(len(normal),2*normalizations)
+                for index in range(normalizations):
+                    pre,post=normal[2*index:2*index+2]
+                    self.assertEqual([pre["pc"],post["pc"]],[0x5d38ec,0x5d3968])
+                    self.assertEqual([pre["contact_index"],post["contact_index"]],[index,index])
+                    for event,base in ((pre,6000),(post,6100)):
+                        block=next(b for b in event["blocks"] if b["name"]=="normalization_vector")
+                        self.assertEqual(block["words"],list(range(base+100*index,base+100*index+3)))
+                        self.assertEqual(block["address"],event["registers"][7])
+                        self.assertEqual(block["address"]+8,event["registers"][25])
+                aggregates=[e for e in events if e["event"].startswith("aggregate_")]
+                if crosses:
+                    self.assertEqual([e["pc"] for e in aggregates],[0x5d3b90,0x5d3cc0])
+                    self.assertEqual(aggregates[-1]["object_words"][0x2c//4],9000)
+                    blocks={b["name"]:b for b in aggregates[-1]["blocks"]}
+                    self.assertEqual(blocks["candidate_position"]["words"][0],9001)
+                    self.assertEqual(blocks["candidate_orientation"]["words"][1],9002)
+                    self.assertEqual(blocks["feedback"]["words"][1:],[9003,9004])
+                else:self.assertEqual(aggregates,[])
+
+    def test_main_new_component_failures_cannot_seal_capture(self):
+        for suffix in ("normalization-pointer","normalization-index","normalization-frame","normalization-parent",
+                       "normalization-no-pre","normalization-duplicate-pre","normalization-no-post","normalization-repeat",
+                       "metric-nonzero","metric-index","metric-frame","metric-parent","metric-no-post","metric-duplicate-post",
+                       "step-index","step-object","step-no-post","step-duplicate-post",
+                       "aggregate-frame","aggregate-no-pre","aggregate-duplicate-pre","aggregate-no-post","aggregate-duplicate-post"):
+            with self.subTest(suffix=suffix):
+                path,result=self.run_case("main-"+suffix)
+                self.assertNotEqual(result.returncode,0,result.stdout)
+                self.assertFalse((path/"capture.json").exists())
+                self.assertFalse((path/"main-contact.jsonl").exists())
 
     def test_new_region_failures_never_seal_a_capture(self):
         cases={

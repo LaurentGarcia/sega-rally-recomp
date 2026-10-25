@@ -1,0 +1,6 @@
+{
+  "sources": ["platform/ps2/tests/recovered_scalar_metric_test.cpp", "platform/ps2/native/recovered_scalar_metric.cpp"],
+  "includes": ["platform/ps2/native", "platform/ps2/tests"],
+  "libraries": [],
+  "embed_iop_modules": false
+}

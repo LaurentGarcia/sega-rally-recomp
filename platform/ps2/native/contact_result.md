@@ -107,7 +107,7 @@ host-arithmetic formula and protects the point, output prefix and surrounding
 memory.
 
 The source-bound live comparison is recorded privately at
-`build/ps2-native-contact-result-live-002/result.json`. Capture009 has exact
+`build/ps2-native-contact-result-live-003/result.json`. Capture010 has exact
 observer-enabled/disabled parity at all 2,850 frame checkpoints. Its 34
 alternate and 104 main adapters produce 138 observed results: 125 plane and
 13 edge paths. All five result words agree with both native and original
@@ -140,7 +140,7 @@ python3 platform/ps2/tools/check_contact_result.py \
   --program build/ps2/native/rom_cache/program.bin \
   --tgp-program build/ps2/native/tgp/program.bin \
   --tgp-tables build/ps2/native/tgp/copro_tgp_tables.bin \
-  --capture build/ps2/driving-capture-009/capture \
+  --capture build/ps2/driving-capture-010/capture \
   --output build/ps2-native-contact-result-new
 ```
 

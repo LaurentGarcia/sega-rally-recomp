@@ -116,6 +116,22 @@ class RoundedCrossProductTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 CHECKER.cross_rows(events,bad)
 
+    def test_later_arithmetic_events_are_allowed_only_outside_cross_pairs(self):
+        events,marker=capture()
+        for kind in ("normalization_pre","normalization_post","metric_post","step_post",
+                     "aggregate_pre","aggregate_post"):
+            extra=copy.deepcopy(events[2]);extra["event"]=kind
+            extended=copy.deepcopy(events[:3])+[extra]+copy.deepcopy(events[3:])
+            for i,event in enumerate(extended):
+                event["instructions"]=10*(i+1)
+            counts=dict(marker);counts["main_events"]=len(extended)
+            self.assertEqual(len(CHECKER.cross_rows(extended,counts)[0]),4)
+            inside=copy.deepcopy(events[:2])+[extra]+copy.deepcopy(events[2:])
+            for i,event in enumerate(inside):
+                event["instructions"]=10*(i+1)
+            with self.assertRaises(ValueError):
+                CHECKER.cross_rows(inside,counts)
+
 
 if __name__ == "__main__":
     unittest.main()

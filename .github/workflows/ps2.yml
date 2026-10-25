@@ -91,5 +91,11 @@ jobs:
         run: python3 platform/ps2/build_ps2.py build --target core-probe --core-manifest platform/ps2/tests/rounded_affine_transform_manifest.json --container-platform linux/amd64 --output build/ps2-rounded-affine-ci --jobs 2
       - name: Cross-link the native contact-result fixture with original synthetic normal data
         run: python3 platform/ps2/build_ps2.py build --target core-probe --core-manifest platform/ps2/tests/contact_result_manifest.json --container-platform linux/amd64 --output build/ps2-contact-result-ci --jobs 2
+      - name: Cross-link the native contact-direction normalization fixture
+        run: python3 platform/ps2/build_ps2.py build --target core-probe --core-manifest platform/ps2/tests/contact_normalization_manifest.json --container-platform linux/amd64 --output build/ps2-contact-normalization-ci --jobs 2
+      - name: Cross-link the native recovered scalar metric fixture
+        run: python3 platform/ps2/build_ps2.py build --target core-probe --core-manifest platform/ps2/tests/recovered_scalar_metric_manifest.json --container-platform linux/amd64 --output build/ps2-recovered-scalar-metric-ci --jobs 2
+      - name: Cross-link the native contact accumulation and state update fixture
+        run: python3 platform/ps2/build_ps2.py build --target core-probe --core-manifest platform/ps2/tests/contact_aggregate_manifest.json --container-platform linux/amd64 --output build/ps2-contact-aggregate-ci --jobs 2
       # No ROMs, generated game core, signing secrets or artifact publication.
       # This job proves cross-linking; console execution is a separate test.

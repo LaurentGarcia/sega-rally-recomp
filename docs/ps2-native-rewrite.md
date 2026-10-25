@@ -95,6 +95,9 @@ that scene or a ROM-free hardware test.
 | [Rounded cross product](../platform/ps2/native/rounded_cross_product.md) | Three bounded, separately rounded product differences with alias-safe atomic output | 110,084 evaluations, including all 36 captured calls; 2,642,016 original firmware instructions |
 | [Affine point transform](../platform/ps2/native/rounded_affine_transform.md) | Explicit matrix columns and translation-first point transformation; separately rounded products and sums | 84,273 evaluations; 2,696,736 original firmware instructions |
 | [Contact-result interpretation](../platform/ps2/native/contact_result.md) | Miss/plane/edge status, bounded gap arithmetic and an explicit private normal lookup asset | 40,530 evaluations, including 138 captured replies; original CPU and normalization firmware |
+| [Contact-direction normalization](../platform/ps2/native/contact_normalization.md) | Separately rounded squared length, exact root/division and tiny-value fallback | 59,925 evaluations, including all 13 captured pairs; 1,416,524 original instructions |
+| [Recovered scalar metric](../platform/ps2/native/recovered_scalar_metric.md) | Explicit interleaved point mapping and the pinned firmware's rounded scalar approximation | 156,680 evaluations, including 146,772 accepted results and all 36 captured pairs |
+| [Contact aggregation](../platform/ps2/native/contact_aggregate.md) | Signed accumulation, active response updates and conditional integer feedback | 25,764 scalar steps and 18,409 state updates, including 36 live steps and nine live updates |
 
 The first four components have portable boundary tests, sanitizer checks and standalone
 EE fixtures executed successfully in Play: 121 progress boundary/rejection
@@ -121,6 +124,11 @@ checks. Both include alias checks and a fused-arithmetic discriminator; the
 affine fixture also distinguishes translation-first ordering.
 Contact-result interpretation passed 2,440 EE cases, 34 atomic-rejection checks
 and three interpolation guards using an original synthetic normal table.
+Contact-direction normalization passed 4,064 EE cases and 48 rejection checks.
+The scalar metric passed 11,972 EE evaluations, including 11,234 accepted
+results, six aliases and 96 rejection checks. Contact aggregation passed 2,240
+scalar steps, 912 updates and 33 rejection checks. Each fixture enforces its
+expected result fingerprint; execution uses Play 0.72 HLE, not physical hardware.
 The original-program comparisons run on the host against the
 owner's verified Revision B image; the reference interpreter and memory
 adapters are not part of the native executable. The components are compiled
@@ -138,11 +146,13 @@ is a third, separate path that consumes cabinet steering. That callback and its
 remaining geometry/force dependencies must be recovered to drive the main car.
 Its [four-point candidate-contact pass](../platform/ps2/native/main_contact_pass_recovery.md)
 has a bounded dependency study. Explicit point transformation, cross products
-and interpreted replies are recovered separately; matrix construction,
-per-contact response and aggregation still require native recovery and comparison.
+and interpreted replies are recovered separately. Normalization, the scalar
+metric and final aggregate updates now also have typed native implementations.
+Matrix construction and the intervening per-contact force expressions still
+require recovery before this pass can be connected.
 
 The separate [driving observer](../platform/ps2/tools/driving_capture.md) now
-records those routes using the existing cabinet replay. Capture 009 passes all
+records those routes using the existing cabinet replay. Capture 010 passes all
 2,850 enabled/disabled frame checkpoints. It records 1,202 complete alternate
 calls and 34 detailed groups, plus 601 complete main-object cabinet-filter calls
 with 32 detailed pairs. Callback records and matching published steering values
@@ -150,7 +160,8 @@ associate the cabinet input with object `0x500000`; the alternate calls belong
 to two different objects, each updating once per frame in the observed window.
 Its separate main-contact stream records 601 complete passes and 2,404 complete
 query/result pairs, with 26 detailed passes and all 36 cross operations in the
-observed window. Native result interpretation matches all 104 sampled main
+observed window. It additionally samples all 13 normalization pairs, 36 scalar
+metric/accumulation pairs and nine active aggregate updates. Native result interpretation matches all 104 sampled main
 replies and 34 alternate replies, including 13 edge and 125 plane results.
 No miss occurred in those samples; miss behavior is covered synthetically.
 This is bounded host-reference evidence, not independent arcade-board fidelity

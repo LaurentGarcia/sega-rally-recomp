@@ -95,6 +95,7 @@ int main(int argc,char **argv) {
                 if (mode=="main-query-duplicate-count") observe(0x2ac08);
                 cpu.m_r[31]=mode=="main-query-wrong-frame" ? main_fp+0x40 : main_fp;
                 observe(resume);
+                cpu.m_r[0]=0x500200;saved_return(0x500200,relocation+0x3521c,mode=="main-spilled");
             };
             query(0);
             for (unsigned i=0;i<4;++i) {
@@ -115,8 +116,22 @@ int main(int argc,char **argv) {
                 cpu.m_r[16]=0xdeadbeef;cpu.m_r[17]=0xcafebabe;
                 cpu.m_r[31]=mode=="main-contact-wrong-frame" ? main_fp+0x40 : main_fp;
                 observe(0x34710);
+                cpu.m_r[0]=0x500200;saved_return(0x500200,relocation+0x3521c,mode=="main-spilled");
                 if (i<3) query(i+1); // Original pipelined query order.
                 cpu.m_r[5]=i;cpu.m_r[13]=object;
+                if (mode!="main-no-normalization") {
+                    cpu.m_r[7]=main_fp+0xd0;cpu.m_r[25]=main_fp+0xd8;
+                    if (mode=="main-normalization-pointer") cpu.m_r[25]+=4;
+                    if (mode=="main-normalization-index") cpu.m_r[5]=4;
+                    if (mode=="main-normalization-frame") cpu.m_r[31]+=0x40;
+                    if (mode=="main-normalization-parent") cpu.m_rcache[0][2]+=4;
+                    for (unsigned j=0;j<3;++j) bus.values[main_fp+0xd0+4*j]=6000+100*i+j;
+                    if (mode!="main-normalization-no-pre") observe(0x348ec);
+                    if (mode=="main-normalization-duplicate-pre") observe(0x348ec);
+                    for (unsigned j=0;j<3;++j) bus.values[main_fp+0xd0+4*j]=6100+100*i+j;
+                    if (mode!="main-normalization-no-post") observe(0x34968);
+                    if (mode=="main-normalization-repeat") { observe(0x348ec);observe(0x34968); }
+                }
                 if (mode=="main-response-index") cpu.m_r[5]=4;
                 if (mode!="main-response-missing") observe(0x34a30);
             }
@@ -129,9 +144,31 @@ int main(int argc,char **argv) {
                 if (mode!="main-cross-no-pre") observe(0x34a88);
                 if (mode=="main-cross-duplicate-pre") observe(0x34a88);
                 for (unsigned j=0;j<3;++j) bus.values[main_fp+0xd0+4*j]=5000+100*i+j;
+                if (mode=="main-metric-nonzero") cpu.m_r[30]=1;
                 if (mode!="main-cross-no-post") observe(0x34b04);
+                cpu.m_r[28]=7000+i;cpu.m_r[21]=5001+100*i;
+                if (mode=="main-metric-index") cpu.m_r[23]+=12;
+                if (mode=="main-metric-frame") cpu.m_r[31]+=0x40;
+                if (mode=="main-metric-parent") cpu.m_rcache[0][2]+=4;
+                if (mode!="main-metric-no-post") observe(0x34b5c);
+                if (mode=="main-metric-duplicate-post") observe(0x34b5c);
+                cpu.m_r[11]=8000+i;
+                if (mode=="main-step-index") cpu.m_r[23]+=12;
+                if (mode=="main-step-object") cpu.m_r[13]+=0x100;
+                if (mode!="main-step-no-post") observe(0x34b84);
+                if (mode=="main-step-duplicate-post") observe(0x34b84);
                 if (mode=="main-cross-partial") break;
             }
+            if (mode!="main-no-cross") {
+                cpu.m_r[23]=48;
+                if (mode=="main-aggregate-frame") cpu.m_r[31]+=0x40;
+                if (mode!="main-aggregate-no-pre") observe(0x34b90);
+                if (mode=="main-aggregate-duplicate-pre") observe(0x34b90);
+                bus.values[object+0x2c]=9000;bus.values[0x220000]=9001;bus.values[0x220024]=9002;
+                bus.values[0x213964]=9003;bus.values[0x213968]=9004;
+                if (mode!="main-aggregate-no-post") observe(0x34cc0);
+                if (mode=="main-aggregate-duplicate-post") observe(0x34cc0);
+            } else observe(0x34cc0); // Skip path must not manufacture an aggregate pair.
             cpu.m_r[31]=mode=="main-return-frame" ? 0x500240 : 0x500200;
             if (mode!="main-incomplete") observe(0x3521c);
             // Resume the pre-existing synthetic stream, proving both can coexist.

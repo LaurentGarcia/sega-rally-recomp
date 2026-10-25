@@ -51,7 +51,9 @@ struct MainPass {
     Contact contact;
     std::uint32_t query_frame=0,query_point=0;
     unsigned queries=0,query_completions=0,contacts=0,contact_completions=0,responses=0,crosses=0;
+    unsigned metrics=0,steps=0,normalizations=0,aggregate_phase=0;
     bool detailed=false,prepared=false,query_count=false,cross_pending=false;
+    bool metric_pending=false,step_pending=false,normalization_pending=false,normalization_seen=false;
 };
 struct Capture {
     std::filesystem::path path;
@@ -79,6 +81,10 @@ struct Capture {
     unsigned main_calls=0,main_completions=0,main_samples=0,main_event_count=0;
     unsigned main_queries=0,main_query_completions=0,main_contacts=0,main_contact_completions=0;
     unsigned main_cross_pairs=0,main_sampled_cross_pairs=0;
+    unsigned main_metric_entries=0,main_metric_completions=0,main_metric_sampled_pairs=0;
+    unsigned main_step_entries=0,main_step_completions=0,main_step_sampled_pairs=0;
+    unsigned main_aggregate_entries=0,main_aggregate_completions=0,main_aggregate_samples=0;
+    unsigned main_normalization_entries=0,main_normalization_completions=0,main_normalization_sampled_pairs=0;
     std::uint64_t main_selected_frame=~std::uint64_t{};
     // Original and relocated forms of the bounded car-code analysis region.
     std::array<std::uint64_t, 2*0x8000> code_counts{};
@@ -209,8 +215,10 @@ void main_snapshot(Capture &capture,const rt::Cpu &cpu,const char *event,
     out << ",\"parent_return_frame\":";return_frame(out,main.returning);
     if (kind.starts_with("query_")) out << ",\"query_index\":" << main.queries-1;
     if (kind.starts_with("contact_")) out << ",\"contact_index\":" << main.contacts-1;
-    if (kind=="response_post") out << ",\"contact_index\":" << main.responses;
+    if (kind=="response_post" || kind.starts_with("normalization_")) out << ",\"contact_index\":" << main.responses;
     if (kind.starts_with("cross_")) out << ",\"cross_index\":" << main.crosses;
+    if (kind=="cross_post" || kind=="metric_post") out << ",\"metric_index\":" << main.metrics;
+    if (kind=="metric_post" || kind=="step_post") out << ",\"step_index\":" << main.steps;
     std::array<std::uint64_t,4> fp{};
     for (unsigned i=0;i<4;++i) fp[i]=std::bit_cast<std::uint64_t>(cpu.m_fp[i]);
     out << ",\"fp_bits\":";integers(out,fp);
@@ -250,6 +258,10 @@ void main_snapshot(Capture &capture,const rt::Cpu &cpu,const char *event,
         block("cross_right",main.frame_pointer+0xa0+12*main.crosses,3);
         block("cross_result",main.frame_pointer+0xd0,3);
     }
+    if (kind=="cross_post" || kind=="metric_post" || kind=="step_post")
+        block("metric_cross",main.frame_pointer+0xd0,3);
+    if (kind.starts_with("normalization_"))
+        block("normalization_vector",main.frame_pointer+0xd0,3);
     out << "]}";write(capture,capture.main_events,out.str());
 }
 void observe_main(Capture &capture,const rt::Cpu &cpu,std::uint64_t instructions,
@@ -295,7 +307,9 @@ void observe_main(Capture &capture,const rt::Cpu &cpu,std::uint64_t instructions
     if (cpu.m_IP==main.returning.pc) {
         if (cpu.m_r[31]!=main.returning.frame_pointer || !main.prepared || main.query_return.pc ||
             main.contact.return_pc || main.cross_pending || main.queries!=4 || main.query_completions!=4 ||
-            main.contacts!=4 || main.contact_completions!=4 || main.responses!=4 || (main.crosses!=0 && main.crosses!=4))
+            main.contacts!=4 || main.contact_completions!=4 || main.responses!=4 || (main.crosses!=0 && main.crosses!=4) ||
+            main.metric_pending || main.step_pending || main.normalization_pending ||
+            main.metrics!=main.crosses || main.steps!=main.crosses || main.aggregate_phase!=(main.crosses ? 2u : 0u))
             throw std::runtime_error("main contact return has incomplete or mismatched boundaries");
         main_snapshot(capture,cpu,"main_return",instructions,frame,ns);
         main_cadence(capture,cpu,"main_return",instructions,frame,ns);
@@ -341,21 +355,93 @@ void observe_main(Capture &capture,const rt::Cpu &cpu,std::uint64_t instructions
         main.contact.reply_seen=true;main_snapshot(capture,cpu,"contact_reply",instructions,frame,ns);break;
     case 0x34a30:
         if (cpu.m_r[31]!=main.frame_pointer || cpu.m_r[13]!=main.object || main.responses>=4 ||
-            cpu.m_r[5]!=main.responses || main.contact_completions!=main.responses+1)
+            cpu.m_r[5]!=main.responses || main.contact_completions!=main.responses+1 || main.normalization_pending)
             throw std::runtime_error("main response frame or sequence mismatch");
-        main_snapshot(capture,cpu,"response_post",instructions,frame,ns);++main.responses;break;
+        main_snapshot(capture,cpu,"response_post",instructions,frame,ns);
+        ++main.responses;main.normalization_seen=false;break;
+    case 0x348ec:
+    case 0x34968:
+        if (cpu.m_r[31]!=main.frame_pointer || cpu.m_r[13]!=main.object || main.responses>=4 ||
+            cpu.m_r[5]!=main.responses || main.contact_completions!=main.responses+1 ||
+            cpu.m_r[7]!=main.frame_pointer+0xd0 || cpu.m_r[25]!=main.frame_pointer+0xd8 ||
+            (pc==0x348ec ? main.normalization_seen : !main.normalization_pending))
+            throw std::runtime_error("main normalization frame, pointer or sequence mismatch");
+        if (const auto returning=caller_return(cpu); returning.pc!=main.returning.pc ||
+            returning.frame_pointer!=main.returning.frame_pointer)
+            throw std::runtime_error("main normalization saved parent mismatch");
+        main_snapshot(capture,cpu,pc==0x348ec ? "normalization_pre" : "normalization_post",instructions,frame,ns);
+        main.normalization_pending=pc==0x348ec;
+        if (pc==0x348ec) { main.normalization_seen=true;++capture.main_normalization_entries; }
+        else {
+            ++main.normalizations;++capture.main_normalization_completions;
+            if (main.detailed) ++capture.main_normalization_sampled_pairs;
+        }
+        break;
     case 0x34a88:
     case 0x34b04:
         if (cpu.m_r[31]!=main.frame_pointer || cpu.m_r[13]!=main.object || main.responses!=4 ||
-            main.crosses>=4 || cpu.m_r[23]!=12*main.crosses ||
+            main.crosses>=4 || cpu.m_r[23]!=12*main.crosses || main.metrics!=main.crosses ||
+            main.steps!=main.crosses || main.metric_pending || main.step_pending || main.aggregate_phase ||
             (pc==0x34a88 ? (main.cross_pending || cpu.m_r[21]!=main.frame_pointer+0x40+12*main.crosses) : !main.cross_pending))
             throw std::runtime_error("main cross frame, operand or sequence mismatch");
+        if (pc==0x34b04 && cpu.m_r[30]!=0)
+            throw std::runtime_error("main metric requires the observed zero scratch operand");
+        if (const auto returning=caller_return(cpu); returning.pc!=main.returning.pc ||
+            returning.frame_pointer!=main.returning.frame_pointer)
+            throw std::runtime_error("main cross/metric saved parent mismatch");
         main_snapshot(capture,cpu,pc==0x34a88 ? "cross_pre" : "cross_post",instructions,frame,ns);
         main.cross_pending=pc==0x34a88;
         if (pc==0x34b04) {
             ++main.crosses;++capture.main_cross_pairs;
+            main.metric_pending=true;++capture.main_metric_entries;
             if (main.detailed) ++capture.main_sampled_cross_pairs;
         }
+        break;
+    case 0x34b5c:
+    case 0x34b84: {
+        const auto index=pc==0x34b5c ? main.metrics : main.steps;
+        if (cpu.m_r[31]!=main.frame_pointer || cpu.m_r[13]!=main.object || index>=4 ||
+            cpu.m_r[23]!=12*index || cpu.m_r[30]!=0 ||
+            (pc==0x34b5c ? (!main.metric_pending || main.step_pending || main.crosses!=index+1 || main.steps!=index) :
+                            (!main.step_pending || main.metric_pending || main.metrics!=index+1)))
+            throw std::runtime_error("main metric/step frame, operand or sequence mismatch");
+        const auto returning=caller_return(cpu);
+        if (returning.pc!=main.returning.pc || returning.frame_pointer!=main.returning.frame_pointer)
+            throw std::runtime_error("main metric/step saved parent mismatch");
+        main_snapshot(capture,cpu,pc==0x34b5c ? "metric_post" : "step_post",instructions,frame,ns);
+        if (pc==0x34b5c) {
+            main.metric_pending=false;main.step_pending=true;++main.metrics;
+            ++capture.main_metric_completions;++capture.main_step_entries;
+            if (main.detailed) ++capture.main_metric_sampled_pairs;
+        } else {
+            main.step_pending=false;++main.steps;++capture.main_step_completions;
+            if (main.detailed) ++capture.main_step_sampled_pairs;
+        }
+        break;
+    }
+    case 0x34b90:
+        if (main.aggregate_phase || main.steps!=4 || main.metrics!=4 || main.crosses!=4 ||
+            main.metric_pending || main.step_pending || cpu.m_r[31]!=main.frame_pointer || cpu.m_r[13]!=main.object)
+            throw std::runtime_error("main aggregate input frame or sequence mismatch");
+        if (const auto returning=caller_return(cpu); returning.pc!=main.returning.pc ||
+            returning.frame_pointer!=main.returning.frame_pointer)
+            throw std::runtime_error("main aggregate input saved parent mismatch");
+        main.aggregate_phase=1;++capture.main_aggregate_entries;
+        main_snapshot(capture,cpu,"aggregate_pre",instructions,frame,ns);break;
+    case 0x34cc0:
+        // The inactive aggregate path also reaches this PC. It has no paired input.
+        if (!main.aggregate_phase) {
+            if (main.crosses) throw std::runtime_error("main aggregate output lacks its paired input");
+            break;
+        }
+        if (main.aggregate_phase!=1 || cpu.m_r[31]!=main.frame_pointer || cpu.m_r[13]!=main.object)
+            throw std::runtime_error("main aggregate output frame or sequence mismatch");
+        if (const auto returning=caller_return(cpu); returning.pc!=main.returning.pc ||
+            returning.frame_pointer!=main.returning.frame_pointer)
+            throw std::runtime_error("main aggregate output saved parent mismatch");
+        main_snapshot(capture,cpu,"aggregate_post",instructions,frame,ns);
+        main.aggregate_phase=2;++capture.main_aggregate_completions;
+        if (main.detailed) ++capture.main_aggregate_samples;
         break;
     default:break;
     }
@@ -658,7 +744,11 @@ void end_driving_capture() {
         capture.orientation_entries!=capture.orientation_completions || capture.contact_entries!=capture.contact_completions ||
         capture.steering_entries!=capture.steering_completions || capture.filter_entries!=capture.filter_completions ||
         capture.main_calls!=capture.main_completions || capture.main_queries!=capture.main_query_completions ||
-        capture.main_contacts!=capture.main_contact_completions)
+        capture.main_contacts!=capture.main_contact_completions ||
+        capture.main_metric_entries!=capture.main_metric_completions ||
+        capture.main_step_entries!=capture.main_step_completions ||
+        capture.main_aggregate_entries!=capture.main_aggregate_completions ||
+        capture.main_normalization_entries!=capture.main_normalization_completions)
         throw std::runtime_error("driving capture has no complete bounded caller evidence");
     capture.events.close();capture.cadence.close();capture.selectors.close();capture.callbacks.close();capture.steering.close();
     capture.steering_filters.close();
@@ -689,6 +779,18 @@ void end_driving_capture() {
         << ",\"main_contacts\":" << capture.main_contacts << ",\"main_contact_completions\":" << capture.main_contact_completions
         << ",\"main_cross_pairs\":" << capture.main_cross_pairs
         << ",\"main_sampled_cross_pairs\":" << capture.main_sampled_cross_pairs
+        << ",\"main_metric_entries\":" << capture.main_metric_entries
+        << ",\"main_metric_completions\":" << capture.main_metric_completions
+        << ",\"main_metric_sampled_pairs\":" << capture.main_metric_sampled_pairs
+        << ",\"main_step_entries\":" << capture.main_step_entries
+        << ",\"main_step_completions\":" << capture.main_step_completions
+        << ",\"main_step_sampled_pairs\":" << capture.main_step_sampled_pairs
+        << ",\"main_aggregate_entries\":" << capture.main_aggregate_entries
+        << ",\"main_aggregate_completions\":" << capture.main_aggregate_completions
+        << ",\"main_aggregate_samples\":" << capture.main_aggregate_samples
+        << ",\"main_normalization_entries\":" << capture.main_normalization_entries
+        << ",\"main_normalization_completions\":" << capture.main_normalization_completions
+        << ",\"main_normalization_sampled_pairs\":" << capture.main_normalization_sampled_pairs
         << ",\"events\":" << capture.events_count << ",\"bytes\":" << capture.bytes
         << ",\"sampling\":\"up to four calls at each selected input/60-frame checkpoint; maximum128 detailed calls\"}\n";
     summary.close();if (!summary) throw std::runtime_error("cannot finish driving capture marker");

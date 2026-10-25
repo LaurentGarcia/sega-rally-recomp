@@ -66,7 +66,7 @@ adjacent objects may share that window.
 | `callbacks.jsonl` | Dispatcher ROM `0x2aba8`: actual `g0` object and `g4` callback, without additional memory reads |
 | `steering.jsonl` | Independently paired cabinet steering entry/output, byte input, return identity, AC and integer registers; no inferred object |
 | `steering-filter.jsonl` | Full filter entry/output with the input word, previous/current history and output registers |
-| `main-contact.jsonl` | Separately sampled main candidate contact passes, including their four query/result slots and optional aggregate cross operations |
+| `main-contact.jsonl` | Separately sampled main candidate contact passes, including four query/result slots, optional normalization and the cross/metric/accumulation/update path |
 | `main-contact-cadence.jsonl` | Every bounded main-pass entry/return, object, frame and completed cross-pair count |
 | Detailed events | All 32 integer registers, AC, raw bits of four floating registers, object window and named RAM blocks |
 | `code-coverage.jsonl` | Nonzero instruction counts for the bounded ROM `0x20000..0x3ffff` analysis region and its relocated copy |
@@ -135,7 +135,7 @@ main passes, 2,404 query/adapter pairs, 26 detailed passes (878 events), and all
 36 aggregate cross pairs. All six older detailed/cadence/selector/callback/
 steering/filter streams remain byte-identical to capture 007.
 
-The final private report is `build/ps2/driving-capture-009/validation.json`,
+The capture 009 private report is `build/ps2/driving-capture-009/validation.json`,
 SHA-256 `d704254e2536fb19bca05a971aba7447224a9ba73bb25663a2e239e1ac7afd90`.
 The main stream SHA-256 is
 `e6845aae16d47a88592e37adad91a02c9d723d565b511c735e09ff13379023dd`.
@@ -145,6 +145,23 @@ sealed. Subsequent build-inventory changes do not rewrite that frozen evidence.
 The observation result alone does not prove the contact pass or its arithmetic
 has been implemented natively; the separate component consumers make narrower
 numerical claims.
+
+Capture 010 adds the numerical boundaries described below and again passes all
+2,850 enabled/disabled checkpoints with all nineteen input events. It records
+601 completed main passes, 2,404 query/adapter pairs and 26 detailed passes
+(994 events). All 36 cross operations have paired metric and accumulation
+observations; nine aggregate updates and thirteen normalization pairs are
+complete. The six older streams and `main-contact-cadence.jsonl` are
+byte-identical to capture 009. The expanded streams use 8,258,956 bytes, still
+below the unchanged 16 MiB cap.
+
+The capture 010 report is `build/ps2/driving-capture-010/validation.json`, SHA-256
+`3565df75062bf756e90842e0bc5eb24b3ba54acb51c3fb064d75774cdaf16f73`.
+Its main stream SHA-256 is
+`c9fd5cfa9b1dcf704edad9f1f32288535ddd80849369b7c261272da85ab9ad29`.
+All 120 source-input hashes and capture-file hashes matched when the report was
+sealed. These counts establish observed execution and sampling, while the
+separate native/original consumers establish each bounded numerical comparison.
 
 ## Contact result
 
@@ -234,13 +251,44 @@ the observed byte offset in `g7`: 0, 12, 24 and 36. The three-word
 operands/results for a separate numerical comparison, not a native contact
 response implementation. No extra FIFO or geometry-state reads occur.
 
+`cross_post` is also the metric-input boundary. Its `metric_index` and
+`metric_cross` block bind the three stored cross words at main `fp+0xd0`.
+`metric_post` at ROM `0x34b5c` follows the original FIFO read and records the
+scalar in `g12` (`registers[28]`). It is simultaneously the input to scalar
+accumulation: `step_index`, prior `r11`, and the sign source in `g5` are recorded
+once at this shared instruction boundary. `step_post` at `0x34b84` records the
+updated `r11`. All three boundaries retain raw registers, AC, the parent object,
+frame, saved caller proof and `g7` byte offset; `g14` must remain zero.
+The observer obtains the result from the CPU's already-read register, never by
+performing another FIFO read.
+
+Four completed cross/metric/step groups permit `aggregate_pre` at ROM `0x34b90`
+and `aggregate_post` at `0x34cc0`. Their existing object, candidate, response and
+feedback blocks retain the before/after state. The inactive branch also reaches
+the latter PC; it emits no aggregate event without the paired input boundary.
+
+Within each contact response, optional `normalization_pre` at ROM `0x348ec`
+and `normalization_post` at `0x34968` capture the three-word
+`normalization_vector` at main `fp+0xd0`. `contact_index` must equal `r5`;
+`r7` and `g9` must identify `fp+0xd0` and `fp+0xd8`. A response may contain at
+most one complete normalization pair. The next query may already have completed
+before this pair because the original response loop is pipelined.
+
 `main_return` requires all four query/count/adapter/reply/response groups to
-complete, plus either zero or four complete cross pairs. Marker fields
+complete, plus either zero cross operations or four complete cross/metric/step
+groups and their aggregate update. No pending normalization, metric, step or
+aggregate pair may survive the return. Marker fields
 `main_calls`, `main_completions`, `main_samples`, `main_events`,
 `main_queries`, `main_query_completions`, `main_contacts`,
 `main_contact_completions`, `main_cross_pairs` and `main_sampled_cross_pairs`
 describe the distinct populations. The replay tool also requires at least one
 complete sampled main pass before it can report success.
+
+New marker families `main_metric_*`, `main_step_*` and
+`main_normalization_*` each contain `entries`, `completions` and
+`sampled_pairs`. `main_aggregate_*` contains `entries`, `completions` and
+`samples`. Counts include all bounded passes; detailed records include only the
+explicitly sampled passes. Completion totals must match before sealing.
 
 ## Limits and tests
 
@@ -272,3 +320,9 @@ interrupt-altered child `r2`, independent steering/filter identity,
 four-slot main query pipelining, exact cross block mapping, optional no-cross
 passes, and output-directory confinement. Missing, duplicated or mismatched
 main boundaries and non-RAM arguments cannot seal a successful capture.
+The added cases exercise raw normalization/metric/accumulator/feedback fields,
+cached and spilled parent frames, skipped aggregate/normalization paths and
+23 malformed numerical sequences. Repeated normalization, missing metric or
+step output, an unpaired aggregate update or a changed saved parent cannot
+produce a completion marker. The actual observer also passes focused
+AddressSanitizer/UndefinedBehaviorSanitizer runs on valid and rejected sequences.

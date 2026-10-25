@@ -1,0 +1,6 @@
+{
+  "sources": ["platform/ps2/tests/contact_normalization_test.cpp", "platform/ps2/native/contact_normalization.cpp"],
+  "includes": ["platform/ps2/native", "platform/ps2/tests"],
+  "libraries": [],
+  "embed_iop_modules": false
+}

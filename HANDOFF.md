@@ -1,5 +1,112 @@
 # Handoff
 
+## Native contact normalization, scalar metric and aggregate updates (2026-10-25)
+
+The preceding b844fe4 checkpoint is published with all five workflows green:
+PS2, the desktop Build matrix/source export, Metal and both Vulkan workflows.
+This batch adds three independently written typed components under the game
+source role. No arcade processor, mapped bus, geometry state machine or device
+runtime enters the native PS2 target. Driving remains unconnected and physical
+console validation remains pending.
+
+Contact-direction normalization recovers the region 348ec..34968 with separate
+binary32 products, ordered sums, an exactly rounded square root and divisions.
+The bounded integer implementation preserves gradual underflow and the original
+tiny-value fallback. Finite input magnitudes are limited to 2^20; output aliasing
+and atomic rejection are explicit. Portable and original comparisons pass
+59,912 synthetic evaluations / 59,896 unique triples, including 5,419 fallback
+branches and 1,416,212 original instructions, fingerprint 53b71c272e0a45ea.
+ASan/UBSan and 48 rejection checks pass. All 13 captured pairs also match:
+59,925 combined evaluations / 59,909 unique triples / 1,416,524 instructions,
+fingerprint 82716f3cde064327. Final source-bound evidence is
+build/ps2-native-contact-normalization-live-003/result.json. The first oracle
+assumed three reads on both branches; the original normal branch rereads YZ,
+so its checked count is five rather than three. Correcting this harness did
+not change production arithmetic. Exact instruction counts are 24 and 20.
+
+The recovered scalar metric implements the verified command 58 / primitive 1ab
+sequence with initialized constants and no external table access. It preserves
+the pinned reference's unusual first correction: a unit difference returns
+1.0183569, not 1.0. This is not a claim about independent PCB timing or a generic
+Euclidean distance. Positive subnormal squared sums are explicitly rejected;
+zero and normal sums are accepted within the bounded coordinate domain.
+The synthetic comparison covers 156,644 inputs, with 146,736 accepted native
+results. It executes 148,411 original commands / 6,996,272 instructions; 8,233
+coordinate rejections skip firmware and 1,675 original executions establish
+the rejected subnormal-sum path. Six coordinate aliases and 96 rejection checks
+pass. Capture 010's 36 interleaved-input calls all match: 156,680 combined
+evaluations / 146,772 accepted / 148,447 original calls / 6,997,470 instructions,
+fingerprint 0b7c806697edb751. The final report is
+build/ps2-native-scalar-metric-live-001/result.json. Original firmware and
+all recorded values remain private under ignored build/.
+
+Contact aggregation exposes signed scalar accumulation and the already-active
+final state update. Its explicit inputs include response triples, previous
+motion/candidates, divisors, base components and the feedback gate. Preserved
+fields retain arbitrary bits; numerical rejection leaves the whole state
+unchanged. Enabled feedback truncates exact scaled products with checked int32
+bounds. The scalar-step and final-update regions pass 25,728 and 18,400 synthetic
+cases respectively, fingerprint 390cbdf6408065cd; ASan/UBSan and 33 rejection
+checks pass. The oracle's initial store model incorrectly expected an extra
+absolute-value write when the first feedback product truncates to zero while the second is
+negative; the original omits that write. Only the expected trace changed.
+All 36 live scalar steps and nine active final updates also match: 25,764
+combined scalar steps / 18,409 updates / 1,272,452 original CPU instructions,
+fingerprint 57b055a27cdfbbf8. Final source-bound evidence is
+build/ps2-native-contact-aggregate-live-002/result.json.
+
+Observer 010 adds paired normalization, metric, signed-step and final-update
+boundaries. The metric input shares the existing cross output boundary and its
+result shares the step input, avoiding duplicate instruction-count events.
+Saved caller identity, frame/index/pointer checks and bounded ordinary RAM reads
+remain enforced. No extra FIFO/device reads are introduced. All 2,850 observer
+enabled/disabled checkpoints match; all six older streams and main cadence
+remain byte-identical to 009. There are 26 detailed main passes / 994 events,
+36 scalar/step pairs, 13 normalization pairs and nine active aggregate pairs.
+Validation SHA256: 3565df75062bf756e90842e0bc5eb24b3ba54acb51c3fb064d75774cdaf16f73.
+The main stream SHA256 is
+c9fd5cfa9b1dcf704edad9f1f32288535ddd80849369b7c261272da85ab9ad29.
+These are bounded host-reference comparisons, not independent arcade-board
+or full-course fidelity certification.
+
+All three standalone EE fixtures execute in Play 0.72 HLE with exact PASS
+markers, empty guest stderr and source/build/ELF/log identities bound in their
+build/ps2-native-*-ee-001/runtime-validation.json reports. Normalization passes
+4,064 cases / hash 2f11e06fc7af1915 and 48 rejections; its ELF is
+153922383664734e9b37e4fd6a653edb655f90f75d2ae8a6f6214b5077223fd8,
+1,227,036 file bytes / 181,088 resident bytes. Scalar metric passes 11,972 cases /
+11,234 accepted / hash 46407e33dcf00f1b and 96 rejections; its ELF is
+b989dc8897c59852908e0aa26f67d88fc1fedff258b3bd7766c82c47af7812b1,
+1,228,276 file bytes / 182,368 resident bytes. Aggregation passes 2,240 scalar
+steps and 912 updates / hash 63248df7338a0797 plus 33 rejections; its ELF is
+cf4761829bbbfbc11ff553720ba5e2d3b801b43b29114dd62e0e4a93c88eb2c6,
+1,232,752 file bytes / 186,336 resident bytes. Observation windows are 20.064,
+20.175 and 20.109 seconds respectively, not measured execution time. Both
+aggregate window-image attempts failed; its guest completion evidence passed.
+
+Native 018 passes its 62-file fixed source boundary, dependency-direction and
+forbidden-symbol audits. Recorded sources match the compiled inputs. Its
+static diagnostic ELF remains 2338119372579ee7012ec95fcd43f5210d8382cb112d6f4dbce9d3fc8f050158,
+2,274,240 file bytes / 593,080 resident bytes: disconnected helpers are removed
+by the linker, so this is not a new gameplay result. The shared engine retains
+its 21-file identity 8bfba3e1904f90f61cec9230f3ea3f2a66013a37a6a7257d8dbe9055be1094e2.
+CI now cross-links all three new synthetic EE fixtures.
+
+All final oracle reports rehash their current source dependencies. The shared
+reader change also has fresh earlier proofs against capture 010:
+build/ps2-native-rounded-cross-live-003/result.json retains all 36 live matches
+and fingerprint 61cedd9373797928; build/ps2-native-contact-result-live-003/result.json
+retains all 138 live replies and fingerprint c898451d51b72992. Independent reviews
+found no remaining arithmetic or observer blocker.
+The final portable PS2 suite passes all 175 tests in 29.922 seconds; its log is
+build/ps2/validation/contact-aggregate-tests-002.log. The exact staged tree and
+source archive must pass the publication gate before this checkpoint is pushed.
+
+Remaining work is the main pass's orientation-transform construction and
+intervening per-contact force expressions, followed by complete pass and
+main-car integration against paired driving states. Typed leaf recovery alone
+does not establish a playable native driving loop or console performance.
+
 ## Native contact transforms, reply interpretation and main-pass capture (2026-10-24)
 
 The preceding e6957c4 checkpoint is published and all triggered workflows now
