@@ -56,6 +56,95 @@ int main(int argc,char **argv) {
             cpu.m_IP=pc+relocation;cpu.reference_cycles=instruction*3;
             ps2::offline::observe_driving_instruction(cpu,instruction++,frame,123456);
         };
+        if (mode.starts_with("vehicle-")) {
+            constexpr std::uint32_t object=0x210000,parent=0x500200,vehicle_fp=0x500400,helper_fp=0x500800;
+            const bool spilled=mode=="vehicle-spilled";
+            if (mode=="vehicle-unselected") frame=2301;
+            const auto restore_parent=[&]() {
+                cpu.m_r[0]=parent;cpu.m_r[31]=vehicle_fp;
+                saved_return(parent,relocation+0x2abac,spilled);
+            };
+            restore_parent();cpu.m_r[16]=object;cpu.m_r[2]=relocation+0x34f40;
+            bus.values[0x2140cc]=object;bus.values[object+4]=relocation+0x34f40;
+            if (mode=="vehicle-bad-object") cpu.m_r[16]=0x900000;
+            if (mode=="vehicle-bad-frame") cpu.m_r[31]=0x5fff00;
+            if (mode=="vehicle-bad-caller") saved_return(parent,relocation+0x2abb0,spilled);
+            observe(0x34f40);
+            if (mode=="vehicle-nested") observe(0x34f40);
+            if (mode=="vehicle-timeout") { instruction+=2000001;observe(0x34f44); }
+            cpu.m_r[28]=object;
+            if (mode=="vehicle-prefix-object") cpu.m_r[28]+=0x100;
+            if (mode=="vehicle-prefix-ac") cpu.m_AC|=0x40000000;
+            if (mode=="vehicle-prefix-parent") cpu.m_rcache[0][3]^=1;
+            if (mode!="vehicle-prefix-no-pre") observe(0x34ff0);
+            if (mode=="vehicle-prefix-duplicate") observe(0x34ff0);
+            for (unsigned i=0;i<3;++i) {
+                bus.values[vehicle_fp+0x130+4*i]=100+i;
+                bus.values[vehicle_fp+0x140+4*i]=200+i;
+            }
+            cpu.m_r[16]=object;cpu.m_r[17]=vehicle_fp+0x130;cpu.m_r[18]=vehicle_fp+0x140;
+            if (mode!="vehicle-prefix-no-post") observe(0x35218);
+            constexpr std::uint32_t returns[]={0x35b88,0x35bb4,0x35bf0,0x35c28};
+            for (unsigned i=0;i<4;++i) {
+                cpu.m_r[0]=vehicle_fp;cpu.m_r[31]=helper_fp;
+                saved_return(vehicle_fp,relocation+returns[i],spilled);
+                cpu.m_r[2]=relocation+0x37200;cpu.m_r[16]=object;
+                cpu.m_r[17]=vehicle_fp+0x40+12*i;cpu.m_r[18]=vehicle_fp+0xf0+12*i;
+                cpu.m_r[19]=vehicle_fp+0xa0+12*(i/2);cpu.m_r[20]=0x3e800000;
+                cpu.m_r[21]=vehicle_fp+0x70+12*i;cpu.m_r[22]=i;cpu.m_r[30]=0;
+                if (mode=="vehicle-slot-index") cpu.m_r[22]=4;
+                if (mode=="vehicle-slot-pointer") cpu.m_r[19]=0xfffffff8;
+                if (mode=="vehicle-slot-zero") cpu.m_r[30]=1;
+                if (mode=="vehicle-slot-parent") saved_return(parent,relocation+returns[i],spilled);
+                if (mode=="vehicle-slot-return") saved_return(vehicle_fp,relocation+returns[i]+4,spilled);
+                observe(0x37200);
+                if (mode=="vehicle-slot-nested") observe(0x37200);
+                for (unsigned j=0;j<3;++j) bus.values[vehicle_fp+0x70+12*i+4*j]=300+10*i+j;
+                if (mode=="vehicle-slot-exit-frame") cpu.m_r[31]+=64;
+                if (mode=="vehicle-slot-exit-proof") cpu.m_rcache[0][3]^=1;
+                if (mode!="vehicle-slot-no-exit") observe(i&1 ? 0x37674 : 0x37360);
+                cpu.m_r[16]=i&1;cpu.m_r[21]=0xdeadbeef;
+                cpu.m_r[31]=mode=="vehicle-slot-return-frame" ? vehicle_fp+64 : vehicle_fp;
+                cpu.m_r[0]=parent;
+                if (mode!="vehicle-slot-no-post") observe(returns[i]);
+            }
+            cpu.m_r[0]=vehicle_fp;cpu.m_r[31]=helper_fp;saved_return(vehicle_fp,relocation+0x36760,spilled);
+            cpu.m_r[16]=object;cpu.m_r[17]=vehicle_fp+0x120;cpu.m_r[18]=vehicle_fp+0x150;
+            cpu.m_r[19]=0x3e123456;cpu.m_r[2]=relocation+0x37870;
+            if (mode=="vehicle-balance-pointer") cpu.m_r[18]=0x900000;
+            if (mode=="vehicle-balance-parent") saved_return(parent,relocation+0x36760,spilled);
+            observe(0x37870);
+            if (mode=="vehicle-balance-nested") observe(0x37870);
+            cpu.m_r[9]=object;cpu.m_r[3]=cpu.m_r[17];cpu.m_r[15]=cpu.m_r[18];bus.values[0x214208]=64;
+            if (mode!="vehicle-selection-no-pre") observe(0x3789c);
+            if (mode=="vehicle-selection-duplicate") observe(0x3789c);
+            cpu.m_r[10]=6;bus.values[0x214208]=64;
+            for (unsigned i=0;i<13;++i) bus.values[0x2141c0+4*i]=500+i;
+            if (mode=="vehicle-selection-post-frame") cpu.m_r[31]+=64;
+            if (mode=="vehicle-selection-post-proof") cpu.m_rcache[0][3]^=1;
+            if (mode!="vehicle-selection-no-post") observe(0x378f4);
+            if (mode=="vehicle-balance-object") cpu.m_r[9]+=0x100;
+            if (mode!="vehicle-balance-no-pre") observe(0x37900);
+            cpu.m_r[5]=0x3f000001;cpu.m_r[7]=0x3f000002;cpu.m_r[14]=0xbe000001;cpu.m_r[13]=0xbe000002;
+            if (mode=="vehicle-balance-post-frame") cpu.m_r[31]+=64;
+            if (mode=="vehicle-balance-post-proof") cpu.m_rcache[0][3]^=1;
+            if (mode!="vehicle-balance-no-post") observe(0x379d0);
+            for (unsigned i=0;i<3;++i) bus.values[vehicle_fp+0x150+4*i]=400+i;
+            if (mode!="vehicle-balance-no-exit") observe(0x38670);
+            cpu.m_r[31]=mode=="vehicle-balance-return-frame" ? vehicle_fp+64 : vehicle_fp;
+            cpu.m_r[0]=parent;
+            cpu.m_r[18]=0xdeadbeef;
+            if (mode!="vehicle-balance-no-return") observe(0x36760);
+            restore_parent();
+            if (mode=="vehicle-exit-proof") cpu.m_rcache[0][3]^=1;
+            if (mode!="vehicle-no-exit") observe(0x371f0);
+            cpu.m_r[31]=mode=="vehicle-return-frame" ? parent+64 : parent;
+            if (mode!="vehicle-incomplete") observe(0x2abac);
+            for (auto &value:cpu.m_r) value=0;
+            frame=2300;cpu.m_r[16]=object;cpu.m_r[17]=0x220000;
+            cpu.m_r[0]=0x500000;cpu.m_r[31]=0x500040;cpu.m_r[15]=object;cpu.m_r[2]=0x5cafec;
+            saved_return(cpu.m_r[0],cpu.m_r[2]);
+        }
         if (mode.starts_with("main-")) {
             if (mode=="main-aggregate-window") frame=2571;
             if (mode=="main-before-aggregate-window") frame=2570;

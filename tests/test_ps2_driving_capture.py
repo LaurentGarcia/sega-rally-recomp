@@ -206,6 +206,96 @@ class DrivingCaptureTests(unittest.TestCase):
                 self.assertIn("new directory below ignored build",result.stderr)
             self.assertFalse((Path(external)/"capture").exists())
 
+    def test_vehicle_prefix_four_helpers_and_balance_preserve_saved_pointer_contracts(self):
+        for mode in ("vehicle-valid","vehicle-spilled"):
+            with self.subTest(mode=mode):
+                path,result=self.run_case(mode)
+                self.assertEqual(result.returncode,0,result.stderr)
+                marker=json.loads((path/"capture.json").read_text())
+                for key in ("vehicle_calls","vehicle_completions","vehicle_samples","vehicle_prefix_entries",
+                            "vehicle_prefix_completions","vehicle_prefix_samples","vehicle_balance_entries",
+                            "vehicle_balance_completions","vehicle_balance_samples","vehicle_balance_calls","vehicle_balance_returns",
+                            "vehicle_selection_entries","vehicle_selection_completions","vehicle_selection_samples"):
+                    self.assertEqual(marker[key],1,key)
+                for key in ("vehicle_slot_entries","vehicle_slot_completions","vehicle_slot_samples"):
+                    self.assertEqual(marker[key],4,key)
+                events=[json.loads(line) for line in (path/"main-vehicle.jsonl").read_text().splitlines()]
+                self.assertEqual(marker["vehicle_events"],18)
+                self.assertEqual([event["event"] for event in events],
+                    ["vehicle_entry","prefix_pre","prefix_post"]+["slot_pre","slot_post"]*4+
+                    ["balance_helper_pre","selection_pre","selection_post","balance_pre","balance_post","balance_helper_post","vehicle_return"])
+                self.assertEqual([e["instructions"] for e in events],sorted(set(e["instructions"] for e in events)))
+                self.assertEqual(len((path/"main-vehicle-cadence.jsonl").read_text().splitlines()),2)
+                self.assertEqual(marker["events"],10)  # Old detailed stream is independent.
+                for event in events:
+                    self.assertEqual(event["parent_return_frame"],events[0]["return_frame"])
+                    self.assertEqual(event["object"],0x210000)
+                    self.assertEqual(len(event["object_words"]),64)
+                    self.assertEqual(event["object_words"][1],0x5d3f40)
+                    self.assertEqual(len(event["registers"]),32)
+                    self.assertEqual(event["fp_bits"][0],1<<63)
+                    self.assertEqual(event["return_frame"]["words"][2],event["return_frame"]["pc"])
+                    self.assertEqual(event["return_frame"]["source"],"ordinary_ram" if mode.endswith("spilled") else "register_cache")
+                prefix={b["name"]:b for b in events[2]["blocks"]}
+                self.assertEqual(prefix["prefix_global"]["address"],0x213974)
+                self.assertEqual(prefix["candidate_position"]["address"],0x500530)
+                self.assertEqual(prefix["candidate_position"]["words"],[100,101,102])
+                self.assertEqual(prefix["candidate_orientation"]["words"],[200,201,202])
+                posts=[e for e in events if e["event"]=="slot_post"]
+                pres=[e for e in events if e["event"]=="slot_pre"]
+                self.assertEqual([e["slot_index"] for e in posts],list(range(4)))
+                for i,(pre,post) in enumerate(zip(pres,posts)):
+                    self.assertEqual(pre["return_frame"],post["return_frame"])
+                    self.assertEqual(post["pc"],pre["return_frame"]["pc"])
+                    self.assertNotEqual(pre["registers"][2],pre["return_frame"]["pc"])
+                    self.assertEqual(post["registers"][31],pre["return_frame"]["frame_pointer"])
+                    blocks={b["name"]:b for b in post["blocks"]}
+                    for name,reg in (("slot_vector",17),("slot_triple",18),("slot_direction",19),("slot_output",21)):
+                        self.assertEqual(blocks[name]["address"],pre["registers"][reg])
+                        self.assertEqual(len(blocks[name]["words"]),3)
+                    self.assertEqual(blocks["slot_output"]["words"],[300+10*i+j for j in range(3)])
+                    self.assertNotEqual(blocks["slot_output"]["address"],post["registers"][21])
+                    self.assertEqual((blocks["slot_result"]["address"],len(blocks["slot_result"]["words"])),(0x2138d0+36*i,9))
+                    self.assertEqual((blocks["slot_globals"]["address"],len(blocks["slot_globals"]["words"])),(0x213880,16))
+                balances=[e for e in events if e["event"].startswith("balance_")]
+                self.assertEqual(balances[2]["registers"][5],0x3f000001)
+                self.assertEqual(balances[2]["registers"][13:15],[0xbe000002,0xbe000001])
+                blocks={b["name"]:b for b in balances[-1]["blocks"]}
+                self.assertEqual((blocks["balance_pairs"]["address"],len(blocks["balance_pairs"]["words"])),(0x210064,4))
+                self.assertEqual(blocks["balance_output"]["address"],balances[0]["registers"][18])
+                self.assertEqual(blocks["balance_output"]["words"],[400,401,402])
+                self.assertEqual(events[-1]["pc"],events[0]["return_frame"]["pc"])
+                selected=next(e for e in events if e["event"]=="selection_post")
+                self.assertEqual(selected["registers"][10],6)
+                block=next(b for b in selected["blocks"] if b["name"]=="selected_parameters")
+                self.assertEqual((block["address"],block["words"]),(0x2141c0,list(range(500,513))))
+
+    def test_vehicle_unsampled_callbacks_are_paired_without_extra_detailed_reads(self):
+        path,result=self.run_case("vehicle-unselected")
+        self.assertEqual(result.returncode,0,result.stderr)
+        marker=json.loads((path/"capture.json").read_text())
+        self.assertEqual((marker["vehicle_calls"],marker["vehicle_completions"]),(1,1))
+        self.assertEqual(marker["vehicle_slot_completions"],4)
+        self.assertEqual(marker["vehicle_samples"],0)
+        self.assertEqual(marker["vehicle_slot_samples"],0)
+        self.assertEqual((path/"main-vehicle.jsonl").read_bytes(),b"")
+        self.assertEqual(len((path/"main-vehicle-cadence.jsonl").read_text().splitlines()),2)
+
+    def test_vehicle_rejects_unpaired_cross_frame_non_ram_or_changed_saved_caller(self):
+        for suffix in ("bad-object","bad-frame","bad-caller","nested","timeout","prefix-object","prefix-ac",
+                       "prefix-parent","prefix-no-pre","prefix-duplicate","prefix-no-post","slot-index",
+                       "slot-pointer","slot-zero","slot-parent","slot-return","slot-nested","slot-exit-frame",
+                       "slot-exit-proof","slot-no-exit","slot-return-frame","slot-no-post","balance-pointer",
+                       "balance-parent","balance-nested","balance-object","balance-no-pre","balance-post-frame",
+                       "balance-post-proof","balance-no-post","balance-no-exit","balance-return-frame",
+                       "balance-no-return","selection-no-pre","selection-duplicate","selection-post-frame",
+                       "selection-post-proof","selection-no-post","exit-proof","no-exit","return-frame","incomplete"):
+            with self.subTest(suffix=suffix):
+                path,result=self.run_case("vehicle-"+suffix)
+                self.assertNotEqual(result.returncode,0,result.stdout)
+                self.assertFalse((path/"capture.json").exists())
+                self.assertFalse((path/"main-vehicle.jsonl").exists())
+
     def test_main_pass_has_independent_four_slot_pipeline_and_exact_cross_blocks(self):
         for mode in ("main-valid","main-spilled","main-no-cross"):
             with self.subTest(mode=mode):

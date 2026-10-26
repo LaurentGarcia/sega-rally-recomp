@@ -56,9 +56,23 @@ struct MainPass {
     bool metric_pending=false,step_pending=false,normalization_pending=false,normalization_seen=false;
     bool response_pending=false;
 };
+struct VehicleHelper {
+    ReturnFrame returning;
+    std::uint32_t frame_pointer=0,vector=0,triple=0,direction=0,output=0,slot=0;
+    unsigned phase=0;
+};
+struct Vehicle {
+    std::uint64_t id=0,instructions=0;
+    std::uint32_t object=0,frame_pointer=0;
+    ReturnFrame returning;
+    VehicleHelper slot,balance;
+    unsigned prefix_phase=0,slots=0;
+    bool detailed=false,exit_seen=false;
+};
 struct Capture {
     std::filesystem::path path;
     std::ofstream events, cadence, selectors, callbacks, steering, steering_filters,main_events,main_cadence;
+    std::ofstream vehicle_events,vehicle_cadence;
     unsigned first = 0, last = 0, detailed = 0, events_count = 0, completed = 0;
     std::uint64_t calls = 0, last_count = ~std::uint64_t{}, selected_frame = ~std::uint64_t{};
     unsigned frame_samples = 0;
@@ -88,6 +102,14 @@ struct Capture {
     unsigned main_normalization_entries=0,main_normalization_completions=0,main_normalization_sampled_pairs=0;
     unsigned main_response_entries=0,main_response_completions=0,main_response_sampled_pairs=0;
     std::uint64_t main_selected_frame=~std::uint64_t{};
+    Vehicle vehicle;
+    unsigned vehicle_calls=0,vehicle_completions=0,vehicle_samples=0,vehicle_event_count=0;
+    unsigned vehicle_prefix_entries=0,vehicle_prefix_completions=0,vehicle_prefix_samples=0;
+    unsigned vehicle_slot_entries=0,vehicle_slot_completions=0,vehicle_slot_samples=0;
+    unsigned vehicle_balance_entries=0,vehicle_balance_completions=0,vehicle_balance_samples=0;
+    unsigned vehicle_balance_calls=0,vehicle_balance_returns=0;
+    unsigned vehicle_selection_entries=0,vehicle_selection_completions=0,vehicle_selection_samples=0;
+    std::uint64_t vehicle_selected_frame=~std::uint64_t{};
     // Original and relocated forms of the bounded car-code analysis region.
     std::array<std::uint64_t, 2*0x8000> code_counts{};
     Call call;
@@ -144,6 +166,198 @@ void write(Capture &capture, std::ofstream &stream, const std::string &text) {
     stream << text << '\n';
     if (!stream) throw std::runtime_error("cannot write driving capture");
     capture.bytes += text.size()+1;
+}
+bool same_return(const ReturnFrame &left,const ReturnFrame &right) {
+    // Cache residency may change across interrupts; the saved caller identity may not.
+    return left.pc==right.pc && left.frame_pointer==right.frame_pointer && left.words==right.words;
+}
+void vehicle_cadence(Capture &capture,const rt::Cpu &cpu,const char *event,
+                     std::uint64_t instructions,std::uint64_t frame,std::uint64_t ns) {
+    const auto &vehicle=capture.vehicle;
+    std::ostringstream out;
+    out << "{\"event\":\"" << event << "\",\"call_id\":" << vehicle.id
+        << ",\"object\":" << vehicle.object << ",\"frame\":" << frame
+        << ",\"instructions\":" << instructions << ",\"cycles\":" << cpu.reference_cycles
+        << ",\"board_ns\":" << ns << ",\"pc\":" << cpu.m_IP
+        << ",\"slot_pairs\":" << vehicle.slots << '}';
+    write(capture,capture.vehicle_cadence,out.str());
+}
+void vehicle_snapshot(Capture &capture,const rt::Cpu &cpu,const char *event,
+                      std::uint64_t instructions,std::uint64_t frame,std::uint64_t ns) {
+    const auto &vehicle=capture.vehicle;
+    if (!vehicle.detailed) return;
+    if (++capture.vehicle_event_count>1024) throw std::runtime_error("main vehicle event limit exceeded");
+    const std::string_view kind(event);
+    const auto *helper=kind.starts_with("slot_") ? &vehicle.slot :
+                       (kind.starts_with("balance_") || kind.starts_with("selection_")) ? &vehicle.balance : nullptr;
+    std::ostringstream out;
+    out << "{\"schema\":1,\"event\":\"" << event << "\",\"call_id\":" << vehicle.id
+        << ",\"object\":" << vehicle.object << ",\"frame\":" << frame
+        << ",\"instructions\":" << instructions << ",\"cycles\":" << cpu.reference_cycles
+        << ",\"board_ns\":" << ns << ",\"pc\":" << cpu.m_IP << ",\"ac\":" << cpu.m_AC
+        << ",\"vehicle_frame_pointer\":" << vehicle.frame_pointer << ",\"registers\":";
+    integers(out,cpu.m_r);
+    out << ",\"return_frame\":";return_frame(out,helper ? helper->returning : vehicle.returning);
+    out << ",\"parent_return_frame\":";return_frame(out,vehicle.returning);
+    if (helper) out << ",\"helper_frame_pointer\":" << helper->frame_pointer;
+    if (kind.starts_with("slot_")) out << ",\"slot_index\":" << vehicle.slot.slot;
+    std::array<std::uint64_t,4> fp{};
+    for (unsigned i=0;i<4;++i) fp[i]=std::bit_cast<std::uint64_t>(cpu.m_fp[i]);
+    out << ",\"fp_bits\":";integers(out,fp);
+    out << ",\"object_words\":";integers(out,words(cpu,vehicle.object,64));
+    out << ",\"blocks\":[";
+    bool first=true;
+    const auto block=[&](const char *name,std::uint32_t address,unsigned count) {
+        if (!first) out << ',';first=false;
+        out << "{\"name\":\"" << name << "\",\"address\":" << address << ",\"words\":";
+        integers(out,words(cpu,address,count));out << '}';
+    };
+    block("main_object_pointer",0x2140cc,1);
+    if (kind.starts_with("prefix_")) block("prefix_global",0x213974,1);
+    if (kind.starts_with("prefix_")) {
+        block("candidate_position",vehicle.frame_pointer+0x130,3);
+        block("candidate_orientation",vehicle.frame_pointer+0x140,3);
+    }
+    if (kind.starts_with("slot_")) {
+        block("slot_vector",vehicle.slot.vector,3);
+        block("slot_triple",vehicle.slot.triple,3);
+        block("slot_direction",vehicle.slot.direction,3);
+        block("slot_output",vehicle.slot.output,3);
+        block("slot_result",0x2138d0+36*vehicle.slot.slot,9);
+        block("slot_globals",0x213880,16);
+        block("slot_mask",0x214208,1);
+        block("slot_parameters",0x2141d0,5);
+        block("slot_control",0x214124,1);
+    }
+    if (kind.starts_with("balance_")) {
+        block("balance_vector",vehicle.balance.vector,3);
+        block("balance_output",vehicle.balance.output,3);
+        block("balance_pairs",vehicle.object+0x64,4);
+        block("balance_prior",0x21425c,1);
+    }
+    if (kind.starts_with("selection_")) {
+        block("selection_flags",0x214208,1);
+        block("selected_parameters",0x2141c0,13);
+    }
+    out << "]}";write(capture,capture.vehicle_events,out.str());
+}
+void observe_vehicle(Capture &capture,const rt::Cpu &cpu,std::uint64_t instructions,
+                     std::uint64_t frame,std::uint64_t ns) {
+    auto &vehicle=capture.vehicle;
+    const auto pc=original_pc(cpu.m_IP);
+    if (pc==0x34f40 && frame>=capture.first && frame<=capture.last) {
+        if (vehicle.id) throw std::runtime_error("nested main vehicle callback");
+        if (++capture.vehicle_calls>16384) throw std::runtime_error("main vehicle call limit exceeded");
+        if (!ram(cpu.m_r[16],0x100) || !ram(cpu.m_r[31],0x1f4))
+            throw std::runtime_error("main vehicle arguments require bounded ordinary RAM");
+        const auto returning=caller_return(cpu);
+        if (original_pc(returning.pc)!=0x2abac) throw std::runtime_error("main vehicle dispatcher return mismatch");
+        vehicle={};vehicle.id=capture.vehicle_calls;vehicle.instructions=instructions;
+        vehicle.object=cpu.m_r[16];vehicle.frame_pointer=cpu.m_r[31];vehicle.returning=returning;
+        const bool selected=frame%60==0 || frame==2300 || frame==2500 || frame==2501 ||
+                            frame==2600 || frame==2601 || frame==2700 || frame==2701 || frame==2752 ||
+                            (frame>=2571 && frame<=2579);
+        vehicle.detailed=selected && capture.vehicle_selected_frame!=frame && capture.vehicle_samples<32;
+        if (vehicle.detailed) { ++capture.vehicle_samples;capture.vehicle_selected_frame=frame; }
+        vehicle_cadence(capture,cpu,"vehicle_entry",instructions,frame,ns);
+        vehicle_snapshot(capture,cpu,"vehicle_entry",instructions,frame,ns);return;
+    }
+    if (!vehicle.id) return;
+    if (instructions-vehicle.instructions>2000000) throw std::runtime_error("main vehicle exceeded bounded instruction count");
+    if (vehicle.slot.phase && cpu.m_IP==vehicle.slot.returning.pc) {
+        if (vehicle.slot.phase!=2 || cpu.m_r[31]!=vehicle.frame_pointer)
+            throw std::runtime_error("main vehicle slot return identity or completion mismatch");
+        vehicle_snapshot(capture,cpu,"slot_post",instructions,frame,ns);
+        ++vehicle.slots;++capture.vehicle_slot_completions;
+        if (vehicle.detailed) ++capture.vehicle_slot_samples;
+        vehicle.slot={};
+    }
+    if (vehicle.balance.phase && vehicle.balance.phase<7 && cpu.m_IP==vehicle.balance.returning.pc) {
+        if (vehicle.balance.phase!=6 || cpu.m_r[31]!=vehicle.frame_pointer)
+            throw std::runtime_error("main vehicle balance return identity or completion mismatch");
+        vehicle_snapshot(capture,cpu,"balance_helper_post",instructions,frame,ns);
+        vehicle.balance.phase=7;++capture.vehicle_balance_returns;
+    }
+    if (cpu.m_IP==vehicle.returning.pc) {
+        if (cpu.m_r[31]!=vehicle.returning.frame_pointer || !vehicle.exit_seen || vehicle.prefix_phase!=2 ||
+            vehicle.slots!=4 || vehicle.slot.phase || vehicle.balance.phase!=7)
+            throw std::runtime_error("main vehicle return has incomplete or mismatched boundaries");
+        vehicle_snapshot(capture,cpu,"vehicle_return",instructions,frame,ns);
+        vehicle_cadence(capture,cpu,"vehicle_return",instructions,frame,ns);
+        ++capture.vehicle_completions;vehicle={};return;
+    }
+    switch(pc) {
+    case 0x34ff0:
+    case 0x35218:
+        if (cpu.m_r[31]!=vehicle.frame_pointer || cpu.m_r[pc==0x34ff0 ? 28 : 16]!=vehicle.object ||
+            (cpu.m_AC&0xc0000000u) || !same_return(caller_return(cpu),vehicle.returning) ||
+            vehicle.prefix_phase!=(pc==0x34ff0 ? 0u : 1u))
+            throw std::runtime_error("main vehicle prefix identity or sequence mismatch");
+        ++vehicle.prefix_phase;
+        vehicle_snapshot(capture,cpu,pc==0x34ff0 ? "prefix_pre" : "prefix_post",instructions,frame,ns);
+        if (pc==0x34ff0) ++capture.vehicle_prefix_entries;
+        else { ++capture.vehicle_prefix_completions;if (vehicle.detailed) ++capture.vehicle_prefix_samples; }
+        break;
+    case 0x37200: {
+        if (vehicle.slot.phase || vehicle.slots>=4 || cpu.m_r[22]!=vehicle.slots || cpu.m_r[16]!=vehicle.object ||
+            cpu.m_r[30] || !ram(cpu.m_r[31],0x80) || !ram(cpu.m_r[17],12) || !ram(cpu.m_r[18],12) ||
+            !ram(cpu.m_r[19],12) || !ram(cpu.m_r[21],12))
+            throw std::runtime_error("main vehicle slot arguments or sequence mismatch");
+        constexpr std::array<std::uint32_t,4> returns{0x35b88,0x35bb4,0x35bf0,0x35c28};
+        const auto returning=caller_return(cpu);
+        if (returning.frame_pointer!=vehicle.frame_pointer || original_pc(returning.pc)!=returns[vehicle.slots])
+            throw std::runtime_error("main vehicle slot caller mismatch");
+        vehicle.slot={returning,cpu.m_r[31],cpu.m_r[17],cpu.m_r[18],cpu.m_r[19],cpu.m_r[21],vehicle.slots,1};
+        ++capture.vehicle_slot_entries;vehicle_snapshot(capture,cpu,"slot_pre",instructions,frame,ns);break;
+    }
+    case 0x37360:
+    case 0x37674:
+        if (vehicle.slot.phase!=1 || cpu.m_r[31]!=vehicle.slot.frame_pointer ||
+            !same_return(caller_return(cpu),vehicle.slot.returning))
+            throw std::runtime_error("main vehicle slot exit identity mismatch");
+        vehicle.slot.phase=2;break;
+    case 0x37870: {
+        if (vehicle.balance.phase || cpu.m_r[16]!=vehicle.object || !ram(cpu.m_r[17],12) ||
+            !ram(cpu.m_r[18],12) || !ram(cpu.m_r[31],0x80))
+            throw std::runtime_error("main vehicle balance arguments or sequence mismatch");
+        const auto returning=caller_return(cpu);
+        if (returning.frame_pointer!=vehicle.frame_pointer || original_pc(returning.pc)!=0x36760)
+            throw std::runtime_error("main vehicle balance caller mismatch");
+        vehicle.balance={returning,cpu.m_r[31],cpu.m_r[17],0,0,cpu.m_r[18],0,1};
+        ++capture.vehicle_balance_calls;vehicle_snapshot(capture,cpu,"balance_helper_pre",instructions,frame,ns);break;
+    }
+    case 0x3789c:
+    case 0x378f4:
+        if (vehicle.balance.phase!=(pc==0x3789c ? 1u : 2u) || cpu.m_r[31]!=vehicle.balance.frame_pointer ||
+            cpu.m_r[9]!=vehicle.object || !same_return(caller_return(cpu),vehicle.balance.returning))
+            throw std::runtime_error("main vehicle selection identity or sequence mismatch");
+        ++vehicle.balance.phase;
+        vehicle_snapshot(capture,cpu,pc==0x3789c ? "selection_pre" : "selection_post",instructions,frame,ns);
+        if (pc==0x3789c) ++capture.vehicle_selection_entries;
+        else { ++capture.vehicle_selection_completions;if (vehicle.detailed) ++capture.vehicle_selection_samples; }
+        break;
+    case 0x37900:
+    case 0x379d0:
+        if (vehicle.balance.phase!=(pc==0x37900 ? 3u : 4u) || cpu.m_r[31]!=vehicle.balance.frame_pointer ||
+            cpu.m_r[9]!=vehicle.object || !same_return(caller_return(cpu),vehicle.balance.returning))
+            throw std::runtime_error("main vehicle balance identity or sequence mismatch");
+        ++vehicle.balance.phase;
+        vehicle_snapshot(capture,cpu,pc==0x37900 ? "balance_pre" : "balance_post",instructions,frame,ns);
+        if (pc==0x37900) ++capture.vehicle_balance_entries;
+        else { ++capture.vehicle_balance_completions;if (vehicle.detailed) ++capture.vehicle_balance_samples; }
+        break;
+    case 0x38670:
+        if (vehicle.balance.phase!=5 || cpu.m_r[31]!=vehicle.balance.frame_pointer ||
+            !same_return(caller_return(cpu),vehicle.balance.returning))
+            throw std::runtime_error("main vehicle balance exit identity mismatch");
+        vehicle.balance.phase=6;break;
+    case 0x371f0:
+        if (vehicle.exit_seen || cpu.m_r[31]!=vehicle.frame_pointer ||
+            !same_return(caller_return(cpu),vehicle.returning))
+            throw std::runtime_error("main vehicle exit identity mismatch");
+        vehicle.exit_seen=true;break;
+    default:break;
+    }
 }
 void cadence(Capture &capture, const rt::Cpu &cpu, const char *event,
              std::uint64_t instructions, std::uint64_t frame, std::uint64_t ns) {
@@ -577,8 +791,10 @@ void begin_driving_capture(const char *directory,unsigned first,unsigned last) {
     capture->steering_filters.open(path/"steering-filter.jsonl.tmp");
     capture->main_events.open(path/"main-contact.jsonl.tmp");
     capture->main_cadence.open(path/"main-contact-cadence.jsonl.tmp");
+    capture->vehicle_events.open(path/"main-vehicle.jsonl.tmp");
+    capture->vehicle_cadence.open(path/"main-vehicle-cadence.jsonl.tmp");
     if (!capture->events||!capture->cadence||!capture->selectors||!capture->callbacks||!capture->steering||!capture->steering_filters||
-        !capture->main_events||!capture->main_cadence)
+        !capture->main_events||!capture->main_cadence||!capture->vehicle_events||!capture->vehicle_cadence)
         throw std::runtime_error("cannot open driving capture");
     active=std::move(capture);
 }
@@ -593,6 +809,7 @@ void observe_driving_instruction(const rt::Cpu &cpu,std::uint64_t instructions,
     if (cpu.m_IP==0x2cce0) ++capture.rom_entries;
     if (cpu.m_IP==relocation+0x2cce0) ++capture.ram_entries;
     const auto pc=original_pc(cpu.m_IP);
+    observe_vehicle(capture,cpu,instructions,frame,ns);
     observe_main(capture,cpu,instructions,frame,ns);
     if (capture.contact.return_pc && (pc==0x2ae68 || pc==0x2aeb4 || pc==0x2aec0)) {
         capture.contact.last_ret_pc=cpu.m_IP;capture.contact.last_ret_pfp=cpu.m_r[0];
@@ -770,7 +987,7 @@ void end_driving_capture() {
                  << ",\"count\":" << capture.code_counts[i] << "}\n";
     coverage.close();
     if (!coverage) throw std::runtime_error("cannot write bounded code execution coverage");
-    if (capture.call.id || capture.query_return || capture.contact.return_pc || capture.orientation.phase || capture.steering_call.return_pc || capture.filter.returning.pc || capture.main.id ||
+    if (capture.call.id || capture.query_return || capture.contact.return_pc || capture.orientation.phase || capture.steering_call.return_pc || capture.filter.returning.pc || capture.main.id || capture.vehicle.id ||
         !capture.calls || !capture.detailed || capture.completed!=capture.calls ||
         capture.orientation_entries!=capture.orientation_completions || capture.contact_entries!=capture.contact_completions ||
         capture.steering_entries!=capture.steering_completions || capture.filter_entries!=capture.filter_completions ||
@@ -780,13 +997,20 @@ void end_driving_capture() {
         capture.main_step_entries!=capture.main_step_completions ||
         capture.main_aggregate_entries!=capture.main_aggregate_completions ||
         capture.main_normalization_entries!=capture.main_normalization_completions ||
-        capture.main_response_entries!=capture.main_response_completions)
+        capture.main_response_entries!=capture.main_response_completions ||
+        capture.vehicle_calls!=capture.vehicle_completions ||
+        capture.vehicle_prefix_entries!=capture.vehicle_prefix_completions ||
+        capture.vehicle_slot_entries!=capture.vehicle_slot_completions ||
+        capture.vehicle_balance_entries!=capture.vehicle_balance_completions ||
+        capture.vehicle_selection_entries!=capture.vehicle_selection_completions ||
+        capture.vehicle_balance_calls!=capture.vehicle_balance_returns)
         throw std::runtime_error("driving capture has no complete bounded caller evidence");
     capture.events.close();capture.cadence.close();capture.selectors.close();capture.callbacks.close();capture.steering.close();
     capture.steering_filters.close();
     capture.main_events.close();capture.main_cadence.close();
+    capture.vehicle_events.close();capture.vehicle_cadence.close();
     if (!capture.events||!capture.cadence||!capture.selectors||!capture.callbacks||!capture.steering||!capture.steering_filters||
-        !capture.main_events||!capture.main_cadence)
+        !capture.main_events||!capture.main_cadence||!capture.vehicle_events||!capture.vehicle_cadence)
         throw std::runtime_error("cannot finish driving capture streams");
     std::ofstream summary(capture.path/"capture.json.tmp");
     summary << "{\"schema\":1,\"complete\":true,\"first_frame\":" << capture.first
@@ -826,6 +1050,22 @@ void end_driving_capture() {
         << ",\"main_response_entries\":" << capture.main_response_entries
         << ",\"main_response_completions\":" << capture.main_response_completions
         << ",\"main_response_sampled_pairs\":" << capture.main_response_sampled_pairs
+        << ",\"vehicle_calls\":" << capture.vehicle_calls << ",\"vehicle_completions\":" << capture.vehicle_completions
+        << ",\"vehicle_samples\":" << capture.vehicle_samples << ",\"vehicle_events\":" << capture.vehicle_event_count
+        << ",\"vehicle_prefix_entries\":" << capture.vehicle_prefix_entries
+        << ",\"vehicle_prefix_completions\":" << capture.vehicle_prefix_completions
+        << ",\"vehicle_prefix_samples\":" << capture.vehicle_prefix_samples
+        << ",\"vehicle_slot_entries\":" << capture.vehicle_slot_entries
+        << ",\"vehicle_slot_completions\":" << capture.vehicle_slot_completions
+        << ",\"vehicle_slot_samples\":" << capture.vehicle_slot_samples
+        << ",\"vehicle_balance_entries\":" << capture.vehicle_balance_entries
+        << ",\"vehicle_balance_completions\":" << capture.vehicle_balance_completions
+        << ",\"vehicle_balance_samples\":" << capture.vehicle_balance_samples
+        << ",\"vehicle_balance_calls\":" << capture.vehicle_balance_calls
+        << ",\"vehicle_balance_returns\":" << capture.vehicle_balance_returns
+        << ",\"vehicle_selection_entries\":" << capture.vehicle_selection_entries
+        << ",\"vehicle_selection_completions\":" << capture.vehicle_selection_completions
+        << ",\"vehicle_selection_samples\":" << capture.vehicle_selection_samples
         << ",\"events\":" << capture.events_count << ",\"bytes\":" << capture.bytes
         << ",\"sampling\":\"up to four calls at each selected input/60-frame checkpoint; maximum128 detailed calls\"}\n";
     summary.close();if (!summary) throw std::runtime_error("cannot finish driving capture marker");
@@ -837,6 +1077,8 @@ void end_driving_capture() {
     std::filesystem::rename(capture.path/"steering-filter.jsonl.tmp",capture.path/"steering-filter.jsonl");
     std::filesystem::rename(capture.path/"main-contact.jsonl.tmp",capture.path/"main-contact.jsonl");
     std::filesystem::rename(capture.path/"main-contact-cadence.jsonl.tmp",capture.path/"main-contact-cadence.jsonl");
+    std::filesystem::rename(capture.path/"main-vehicle.jsonl.tmp",capture.path/"main-vehicle.jsonl");
+    std::filesystem::rename(capture.path/"main-vehicle-cadence.jsonl.tmp",capture.path/"main-vehicle-cadence.jsonl");
     std::filesystem::rename(capture.path/"capture.json.tmp",capture.path/"capture.json");
     active.reset();
 }

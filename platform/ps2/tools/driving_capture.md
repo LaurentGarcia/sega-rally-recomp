@@ -68,6 +68,8 @@ adjacent objects may share that window.
 | `steering-filter.jsonl` | Full filter entry/output with the input word, previous/current history and output registers |
 | `main-contact.jsonl` | Separately sampled main candidate contact passes, including four query/result slots, optional normalization and the cross/metric/accumulation/update path |
 | `main-contact-cadence.jsonl` | Every bounded main-pass entry/return, object, frame and completed cross-pair count |
+| `main-vehicle.jsonl` | Independently paired main callback, candidate prefix, four slot helpers and the balance helper's parameter-selection/scalar boundaries |
+| `main-vehicle-cadence.jsonl` | Every bounded main callback entry/return, object, frame and completed slot-pair count |
 | Detailed events | All 32 integer registers, AC, raw bits of four floating registers, object window and named RAM blocks |
 | `code-coverage.jsonl` | Nonzero instruction counts for the bounded ROM `0x20000..0x3ffff` analysis region and its relocated copy |
 
@@ -178,6 +180,81 @@ The main stream SHA-256 is
 `a6dc646caf1569f4bb71a5bddfb89d9f6a92cd069a271abba6610de8fbb71600`.
 This preserves all four responses per sampled pass, including inactive ones;
 the added snapshots alone do not certify a composed native pass.
+
+Capture 012 adds the independent vehicle stream described below. All 2,850
+enabled/disabled checkpoints match, including the same nineteen input events,
+in 114.485 seconds including compilation. All 120 source-input hashes and all
+capture-file identities were verified before releasing the source snapshot.
+The eight previous streams and instruction-coverage file remain byte-identical
+to 011. There are 601 complete main callbacks, 2,404 complete slot helpers, and
+601 complete prefix, parameter-selection and paired-balance observations.
+Twenty-six sampled parents produce 468 new records, including 104 slot pairs
+and 26 pairs for each scalar region. All streams together occupy 9,863,066 bytes
+under the unchanged 16 MiB cap.
+
+The private report is `build/ps2/driving-capture-012/validation.json`, SHA-256
+`26fa5c2cd5865204a0489daea81d528456fed276896556b2f5e531fc5d453358`.
+The vehicle stream SHA-256 is
+`aac6be0db399dc96f820d8bbb5b921c1f7221e30dd4d9d382e7e6c7a379b22e1`.
+These records establish actual caller relationships and raw inputs/outputs;
+they do not establish a complete native vehicle update or physical-console
+fidelity. Separate native/original comparisons make narrower numerical claims.
+
+## Main vehicle callback
+
+The independent parent starts at ROM `0x34f40` and returns to the dispatcher at
+`0x2abac`, using the actual saved caller PC and frame. Before accepting that
+return, the observer must see the callback's own return instruction at
+`0x371f0` with unchanged saved caller words. The saved frame can move between
+the CPU's register cache and ordinary RAM without changing its identity. The
+raw child `r2` is retained for diagnostics and never substitutes for that proof.
+
+Every sampled parent has eighteen ordered records:
+
+1. `vehicle_entry`.
+2. `prefix_pre` at `0x34ff0`, then `prefix_post` at `0x35218` before the
+   existing contact call. Both retain global `0x213974` and the candidate
+   triples at parent `fp+0x130` and `fp+0x140`, including their old raw words.
+3. Four `slot_pre` / `slot_post` pairs around `0x37200`. Each call retains its
+   four three-word argument spans, indexed result slot and requested globals.
+   Its return is matched to the saved caller among `0x35b88`, `0x35bb4`,
+   `0x35bf0` and `0x35c28`. Both inspected internal return instructions are
+   supported, and a missing internal return fails completion.
+4. `balance_helper_pre` at `0x37870`, `selection_pre` / `selection_post` at
+   `0x3789c` / `0x378f4`, `balance_pre` / `balance_post` at
+   `0x37900` / `0x379d0`, then `balance_helper_post` at its saved return
+   `0x36760`. Selection records flags at `0x214208` and thirteen destination
+   words at `0x2141c0`; it does not read the original selection table again.
+   Balance records four object words at `+0x64` and the prior word at
+   `0x21425c`. The saved `g1` and `g2` vector spans are both **in/out** across
+   the full helper; the name `balance_output` does not imply write-only data.
+5. `vehicle_return`.
+
+These records use their own `call_id`, `vehicle_frame_pointer`, child
+`helper_frame_pointer`, `return_frame` and `parent_return_frame`. They retain
+all 32 integer registers, four floating-register bit patterns and AC. Their
+`object_words` contains exactly **64 words**, a bounded raw `0x100`-byte span;
+the older integrator/contact streams retain their separate 256-word windows.
+Both the object's callback word and global `0x2140cc` are recorded as ownership
+witnesses. Named pointers are captured at entry and reused after return because
+argument registers may then contain results.
+
+The observer tracks all bounded calls for completion, samples at most 32
+parents on the established contact-sampling frames, and limits the new stream
+to 1,024 events. It enforces a two-million-instruction bound per parent,
+including any interrupt work. None of these spans is a hardware timing result.
+The existing ordinary-RAM whitelist and shared byte cap remain unchanged.
+
+`main_vehicle_capture.py` supplies the common strict reader.
+`read_vehicle_capture(directory)` returns events, marker and input hashes;
+`vehicle_envelopes(events, marker)` returns complete ordered parent groups.
+The reader checks the sealed parity report, marker and stream hashes, both
+checkpoint CSV identities, parent/child frames, fixed operand addresses,
+nearest-even AC domain, event order and completion/sample counts. Numerical
+wrappers still have to validate each recovered component's domain and outputs.
+Source-only observer and reader tests cover malformed pointers, missing or
+duplicated boundaries, cached/spilled saved frames, coherent operand repointing,
+wrong ownership, count mismatches, redirected files and altered evidence.
 
 ## Contact result
 

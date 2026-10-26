@@ -1,5 +1,117 @@
 # Handoff
 
+## Native main vehicle operations (2026-10-26)
+
+The preceding ac7f576 checkpoint is published with all five workflows green.
+This batch recovers four more typed value operations from the main vehicle
+path: candidate preparation, the complete bounded contact-slot helper, paired
+balance and parameter selection. The governing design is Platform layer &
+build's native PS2 exception. Original execution remains an offline comparison;
+no arcade processor, mapped bus or device runtime enters the native target.
+The full main callback and continuous driving loop remain unconnected. The
+static preview is unchanged, and there is no new gameplay frame-rate result.
+
+Candidate preparation covers the complete region 0x34ff0..0x35218, including
+the pending-middle clamp, recovered metric, conditional state update and both
+candidate triples. The native contract accepts bounded finite values and the
+metric's zero-or-normal squared-sum domain. Of 17,044 synthetic cases, 16,315
+are accepted original comparisons and 729 exercise explicit atomic rejection.
+The original comparison executes 1,293,072 CPU and 690,109 geometry instructions,
+fingerprint 966c10f581152bec. All 26 captured prefixes match as well: 17,070
+combined cases / 16,341 accepted / 1,294,632 CPU / 690,733 geometry instructions,
+fingerprint 426c711e238b610d. Evidence:
+build/ps2-native-main-candidate-live-001/result.json.
+All captured prefixes have zero pending deltas. The conditional consuming and
+clamping paths are covered by synthetic original execution, not these live
+samples. Twenty-two captured markers are already 15 on entry; counting final
+marker 15 does not count taken branches. The original scaling constant is the
+exact binary32 value 3ecccccc represented in binary64, not rounded binary64 0.4.
+
+The 0x37200 helper updates one of four contact slots, packed types, accumulated
+type mask, histories and response. Separate binary32/binary64 rounding and
+table-based normalization are retained without a processor abstraction. All
+25,852 synthetic cases match original execution, including 7,248 active calls,
+fingerprint 121b47e419609ea7. All 104 captured calls match too: 99 active and
+five inactive. Combined: 25,956 cases / 7,347 active / 2,393,780 CPU instructions /
+504,364 geometry instructions, fingerprint 57a543d2f4626b3f. Final evidence:
+build/ps2-native-main-slot-live-002/result.json. Its earlier report preserves a
+real rejected-domain finding: four observed vectors have zero XZ and nonzero Y,
+so the metric gate can pass while XZ normalization receives a zero square sum.
+The original interpolation expression still runs, with row 4096 and exponent
+adjustment 63. The corrected native domain includes that case and underflow to
+zero, with 64 added signed-zero/underflow controls. Do not substitute a generic
+zero-normal shortcut or claim coverage of unsupported nonzero tiny sums.
+The private table decoder also needed a corrected assumption: stored slope
+words become magnitudes at the pinned interpolation port. Correcting that
+asset conversion did not change the native arithmetic contract.
+
+Inside the larger 0x37870 helper, paired balance preserves the two binary64
+rounding boundaries between binary32 sums/differences and the final store.
+Zero rounded sums yield positive-zero balance; no epsilon is introduced. All 101,130
+synthetic and 26 captured cases match: 4,345,340 original instructions,
+fingerprint 611fdba5efd25614. Parameter selection copies 13 raw words from the
+record chosen by the highest set bit 9..1, defaulting to index zero. All 6,144
+synthetic and 26 captured cases match: 99,140 instructions, fingerprint
+6767e7e5a9bd359d. Synthetic tests cover independent and aliased source records;
+all live selections choose index two. Neither proof recovers the complete
+helper. Current shared-reader-bound evidence:
+build/ps2-native-paired-balance-live-002/result.json.
+
+Capture 012 adds independent vehicle and cadence streams, with parent/child
+frame proofs, exact operand spans and all paired boundaries. All 2,850
+enabled/disabled checkpoints match. It observes 601 complete main callbacks,
+2,404 slot pairs and 601 prefix/balance/selection pairs; 26 sampled callbacks
+produce 468 detailed events and 104 slot pairs. All eight previous streams and
+code coverage remain byte-identical to 011. Total stream size is 9,863,066 bytes,
+within the 16 MiB bound. Validation SHA256 is
+26fa5c2cd5865204a0489daea81d528456fed276896556b2f5e531fc5d453358;
+vehicle stream SHA256 is
+aac6be0db399dc96f820d8bbb5b921c1f7221e30dd4d9d382e7e6c7a379b22e1.
+Its historical source closure was verified before later build-inventory edits;
+the sealed capture is not claimed to have run with that newer builder. The
+shared reader also checks restored parent PFP after each of the 130 sampled
+child returns. Original images, captures and generated comparison code stay
+private under ignored build/.
+
+All three standalone EE fixtures execute in Play 0.72 HLE with exact completion
+markers, empty guest stderr and source/build/ELF/log bindings. Candidate: 1,684
+cases / 1,641 accepted / d782474a4f893dc8 and 75 rejection checks. Slot: 2,876
+cases / 947 active / 32ef92cd4f0d4583, 316 rejection checks and two known controls.
+Paired balance: 2,154 cases / 1fd698b609c8f960 and 24 rejection checks; parameter
+selection: 3,072 cases / cf0278eb2ab1a5a1. Reports are the corresponding
+build/ps2-native-{main-candidate,main-contact-slot,paired-balance}-ee-001/runtime-validation.json
+files. The roughly 20-second observation windows are not execution timings.
+The candidate window-image attempts failed; both later fixtures produced two
+captures. Numerical guest logs establish completion in all three. Host and
+ASan/UBSan checks pass; physical PS2 behavior remains unverified.
+
+Native 020 passes the 78-file boundary, dependency-direction and forbidden-symbol
+audits, with all recorded source hashes current. The static ELF remains
+2338119372579ee7012ec95fcd43f5210d8382cb112d6f4dbce9d3fc8f050158,
+2,274,240 file bytes / 593,080 resident bytes, because the unconnected operations
+are removed by the linker. The unchanged 21-file shared engine identity is
+8bfba3e1904f90f61cec9230f3ea3f2a66013a37a6a7257d8dbe9055be1094e2.
+CI now cross-links these three fixtures. Independent arithmetic, oracle,
+capture-parser and restored-frame-proof reviews found no remaining blocker.
+The final portable PS2 suite passes all 225 tests in 46.339 seconds; log:
+build/ps2/validation/main-vehicle-tests-001.log. Current source bindings for all
+six live/runtime reports are checked in main-vehicle-evidence-001.json under
+that validation directory. Exact staged-tree and source-archive gates are
+required before publication.
+
+The dependency map corrects an earlier research assumption: helper 0x34ce0
+ends at 0x34e3c, after the return at 0x34e38. Extending to 0x34f40 included data.
+It schedules counters, feedback and events; it is not a generic force routine.
+Both vector pointers of the complete 0x37870 helper are in/out, including its
+final geometry-result store through the first pointer. Neither observation
+authorizes replacing the unrecovered effects with generic physics.
+
+Next: recover the intervening main-callback operations and remaining 0x37870
+effects, compose a whole-car update against paired observations, then connect
+the continuous native loop. Only then measure EE/VU/GS bottlenecks and gameplay
+frame rates. Original textured rendering, game audio integration, full-course
+behavior and physical PS2 validation remain separate work.
+
 ## Native four-point candidate contact pass (2026-10-25)
 
 The preceding 7ec4e8b checkpoint is published with all five workflows green.

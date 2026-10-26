@@ -102,6 +102,10 @@ that scene or a ROM-free hardware test.
 | [Per-contact response](../platform/ps2/native/contact_response.md) | Two cross products, normalization, rounded scalar gain, response and selected scalar | 18,536 evaluations, 18,464 accepted results, including all 104 captured responses |
 | [Post-query response pass](../platform/ps2/native/contact_pass_response.md) | Four responses, mask and gate, cross/metric accumulation and atomic car-state update | 4,250 passes including all 26 captured passes; 2,128,380 CPU and 615,149 geometry instructions |
 | [Candidate contact pass](../platform/ps2/native/candidate_contact_pass.md) | Candidate pose and private course/normal/local-point assets through search and complete response | 26 captured passes, 104 contacts and nine active aggregates; 858 final state/contact words and 312 offset words match |
+| [Main-candidate preparation](../platform/ps2/native/main_candidate.md) | Pending-middle clamp, recovered metric gate, conditional residual/state consumption and separately rounded candidate triples | 17,070 evaluations, 16,341 accepted original comparisons including all 26 live states; 729 explicit native-domain rejections |
+| [Main contact-slot update](../platform/ps2/native/main_contact_slot.md) | One of four slots: packed type/mask, history, response, metric and table-based lateral value | 25,852 synthetic cases plus all 104 captured calls, including 99 active calls; 2,393,780 CPU and 504,364 geometry instructions |
+| [Paired balance](../platform/ps2/native/paired_balance.md) | Two pair sums and signed balances with separate binary64 product/division rounding; zero/subnormal sums supported | 101,130 synthetic cases plus all 26 captured pairs; 4,345,340 original instructions |
+| [Vehicle parameter selection](../platform/ps2/native/paired_balance.md#parameter-selection) | Highest enabled bit among 9–1, otherwise index 0; raw copy of an explicit 13-word record | 6,144 synthetic selections plus all 26 captured selections; 99,140 original instructions |
 
 The first four components have portable boundary tests, sanitizer checks and standalone
 EE fixtures executed successfully in Play: 121 progress boundary/rejection
@@ -139,6 +143,15 @@ preservation and late atomic rejection. The complete candidate pass passed
 768 EE authored-course cases, including 512 active and 256 missed-contact
 passes, a known-geometry result and six atomic rejections. Each fixture enforces its
 expected result fingerprint; execution uses Play 0.72 HLE, not physical hardware.
+Main-candidate preparation also passed 1,684 EE evaluations, including 1,641
+accepted inputs, and 75 separate atomic rejection checks. Its fingerprint is
+`d782474a4f893dc8`; the 43 unsupported probe evaluations are not successful
+original-program comparisons. The contact-slot EE fixture passed 2,876 cases,
+including 947 active updates, fingerprint `32ef92cd4f0d4583`, plus 316 atomic
+rejections and two known controls. Paired balance passed 2,154 EE cases,
+fingerprint `1fd698b609c8f960`, plus 24 atomic rejections; parameter selection
+passed 3,072 cases, fingerprint `cf0278eb2ab1a5a1`. These are standalone
+numerical fixtures in Play 0.72 HLE, not physical-console or gameplay tests.
 The original-program comparisons run on the host against the
 owner's verified Revision B image; the reference interpreter and memory
 adapters are not part of the native executable. The components are compiled
@@ -166,7 +179,7 @@ runtime. The full main callback and driving loop remain unconnected, and no
 native frame-rate claim follows from these numerical fixtures.
 
 The separate [driving observer](../platform/ps2/tools/driving_capture.md) now
-records those routes using the existing cabinet replay. Capture 011 passes all
+records those routes using the existing cabinet replay. Capture 012 passes all
 2,850 enabled/disabled frame checkpoints. It records 1,202 complete alternate
 calls and 34 detailed groups, plus 601 complete main-object cabinet-filter calls
 with 32 detailed pairs. Callback records and matching published steering values
@@ -179,6 +192,20 @@ responses. It includes all 36 cross operations in the observed window,
 aggregate updates. Native result interpretation matches all 104 sampled main
 replies and 34 alternate replies, including 13 edge and 125 plane results.
 No miss occurred in those samples; miss behavior is covered synthetically.
+Capture 012 additionally records 468 main-vehicle events across 26 complete
+sampled callbacks, with candidate-preparation boundaries, 104 contact-slot pairs,
+26 paired-balance regions and 26 parameter selections. The previous streams are
+byte-identical to Capture 011. All 26 candidate-preparation states match the
+native and original CPU/geometry operations; the combined comparison executes
+1,294,632 CPU and 690,733 geometry instructions. All 26 live prefixes have a
+zero pending delta and preserve the existing marker; clamp and active-consumption
+branches are covered by synthetic original comparisons. All sampled pair
+reductions and record copies
+match the native functions and isolated original execution; sampled selection
+uses only index 2. All 104 slot calls also match, including four vertical-only
+inputs that require the original interpolation expression at zero rounded XZ
+squared length. Tiny nonzero XZ inputs whose squares underflow to zero are
+covered by additional synthetic controls.
 This is bounded host-reference evidence, not independent arcade-board fidelity
 or a full-course proof. The native PS2 application still does not connect these
 components into driving gameplay.
@@ -223,14 +250,18 @@ GS geometry with depth testing. Left/Right step the orbit; L1/R1 change distance
 Both vector units are inactive for its solid triangles. Recovered game systems,
 original textures, collision, driving and game audio remain unconnected.
 
-The latest source-bound `native-016` build reproduces the executed `native-011`
+The latest source-bound `native-020` build reproduces the executed `native-011`
 ELF byte for byte (SHA-256
 `2338119372579ee7012ec95fcd43f5210d8382cb112d6f4dbce9d3fc8f050158`).
 The 10.212-second Play 0.72 HLE/Vulkan run visibly rendered the private six-object
 car mesh, with flat study shading and a diagnostic caption. All 1,040 triangles
-were submitted and guest stderr was empty. The 50-file dependency audit and
-forbidden-runtime symbol check pass; load segments occupy 593,080 bytes before
-dynamic allocation. Earlier native-008 runs also checked the no-asset bootstrap.
+were submitted and guest stderr was empty. The current 78-file dependency audit,
+dependency-direction checks and forbidden-runtime symbol check pass. The ELF
+has 2,274,240 file bytes; load segments occupy 593,080 bytes before dynamic
+allocation. Its shared 21-file engine source identity is unchanged. The current
+integration proof is `build/ps2-native-020/integration-validation.json`; it does
+not imply a new gameplay execution. Earlier native-008 runs also checked the
+no-asset bootstrap.
 The recovered game components have separate EE fixture evidence;
 they remain unused and are discarded from this diagnostic ELF by the linker.
 
@@ -240,6 +271,7 @@ textured draw ordering, the diagnostic page and depth clearing on return.
 This validates those sampled regions in Play, not original-game image fidelity
 or physical PS2 behavior. The visible car is a static study: the emulator's
 frame-rate overlay is not a native gameplay or console performance measurement.
-Private records remain under `build/ps2-native-016/` and
+Private integration records remain under `build/ps2-native-020/`; earlier
+execution records remain under their original directories and
 `build/ps2-native-depth-wrapper-004/`. Controller interaction, speaker output
 and physical hardware still need separate validation.

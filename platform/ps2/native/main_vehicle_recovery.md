@@ -49,10 +49,11 @@ Private `callback-validation.json` binds these checks to the validated capture.
 | `0x39a90` called at `0x34f8c` | Recovered [cabinet steering filter](cabinet_steering_filter.md); result stored at object `+0x74` |
 | `0x33e90` called at `0x34fb0` | Conditional render-state consumer; full effect not recovered |
 | `0x2b0b0` called at `0x34fc4` | Segment-selection helper receiving position and signed-index storage |
-| `0x351a8..0x35218` | Separately rounded additions build candidate position and orientation triples for the [four-point contact pass](main_contact_pass_recovery.md) at `0x34380` |
+| `0x34ff0..0x35218` | Recovered [candidate preparation](main_candidate.md): pending-middle clamp, metric gate, conditional state update and candidate triples for the [four-point contact pass](main_contact_pass_recovery.md) |
 | `0x2abc0` / `0x2acc0` at `0x35704` / `0x35710` | Shared course-query preparation and result interpretation |
-| `0x37200` | Four explicit calls from the update; slot arithmetic and physical meaning still require recovery |
-| `0x37870`, `0x34ce0` | Further state/arithmetic dependencies; not replaced by generic force or drivetrain models |
+| `0x37200` | Recovered [main contact-slot update](main_contact_slot.md), called four times; bounded scalar/history/type/response behavior, with explicit private normalization coefficients |
+| `0x37870` | Recovered [parameter selection and paired balance](paired_balance.md) inside a larger helper; remaining filtering, geometry and state updates are unrecovered |
+| `0x34ce0` | Counter, feedback and event scheduling through return at `0x34e38`; calls `0x261b0` and BAL dependency `0x26e18` remain outside the native recovery |
 | `0x371b0`, `0x371c0`, `0x371d0` | Three calls to the recovered one-step angle fold, without the earlier integrator's final pi/8 clamps |
 | `0x34078` at `0x371dc` | Recovered [main-object pose publication](main_car_pose.md), including raw flags/index words and an external four-word state group |
 
@@ -66,7 +67,41 @@ value type without mutating either input. Original addresses belong only to
 its offline comparison adapter. This isolated recovery does not establish
 the complete main-callback behavior.
 
-The callback contains additional geometry commands, conditional state updates,
+The `0x34ce0` helper's code span is `[0x34ce0,0x34e3c)`, 348 bytes. Extending it
+to `0x34f40` includes following data, not additional helper instructions. Its
+three observed return instructions are at `0x34d0c`, `0x34d50` and `0x34e38`.
+It must not be described as a generic force or drivetrain calculation.
+
+The complete `0x37870` helper spans 3,588 bytes and has nine direct/BAL
+dependencies plus geometry FIFO operations. Both vector pointer arguments are
+in/out: the tail modifies the second and stores a geometry result through the
+first. The recovered pair reduction and raw record copy do not establish the
+whole helper's result or side effects.
+
+## Current comparison scope
+
+Capture 012 adds a separate main-vehicle stream while retaining all 2,850
+enabled/disabled frame checkpoints and the earlier capture streams unchanged.
+Its 26 complete sampled callbacks contain 104 contact-slot calls, 26 paired
+balance regions and 26 parameter selections. Saved caller frames bind each
+child to its enclosing callback even when the child's raw return register has
+changed after an interrupt. These snapshots validate isolated components;
+the native application does not execute the complete callback.
+
+The contact-slot comparison matches all 104 recorded calls, including 99 active
+and five inactive updates, plus 25,852 synthetic cases. Pair reduction matches
+all 26 recorded regions plus 101,130 synthetic cases. Parameter selection matches
+all 26 recorded copies plus 6,144 synthetic selections; every live sample chooses
+record 2, so other indices rely on synthetic coverage. The candidate-preparation
+original comparison accepts 16,315 of 17,044 synthetic evaluations and matches
+all 26 sampled live candidate states; the remaining
+729 exercise its explicit rejection of unsupported metric squared-subnormal
+inputs and are not original-execution successes. Every sampled candidate prefix
+has a zero pending delta, so live evidence covers the zero-metric branch; clamp
+and active-consumption behavior are covered synthetically. Runtime fixture and live-proof
+details are recorded in the [native rewrite guide](../../../docs/ps2-native-rewrite.md).
+
+The callback still contains additional geometry commands, conditional state updates,
 transcendental operations and mixed binary32/binary64 arithmetic. Units, axis
 meanings, exceptional behavior and full caller domains remain unproven. A full
 typed update requires those dependencies and comparisons across actual control
