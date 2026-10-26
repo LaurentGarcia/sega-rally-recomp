@@ -163,6 +163,22 @@ All 120 source-input hashes and capture-file hashes matched when the report was
 sealed. These counts establish observed execution and sampling, while the
 separate native/original consumers establish each bounded numerical comparison.
 
+Capture 011 adds the paired response inputs and the fixed local-point block.
+It passes all 2,850 enabled/disabled checkpoints with all nineteen replay events
+in 125.712 seconds including compilation. All 120 source-input identities and
+capture-file hashes matched at completion. It records 601 complete main passes,
+2,404 complete response pairs and 104 detailed response pairs across the same
+26 sampled passes (1,098 main events). The six older streams and main cadence
+are byte-identical to 010; prior numerical-operation counts are unchanged.
+Combined streams occupy 8,719,816 bytes under the same 16 MiB cap.
+
+Its private report is `build/ps2/driving-capture-011/validation.json`, SHA-256
+`b2c5d4b0f8655e306bf7f05dfba1ca088e788a00a6efcaf0f9d1e4710e4f5359`.
+The main stream SHA-256 is
+`a6dc646caf1569f4bb71a5bddfb89d9f6a92cd069a271abba6610de8fbb71600`.
+This preserves all four responses per sampled pass, including inactive ones;
+the added snapshots alone do not certify a composed native pass.
+
 ## Contact result
 
 The events are `contact_pre` at ROM `0x2acc0`, `contact_reply` at `0x2adac`,
@@ -220,6 +236,12 @@ entry `g2`, and the actual saved caller return. The return must resume ROM
 `0x3521c` with the original caller frame. Ownership still depends on the separate
 main-callback analysis, rather than the stream's name alone.
 
+Entry and prequery additionally retain `local_contact_points`, twelve words at
+ordinary relocated RAM `0x5d2e30`. These bind the four original local triples to
+the candidate inputs and transformed outputs. There is no additional matrix
+or geometry-device read; the intermediate matrix is internal to the reference
+geometry program and requires its own offline arithmetic comparison.
+
 `main_prequery` at ROM `0x346d8` follows all four point stores. From that boundary
 onwards the snapshots include twelve-word `transformed_offsets`, `query_points`
 and `response_vectors` blocks at main `fp+0x70`, `fp+0x40` and `fp+0xa0`.
@@ -235,8 +257,15 @@ Each of the four queries has `query_pre/count/post` events with `query_index`;
 each adapter invocation has `contact_pre/reply/post` with `contact_index` and
 the same raw 17-word reply reconstruction described above. The observer checks
 the actual pipelined order: query zero, adapter zero, query one, response zero,
-and so on. `response_post` occurs at ROM `0x34a30`, before the loop index is
-incremented. Query returns must be ROM `0x346dc` or `0x34728`; adapter returns
+and so on. `response_pre` occurs at ROM `0x3472c`, immediately after the
+game loads the current status byte. This avoids duplicating the next-query
+return event at `0x34728`; it also covers the final contact, which issues no
+next query. The record binds the current result slot, contact/index offsets,
+scratch pointers, already-read status in `g4`, previous selected scalar in
+`r12`, parent frame and saved caller. `response_post` occurs at ROM `0x34a30`,
+before the loop index is incremented, and retains the resulting response array,
+mask and selected scalar. Every contact, including inactive responses, requires
+this ordered pair. Query returns must be ROM `0x346dc` or `0x34728`; adapter returns
 must be `0x34710`, all in the saved main frame. Every event carries a
 `parent_return_frame`; helper events additionally bind their own saved caller
 proof in `return_frame`. Child `r2` is diagnostic only.
@@ -289,6 +318,10 @@ New marker families `main_metric_*`, `main_step_*` and
 `sampled_pairs`. `main_aggregate_*` contains `entries`, `completions` and
 `samples`. Counts include all bounded passes; detailed records include only the
 explicitly sampled passes. Completion totals must match before sealing.
+The later `main_response_*` family likewise records `entries`, `completions`
+and `sampled_pairs` for the complete per-contact response. Historical captures
+through 010 precede these response-input records and cannot establish their
+paired-input contract.
 
 ## Limits and tests
 
@@ -326,3 +359,9 @@ cached and spilled parent frames, skipped aggregate/normalization paths and
 step output, an unpaired aggregate update or a changed saved parent cannot
 produce a completion marker. The actual observer also passes focused
 AddressSanitizer/UndefinedBehaviorSanitizer runs on valid and rejected sequences.
+Response-input tests additionally check all four slot/pointer/index mappings,
+the already-read status byte, the prior/result scalar, cached and spilled
+caller proofs, and ten missing/duplicated/mismatched-input cases. Event counts
+remain strictly increasing even at the next-query return. Missing response
+inputs and changed caller proofs fail without a completion marker. All 17
+observer tests pass; eight focused response sequences also pass sanitizer runs.

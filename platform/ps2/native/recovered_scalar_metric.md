@@ -155,11 +155,14 @@ are within the declared domain, with no subnormal input words. This is a
 measured replay window, not every driving mode or physical-hardware fidelity.
 
 The combined source-bound report is
-`build/ps2-native-scalar-metric-live-001/result.json`: 156,680 evaluations,
+`build/ps2-native-scalar-metric-live-002/result.json`: 156,680 evaluations,
 156,635 distinct inputs, 146,772 accepted results, 148,447 original commands
 and 6,997,470 instructions, fingerprint `0b7c806697edb751`. Measured ranges are
-recorded beside it in `domain.json`. The validated main-contact stream hash is
-`c9fd5cfa9b1dcf704edad9f1f32288535ddd80849369b7c261272da85ab9ad29`.
+recorded in `build/ps2-native-scalar-metric-live-001/domain.json`. The final
+report refreshes source binding against capture 011, which again matched all
+2,850 checkpoints and retained the same 36 scalar operations. Its validated
+main-contact stream hash is
+`a6dc646caf1569f4bb71a5bddfb89d9f6a92cd069a271abba6610de8fbb71600`.
 EE execution and its source binding are recorded separately in
 `build/ps2-native-scalar-metric-ee-001/runtime-validation.json`.
 

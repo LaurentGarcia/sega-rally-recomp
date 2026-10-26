@@ -1,10 +1,13 @@
 # Main candidate contact pass
 
 This dependency study follows the governing design's **Platform layer & build**
-native rewrite exception. Individual typed dependencies now have separate
-implementations and proofs linked below; the complete pass is not recovered
-or connected to gameplay. Original
-instructions, local point data and private inspection output stay under
+native rewrite exception. Bounded typed implementations now cover point
+preparation, course search, result interpretation, per-contact response and
+response aggregation. Their [native composition](candidate_contact_pass.md)
+matches all 26 captured passes, including all 104 interpreted contacts and
+nine active response aggregates. The main callback and driving loop remain
+unconnected. Original instructions, local
+point data and private inspection output stay under
 `build/ps2-native-player-research-001/`.
 
 ## Identity and caller
@@ -54,49 +57,69 @@ The query-preparation helper also changes its existing staging cursor and
 geometry command state. The full side-effect contract therefore includes those
 callees; the table above must not be mistaken for an exhaustive bus trace.
 The normal calling convention supplies a zero-valued scratch register used
-throughout the routine. A future typed implementation should express zeros and
-external values directly, rather than expose registers or mapped addresses.
+throughout the routine. The native implementation expresses zeros and external values directly;
+processor registers, mapped addresses and query staging are excluded from its
+runtime contract.
 
 ## Work performed and unresolved dependencies
 
-The pass installs the four local triples in geometry state, prepares the
-orientation transform, transforms each indexed triple and retrieves it. It adds
-the resulting offset to candidate position using separate binary32 additions,
-producing four query points. It restores the surrounding matrix state before
-course queries. The explicit matrix/point arithmetic is now recovered by
-[rounded affine transformation](rounded_affine_transform.md), including its
-translation-first operation order. Matrix construction, surrounding state and
-table-dependent rotation rounding still need their own differential proof.
+The pass installs four local triples, constructs an orientation matrix, transforms
+each point and adds candidate position using separate binary32 additions. The
+recovered [point preparation](contact_point_preparation.md) now covers this
+entire arithmetic boundary, reusing the separately proven
+[rounded affine transform](rounded_affine_transform.md). It applies the middle,
+first and third orientation components in their observed order and preserves
+every product and sum, including identity zero operations.
+
+The actual float-angle commands use firmware-initialized polynomial constants.
+They do **not** use an external trigonometric table; the earlier table-dependent
+rotation description was incorrect for this interface. The separate raw-angle
+commands use a different path. The bounded original-command comparison executes
+startup, push/identity/rotations, all indexed point transforms and pop with a
+null external table pointer. It verifies restoration of a varied prior matrix
+and matches all 26 captured preparation outputs. This proves neither a physical
+axis naming convention nor ordinary-library sine/cosine equivalence.
 
 The first `0x2abc0` query is issued at ROM `0x346d8`. The loop retrieves the
 current point's interpreted reply through `0x2acc0` at `0x3470c`, and issues the
 next point's preparation at `0x34724` until all four are handled. Each uses the
 same descriptor selector, signed segment index and result slot zero. The
-recovered [native search](collision_query_recovery.md) supplies the raw selected
-polygon value. The bounded [contact-result adapter](contact_result.md) now
-recovers the `0x2acc0` interpretation, including its immutable-table normal
-calculation. Its final native/original/live comparison matches all five output
-words for 104 sampled main replies and 34 alternate replies. These components
-remain disconnected from the native application; they do not implement the
-following per-contact response or complete main pass.
+recovered [native search](collision_query_recovery.md) supplies the selected
+polygon. The bounded [contact-result adapter](contact_result.md) interprets it,
+including its immutable-table normal calculation and retained stale payload
+when status alone changes. Its original/native/live comparison matches all five
+output words for 104 sampled main replies and 34 alternate replies.
 
-For replies whose interpreted bit 7 is clear, the local response triple is
-zeroed. The other path performs cross-style vector arithmetic, normalization,
-further square roots, divisions and mixed binary32/binary64 expressions using
-the reply direction/scalar and object parameters. The isolated
-[normalization and fallback](contact_normalization.md) now has a typed native
-implementation and matches all 13 sampled calls. Construction of its input
-vector and the subsequent state-dependent scalar gain remain separate work.
+The [per-contact response](contact_response.md) now joins the two cross products,
+[normalization and fallback](contact_normalization.md), rounded dot/root,
+parameter-dependent gain, response vector and selected-scalar comparison.
+Inactive replies produce positive-zero response components. The active domain
+is explicit and bounded; units and a general suspension interpretation remain
+unproven. Its isolated original CPU comparison matches all 104 captured
+responses, including 13 active responses, and rejects unsupported cases
+atomically. No generic force model substitutes for this recovered arithmetic.
 
-The aggregate path runs only when the selected response scalar is nonzero.
-Its [signed accumulation and final update](contact_aggregate.md) are now
-recovered as bounded typed operations. They match all 36 captured scalar steps
-and nine final updates, including enabled and disabled feedback. Their input
-scalar comes from the separately recovered
-[geometry metric](recovered_scalar_metric.md), which matches its 36 captured
-results. The earlier gate, full per-contact response composition and complete
-native-pass integration remain unimplemented. These component proofs do not
-extend the bounded polygon-search proof to the whole collision system.
+The [post-query response composition](contact_pass_response.md) evaluates the
+four contacts in order, builds the contact mask and applies the selected-scalar
+gate. On the active path it combines the separately rounded
+[cross product](rounded_cross_product.md), [scalar metric](recovered_scalar_metric.md)
+and [signed accumulation/final update](contact_aggregate.md). It matches all 26
+captured post-query passes, including nine active aggregates, with all 13 output
+words preserved or updated as observed. Its original harness starts with
+interpreted contacts and excludes the earlier query/adapter calls explicitly.
+
+The complete typed [candidate contact pass](candidate_contact_pass.md) now joins
+point preparation, four searches and interpretations, and the response pass.
+Authored course fixtures cover active contacts, misses and atomic rejection.
+The final comparison supplies private original course and normal assets, then
+executes only typed native components: it links no original CPU, geometry
+processor or machine runtime. All 26 captured passes match all 104 interpreted
+contacts, 312 transformed-offset words and 858 final state/contact words,
+including nine active aggregate passes. Its fingerprint is `2e948c3490a06a63`,
+recorded in `build/ps2-native-candidate-contact-live-001/result.json`. This
+composition remains disconnected from the main callback and native driving
+loop. Its bounded sample does not establish every course or the full collision
+system.
 
 Useful review boundaries, which are regions rather than standalone functions:
 
@@ -133,8 +156,8 @@ component during accumulation. `rounded_cross_product(a,b,out)` exposes typed
 values without the unusual FIFO input ordering. Its documented finite domain,
 zero signs, alias/rejection policy, original-firmware differential and
 standalone EE execution are established separately. Its output now feeds the
-independently recovered scalar and accumulation contracts, but these operations
-are not yet composed into the native game.
+scalar and accumulation contracts in the typed response-pass composition. That
+value operation is still unconnected from the native application loop.
 
 By contrast, substituting a generic host square root or a generic physics
 response for the larger pass would skip known dependencies. The separate
@@ -144,16 +167,22 @@ query points after ROM `0x346d4`, the four interpreted result slots, response
 vectors, feedback and the object fields above. Actual saved caller-frame proofs
 pair entries/returns through interrupts without additional device/FIFO reads.
 
-Private capture 010 passed all 2,850 enabled/disabled reference checkpoints.
+Private capture 011 passed all 2,850 enabled/disabled reference checkpoints.
 It observed 601 complete main passes on object `0x500000`, each with four
-query/adapter calls; 26 passes received detailed snapshots. All 36 aggregate
+query/adapter/response calls; 26 passes received detailed snapshots, producing
+1,098 main-stream events and 104 paired response samples. All 36 aggregate
 cross operations, 36 scalar operations, 36 accumulation steps, nine final
 updates and 13 normalization operations were captured. The aggregate work
-occurs across frames 2,571 through 2,579. That bounded
-window was chosen from capture 008's execution cadence, which had missed their
-operands between its existing sample checkpoints. The final evidence is
-`build/ps2/driving-capture-010/validation.json`, SHA-256
-`3565df75062bf756e90842e0bc5eb24b3ba54acb51c3fb064d75774cdaf16f73`.
-These raw inputs/outputs support separate typed-component comparisons. They
-do not establish a complete native contact-pass implementation, the full
-response arithmetic domain, or native driving.
+occurs across frames 2,571 through 2,579. That bounded window was selected from
+capture 008's execution cadence; capture 010 subsequently established the
+additional arithmetic boundaries, and 011 adds response inputs and local points.
+
+The final observer evidence is
+`build/ps2/driving-capture-011/validation.json`, SHA-256
+`b2c5d4b0f8655e306bf7f05dfba1ca088e788a00a6efcaf0f9d1e4710e4f5359`.
+The main stream SHA-256 is
+`a6dc646caf1569f4bb71a5bddfb89d9f6a92cd069a271abba6610de8fbb71600`.
+These records support the component and post-query comparisons linked above.
+The complete native candidate operation also matches that recorded sample as
+described above. Full main-callback recovery, driving integration, physical PS2
+validation and measured game performance remain separate work.

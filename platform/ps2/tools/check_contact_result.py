@@ -36,7 +36,7 @@ def ordinary(address, size):
 def main_envelopes(events, marker):
     """Require four ordered adapters inside every complete sampled main pass."""
     kinds = {"main_entry", "main_prequery", "query_pre", "query_count", "query_post",
-             "contact_pre", "contact_reply", "contact_post", "response_post",
+             "contact_pre", "contact_reply", "contact_post", "response_pre", "response_post",
              "cross_pre", "cross_post", "main_return", "normalization_pre", "normalization_post",
              "metric_post", "step_post", "aggregate_pre", "aggregate_post"}
     parent, seen, last = None, set(), -1
@@ -86,14 +86,18 @@ def main_envelopes(events, marker):
                 raise ValueError("Incorrect main prequery boundary")
             parent["prequery"] = True
             continue
-        if kind == "response_post":
+        if kind in ("response_pre", "response_post"):
             index = integer(event.get("contact_index"), 32)
             expected_phase = 0 if index == 3 else 3
             if index != parent["responses"] or index >= 4 or parent["contacts"] != index + 1 or \
                parent["queries"] != min(index + 2, 4) or parent["phase"] != expected_phase or \
-               pc != 0x5d3a30 or regs[31] != fp:
+               pc != (0x5d372c if kind == "response_pre" else 0x5d3a30) or regs[31] != fp:
                 raise ValueError("Incorrect pipelined main response boundary")
-            parent["responses"] += 1
+            if kind == "response_pre" and (regs[13] != obj or event.get("return_frame") != parent["proof"] or
+                saved_return(event) != (parent["pc"], parent["caller_fp"])):
+                raise ValueError("Response input differs from its saved parent")
+            if kind == "response_post":
+                parent["responses"] += 1
             continue
         extra_pcs = {"normalization_pre": 0x5d38ec, "normalization_post": 0x5d3968,
                      "metric_post": 0x5d3b5c, "step_post": 0x5d3b84,

@@ -98,6 +98,10 @@ that scene or a ROM-free hardware test.
 | [Contact-direction normalization](../platform/ps2/native/contact_normalization.md) | Separately rounded squared length, exact root/division and tiny-value fallback | 59,925 evaluations, including all 13 captured pairs; 1,416,524 original instructions |
 | [Recovered scalar metric](../platform/ps2/native/recovered_scalar_metric.md) | Explicit interleaved point mapping and the pinned firmware's rounded scalar approximation | 156,680 evaluations, including 146,772 accepted results and all 36 captured pairs |
 | [Contact aggregation](../platform/ps2/native/contact_aggregate.md) | Signed accumulation, active response updates and conditional integer feedback | 25,764 scalar steps and 18,409 state updates, including 36 live steps and nine live updates |
+| [Contact-point preparation](../platform/ps2/native/contact_point_preparation.md) | Recovered orientation polynomial, ordered matrix construction and four transformed/query points; no external trig table | 49,321 evaluations, including all 26 captured preparations; 46,700,153 original firmware instructions |
+| [Per-contact response](../platform/ps2/native/contact_response.md) | Two cross products, normalization, rounded scalar gain, response and selected scalar | 18,536 evaluations, 18,464 accepted results, including all 104 captured responses |
+| [Post-query response pass](../platform/ps2/native/contact_pass_response.md) | Four responses, mask and gate, cross/metric accumulation and atomic car-state update | 4,250 passes including all 26 captured passes; 2,128,380 CPU and 615,149 geometry instructions |
+| [Candidate contact pass](../platform/ps2/native/candidate_contact_pass.md) | Candidate pose and private course/normal/local-point assets through search and complete response | 26 captured passes, 104 contacts and nine active aggregates; 858 final state/contact words and 312 offset words match |
 
 The first four components have portable boundary tests, sanitizer checks and standalone
 EE fixtures executed successfully in Play: 121 progress boundary/rejection
@@ -127,14 +131,20 @@ and three interpolation guards using an original synthetic normal table.
 Contact-direction normalization passed 4,064 EE cases and 48 rejection checks.
 The scalar metric passed 11,972 EE evaluations, including 11,234 accepted
 results, six aliases and 96 rejection checks. Contact aggregation passed 2,240
-scalar steps, 912 updates and 33 rejection checks. Each fixture enforces its
+scalar steps, 912 updates and 33 rejection checks. Contact-point preparation
+passed 3,279 EE cases with three input aliases and 114 rejection checks.
+Per-contact response passed 1,200 cases, including 1,128 accepted inputs, plus
+33 rejection checks. The post-query pass passed 640 cases, inactive-state
+preservation and late atomic rejection. The complete candidate pass passed
+768 EE authored-course cases, including 512 active and 256 missed-contact
+passes, a known-geometry result and six atomic rejections. Each fixture enforces its
 expected result fingerprint; execution uses Play 0.72 HLE, not physical hardware.
 The original-program comparisons run on the host against the
 owner's verified Revision B image; the reference interpreter and memory
 adapters are not part of the native executable. The components are compiled
 by the native target but remain unconnected to its diagnostic loop and may
 be removed by linker garbage collection. Their bounded contracts do not
-establish complete car physics, coordinate conventions, collision response
+establish complete car physics, coordinate conventions, every collision path
 or a complete race system.
 The [car integration dependency map](../platform/ps2/native/car_integration_recovery.md)
 records the remaining data and arithmetic contracts and the alternate route
@@ -145,23 +155,28 @@ its smaller helpers match. The [main vehicle callback](../platform/ps2/native/ma
 is a third, separate path that consumes cabinet steering. That callback and its
 remaining geometry/force dependencies must be recovered to drive the main car.
 Its [four-point candidate-contact pass](../platform/ps2/native/main_contact_pass_recovery.md)
-has a bounded dependency study. Explicit point transformation, cross products
-and interpreted replies are recovered separately. Normalization, the scalar
-metric and final aggregate updates now also have typed native implementations.
-Matrix construction and the intervening per-contact force expressions still
-require recovery before this pass can be connected.
+now has a bounded native composition: exact orientation/point preparation,
+course search and reply interpretation, per-contact response, and final state
+aggregation. The preparation and response operations have separate original
+and captured proofs. The complete private-asset composition independently
+matches all 26 captured passes, including 104 interpreted contacts, 312 offset
+words and 858 final state/contact words. That comparison links only typed
+native components and private data, with no original processor or machine
+runtime. The full main callback and driving loop remain unconnected, and no
+native frame-rate claim follows from these numerical fixtures.
 
 The separate [driving observer](../platform/ps2/tools/driving_capture.md) now
-records those routes using the existing cabinet replay. Capture 010 passes all
+records those routes using the existing cabinet replay. Capture 011 passes all
 2,850 enabled/disabled frame checkpoints. It records 1,202 complete alternate
 calls and 34 detailed groups, plus 601 complete main-object cabinet-filter calls
 with 32 detailed pairs. Callback records and matching published steering values
 associate the cabinet input with object `0x500000`; the alternate calls belong
 to two different objects, each updating once per frame in the observed window.
 Its separate main-contact stream records 601 complete passes and 2,404 complete
-query/result pairs, with 26 detailed passes and all 36 cross operations in the
-observed window. It additionally samples all 13 normalization pairs, 36 scalar
-metric/accumulation pairs and nine active aggregate updates. Native result interpretation matches all 104 sampled main
+query/result pairs, with 26 detailed passes, 1,098 main events and all 104 paired per-contact
+responses. It includes all 36 cross operations in the observed window,
+13 normalization pairs, 36 scalar metric/accumulation pairs and nine active
+aggregate updates. Native result interpretation matches all 104 sampled main
 replies and 34 alternate replies, including 13 edge and 125 plane results.
 No miss occurred in those samples; miss behavior is covered synthetically.
 This is bounded host-reference evidence, not independent arcade-board fidelity

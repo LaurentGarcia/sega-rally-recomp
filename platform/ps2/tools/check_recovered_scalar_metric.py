@@ -36,7 +36,7 @@ def ordinary(address,size):
 
 def metric_rows(events,marker):
     kinds={"main_entry","main_prequery","query_pre","query_count","query_post","contact_pre","contact_reply",
-           "contact_post","response_post","normalization_pre","normalization_post","cross_pre","cross_post",
+           "contact_post","response_post","response_pre","normalization_pre","normalization_post","cross_pre","cross_post",
            "metric_post","step_post","aggregate_pre","aggregate_post","main_return"}
     parent=pending=None
     rows,pairs,seen=[],[],set()

@@ -97,5 +97,13 @@ jobs:
         run: python3 platform/ps2/build_ps2.py build --target core-probe --core-manifest platform/ps2/tests/recovered_scalar_metric_manifest.json --container-platform linux/amd64 --output build/ps2-recovered-scalar-metric-ci --jobs 2
       - name: Cross-link the native contact accumulation and state update fixture
         run: python3 platform/ps2/build_ps2.py build --target core-probe --core-manifest platform/ps2/tests/contact_aggregate_manifest.json --container-platform linux/amd64 --output build/ps2-contact-aggregate-ci --jobs 2
+      - name: Cross-link the native per-contact force fixture
+        run: python3 platform/ps2/build_ps2.py build --target core-probe --core-manifest platform/ps2/tests/contact_response_manifest.json --container-platform linux/amd64 --output build/ps2-contact-response-ci --jobs 2
+      - name: Cross-link the native response-pass fixture
+        run: python3 platform/ps2/build_ps2.py build --target core-probe --core-manifest platform/ps2/tests/contact_pass_response_manifest.json --container-platform linux/amd64 --output build/ps2-contact-pass-response-ci --jobs 2
+      - name: Cross-link the native contact-point preparation fixture
+        run: python3 platform/ps2/build_ps2.py build --target core-probe --core-manifest platform/ps2/tests/contact_point_preparation_manifest.json --container-platform linux/amd64 --output build/ps2-contact-point-preparation-ci --jobs 2
+      - name: Cross-link the native candidate-contact pass fixture
+        run: python3 platform/ps2/build_ps2.py build --target core-probe --core-manifest platform/ps2/tests/candidate_contact_pass_manifest.json --container-platform linux/amd64 --output build/ps2-candidate-contact-pass-ci --jobs 2
       # No ROMs, generated game core, signing secrets or artifact publication.
       # This job proves cross-linking; console execution is a separate test.

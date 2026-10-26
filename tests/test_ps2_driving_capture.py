@@ -218,7 +218,7 @@ class DrivingCaptureTests(unittest.TestCase):
                 crosses=0 if mode=="main-no-cross" else 4
                 self.assertEqual((marker["main_cross_pairs"],marker["main_sampled_cross_pairs"]),(crosses,crosses))
                 events=[json.loads(line) for line in (path/"main-contact.jsonl").read_text().splitlines()]
-                self.assertEqual(len(events),39+4*crosses+(2 if crosses else 0))
+                self.assertEqual(len(events),43+4*crosses+(2 if crosses else 0))
                 self.assertEqual(marker["main_events"],len(events))
                 self.assertEqual([events[0]["event"],events[1]["event"],events[-1]["event"]],
                                  ["main_entry","main_prequery","main_return"])
@@ -290,7 +290,7 @@ class DrivingCaptureTests(unittest.TestCase):
                 self.assertEqual(marker["main_cross_pairs"],4)
                 self.assertEqual(marker["main_sampled_cross_pairs"],4 if sampled else 0)
                 events=[json.loads(line) for line in (path/"main-contact.jsonl").read_text().splitlines()]
-                self.assertEqual(len(events),57 if sampled else 0)
+                self.assertEqual(len(events),61 if sampled else 0)
                 if sampled: self.assertTrue(all(event["frame"]==2571 for event in events))
 
     def test_main_metric_normalization_and_aggregate_snapshots_are_ordered_and_raw(self):
@@ -354,6 +354,48 @@ class DrivingCaptureTests(unittest.TestCase):
                        "metric-nonzero","metric-index","metric-frame","metric-parent","metric-no-post","metric-duplicate-post",
                        "step-index","step-object","step-no-post","step-duplicate-post",
                        "aggregate-frame","aggregate-no-pre","aggregate-duplicate-pre","aggregate-no-post","aggregate-duplicate-post"):
+            with self.subTest(suffix=suffix):
+                path,result=self.run_case("main-"+suffix)
+                self.assertNotEqual(result.returncode,0,result.stdout)
+                self.assertFalse((path/"capture.json").exists())
+                self.assertFalse((path/"main-contact.jsonl").exists())
+
+    def test_all_contact_responses_have_distinct_pre_and_post_records(self):
+        for mode in ("main-valid","main-spilled","main-no-normalization"):
+            with self.subTest(mode=mode):
+                path,result=self.run_case(mode,"force-"+mode)
+                self.assertEqual(result.returncode,0,result.stderr)
+                marker=json.loads((path/"capture.json").read_text())
+                self.assertEqual([marker["main_response"+suffix] for suffix in
+                                  ("_entries","_completions","_sampled_pairs")],[4,4,4])
+                events=[json.loads(line) for line in (path/"main-contact.jsonl").read_text().splitlines()]
+                instructions=[event["instructions"] for event in events]
+                self.assertEqual(instructions,sorted(set(instructions)))
+                for event in events[:2]:
+                    points=next(b for b in event["blocks"] if b["name"]=="local_contact_points")
+                    self.assertEqual(points["address"],0x5d2e30)
+                    self.assertEqual(points["words"],[(0x5d2e30+4*i)^0x12345678 for i in range(12)])
+                pres=[event for event in events if event["event"]=="response_pre"]
+                posts=[event for event in events if event["event"]=="response_post"]
+                for index,(pre,post) in enumerate(zip(pres,posts)):
+                    self.assertEqual((pre["contact_index"],post["contact_index"]),(index,index))
+                    self.assertEqual((pre["pc"],post["pc"]),(0x5d372c,0x5d3a30))
+                    self.assertEqual((pre["registers"][12],post["registers"][12]),(10000+index,11000+index))
+                    for reg,value in ((3,0x2138ec+36*index),(9,0x2138d0+36*index),(10,0x2138e8+36*index),
+                                      (5,index),(6,12*index),(15,36*index),(7,0x5004d0),(14,0x5004e0),(25,0x5004d8)):
+                        self.assertEqual(pre["registers"][reg],value)
+                    blocks={b["name"]:b for b in pre["blocks"]}
+                    self.assertEqual(pre["registers"][20],blocks["result_slots"]["words"][9*index+7]&255)
+                    self.assertEqual(len(blocks["response_vectors"]["words"]),12)
+                    self.assertEqual(pre["return_frame"],events[0]["return_frame"])
+                    self.assertLess(pre["instructions"],post["instructions"])
+                    before=events[events.index(pre)-1]
+                    self.assertEqual(before["event"],"query_post" if index<3 else "contact_post")
+
+    def test_unpaired_or_mismatched_response_inputs_cannot_seal_capture(self):
+        for suffix in ("response-pre-pointer","response-pre-offset","response-pre-frame",
+                       "response-pre-object","response-pre-status","response-pre-scratch",
+                       "response-pre-parent","response-no-pre","response-duplicate-pre","response-post-parent"):
             with self.subTest(suffix=suffix):
                 path,result=self.run_case("main-"+suffix)
                 self.assertNotEqual(result.returncode,0,result.stdout)

@@ -64,7 +64,11 @@ GAME_SOURCES = ("platform/ps2/native/race_progress.cpp", "platform/ps2/native/ca
                 "platform/ps2/native/contact_result.cpp",
                 "platform/ps2/native/contact_normalization.cpp",
                 "platform/ps2/native/recovered_scalar_metric.cpp",
-                "platform/ps2/native/contact_aggregate.cpp")
+                "platform/ps2/native/contact_aggregate.cpp",
+                "platform/ps2/native/contact_response.cpp",
+                "platform/ps2/native/contact_pass_response.cpp",
+                "platform/ps2/native/contact_point_preparation.cpp",
+                "platform/ps2/native/candidate_contact_pass.cpp")
 # Preserve the existing native-port object order while the demo omits study code.
 NATIVE_TOOLKIT_SOURCES = (*ENGINE_SOURCES[:3], *STUDY_SOURCES, *ENGINE_SOURCES[3:])
 NATIVE_SOURCES = ["platform/ps2/native/main.cpp", *GAME_SOURCES, *NATIVE_TOOLKIT_SOURCES]

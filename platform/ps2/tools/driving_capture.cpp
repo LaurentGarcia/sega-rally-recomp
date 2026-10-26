@@ -54,6 +54,7 @@ struct MainPass {
     unsigned metrics=0,steps=0,normalizations=0,aggregate_phase=0;
     bool detailed=false,prepared=false,query_count=false,cross_pending=false;
     bool metric_pending=false,step_pending=false,normalization_pending=false,normalization_seen=false;
+    bool response_pending=false;
 };
 struct Capture {
     std::filesystem::path path;
@@ -85,6 +86,7 @@ struct Capture {
     unsigned main_step_entries=0,main_step_completions=0,main_step_sampled_pairs=0;
     unsigned main_aggregate_entries=0,main_aggregate_completions=0,main_aggregate_samples=0;
     unsigned main_normalization_entries=0,main_normalization_completions=0,main_normalization_sampled_pairs=0;
+    unsigned main_response_entries=0,main_response_completions=0,main_response_sampled_pairs=0;
     std::uint64_t main_selected_frame=~std::uint64_t{};
     // Original and relocated forms of the bounded car-code analysis region.
     std::array<std::uint64_t, 2*0x8000> code_counts{};
@@ -215,7 +217,8 @@ void main_snapshot(Capture &capture,const rt::Cpu &cpu,const char *event,
     out << ",\"parent_return_frame\":";return_frame(out,main.returning);
     if (kind.starts_with("query_")) out << ",\"query_index\":" << main.queries-1;
     if (kind.starts_with("contact_")) out << ",\"contact_index\":" << main.contacts-1;
-    if (kind=="response_post" || kind.starts_with("normalization_")) out << ",\"contact_index\":" << main.responses;
+    if (kind=="response_pre" || kind=="response_post" || kind.starts_with("normalization_"))
+        out << ",\"contact_index\":" << main.responses;
     if (kind.starts_with("cross_")) out << ",\"cross_index\":" << main.crosses;
     if (kind=="cross_post" || kind=="metric_post") out << ",\"metric_index\":" << main.metrics;
     if (kind=="metric_post" || kind=="step_post") out << ",\"step_index\":" << main.steps;
@@ -239,6 +242,8 @@ void main_snapshot(Capture &capture,const rt::Cpu &cpu,const char *event,
     block("result_slots",0x2138d0,36);
     block("feedback",0x213960,3);
     block("feedback_enable",0x2142c8,1);
+    if (kind=="main_entry" || kind=="main_prequery")
+        block("local_contact_points",0x5d2e30,12);
     if (main.prepared) {
         block("transformed_offsets",main.frame_pointer+0x70,12);
         block("query_points",main.frame_pointer+0x40,12);
@@ -308,7 +313,7 @@ void observe_main(Capture &capture,const rt::Cpu &cpu,std::uint64_t instructions
         if (cpu.m_r[31]!=main.returning.frame_pointer || !main.prepared || main.query_return.pc ||
             main.contact.return_pc || main.cross_pending || main.queries!=4 || main.query_completions!=4 ||
             main.contacts!=4 || main.contact_completions!=4 || main.responses!=4 || (main.crosses!=0 && main.crosses!=4) ||
-            main.metric_pending || main.step_pending || main.normalization_pending ||
+            main.metric_pending || main.step_pending || main.normalization_pending || main.response_pending ||
             main.metrics!=main.crosses || main.steps!=main.crosses || main.aggregate_phase!=(main.crosses ? 2u : 0u))
             throw std::runtime_error("main contact return has incomplete or mismatched boundaries");
         main_snapshot(capture,cpu,"main_return",instructions,frame,ns);
@@ -353,16 +358,42 @@ void observe_main(Capture &capture,const rt::Cpu &cpu,std::uint64_t instructions
         if (!main.contact.return_pc || main.contact.reply_seen || cpu.m_r[31]!=main.contact.frame_pointer)
             throw std::runtime_error("main contact reply frame or sequence mismatch");
         main.contact.reply_seen=true;main_snapshot(capture,cpu,"contact_reply",instructions,frame,ns);break;
+    case 0x3472c: {
+        const auto index=main.responses;
+        if (!main.prepared || main.response_pending || index>=4 ||
+            main.contact.return_pc || main.query_return.pc || main.contact_completions!=index+1 ||
+            main.query_completions!=(index<3 ? index+2 : 4) ||
+            cpu.m_r[31]!=main.frame_pointer || cpu.m_r[13]!=main.object ||
+            cpu.m_r[3]!=0x2138ecu+36*index || cpu.m_r[9]!=0x2138d0u+36*index ||
+            cpu.m_r[10]!=0x2138e8u+36*index || cpu.m_r[5]!=index ||
+            cpu.m_r[6]!=12*index || cpu.m_r[15]!=36*index ||
+            cpu.m_r[7]!=main.frame_pointer+0xd0 || cpu.m_r[14]!=main.frame_pointer+0xe0 ||
+            cpu.m_r[25]!=main.frame_pointer+0xd8 || cpu.m_r[30]!=0 || cpu.m_r[20]>255)
+            throw std::runtime_error("main response input frame, pointer or sequence mismatch");
+        const auto returning=caller_return(cpu);
+        if (returning.pc!=main.returning.pc || returning.frame_pointer!=main.returning.frame_pointer)
+            throw std::runtime_error("main response input saved parent mismatch");
+        main_snapshot(capture,cpu,"response_pre",instructions,frame,ns);
+        main.response_pending=true;++capture.main_response_entries;
+        break;
+    }
     case 0x34a30:
         if (cpu.m_r[31]!=main.frame_pointer || cpu.m_r[13]!=main.object || main.responses>=4 ||
-            cpu.m_r[5]!=main.responses || main.contact_completions!=main.responses+1 || main.normalization_pending)
+            cpu.m_r[5]!=main.responses || main.contact_completions!=main.responses+1 ||
+            !main.response_pending || main.normalization_pending)
             throw std::runtime_error("main response frame or sequence mismatch");
+        if (const auto returning=caller_return(cpu); returning.pc!=main.returning.pc ||
+            returning.frame_pointer!=main.returning.frame_pointer)
+            throw std::runtime_error("main response output saved parent mismatch");
         main_snapshot(capture,cpu,"response_post",instructions,frame,ns);
-        ++main.responses;main.normalization_seen=false;break;
+        main.response_pending=false;++main.responses;main.normalization_seen=false;
+        ++capture.main_response_completions;
+        if (main.detailed) ++capture.main_response_sampled_pairs;
+        break;
     case 0x348ec:
     case 0x34968:
         if (cpu.m_r[31]!=main.frame_pointer || cpu.m_r[13]!=main.object || main.responses>=4 ||
-            cpu.m_r[5]!=main.responses || main.contact_completions!=main.responses+1 ||
+            cpu.m_r[5]!=main.responses || main.contact_completions!=main.responses+1 || !main.response_pending ||
             cpu.m_r[7]!=main.frame_pointer+0xd0 || cpu.m_r[25]!=main.frame_pointer+0xd8 ||
             (pc==0x348ec ? main.normalization_seen : !main.normalization_pending))
             throw std::runtime_error("main normalization frame, pointer or sequence mismatch");
@@ -748,7 +779,8 @@ void end_driving_capture() {
         capture.main_metric_entries!=capture.main_metric_completions ||
         capture.main_step_entries!=capture.main_step_completions ||
         capture.main_aggregate_entries!=capture.main_aggregate_completions ||
-        capture.main_normalization_entries!=capture.main_normalization_completions)
+        capture.main_normalization_entries!=capture.main_normalization_completions ||
+        capture.main_response_entries!=capture.main_response_completions)
         throw std::runtime_error("driving capture has no complete bounded caller evidence");
     capture.events.close();capture.cadence.close();capture.selectors.close();capture.callbacks.close();capture.steering.close();
     capture.steering_filters.close();
@@ -791,6 +823,9 @@ void end_driving_capture() {
         << ",\"main_normalization_entries\":" << capture.main_normalization_entries
         << ",\"main_normalization_completions\":" << capture.main_normalization_completions
         << ",\"main_normalization_sampled_pairs\":" << capture.main_normalization_sampled_pairs
+        << ",\"main_response_entries\":" << capture.main_response_entries
+        << ",\"main_response_completions\":" << capture.main_response_completions
+        << ",\"main_response_sampled_pairs\":" << capture.main_response_sampled_pairs
         << ",\"events\":" << capture.events_count << ",\"bytes\":" << capture.bytes
         << ",\"sampling\":\"up to four calls at each selected input/60-frame checkpoint; maximum128 detailed calls\"}\n";
     summary.close();if (!summary) throw std::runtime_error("cannot finish driving capture marker");

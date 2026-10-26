@@ -119,6 +119,17 @@ class RecoveredScalarMetricTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 CHECKER.metric_rows(events,bad)
 
+    def test_response_boundary_is_allowed_only_outside_metric_pair(self):
+        events,marker=capture()
+        extra=copy.deepcopy(events[1]);extra["event"]="response_pre";extra["pc"]=0x5d372c
+        for offset,accepted in ((1,True),(2,False)):
+            extended=copy.deepcopy(events[:offset])+[extra]+copy.deepcopy(events[offset:])
+            for i,event in enumerate(extended):event["instructions"]=10*(i+1)
+            counts=dict(marker);counts["main_events"]=len(extended)
+            if accepted:self.assertEqual(len(CHECKER.metric_rows(extended,counts)[0]),4)
+            else:
+                with self.assertRaises(ValueError):CHECKER.metric_rows(extended,counts)
+
     def test_capture_files_must_match_successful_observer_validation(self):
         events,marker=capture()
         with tempfile.TemporaryDirectory(prefix="metric-capture-",dir=ROOT/"build") as directory:

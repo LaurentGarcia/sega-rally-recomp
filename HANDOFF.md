@@ -1,5 +1,108 @@
 # Handoff
 
+## Native four-point candidate contact pass (2026-10-25)
+
+The preceding 7ec4e8b checkpoint is published with all five workflows green.
+This batch composes orientation construction, four course searches, interpreted
+contacts, per-contact force and final response aggregation as native game-value
+operations. It follows the governing design's Platform layer & build exception;
+no arcade CPU, generated game instructions, mapped bus or device runtime enters
+the native PS2 target. The complete main vehicle callback and driving loop are
+still unconnected. This is a recovery checkpoint, not a playable PS2 release.
+
+The complete candidate pass matches all 26 captured original calls, 104 contact
+results and nine active aggregate updates. Every pass compares all 12 transformed
+offset words and 33 final state/contact words: 312 offsets and 858 final words
+in total, fingerprint 2e948c3490a06a63. The comparison decodes the owner's verified
+course/normal/local-point assets, starts from the original candidate pose and
+prior contacts, and computes searches itself. Captured interpreted contacts are
+expected outputs, not supplied native inputs. The checker links no original CPU
+or generated firmware. Its final source-bound report is
+build/ps2-native-candidate-contact-live-001/result.json. The recorded replay
+window is not full-course coverage or independent PCB certification.
+
+The component proofs remain separately scoped. Contact-point preparation uses
+the actual float-angle polynomial, not an external sine table. It matches 49,295
+synthetic evaluations / 49,287 unique inputs and 46,675,549 firmware instructions,
+fingerprint f05d0d03253121d8. With all 26 live preparations: 49,321 evaluations /
+49,313 unique / 46,700,153 instructions / a0a0b262f4a83792. Matrix restoration,
+zero/subnormal rounding, three alias modes and 114 rejections are checked.
+The final report is build/ps2-native-contact-point-live-001/result.json.
+The earlier assumption that these rotations needed external table ports was
+wrong: commands 2a/29/2b use initialized polynomial helpers 1e6/1e8; raw-angle
+commands 32/33/34 belong to a different interface. Null-table original execution
+and explicit rejection of external accesses establish that distinction.
+
+Per-contact force preserves both rounded crosses, normalization, separately
+rounded dot/square-root/products, mixed-precision gain and maximum scalar
+selection. Equal scalars select the new gap. The native contract accepts bounded
+finite operands and a nonnegative rounded dot; it does not claim the original
+raw-pointer alias path. Synthetic evaluation covers 18,432 cases, of which
+18,360 are accepted original comparisons and 72 are explicit negative-dot native
+rejections. All 104 live pairs match, 13 active and 91 inactive. Combined:
+18,536 evaluations / 18,464 accepted / 2,003,904 CPU instructions, fingerprint
+b7152b8cdc529ab3. Evidence: build/ps2-native-contact-response-live-001/result.json.
+
+The post-query composition oracle executes the original response/aggregate
+control flow but deliberately bypasses only the checked query/adapter calls.
+Its supplied contacts are that narrower API's inputs. All 4,224 synthetic and
+26 live passes match, including the 13 output state words, with 2,128,380 CPU
+instructions and 615,149 geometry instructions, fingerprint 6b4f4fd1f1c199bf.
+Evidence: build/ps2-native-contact-pass-response-live-002/result.json. The full
+candidate comparison above separately closes preparation/search/interpretation.
+
+Capture 011 adds response_pre after the program's own status-byte read, avoiding
+a duplicate instruction event at the query-return boundary. It also observes the
+12 owner-supplied local-point words at entry/prequery. Saved parent, index/frame,
+slot/scratch pointers and complete paired response counts are checked, without
+extra FIFO/device reads. All 2,850 enabled/disabled checkpoints match. All six
+older streams and main cadence remain byte-identical to 010. It observes 601
+complete main passes and 2,404 response pairs; 26 passes / 1,098 events / 104
+response pairs receive detailed snapshots. Validation SHA256 is
+b2c5d4b0f8655e306bf7f05dfba1ca088e788a00a6efcaf0f9d1e4710e4f5359;
+main stream SHA256 is
+a6dc646caf1569f4bb71a5bddfb89d9f6a92cd069a271abba6610de8fbb71600.
+Shared readers preserve older-capture compatibility. Fresh cross/metric proofs
+against 011 are rounded-cross-live-004 and scalar-metric-live-002; both retain
+their prior fingerprints and all 36 live matches.
+The changed shared result reader also has a fresh proof against 011:
+build/ps2-native-contact-result-live-004/result.json passes all 138 live replies
+and retains fingerprint c898451d51b72992.
+
+All four new EE fixtures execute in Play 0.72 HLE with exact completion markers,
+empty guest stderr and current source/build/ELF/log bindings in their runtime
+validation reports. Force: 1,200 cases / 1,128 accepted / cd1b0a7946e70d88 and
+33 rejection checks. Point preparation: 3,279 / ef519d24a3f602fa, three aliases
+and 114 rejections. Post-query response: 640 / 3a490cc705f0b6f2 plus inactive
+preservation and late atomic rejection. Complete candidate pass: 768 cases /
+512 active / 256 misses / b8ed3cad65bf6be4, a hand-calculated geometry case and
+six atomic rejection paths. Review strengthened its fixture with a successful
+fourth-contact control followed by an invalid fourth divisor, proving rollback
+of the first three new slots as well as the car state. Final candidate EE
+report is build/ps2-native-candidate-contact-ee-003/runtime-validation.json;
+the other three are their corresponding ee-001/runtime-validation.json reports.
+Host and ASan/UBSan checks pass. Observation windows near 20 seconds are not
+execution timings. All final window-image attempts failed; numerical guest logs
+provide the evidence. No physical-console or gameplay-performance claim follows.
+
+Native 019 passes the fixed 70-file source boundary, dependency directions and
+forbidden-symbol audit. All recorded sources match the compiled inputs. The
+static diagnostic ELF remains 2338119372579ee7012ec95fcd43f5210d8382cb112d6f4dbce9d3fc8f050158,
+2,274,240 file bytes / 593,080 resident bytes: the unconnected helpers are removed
+by the linker. The unchanged 21-file shared engine identity is
+8bfba3e1904f90f61cec9230f3ea3f2a66013a37a6a7257d8dbe9055be1094e2.
+CI cross-links all four new fixtures. Independent arithmetic, observer, parser,
+source-dependency and composition reviews found no remaining blocker.
+The final portable PS2 suite passes all 202 tests in 37.194 seconds; log:
+build/ps2/validation/candidate-contact-tests-001.log. Exact staged-tree and
+source-archive gates are required before publication of this checkpoint.
+
+Next in order: recover the surrounding main vehicle callback and candidate
+integration, validate paired whole-car updates, then connect a continuous native
+driving loop. Only that loop can establish meaningful EE/VU/GS bottlenecks and
+native gameplay frame rates. Original textured rendering, full course behavior,
+game audio integration and physical PS2 validation remain separate work.
+
 ## Native contact normalization, scalar metric and aggregate updates (2026-10-25)
 
 The preceding b844fe4 checkpoint is published with all five workflows green:

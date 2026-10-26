@@ -119,7 +119,7 @@ class RoundedCrossProductTests(unittest.TestCase):
     def test_later_arithmetic_events_are_allowed_only_outside_cross_pairs(self):
         events,marker=capture()
         for kind in ("normalization_pre","normalization_post","metric_post","step_post",
-                     "aggregate_pre","aggregate_post"):
+                     "aggregate_pre","aggregate_post","response_pre"):
             extra=copy.deepcopy(events[2]);extra["event"]=kind
             extended=copy.deepcopy(events[:3])+[extra]+copy.deepcopy(events[3:])
             for i,event in enumerate(extended):

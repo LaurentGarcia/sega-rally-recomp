@@ -123,13 +123,13 @@ subnormal, so subnormal coverage remains synthetic.
 
 The combined comparison has 110,084 evaluations, 110,068 distinct inputs and
 2,642,016 original instructions, fingerprint `61cedd9373797928`. Its source-bound
-report is `build/ps2-native-rounded-cross-live-003/result.json`, refreshed against
-capture 010 and its additional arithmetic events. Capture 010 also passed all
+report is `build/ps2-native-rounded-cross-live-004/result.json`, refreshed against
+capture 011 and its additional response boundary. Capture 011 also passed all
 2,850 observer-parity checkpoints and retained the same 36 cross results.
 Measured caller domains remain recorded in
 `build/ps2-native-rounded-cross-live-001/domain.json`. The validated main-contact
 stream SHA-256 is
-`c9fd5cfa9b1dcf704edad9f1f32288535ddd80849369b7c261272da85ab9ad29`.
+`a6dc646caf1569f4bb71a5bddfb89d9f6a92cd069a271abba6610de8fbb71600`.
 This covers the observed replay window, not every mode or complete response
 path. The full native contact pass remains disconnected from gameplay.
 

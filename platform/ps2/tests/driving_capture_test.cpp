@@ -119,6 +119,19 @@ int main(int argc,char **argv) {
                 cpu.m_r[0]=0x500200;saved_return(0x500200,relocation+0x3521c,mode=="main-spilled");
                 if (i<3) query(i+1); // Original pipelined query order.
                 cpu.m_r[5]=i;cpu.m_r[13]=object;
+                cpu.m_r[3]=0x2138ec+36*i;cpu.m_r[9]=0x2138d0+36*i;cpu.m_r[10]=0x2138e8+36*i;
+                cpu.m_r[6]=12*i;cpu.m_r[15]=36*i;
+                cpu.m_r[7]=main_fp+0xd0;cpu.m_r[14]=main_fp+0xe0;cpu.m_r[25]=main_fp+0xd8;
+                cpu.m_r[20]=(4007+100*i)&255;cpu.m_r[12]=10000+i;
+                if (mode=="main-response-pre-pointer") cpu.m_r[9]+=4;
+                if (mode=="main-response-pre-offset") cpu.m_r[6]+=12;
+                if (mode=="main-response-pre-frame") cpu.m_r[31]+=64;
+                if (mode=="main-response-pre-object") cpu.m_r[13]+=256;
+                if (mode=="main-response-pre-status") cpu.m_r[20]=256;
+                if (mode=="main-response-pre-scratch") cpu.m_r[30]=1;
+                if (mode=="main-response-pre-parent") cpu.m_rcache[0][2]+=4;
+                if (mode!="main-response-no-pre") observe(0x3472c);
+                if (mode=="main-response-duplicate-pre") observe(0x3472c);
                 if (mode!="main-no-normalization") {
                     cpu.m_r[7]=main_fp+0xd0;cpu.m_r[25]=main_fp+0xd8;
                     if (mode=="main-normalization-pointer") cpu.m_r[25]+=4;
@@ -133,6 +146,8 @@ int main(int argc,char **argv) {
                     if (mode=="main-normalization-repeat") { observe(0x348ec);observe(0x34968); }
                 }
                 if (mode=="main-response-index") cpu.m_r[5]=4;
+                cpu.m_r[12]=11000+i;
+                if (mode=="main-response-post-parent") cpu.m_rcache[0][2]+=4;
                 if (mode!="main-response-missing") observe(0x34a30);
             }
             if (mode!="main-no-cross") for (unsigned i=0;i<4;++i) {
