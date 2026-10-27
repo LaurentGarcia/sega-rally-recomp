@@ -43,6 +43,8 @@ PadSnapshot PadInput::poll() {
     PadSnapshot out;
     if (!opened_) return out;
     const int state = padGetState(0, 0);
+    sdk_state_ = state;
+    sdk_request_state_ = padGetReqState(0, 0);
     if (state != PAD_STATE_STABLE && state != PAD_STATE_FINDCTP1) {
         if (state == PAD_STATE_DISCONN) requested_analog_ = analog_pending_ = false;
         status_ = analog_pending_ && state == PAD_STATE_EXECCMD ?
@@ -51,6 +53,7 @@ PadSnapshot PadInput::poll() {
     }
     if (analog_pending_) {
         const int request = padGetReqState(0, 0);
+        sdk_request_state_ = request;
         if (request == PAD_RSTAT_BUSY) {
             status_ = "WAITING FOR ANALOG MODE";
             return out;

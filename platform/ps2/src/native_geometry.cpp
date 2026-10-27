@@ -90,8 +90,10 @@ bool repair_roundoff(WideVertex &p) {
     }
     return true;
 }
-bool project(WideVertex p, Vertex &v) {
-    if (!repair_roundoff(p)) return false;
+bool project(WideVertex p, Vertex &v, bool original_inside) {
+    // Unclipped binary32 inputs already passed all seven exact plane tests.
+    // Only interpolated vertices need the binary64 roundoff repair pass.
+    if (!original_inside && !repair_roundoff(p)) return false;
     v = {float((p.x / p.w + 1) * (frame_width / 2.0)),
          float((1 - p.y / p.w) * (frame_height / 2.0)),
          float(p.u), float(p.v), float(1 / p.w), float(1 - p.z / p.w)};
@@ -159,7 +161,7 @@ ClipResult clip_project_triangle(const ClipTriangle &input, std::span<Triangle> 
     if (count < 3) return {};
     std::array<Vertex, clip_polygon_capacity> projected{};
     for (std::size_t i = 0; i < count; ++i)
-        if (!project((*from)[i], projected[i])) return {ClipStatus::numerical_failure, 0, 0};
+        if (!project((*from)[i], projected[i], any_outside == 0)) return {ClipStatus::numerical_failure, 0, 0};
     std::array<Triangle, clip_triangle_capacity> staged{};
     std::size_t triangles = 0;
     for (std::size_t i = 1; i + 1 < count; ++i) {

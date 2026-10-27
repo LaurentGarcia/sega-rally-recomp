@@ -43,6 +43,18 @@ struct RallyBodyScene::Storage {
 };
 RallyBodyScene::RallyBodyScene() noexcept=default;
 RallyBodyScene::~RallyBodyScene()=default;
+void RallyBodyScene::set_profile_clock(WorldSceneClock clock,void* context) noexcept {
+    clock_=clock;clock_context_=context;
+    if(storage_)storage_->scene->set_profile_clock(clock,context);
+}
+void RallyBodyScene::set_transform_provider(WorldSceneTransformBatch batch,void* context) noexcept {
+    transform_batch_=batch;transform_context_=context;
+    if(storage_)storage_->scene->set_transform_provider(batch,context);
+}
+void RallyBodyScene::set_numeric_mode(WorldNumericMode mode) noexcept {
+    numeric_mode_=mode;
+    if(storage_)storage_->scene->set_numeric_mode(mode);
+}
 
 bool RallyBodyScene::decode(std::span<const std::uint8_t> bytes,const WorldMatrix& bridge,
                             RallyBodyError& error) noexcept {
@@ -77,6 +89,9 @@ bool RallyBodyScene::decode(std::span<const std::uint8_t> bytes,const WorldMatri
         // and reject an overflowing frame rather than dropping geometry.
         if(!next->scene->configure(faces,std::min<std::size_t>(16384,std::size_t(faces)*8),engine_error))
             return failure(error,RallyBodyError::allocation_failed);
+        next->scene->set_profile_clock(clock_,clock_context_);
+        next->scene->set_transform_provider(transform_batch_,transform_context_);
+        next->scene->set_numeric_mode(numeric_mode_);
         storage_.swap(next);error=RallyBodyError::none;return true;
     }catch(const std::bad_alloc&){return failure(error,RallyBodyError::allocation_failed);}
      catch(const std::length_error&){return failure(error,RallyBodyError::capacity);}
@@ -137,6 +152,9 @@ bool RallyBodyScene::attach_course(std::span<const ContactSegment> course,RallyB
         const auto total_faces=storage_->faces.size()+faces.size();
         if(!scene->configure(total_faces,std::min<std::size_t>(16384,total_faces*8),engine_error))
             return failure(error,RallyBodyError::allocation_failed);
+        scene->set_profile_clock(clock_,clock_context_);
+        scene->set_transform_provider(transform_batch_,transform_context_);
+        scene->set_numeric_mode(numeric_mode_);
         storage_->course_vertices.swap(vertices);storage_->course_faces.swap(faces);
         storage_->course_groups.swap(groups);
         storage_->scene.swap(scene);error=RallyBodyError::none;return true;
@@ -152,6 +170,11 @@ bool RallyBodyScene::update(const RallyBodyPose& pose,const WorldView& view,Rall
     car[12]=pose.position.x;car[13]=pose.position.y;car[14]=pose.position.z;car[15]=1;
     WorldMatrix combined{};
     for(unsigned column=0;column<4;++column)for(unsigned row=0;row<4;++row){
+        if(numeric_mode_==WorldNumericMode::native_float){
+            float value=0;
+            for(unsigned k=0;k<4;++k)value+=car[k*4+row]*storage_->bridge[column*4+k];
+            combined[column*4+row]=value;continue;
+        }
         double value=0;
         for(unsigned k=0;k<4;++k)value+=double(car[k*4+row])*storage_->bridge[column*4+k];
         combined[column*4+row]=float(value);

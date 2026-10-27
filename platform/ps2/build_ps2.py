@@ -47,9 +47,12 @@ ENGINE_SOURCES = (
     "platform/ps2/src/native_display.cpp",
     "platform/ps2/src/native_frame.cpp",
     "platform/ps2/src/native_geometry.cpp",
+    "platform/ps2/src/native_geometry_float.cpp",
     "platform/ps2/src/pad_input.cpp", "platform/ps2/src/storage.cpp",
     "platform/ps2/src/audio_output.cpp", "platform/ps2/src/vu0_pack.cpp",
     "platform/ps2/src/world_scene.cpp",
+    "platform/ps2/src/vu1_transform.cpp", "platform/ps2/src/vu1_transform_math.cpp",
+    "platform/ps2/src/vu1_transform.vsm",
 )
 STUDY_SOURCES = ("platform/ps2/src/native_mesh.cpp", "platform/ps2/src/native_scene.cpp")
 GAME_SOURCES = ("platform/ps2/native/race_progress.cpp", "platform/ps2/native/car_pose.cpp",
@@ -96,8 +99,8 @@ NATIVE_SOURCES = ["platform/ps2/native/main.cpp", *GAME_SOURCES, *NATIVE_TOOLKIT
 ENGINE_DEMO_SOURCES = ["platform/ps2/samples/engine_demo/main.cpp", *ENGINE_SOURCES]
 ENGINE_HEADERS = {
     "audio_output.h", "pcm_protocol.h", "pcm_resampler.h", "pcm_ring.h",
-    "native_display.h", "native_geometry.h", "world_scene.h",
-    "pad_input.h", "pad_state.h", "debug_controls.h", "storage.h", "vu0_pack.h", "diagnostic_font.h",
+    "native_display.h", "native_geometry.h", "native_geometry_float.h", "world_scene.h",
+    "pad_input.h", "pad_state.h", "debug_controls.h", "storage.h", "vu0_pack.h", "vu1_transform.h", "diagnostic_font.h",
 }
 STUDY_HEADERS = {"native_mesh.h", "native_scene.h"}
 NATIVE_TOOLKIT_HEADERS = ENGINE_HEADERS | STUDY_HEADERS
@@ -158,22 +161,41 @@ def project_headers(sources: list[Path], includes: list[Path], *,
     Conditional includes that do not exist in this checkout are left for the
     compiler to resolve; inactive platform branches need not be installed.
     """
-    pending = list(sources)
+    pending = [(source, [source.parent, *includes] if source.suffix == ".vsm" else None) for source in sources]
     visited, headers = set(), set()
     pattern = re.compile(r'^\s*#\s*include\s*(["<])([^">\n]+)[">]', re.MULTILINE)
     while pending:
-        declared = pending.pop()
+        declared, assembly_roots = pending.pop()
+        assembly = assembly_roots is not None
         path = native_source_path(declared) if reject_redirected else declared.resolve()
-        if path in visited:
+        identity = (path, tuple(assembly_roots) if assembly else None)
+        if identity in visited:
             continue
-        visited.add(path)
-        for opening, name in pattern.findall(path.read_text()):
-            roots = [path.parent, *includes] if opening == '"' else includes
+        visited.add(identity)
+        text = path.read_text()
+        if assembly:
+            # DVP uses assembler includes, not the C preprocessor. Resolve all
+            # textual inputs explicitly; never hide binary payloads in objects.
+            text = re.sub(r'/\*.*?\*/', '', text, flags=re.DOTALL)
+            text = re.sub(r'[;#].*', '', text)
+            directives = re.findall(r'(?im)^\s*(?:[\w.$]+:\s*)?\.(include|incbin)\b([^\n]*)', text)
+            references = []
+            for directive, argument in directives:
+                match = re.fullmatch(r'\s*"([^"\\\n]+)"\s*', argument)
+                if directive.lower() != "include" or not match:
+                    raise ValueError("DVP assembly forbids binary or opaque includes: " + relative(path))
+                references.append(('"', match.group(1)))
+        else:
+            references = pattern.findall(text)
+        for opening, name in references:
+            roots = assembly_roots if assembly else ([path.parent, *includes] if opening == '"' else includes)
             candidate = next((root / name for root in roots if (root / name).is_file()), None)
+            if candidate is None and assembly:
+                raise ValueError("Missing DVP assembly include: " + name)
             if candidate is not None:
                 candidate = native_source_path(candidate) if reject_redirected else candidate.resolve()
                 headers.add(candidate)
-                pending.append(candidate)
+                pending.append((candidate, assembly_roots))
     return sorted(headers - {path.resolve() for path in sources})
 
 
@@ -351,6 +373,9 @@ class Runner:
     def tool(self, name: str) -> str:
         return self.ps2dev + "/ee/bin/" + PREFIX + name
 
+    def dvp_tool(self, name: str) -> str:
+        return self.ps2dev + "/dvp/bin/dvp-" + name
+
     def run(self, command: list[str], name: str, container: bool = True) -> str:
         actual = command
         if self.args.backend == "docker" and container:
@@ -444,6 +469,9 @@ def build(args: argparse.Namespace, report: dict) -> None:
     for source in sources:
         if not source.is_file():
             raise ValueError("Missing build source: " + str(source))
+    if any(source.suffix == ".vsm" for source in sources):
+        report["toolchain"]["dvp_assembler_version"] = runner.run(
+            [runner.dvp_tool("as"), "--version"], "dvp-assembler-version").strip()
     (args.output / "obj").mkdir(exist_ok=True)
     # A frontend header edit must not rebuild every generated i960 chunk.
     dependencies = {source: project_headers([source], includes) for source in sources}
@@ -469,28 +497,47 @@ def build(args: argparse.Namespace, report: dict) -> None:
     common += ["-D" + value for value in spec["defines"]] + spec["compile_flags"]
     common += ["-fno-fast-math", "-ffp-contract=off"]
     common_signature = hashlib.sha256(json.dumps(
-        {"toolchain": report["toolchain"], "flags": common},
+        {"toolchain": {key: value for key, value in report["toolchain"].items()
+                       if key != "dvp_assembler_version"}, "flags": common},
         sort_keys=True).encode()).hexdigest()
 
     def compile_source(source: Path) -> Path:
         name = source.stem + "-" + hashlib.sha256(relative(source).encode()).hexdigest()[:12]
-        signature = compilation_key(source, dependencies[source], fingerprints, common_signature)
         obj = args.output / "obj" / (name + ".o")
         stamp = obj.with_suffix(".json")
+        assembly = source.suffix == ".vsm"
+        listing = obj.with_suffix(".lst")
+        assembly_flags = ["-I" + runner.path(p) for p in [source.parent, *includes]]
+        context = hashlib.sha256(json.dumps({"toolchain": report["toolchain"],
+                    "assembler": runner.dvp_tool("as"), "flags": assembly_flags,
+                    "driver_sha256": digest(Path(__file__))}, sort_keys=True).encode()).hexdigest() if assembly else common_signature
+        signature = compilation_key(source, dependencies[source], fingerprints, context)
         if obj.exists() and stamp.exists():
             cached = json.loads(stamp.read_text())
-            if cached.get("signature") == signature and cached.get("sha256") == digest(obj):
+            listing_valid = not assembly or (listing.is_file() and cached.get("listing_sha256") == digest(listing))
+            if cached.get("signature") == signature and cached.get("sha256") == digest(obj) and listing_valid:
                 return obj
-        cpp = source.suffix not in (".c", ".S", ".s")
-        standard = ["-std=c++20"] if cpp else (["-std=gnu11"] if source.suffix == ".c" else [])
-        runner.run([runner.tool("g++" if cpp else "gcc"), *standard, *common,
-                    "-c", runner.path(source), "-o", runner.path(obj)], "compile-" + name)
-        write_json(stamp, {"schema": 2, "signature": signature, "sha256": digest(obj)})
+        if assembly:
+            runner.run([runner.dvp_tool("as"), *assembly_flags, "-al=" + runner.path(listing),
+                        runner.path(source), "-o", runner.path(obj)], "assemble-" + name)
+        else:
+            cpp = source.suffix not in (".c", ".S", ".s")
+            standard = ["-std=c++20"] if cpp else (["-std=gnu11"] if source.suffix == ".c" else [])
+            runner.run([runner.tool("g++" if cpp else "gcc"), *standard, *common,
+                        "-c", runner.path(source), "-o", runner.path(obj)], "compile-" + name)
+        metadata = {"schema": 3, "signature": signature, "sha256": digest(obj),
+                    "kind": "dvp_assembly" if assembly else "ee_compilation"}
+        if assembly:
+            metadata["listing_sha256"] = digest(listing)
+        write_json(stamp, metadata)
         return obj
 
     try:
         with ThreadPoolExecutor(max_workers=args.jobs) as pool:
             objects = list(pool.map(compile_source, sources))
+        report["dvp_objects"] = {relative(source): {"object": relative(obj), "sha256": digest(obj),
+            "listing": relative(obj.with_suffix(".lst")), "listing_sha256": digest(obj.with_suffix(".lst"))}
+            for source, obj in zip(sources, objects) if source.suffix == ".vsm"}
         modules = spec.get("iop_modules", ["sio2man", "padman"] if spec["embed_iop_modules"] else [])
         pcm_module = build_pcm_module(runner) if spec.get("pcm_transport") else None
         if modules:

@@ -100,16 +100,35 @@ race initializer. Each subsequent input comes from the pad; no recorded motion,
 forces or contact results are supplied.
 
 The integrated EE driver advances the car under neutral controls in Play.
-Equivalent initial samples measured approximately **12.5 ms for the native
-update** and **375.7 ms for geometry preparation** after renderer fixes, down
-from 1,331.2 ms for geometry in the first run. The measured combined update and
-presentation cost is about 396.8 ms per update (roughly 2.5 updates/second).
+The production renderer uses binary32 geometry and both vector units. The
+equivalent initial samples measured approximately **12.5 ms for the native
+update**, **27.6 ms for geometry preparation** and **52.1 ms combined
+update/presentation**, about 19 updates/sec. Geometry is 13.6 times faster than
+the preceding native 026 build's 375.7 ms. The intervening exact-cache path
+measured 224.3 ms; its arithmetic remains available for comparison.
 These are emulator timer observations, not physical-console performance or a
 full-race benchmark. Display refresh shown by the emulator is not game speed.
 
-Conservative course-section rejection, exact clipping classification and fewer
-bounds conversions reduce the geometry cost by about 3.5 times. Transform and
-clipping work still runs on the EE; broad VU offload is not implemented here.
+Conservative course-section rejection, exact clipping classification, shared
+vertex reuse and fewer bounds conversions reduce that geometry cost. The
+[VU1 path](../platform/ps2/vu1_transform.md) now processes bounded model/view
+transform batches, while VU0 performs final GS coordinate packing. The normal
+path uses float bounds, clipping and projection on EE, with no binary64 guard
+or clipped-triangle restoration. A separate guarded comparison mode restores
+exact coordinates before clipping. The initial guarded integration was slower
+than the exact reference because per-vertex numerical guards cost about 49 ms;
+preparing those guards helped, but removing reference arithmetic from normal
+rendering produced the larger gain. The recovered game calculations are
+unchanged. Transfers and vector-unit work are still serialized.
+
+Complete-frame replay of actual VU output covers all 601 recorded poses and
+1,364,846 transformed vertices. Against the binary64 reference, the independent
+host raster differs at 305 of 114,468,864 color pixels, at most four per frame,
+with 14 coverage differences. Triangle topology differs in 173 frames; native
+presentation is not bit-identical. This comparison uses host clipping and
+rasterization, not GS readback or physical-console validation. Detailed evidence
+and numerical limits are in the [world-scene contract](../platform/ps2/native/world_scene.md).
+
 A separate GS correction sends each solid triangle corner's own depth rather
 than using a 2D helper's single depth. All 1,536 readback samples pass in the
 extended constant/sloped depth fixture, and the diagnostic body is visible
@@ -138,10 +157,19 @@ explicit loader command also accepts `--drive CHECKPOINT COURSE BODY`; each
 path must use `host:` or `mass:`. Without a developer checkpoint it retains
 the existing static-study/bootstrap selection.
 
+The driver requests native float/VU1 rendering by default. Use `--drive-ee` with
+the same three paths for the exact scalar comparison, or `--drive-guarded` for
+guarded VU transforms with reference clipping. VU startup failure keeps the
+selected scalar mode, and transport retirement is logged before disabling offload.
+The application establishes DMA master enable before initializing the display.
+
 Cross accelerates, Square brakes, and the left stick or directional buttons
 steer. L1/R1 select gears only when the checkpoint enables manual selection.
 Start restores the initial checkpoint; Select+Start toggles the debug page.
-The page and serial log separate update, geometry and presentation timing.
+Triangle cycles native float/VU1, exact EE and guarded VU1 presentation. The page and serial log
+separate update, geometry and presentation timing; counters distinguish
+submitted/accepted VU batches, corners actually drawn, clipping fallbacks and
+VU0-packed vertices. No simultaneous VU0/VU1 execution is claimed.
 Game sound requests are generated but playback is not yet connected in this
 mode. These controls are implementation mappings; physical pad validation is
 still required.
@@ -305,14 +333,16 @@ The geometry tail matches both output triples and the published index; three
 samples take its negative first-longitudinal branch. These additions preserve
 the earlier 26-callback population and do not expand it into a full race proof.
 This is bounded host-reference evidence, not independent arcade-board fidelity
-or a full-course proof. The native PS2 application still does not connect these
-components into driving gameplay.
+or a full-course proof. The complete main-player update and its application
+integration are described above; full race flow remains unfinished.
 
 The [hardware study](ps2-architecture-study.md) records the complete local
 manual collection, specific constraints and the executed VU1 experiments.
 The [native clipping reference](ps2-native-geometry.md) provides bounded
 homogeneous clipping and ordered triangle output. Its selected EE checks
-pass, but it uses software-double arithmetic with unmeasured console cost.
+pass; it uses software-double arithmetic and remains an explicit diagnostic.
+The production float clipper has separate coverage, depth and clipping
+comparisons, including complete scenes from all 601 recorded vehicle poses.
 The optional [static geometry study](ps2-native-scene.md) connects it to native
 mesh transforms and GS submission. That diagnostic camera does not establish
 recovered game projection or connect the recovered race components.

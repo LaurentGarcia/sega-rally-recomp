@@ -14,6 +14,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest import mock
 
@@ -104,6 +105,101 @@ class ElfTargetTests(unittest.TestCase):
         for options in ({"entry": 0x100040}, {"entry": 0x0fffff}, {"flags": 6}):
             with self.subTest(options=options), self.assertRaises(ValueError):
                 self.inspect(executable(**options))
+
+
+class DvpAssemblyTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="ps2-dvp-build-")
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name).resolve()
+        self.output = self.root / "build/output"
+        self.source = self.root / "transform.vsm"
+        self.header = self.root / "layout.inc"
+        self.source.write_text('.include "layout.inc"\n.vu\nnop[e] nop\nnop nop\n')
+        self.header.write_text('.equ COUNT, 1\n')
+        self.cpp = self.root / "driver.cpp"
+        self.cpp.write_text('int main() { return 0; }\n')
+        self.args = SimpleNamespace(target="core-probe", output=self.output, jobs=1,
+                                    optimization="O2", backend="native", ps2dev=Path("/pinned/ps2dev"),
+                                    container_platform=None)
+        self.commands = []
+        self.version = "GNU assembler (DVP) 2.45.1"
+        owner = self
+        class FakeRunner(driver.Runner):
+            def identity(self):
+                return {"compiler_version": "test-EE", "compiler_target": "mips64r5900el-ps2-elf"}
+
+            def run(self, command, name, container=True):
+                owner.commands.append((name, command))
+                if name == "dvp-assembler-version":
+                    return owner.version
+                if name == "size":
+                    return "synthetic test ELF"
+                output = Path(command[command.index("-o") + 1])
+                if name == "link":
+                    output.write_bytes(executable())
+                else:
+                    output.write_bytes((name + owner.version).encode() + owner.header.read_bytes())
+                    for arg in command:
+                        if arg.startswith("-al="):
+                            Path(arg[4:]).write_text("original fixture listing\n")
+                return ""
+        self.patches = [mock.patch.object(driver, "ROOT", self.root),
+                        mock.patch.object(driver, "Runner", FakeRunner),
+                        mock.patch.object(driver, "build_spec", return_value={
+                            "sources": [str(self.source), str(self.cpp)], "includes": [],
+                            "defines": [], "compile_flags": [], "libraries": [], "embed_iop_modules": False})]
+        for patch in self.patches:
+            patch.start()
+            self.addCleanup(patch.stop)
+
+    def build(self):
+        report = {}
+        with contextlib.redirect_stdout(io.StringIO()):
+            driver.build(self.args, report)
+        return report
+
+    def test_dvp_tool_listing_and_transitive_input_are_bound(self):
+        report = self.build()
+        commands = [command for name, command in self.commands if name.startswith("assemble-")]
+        self.assertEqual(len(commands), 1)
+        self.assertEqual(commands[0][0], "/pinned/ps2dev/dvp/bin/dvp-as")
+        self.assertFalse(any(arg.startswith(("-std=", "-O", "-D", "-ff")) for arg in commands[0]))
+        self.assertEqual(report["toolchain"]["dvp_assembler_version"], self.version)
+        self.assertEqual(report["compile_dependencies"]["transform.vsm"], ["layout.inc"])
+        self.assertEqual(report["source_sha256"]["layout.inc"], driver.digest(self.header))
+        obj = report["dvp_objects"]["transform.vsm"]
+        self.assertEqual(obj["sha256"], driver.digest(self.root / obj["object"]))
+        self.assertEqual(obj["listing_sha256"], driver.digest(self.root / obj["listing"]))
+
+    def test_cache_invalidates_changed_include_assembler_or_listing_only(self):
+        report = self.build()
+        self.commands.clear()
+        self.build()
+        self.assertFalse(any(name.startswith(("compile-", "assemble-")) for name, _ in self.commands))
+        for mutation in (lambda: self.header.write_text('.equ COUNT, 2\n'),
+                         lambda: setattr(self, "version", "GNU assembler (DVP) changed"),
+                         lambda: (self.root / report["dvp_objects"]["transform.vsm"]["listing"]).write_text("tampered")):
+            self.commands.clear()
+            mutation()
+            self.build()
+            self.assertEqual(sum(name.startswith("assemble-") for name, _ in self.commands), 1)
+            self.assertFalse(any(name.startswith("compile-") for name, _ in self.commands))
+
+    def test_binary_opaque_and_missing_assembly_inputs_are_rejected(self):
+        for text in ('.incbin "private.bin"\n', 'label: .incbin "private.bin"\n',
+                     '.include INPUT\n', '.include "absent.inc"\n'):
+            self.source.write_text(text)
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                driver.project_headers([self.source], [])
+
+    def test_nested_assembler_inputs_use_the_same_search_path_as_as(self):
+        nested = self.root / "sub"
+        nested.mkdir()
+        (nested / "first.inc").write_text('.include "layout.inc"\n')
+        (nested / "layout.inc").write_text('unrelated file must not shadow assembler search path\n')
+        self.source.write_text('.include "sub/first.inc"\n')
+        self.assertEqual(driver.project_headers([self.source], []), [self.header, nested / "first.inc"])
 
 
 class CoreProvenanceTests(unittest.TestCase):

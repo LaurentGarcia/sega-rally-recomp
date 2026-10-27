@@ -32,8 +32,8 @@ struct ClipResult {
 // Allocation-free, synchronous reference clipping. All six input components
 // must be normal binary32 values or signed zero, with absolute value <= 65536.
 // NaNs, infinities and subnormals are rejected by their encodings before math.
-// Intersections/projecting use binary64 scratch arithmetic; its EE cost is
-// unmeasured. This is not an optimized VU kernel or a game-fidelity claim.
+// Intersections/projecting use binary64 scratch arithmetic, measured separately
+// by WorldScene's stage clock. This reference clipper does not execute on a VU.
 //
 // Plane order: positive w, left, right, bottom, top, near z, far z. Seven
 // half-planes can grow a convex triangle to at most ten vertices/eight fans.

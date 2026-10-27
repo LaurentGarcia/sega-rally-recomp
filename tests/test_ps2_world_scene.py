@@ -6,6 +6,49 @@ import tempfile
 import unittest
 ROOT=Path(__file__).resolve().parents[1]
 class WorldScene(unittest.TestCase):
+    def test_native_float_pipeline_and_outside_provider(self):
+        compiler=shutil.which("clang++") or shutil.which("g++")
+        if not compiler:self.skipTest("C++20 compiler unavailable")
+        with tempfile.TemporaryDirectory(prefix="world-float-") as directory:
+            executable=Path(directory)/"test"
+            command=[compiler,"-std=c++20","-O2","-fno-fast-math","-ffp-contract=off","-Wall","-Wextra","-Werror",
+                "-I",str(ROOT/"platform/ps2/include"),
+                str(ROOT/"platform/ps2/src/world_scene.cpp"),str(ROOT/"platform/ps2/src/native_geometry.cpp"),
+                str(ROOT/"platform/ps2/src/native_geometry_float.cpp"),
+                str(ROOT/"platform/ps2/tests/world_scene_float_test.cpp"),"-o",str(executable)]
+            subprocess.run(command,capture_output=True,text=True,check=True)
+            result=subprocess.run([str(executable)],capture_output=True,text=True,check=True)
+            self.assertIn("WORLD_FLOAT PASS",result.stdout)
+            self.assertIn("native_clipping=1 no_update_allocations=1",result.stdout)
+
+    def test_bounded_transform_provider_and_fallback(self):
+        compiler=shutil.which("clang++") or shutil.which("g++")
+        if not compiler:self.skipTest("C++20 compiler unavailable")
+        with tempfile.TemporaryDirectory(prefix="world-batch-") as directory:
+            executable=Path(directory)/"test"
+            command=[compiler,"-std=c++20","-O2","-fno-fast-math","-ffp-contract=off","-Wall","-Wextra","-Werror",
+                "-I",str(ROOT/"platform/ps2/include"),
+                str(ROOT/"platform/ps2/src/world_scene.cpp"),str(ROOT/"platform/ps2/src/native_geometry.cpp"),str(ROOT/"platform/ps2/src/native_geometry_float.cpp"),
+                str(ROOT/"platform/ps2/tests/world_scene_batch_test.cpp"),"-o",str(executable)]
+            subprocess.run(command,capture_output=True,text=True,check=True)
+            result=subprocess.run([str(executable)],capture_output=True,text=True,check=True)
+            self.assertIn("WORLD_BATCH PASS",result.stdout)
+            self.assertIn("bounded_batches=96 guarded_fallback=1 no_update_allocations=1",result.stdout)
+
+    def test_transformed_vertex_cache_and_profile(self):
+        compiler=shutil.which("clang++") or shutil.which("g++")
+        if not compiler:self.skipTest("C++20 compiler unavailable")
+        with tempfile.TemporaryDirectory(prefix="world-cache-") as directory:
+            executable=Path(directory)/"test"
+            command=[compiler,"-std=c++20","-O2","-fno-fast-math","-ffp-contract=off","-Wall","-Wextra","-Werror",
+                "-I",str(ROOT/"platform/ps2/include"),
+                str(ROOT/"platform/ps2/src/world_scene.cpp"),str(ROOT/"platform/ps2/src/native_geometry.cpp"),str(ROOT/"platform/ps2/src/native_geometry_float.cpp"),
+                str(ROOT/"platform/ps2/tests/world_scene_cache_test.cpp"),"-o",str(executable)]
+            subprocess.run(command,capture_output=True,text=True,check=True)
+            result=subprocess.run([str(executable)],capture_output=True,text=True,check=True)
+            self.assertIn("WORLD_CACHE PASS",result.stdout)
+            self.assertIn("mutation_and_collision=1 no_update_allocations=1",result.stdout)
+
     def test_group_culling_matches_ordinary_path(self):
         compiler=shutil.which("clang++") or shutil.which("g++")
         if not compiler:self.skipTest("C++20 compiler unavailable")
@@ -13,7 +56,7 @@ class WorldScene(unittest.TestCase):
             executable=Path(directory)/"test"
             command=[compiler,"-std=c++20","-O2","-fno-fast-math","-ffp-contract=off","-Wall","-Wextra","-Werror",
                 "-I",str(ROOT/"platform/ps2/include"),
-                str(ROOT/"platform/ps2/src/world_scene.cpp"),str(ROOT/"platform/ps2/src/native_geometry.cpp"),
+                str(ROOT/"platform/ps2/src/world_scene.cpp"),str(ROOT/"platform/ps2/src/native_geometry.cpp"),str(ROOT/"platform/ps2/src/native_geometry_float.cpp"),
                 str(ROOT/"platform/ps2/tests/world_scene_groups_test.cpp"),"-o",str(executable)]
             subprocess.run(command,capture_output=True,text=True,check=True)
             result=subprocess.run([str(executable)],capture_output=True,text=True,check=True)
@@ -27,7 +70,7 @@ class WorldScene(unittest.TestCase):
             executable=Path(directory)/"test"
             command=[compiler,"-std=c++20","-O2","-fno-fast-math","-ffp-contract=off","-Wall","-Wextra","-Werror",
                 "-I",str(ROOT/"platform/ps2/include"),
-                str(ROOT/"platform/ps2/src/world_scene.cpp"),str(ROOT/"platform/ps2/src/native_geometry.cpp"),
+                str(ROOT/"platform/ps2/src/world_scene.cpp"),str(ROOT/"platform/ps2/src/native_geometry.cpp"),str(ROOT/"platform/ps2/src/native_geometry_float.cpp"),
                 str(ROOT/"platform/ps2/tests/world_scene_test.cpp"),"-o",str(executable)]
             subprocess.run(command,capture_output=True,text=True,check=True)
             result=subprocess.run([str(executable)],capture_output=True,text=True,check=True)

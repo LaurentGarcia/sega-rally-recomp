@@ -50,6 +50,7 @@ struct Stats {
     std::uint32_t triangles = 0, texture_uploads = 0, texture_hits = 0;
     std::uint32_t palette_uploads = 0, palette_hits = 0;
     std::uint64_t texture_bytes = 0, palette_bytes = 0;
+    std::uint32_t vu0_vertices = 0; // Final XY conversion, excludes padded lanes.
 };
 enum class ReadbackStatus {
     ok, not_ready, invalid_rectangle, busy, unsupported_configuration,

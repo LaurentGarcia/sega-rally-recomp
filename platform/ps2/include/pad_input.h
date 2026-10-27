@@ -17,9 +17,13 @@ public:
     bool initialize(bool reset_iop = true);
     PadSnapshot poll();
     const char *status() const { return status_; }
+    // Last observed SDK states, not an independent connection verdict.
+    int sdk_state() const { return sdk_state_; }
+    int sdk_request_state() const { return sdk_request_state_; }
 private:
     bool opened_ = false, requested_analog_ = false, analog_pending_ = false;
     const char *status_ = "NOT INITIALIZED";
+    int sdk_state_ = -1, sdk_request_state_ = -1;
     alignas(64) unsigned char buffer_[256]{};
 };
 } // namespace ps2

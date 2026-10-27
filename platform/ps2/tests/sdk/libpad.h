@@ -3,7 +3,7 @@
 // Minimal host-only surface for the fields and calls used by pad_input.cpp.
 // This does not emulate libpad, its binary ABI, or controller hardware.
 enum {
-    PAD_STATE_DISCONN = 0, PAD_STATE_FINDCTP1 = 2, PAD_STATE_EXECCMD = 5, PAD_STATE_STABLE = 6,
+    PAD_STATE_DISCONN = 0, PAD_STATE_FINDCTP1 = 2, PAD_STATE_EXECCMD = 5, PAD_STATE_STABLE = 6, PAD_STATE_ERROR = 7,
     PAD_MODETABLE = 4, PAD_TYPE_DIGITAL = 4, PAD_TYPE_ANALOG = 5,
     PAD_TYPE_DUALSHOCK = 7, PAD_MMODE_DUALSHOCK = 1, PAD_MMODE_LOCK = 3,
     PAD_RSTAT_COMPLETE = 0, PAD_RSTAT_FAILED = 1, PAD_RSTAT_BUSY = 2,

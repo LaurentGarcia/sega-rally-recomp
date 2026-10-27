@@ -41,11 +41,20 @@ public:
     // orientation basis, then the fixed bridge and caller-owned camera.
     // Failure retains the previous frame. Successful update expires old views.
     bool update(const RallyBodyPose&, const WorldView&, RallyBodyError&) noexcept;
+    // Preserved across successful model/course replacement.
+    void set_profile_clock(WorldSceneClock,void* context=nullptr) noexcept;
+    void set_transform_provider(WorldSceneTransformBatch,void* context=nullptr) noexcept;
+    void set_numeric_mode(WorldNumericMode) noexcept;
     Frame frame() const noexcept;
     WorldSceneStats stats() const noexcept;
     std::size_t persistent_bytes() const noexcept;
 private:
     struct Storage;
     std::unique_ptr<Storage> storage_;
+    WorldSceneClock clock_=nullptr;
+    void* clock_context_=nullptr;
+    WorldSceneTransformBatch transform_batch_=nullptr;
+    void* transform_context_=nullptr;
+    WorldNumericMode numeric_mode_=WorldNumericMode::reference;
 };
 } // namespace ps2::native

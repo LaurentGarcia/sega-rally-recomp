@@ -383,6 +383,17 @@ sample enforce this direction; see [PS2 engine architecture](ps2-engine-architec
 Reuse does not relax original-game parity requirements or make diagnostic
 geometry a substitute for recovered gameplay.
 
+**Native PS2 rendering policy, 27 October 2026.** The production vehicle
+renderer uses binary32 geometry on EE/VU hardware. Binary64 transforms,
+clipping and numerical guards remain explicit reference/diagnostic modes,
+not unconditional per-vertex production work. This is a presentation-only
+exception: recovered game calculations retain their validated rounding rules.
+Native rendering must be compared against the reference on actual scene data,
+including clipping, coverage and depth differences; it is not bit-identical
+merely because both paths use the same assets. No global fast-math option is
+authorized by this distinction. DMA ownership and synchronization remain
+explicit, and emulator observations remain separate from console validation.
+
 **Rally distribution update, 15 October 2026.** The requested deliverable is a
 prebuilt game executable, rather than a compiler bootstrap requiring developer
 tools. Its original runtime importer verifies the player's ZIP and prepares

@@ -153,6 +153,28 @@ class EngineDependencyTests(unittest.TestCase):
             with self.subTest(path=path), self.assertRaisesRegex(ValueError, "opaque include"):
                 driver.validate_native_boundary([path], target)
 
+    def test_assembler_include_cannot_import_game_or_binary_payload(self):
+        source = self.put("platform/ps2/src/vu1_transform.vsm")
+        source.write_text('.include "' + str(self.game_header) + '"\n')
+        with self.assertRaisesRegex(ValueError, "dependency direction forbidden"):
+            driver.validate_native_boundary([source])
+        source.write_text('payload: .incbin "private.bin"\n')
+        with self.assertRaisesRegex(ValueError, "binary or opaque includes"):
+            driver.validate_native_boundary([source])
+
+    def test_assembler_cannot_redirect_engine_source_or_transitive_header(self):
+        source = self.put("platform/ps2/src/vu1_transform.vsm")
+        source.unlink()
+        source.symlink_to(self.game)
+        with self.assertRaisesRegex(ValueError, "redirected reviewed path"):
+            driver.validate_native_boundary([source])
+        source.unlink()
+        source.write_text('.include "' + str(self.engine_header) + '"\n')
+        self.engine_header.unlink()
+        self.engine_header.symlink_to(self.game_header)
+        with self.assertRaisesRegex(ValueError, "redirected reviewed path"):
+            driver.validate_native_boundary([source])
+
 
 class ActualEngineInventoryTests(unittest.TestCase):
     def smoke(self, target):

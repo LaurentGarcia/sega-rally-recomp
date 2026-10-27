@@ -19,7 +19,7 @@ class RallyBodyScene(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="rally-body-") as directory:
             executable=Path(directory)/"test"
             sources=["native/rally_body_scene.cpp","native/contact_point_preparation.cpp","native/rounded_affine_transform.cpp",
-                     "src/world_scene.cpp","src/native_geometry.cpp","tests/rally_body_scene_test.cpp"]
+                     "src/world_scene.cpp","src/native_geometry.cpp","src/native_geometry_float.cpp","tests/rally_body_scene_test.cpp"]
             command=[compiler,"-std=c++20","-O2","-fno-fast-math","-ffp-contract=off","-Wall","-Wextra","-Werror",
                 "-I",str(ROOT/"platform/ps2/native"),"-I",str(ROOT/"platform/ps2/include"),
                 *(str(ROOT/"platform/ps2"/name) for name in sources),"-o",str(executable)]

@@ -334,6 +334,7 @@ bool Display::present(const Frame &frame) {
         if (q - d.packet->data > 200) { d.submit(q); q = d.packet->data; }
         const auto &material = *triangle.material;
         ++d.counters.triangles;
+        if (d.use_vu0) d.counters.vu0_vertices += 3;
         q = d.test(q, material.cutout);
         if (!material.texture) {
             // The SDK's 2D filled-triangle helper repeats v0.z for all three

@@ -77,7 +77,8 @@ int main() {
     static_assert(!std::is_move_assignable_v<ps2::PadInput>);
     try {
         reset();
-        { ps2::PadInput pad; check(!pad.poll().connected, "uninitialized pad is neutral"); }
+        { ps2::PadInput pad; check(!pad.poll().connected, "uninitialized pad is neutral");
+          check(pad.sdk_state() == -1 && pad.sdk_request_state() == -1, "unobserved SDK state is explicit"); }
         check(sdk.closes == 0, "uninitialized pad is not closed");
         reset(); sdk.module_result = -1;
         { ps2::PadInput pad; check(!pad.initialize(), "module failure reported"); }
@@ -89,6 +90,18 @@ int main() {
         { ps2::PadInput pad; check(!pad.initialize(), "open failure reported"); }
         check(sdk.opens == 1 && sdk.closes == 0, "failed open is not closed");
 
+        reset();
+        {
+            ps2::PadInput pad;
+            check(pad.initialize(), "diagnostic controller initialization");
+            const int states[]{PAD_STATE_DISCONN, PAD_STATE_EXECCMD, PAD_STATE_ERROR};
+            for (int state : states) {
+                sdk.state = state; sdk.request_state = PAD_RSTAT_BUSY;
+                check(!pad.poll().connected && pad.sdk_state() == state &&
+                      pad.sdk_request_state() == PAD_RSTAT_BUSY && sdk.reads == 0 && sdk.requests == 0,
+                      "numeric diagnostics distinguish non-ready states without input or mode requests");
+            }
+        }
         reset();
         {
             ps2::PadInput pad;

@@ -8,6 +8,7 @@
 #include "native_vehicle_demo.h"
 #include "storage.h"
 #include <kernel.h>
+#include <dma_registers.h>
 #include <sifrpc.h>
 #include <timer.h>
 #include <array>
@@ -22,14 +23,24 @@ int main(int argc, char **argv) {
     ps2::native::Display display;
     char page[1600]{}; // Outlives the renderer's retained diagnostic pointer.
     try {
+        // This standalone application owns DMA startup. Enable the master
+        // controller before any rendering, preserving all other control bits.
+        // Channel initialization alone does not establish DMAE.
+        const u32 dma_before=*DMA_REG_CTRL;
+        *DMA_REG_CTRL=dma_before|1u;
+        asm volatile("sync":::"memory");
+        if(*DMA_REG_CTRL!=(dma_before|1u))throw std::runtime_error("NATIVE DMA ENABLE FAILED");
+        std::printf("NATIVE_DMA_START before=%08lx after=%08lx\n",(unsigned long)dma_before,(unsigned long)*DMA_REG_CTRL);
         if (!display.initialize()) throw std::runtime_error(display.error());
         display.set_vu0_packing(true); // Validated final XYZ conversion only.
         display.present_status("NATIVE PS2 REWRITE\nPLATFORM BOOTSTRAP\nNO ARCADE PROCESSOR CORES\nINITIALIZING INPUT AND AUDIO");
         // Preserve loader-provided host modules before considering IOP reset.
         SifInitRpc(0);
-        const bool explicit_drive = argc > 1 && std::strcmp(argv[1],"--drive")==0;
+        const bool exact_drive = argc > 1 && std::strcmp(argv[1],"--drive-ee")==0;
+        const bool guarded_drive = argc > 1 && std::strcmp(argv[1],"--drive-guarded")==0;
+        const bool explicit_drive = exact_drive || guarded_drive || (argc > 1 && std::strcmp(argv[1],"--drive")==0);
         if (explicit_drive && argc != 5)
-            throw std::runtime_error("USE --drive CHECKPOINT COURSE BODY");
+            throw std::runtime_error("USE --drive, --drive-ee OR --drive-guarded CHECKPOINT COURSE BODY");
         const char *checkpoint_path = explicit_drive ? argv[2] : nullptr;
         const char *course_path = explicit_drive ? argv[3] : "host:native-course.bin";
         const char *body_path = explicit_drive ? argv[4] : "host:native-body.bin";
@@ -59,7 +70,9 @@ int main(int argc, char **argv) {
         if (checkpoint_path) {
             if (!ps2::wait_for_file(checkpoint_path)||!ps2::wait_for_file(course_path)||!ps2::wait_for_file(body_path))
                 throw std::runtime_error(ps2::storage_error());
-            return ps2::native::run_native_vehicle_demo(display,pad,checkpoint_path,course_path,body_path);
+            return ps2::native::run_native_vehicle_demo(display,pad,checkpoint_path,course_path,body_path,
+                exact_drive?ps2::native::NativeVehicleRenderMode::reference:guarded_drive?
+                ps2::native::NativeVehicleRenderMode::guarded_vu:ps2::native::NativeVehicleRenderMode::native_vu);
         }
         ps2::native::Mesh mesh;
         ps2::native::StudyScene study;
@@ -107,7 +120,7 @@ int main(int argc, char **argv) {
         std::array<float, 4096> pcm{};
         ps2::AudioOutput::Stats audio_stats{};
         uint64_t previous_ticks = 0;
-        std::puts(scene_path ? "NATIVE STUDY: direct EE transform/clip, solid GIF/GS Z16S; VU0/VU1 inactive for scene" :
+        std::puts(scene_path ? "NATIVE STUDY: EE transform/clip, VU0 XY packing, solid GIF/GS Z16S; VU1 inactive" :
                               "NATIVE PORT: direct EE program, native vertices/textures, VU0 XYZ, GIF/GS, IOP/SPU2");
         std::puts("NATIVE PORT: no arcade processor, bus, board scheduler or sound synthesizer linked");
         std::puts(scene_path ? "NATIVE STUDY: owner-provided mesh; diagnostic camera/lighting, no connected gameplay" :
@@ -174,7 +187,7 @@ int main(int argc, char **argv) {
                     "SOURCE FACES %lu / DRAW %lu\n"
                     "SCENE STORAGE %lu BYTES\n"
                     "MESH CRC %08lX / FRAME %u\n"
-                    "VU0/VU1 INACTIVE FOR SOLID STUDY\n\n"
+                    "VU0 XY PACKING / VU1 INACTIVE\n\n"
                     "SELECT+START TOGGLE THIS PAGE\n"
                     "LEFT/RIGHT STEP DIAGNOSTIC ORBIT\n"
                     "L1/R1 STEP DIAGNOSTIC DISTANCE\n"

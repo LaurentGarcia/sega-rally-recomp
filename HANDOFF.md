@@ -1,5 +1,141 @@
 # Handoff
 
+## Native binary32 rendering and connected VU pipeline (2026-10-27)
+
+The production vehicle renderer now uses binary32 geometry instead of running
+its binary64 reference path every frame. This implements the explicit native
+rendering policy in Platform layer & build. The recovered game update is
+unchanged; its rounding and state comparisons remain separate from presentation.
+The 601-step game comparison was rerun with ASan/UBSan while exporting private
+renderer poses: 96,761 state fields, 13,222 pose words and 458 sound requests
+still match fingerprint 57e2c98c5de78376. Those poses are offline test inputs,
+never successive inputs to the live game driver.
+
+The active pipeline is EE float bounds/batching -> VIF1 DMA -> VU1 model/view
+transforms -> fenced clip-coordinate readback -> EE float clipping/projection
+-> VU0 fixed XY packing -> GIF DMA -> GS. All submitted vertices use VU1 in the
+measured native run, including outside-frustum vertices; no numerical guards or
+binary64 transform fallbacks execute in this normal mode. VU0 packs the final
+coordinates of every drawn triangle. Transfers and unit work remain serialized;
+XGKICK, overlapped scheduling and VU clipping/projection are not implemented.
+Both units working does not mean both are fully utilized.
+
+Native 030 measures 27.558 ms geometry, 12.462 ms game update and 52.110 ms combined
+update/presentation over the same first three states. Geometry was 375.705 ms
+in native 026: a 13.63x reduction. Logged controls, position, motion, triangle
+counts and sound-request counts remain identical for these samples. The run
+reached update 660 without a rendering/domain rejection. These are Play timer
+observations, about 19 updates/sec for the initial sample, not physical-console
+or full-race performance. Report: build/ps2/native-030/performance-comparison.json.
+Native ELF: d7fb48840b1dd1769106e1a7dca685fa754f0e00359bde177c7ab09c505361a5.
+Native/engine-demo share engine manifest
+34f2d14c44ad38b78f4ac7ca5e325344d1021a5fa045fd3f1131320fd76c3284.
+
+The exact comparison path remains available through --drive-ee, and guarded
+VU presentation through --drive-guarded. The default --drive/automatic developer
+checkpoint selects native float/VU rendering. Triangle cycles the three modes;
+these input mappings still await working pad delivery. Hidden debug pages no
+longer format numeric text every frame. Unexpected VU transport retirement is
+logged immediately and disables the provider; numerical input/output rejection
+preserves ownership and caller output. Game flow, textures, wheels, recovered
+camera/body bridge, sound playback and physical PS2 testing remain unfinished.
+
+WorldScene retains transactional frames, caller ownership and no per-update
+allocation. Its exact shared-vertex cache uses at most 128 KiB, with per-instance
+serials and approximation provenance. Optional providers gather at most 96
+unique vertices from 32 faces without crossing a culling group. Native float
+mode has separate conservative float bounds and clipping; reference mode keeps
+whole-triangle restoration when clipping could amplify approximate endpoint
+errors. Float clipper EE disassembly contains single-precision operations and
+no double helpers; raw VU submission also has no software-double call path.
+DVP source/include hashes, assembler identity and listings now participate in
+build caching and the explicit shared-engine source boundary.
+
+Validation records:
+
+- Exact cache: 519 frames / 111,546 checks, 2,052 group comparisons and 60 actual
+  course views under ASan/UBSan; build/ps2-world-cache-001. Fully-inside projection
+  skips redundant roundoff repair; one million frozen-before/current cases
+  remain byte-identical, hash 5334b82311da6f89, in ps2-inside-projection-001.
+- Provider/provenance: 106 frames / 3,299,994 checks plus retained cache/course
+  comparisons, build/ps2-world-batch-002. Native float grouping/provider tests
+  add 775 frames / 70,417 checks, with zero update allocations.
+- Float clipper: 20,010 comparisons / 1,934,112 checks with sanitizer and EE
+  object audit, build/ps2-native-float-geometry-001. It deliberately makes no
+  universal pixel guarantee for ill-conditioned clipping or degeneracy.
+- Whole 601-scene host comparison: 546,158 native versus 546,073 reference
+  triangles; 171 frames differ in fan/degenerate counts. Raster color differs
+  at 68 of 114,468,864 pixels, at most two per frame; four coverage pixels differ.
+  Corresponding vertex difference is at most 0.0185852 logical pixel. Evidence:
+  build/ps2-world-float-001/corpus-result.json. This is host raster evidence,
+  not GS pixel equality.
+- Executing raw/guarded VU authored fixture: 146,895 checks, 15,168 main vertices,
+  323 hardware batches, with bit-identical raw/guarded results where both accept
+  and VU0 checked after each main batch. Evidence:
+  build/ps2-vu1-engine-ee-004/runtime-validation.json.
+- Full guarded VU corpus: 35,276 batches / 1,364,846 vertices from all 601 poses,
+  maximum accepted screen difference 0.00282151 pixel. Evidence:
+  build/ps2-vu1-corpus-ee-002/runtime-validation.json. This historical build
+  precedes the raw production entry point; its report binds that exact snapshot.
+- Current native VU corpus: all 35,276 raw/guarded batch pairs produce identical
+  results for 1,364,846 vertices. All 70,552 submissions pass, including MARK
+  wrap; VU0 packing is checked after each pair. The complete output stream,
+  input, ELF and sources are bound by
+  build/ps2-vu1-corpus-ee-004/runtime-validation.json. Actual VU output SHA-256:
+  ac3c4d3375531d2257c524fe5e4f0464251e6825b6fcaebc12fd9d6e2d7023c4.
+- Whole-frame replay of those actual VU outputs passes all 601 poses:
+  546,152 native triangles versus 546,073 reference, with 173 frames differing
+  in topology. The independent raster comparison changes 305 of 114,468,864
+  color pixels (at most four per frame), including 14 coverage differences.
+  Corresponding vertex differences reach 0.0430603 pixel and 2.05636e-6 depth;
+  the maximum covered raster-sample depth difference is 0.0276916.
+  No clipped corners are restored to binary64. Evidence:
+  build/ps2-world-vu-float-002/corpus-result.json. Clipping and rasterization in
+  this comparison run on the host; this is not GS pixel parity, physical PS2
+  validation, or a universal error bound for other scenes/cameras.
+  The maximum raster-depth difference is an observed edge-coverage change at
+  frame 2569, pixel (266,156), selecting a different surface; the corresponding
+  surfaces' depth differences there are approximately 1.06e-7 and 2.28e-7.
+  The first private replay checker failed to latch an excess provider call
+  beyond its records. Revision 002 rejects that case explicitly, includes a
+  negative control, and reproduces every scene metric above. Production was
+  unaffected; the earlier replay report is superseded.
+- The PS2 portable suite passes 287 tests (84.2 seconds); the updated VU result
+  stream's two portable tests also pass, including incomplete-input rejection.
+
+Source publication uses the staged Git tree and an exact matching tar archive;
+the final source-boundary report is
+build/ps2-native-vu-source-release-002/gate.json. Game-derived checkpoints,
+meshes, VU inputs/results, captures and manuals remain under ignored build/.
+
+Next work, in order: isolate the remaining frame costs before scheduling
+overlapped VIF/VU transfers; recover pad-buffer publication in the emulator;
+connect the recovered camera/body bridge and full scene materials; then race
+flow and game audio. Existing exact game comparisons remain the integration
+gate. Do not describe the current diagnostic view as the finished game.
+
+Findings and rejected assumptions: the first VU integration was actually slower
+(239.150 ms geometry versus the exact cache's 224.291 ms): per-vertex guards
+cost about 49 ms. Preparing guard thresholds reduced it to 195.795 ms, but the
+real improvement required removing the reference arithmetic from the normal
+render loop. Endpoint error bounds alone do not control a clipped intersection;
+reference mode now restores the whole clipped triangle. An unbounded threshold
+correction loop was also rejected; preparation has bounded conservative repair.
+
+Initial VU startup failed because the HLE loader left DMAE clear. SDK channel
+initialization does not set that master bit. Application startup now sets and
+verifies DMAE, preserving other bits; backend configuration checks remain strict.
+Old successful GIF output under Play did not prove correct DMA initialization.
+One sandboxed Qt launch aborted before guest execution with a NEON capability
+error; the permitted GUI launch passed. No guest result was claimed for that run.
+
+Restoring Play's source-defined keyboard defaults did not connect the pad.
+Current logs show SDK EXECCMD (5) / BUSY (2), matching the EE shared-buffer initial
+sentinel. Source review ruled out missing padInit and invalid DMA-status handling;
+IOP VBlank/SIO2/shared-buffer publication remains the unresolved boundary. No
+speculative ready-state workaround or fabricated controller input was added.
+Private profile backup: build/ps2/pad-keyboard-001.
+
 ## Persistent native vehicle and first integrated EE run (2026-10-26)
 
 The previous critical-path review was correct: component proofs were not a

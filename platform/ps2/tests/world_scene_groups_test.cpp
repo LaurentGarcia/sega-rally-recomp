@@ -35,7 +35,7 @@ void run(){
         faces.push_back({{v,v+1,v+2},0xff000000u+n});faces.push_back({{v,v+2,v+3},0xff002000u+n});groups.push_back({f,2});
     }
     WorldScene ordinary,grouped;WorldSceneError error;
-    require(ordinary.configure(faces.size(),1536,error)&&grouped.configure(faces.size(),1536,error));
+    require(ordinary.configure(faces.size(),1536,error,false)&&grouped.configure(faces.size(),1536,error));
     WorldInstance plain{{points,faces},identity()},optimized{{points,faces,groups},identity()};WorldView view{identity()};
     const auto compare_update=[&](){
         ++frames;const auto count=allocations;WorldSceneError a,b;

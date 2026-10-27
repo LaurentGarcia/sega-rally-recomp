@@ -1,0 +1,50 @@
+.vu
+.align 4
+.global native_vu1_transform_begin
+.global native_vu1_transform_end
+
+# Original synchronous engine kernel. VIF owns header/input publication; the
+# EE reads results only after FLUSHE/MARK and DMA completion. No XGKICK.
+# q0..3 object matrix, q4..7 view matrix, q8 count; q10..105 input,
+# q106..201 output. The remaining VU data memory is not touched.
+native_vu1_transform_begin:
+    nop lq vf01,0(vi00)
+    nop lq vf02,1(vi00)
+    nop lq vf03,2(vi00)
+    nop lq vf04,3(vi00)
+    nop lq vf05,4(vi00)
+    nop lq vf06,5(vi00)
+    nop lq vf07,6(vi00)
+    nop lq vf08,7(vi00)
+    nop ilw.x vi01,8(vi00)
+    nop iaddiu vi02,vi00,10
+    nop iaddiu vi03,vi00,106
+    nop ibeq vi01,vi00,native_vu1_transform_done
+    nop nop
+native_vu1_transform_vertex:
+    nop lqi vf10,(vi02++)
+    nop nop
+    nop nop
+    nop nop
+    mulax.xyzw ACC,vf01,vf10x nop
+    madday.xyzw ACC,vf02,vf10y nop
+    maddaz.xyzw ACC,vf03,vf10z nop
+    maddw.xyzw vf11,vf04,vf10w nop
+    nop nop
+    nop nop
+    nop nop
+    mulax.xyzw ACC,vf05,vf11x nop
+    madday.xyzw ACC,vf06,vf11y nop
+    maddaz.xyzw ACC,vf07,vf11z nop
+    maddw.xyzw vf12,vf08,vf11w iaddi vi01,vi01,-1
+    nop nop
+    nop nop
+    nop nop
+    nop sqi vf12,(vi03++)
+    nop ibne vi01,vi00,native_vu1_transform_vertex
+    nop nop
+native_vu1_transform_done:
+    nop[e] nop
+    nop nop
+native_vu1_transform_end:
+.align 4

@@ -32,7 +32,7 @@ might later discard. A folder name alone does not confer permission.
 
 | Role | Current files | Permitted project dependencies |
 | --- | --- | --- |
-| Engine | Native display, frame validation, clipping, VU0 packing, pad hardware, storage, PCM transport and IOP module | Explicit engine inventory only |
+| Engine | Native display, frame validation, clipping, VU0 packing, VU1 transforms, pad hardware, storage, PCM transport and IOP module | Explicit engine inventory only |
 | Rally game | Recovered progress, both pose publications, angle-fold, orientation, direction blend, contact search/result interpretation, rounded cross/affine transforms and cabinet steering/filter | Own game role and engine |
 | Geometry study | `native_mesh`, `native_scene`, captured-view transforms and fitted camera | Own study role and engine |
 | Rally application | `platform/ps2/native/main.cpp` | Rally game, study and engine |
@@ -108,7 +108,7 @@ Rally internals or an arcade device model. Add a test that rejects that directio
 | Draw buffers | Applications retain triangles, materials and texture bytes through `present()`. The display does not own game objects or asset allocations. |
 | Texture identity | Pointer, dimensions and generation identify cached content. Change the generation after editing, or explicitly invalidate the texture cache before allocation identity is reused. |
 | VU0 | The render thread owns macro-mode packing for the complete synchronous call. No overlapping microprogram or other VU0 user is permitted. |
-| VU1/VIF1 | Production VU1 geometry is not integrated. Diagnostic readback requires exclusive idle ownership, including no future XGKICK producer. |
+| VU1/VIF1 | One exclusive transform owner submits bounded batches, fences VU execution and retires DMA before returning. Failure quarantines transport. GS readback must occur between completed calls, with no future XGKICK producer. |
 | IOP | Application startup chooses reset ownership once before opening dependent services. Preserve loader modules when using its host filesystem. |
 | Pad | A nonmovable PadInput retains its DMA buffer until the port closes. Physical controller state is mapped to game actions by the application. |
 | Audio | One application-owned PCM stream; initialize after the final IOP reset and pad/storage setup. Submitted data is consumed/copied synchronously. |
@@ -116,6 +116,14 @@ Rally internals or an arcade device model. Add a test that rejects that directio
 
 Applications serialize hardware-service calls on their owning thread. These
 interfaces do not promise thread-safe concurrent initialization or submission.
+
+The [VU1 transform backend](../platform/ps2/vu1_transform.md) accepts generic
+matrices and vertices, with no Rally state or asset dependencies. WorldScene's
+optional batch provider preserves the exact scalar path and owns no hardware.
+The vehicle application selects native binary32 presentation by default, with
+exact and guarded modes available for comparison. Its game update retains
+separate exact arithmetic. VU1 and VU0 currently execute
+in sequence, so both being active does not establish overlapped work.
 
 The GS path retains native indexed textures, CLUTs, explicit primitive order,
 optional Z16S depth and visible cache/transfer counters. It does not hide these
@@ -155,10 +163,11 @@ implicit entity store, task scheduler or per-object allocation policy.
 - `RLYMESH` version one and `object_to_reference_view` describe captured study
   data. Keep them in the study adapter. A general world-space mesh/material
   format requires its own explicit coordinate, version and lifetime contracts.
-- The EE clipper is a correctness reference using software-double operations.
-  Move measured work to VU kernels only with numerical comparisons, complete
-  bank/transfer budgets and synchronized ownership. VU experiments alone do not
-  establish production throughput.
+- The production EE clipper uses float arithmetic; the software-double clipper
+  remains a correctness reference. VU1 handles model/view transforms and VU0
+  packs GS coordinates, with CPU readback and serialized transfers. Further
+  offload requires numerical comparisons, complete bank/transfer budgets and
+  synchronized ownership. The current pipeline does not overlap unit work.
 
 Further abstraction should follow another real consumer. A scene graph, entity
 system, plugin loader or general scheduler is not required to share the current

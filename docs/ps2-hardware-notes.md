@@ -17,12 +17,37 @@ Native input -> EE game systems -> native geometry -> VU work -> GIF -> GS
                 native sound events -> PCM mixer -> IOP -> SPU2
 ```
 
-The game systems and mixer in that diagram are the destination architecture;
-the executable currently connects platform diagnostics and an optional
-[static mesh study](ps2-native-scene.md). VU0 final XYZ packing works for textured
-diagnostics. The solid mesh study uses EE transforms/clipping and direct
-GIF/GS submission; both VUs are inactive for that path. Standalone VU1 numerical
-experiments have passed, but production VU1 geometry remains to be integrated.
+The current vehicle renderer uses this concrete synchronous path:
+
+```text
+EE game pose -> EE float bounds/batches -> VIF1 DMA -> VU1 model/view transforms
+                                                         |
+                                              completion fence / readback
+                                                         v
+GS <- GIF DMA <- VU0 fixed XY packing <- EE float clipping/projection
+```
+
+The default native mode performs no binary64 geometry transform, clipping or
+per-vertex error guard. The scalar binary64 and guarded VU modes remain explicit
+comparisons. VU1 currently returns clip coordinates to EE memory access; direct
+XGKICK, overlapped transfer and clipping/projection microcode are further work.
+Both active units therefore establish a working pipeline, not full utilization.
+
+Native 030's equivalent first three Play updates measure 27.558 ms geometry,
+12.462 ms game update and 52.110 ms combined update/presentation. Geometry is
+13.63 times faster than native 026's 375.705 ms. Instrumented costs include
+validation, bounds, transforms and clipping; the remaining difference is not
+assigned to a subsystem without measurement. This remains about 19 updates/sec
+in that sample, below the target. Evidence:
+`build/ps2/native-030/performance-comparison.json`.
+
+The native vehicle driver now connects the recovered main-player update to
+diagnostic body/course geometry. Its generated sound requests are not yet
+connected to game synthesis or SPU2 playback. The optional
+[static mesh study](ps2-native-scene.md) remains separate. VU0 final XY packing
+is active for both solid and textured native primitives; solid triangles now
+submit each vertex's own depth. Standalone VU1 numerical experiments have
+passed; integrated geometry work is recorded separately below as validated.
 
 The measurements below come from the separate translated reference probe:
 
@@ -42,7 +67,7 @@ The [PS2dev architecture introduction](https://ps2dev.com/playstation-2-programm
 describes the three graphics paths and the distinction between VU0 macro/micro
 mode and VU1 microprograms. Our current renderer uses GIF Path 3. VU0 performs
 only the tested final coordinate conversion; it is not the whole geometrizer.
-VU1 is inactive. The sound engine still runs on the EE; the IOP handles PCM
+This reference-probe path does not use VU1. Its sound engine runs on the EE; the IOP handles PCM
 queueing and SPU2 transfer, rather than replacing Sega's synthesis behavior.
 
 ## PS2 Linux documentation review
