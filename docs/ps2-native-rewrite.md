@@ -106,6 +106,9 @@ that scene or a ROM-free hardware test.
 | [Main contact-slot update](../platform/ps2/native/main_contact_slot.md) | One of four slots: packed type/mask, history, response, metric and table-based lateral value | 25,852 synthetic cases plus all 104 captured calls, including 99 active calls; 2,393,780 CPU and 504,364 geometry instructions |
 | [Paired balance](../platform/ps2/native/paired_balance.md) | Two pair sums and signed balances with separate binary64 product/division rounding; zero/subnormal sums supported | 101,130 synthetic cases plus all 26 captured pairs; 4,345,340 original instructions |
 | [Vehicle parameter selection](../platform/ps2/native/paired_balance.md#parameter-selection) | Highest enabled bit among 9–1, otherwise index 0; raw copy of an explicit 13-word record | 6,144 synthetic selections plus all 26 captured selections; 99,140 original instructions |
+| [Segment selection](../platform/ps2/native/segment_selection.md) | Ordered search of explicit immutable corner/vertex records; signed progression and original hit/miss encoding | 3,634 synthetic cases plus all 26 captured calls; complete original search and edge firmware |
+| [Main-helper geometry tail](../platform/ps2/native/main_balance_geometry.md) | Separately rounded scalar combination, recovered polynomial rotations, two triple updates and selected-index publication | 20,480 synthetic cases plus all 26 captured calls; 182 live output words match |
+| [Joined main candidate/contact step](../platform/ps2/native/main_contact_step.md) | Candidate preparation followed by the complete private-asset contact pass, with atomic state commit | All 26 captured calls, including nine active responses; 16 independently calculated authored controls and four atomic rejection cases |
 
 The first four components have portable boundary tests, sanitizer checks and standalone
 EE fixtures executed successfully in Play: 121 progress boundary/rejection
@@ -152,6 +155,14 @@ rejections and two known controls. Paired balance passed 2,154 EE cases,
 fingerprint `1fd698b609c8f960`, plus 24 atomic rejections; parameter selection
 passed 3,072 cases, fingerprint `cf0278eb2ab1a5a1`. These are standalone
 numerical fixtures in Play 0.72 HLE, not physical-console or gameplay tests.
+The balance geometry tail passed 1,504 EE cases, 84 rejection checks and two
+controls, fingerprint `3e2a507aab74e9d4`. Its earlier helper dependencies remain
+unrecovered; executing that fixture does not establish a complete vehicle update.
+Segment selection passed 3,634 EE cases, fingerprint `1c1c549c187f8285`,
+55 rejection checks and two controls. The joined candidate/contact step passed
+all 16 independently calculated authored controls, fingerprint
+`76ae45f11adbe279`, and four atomic rejection cases. These fixtures also run in
+Play's HLE environment; physical-console timing remains unmeasured.
 The original-program comparisons run on the host against the
 owner's verified Revision B image; the reference interpreter and memory
 adapters are not part of the native executable. The components are compiled
@@ -178,8 +189,18 @@ native components and private data, with no original processor or machine
 runtime. The full main callback and driving loop remain unconnected, and no
 native frame-rate claim follows from these numerical fixtures.
 
+The joined [main contact step](../platform/ps2/native/main_contact_step.md) now
+derives the contact pass's candidate and motion inputs directly from the newly
+prepared vehicle. Its private comparison uses the exact saved caller and
+one-instruction transition to join the two recorded streams, then matches all
+26 composed results, including nine active responses. It supplies no captured
+intermediate offsets, replies or bases to the native calculation. The final
+marker is retained from the prefix under the inspected callee's preservation
+contract, and the initial selected scalar is an unused/reset zero; those fields
+are explicitly distinguished from directly captured state.
+
 The separate [driving observer](../platform/ps2/tools/driving_capture.md) now
-records those routes using the existing cabinet replay. Capture 012 passes all
+records those routes using the existing cabinet replay. Capture 013 passes all
 2,850 enabled/disabled frame checkpoints. It records 1,202 complete alternate
 calls and 34 detailed groups, plus 601 complete main-object cabinet-filter calls
 with 32 detailed pairs. Callback records and matching published steering values
@@ -206,6 +227,13 @@ uses only index 2. All 104 slot calls also match, including four vertical-only
 inputs that require the original interpolation expression at zero rounded XZ
 squared length. Tiny nonzero XZ inputs whose squares underflow to zero are
 covered by additional synthetic controls.
+Capture 013 retains every earlier stream and adds 104 records: 26 complete
+segment-helper pairs and 26 complete geometry-tail pairs, sampled from 601
+calls of each region. Segment selection matches all 26 original results; every
+sample hits, so missed searches and signed wrap remain synthetic coverage.
+The geometry tail matches both output triples and the published index; three
+samples take its negative first-longitudinal branch. These additions preserve
+the earlier 26-callback population and do not expand it into a full race proof.
 This is bounded host-reference evidence, not independent arcade-board fidelity
 or a full-course proof. The native PS2 application still does not connect these
 components into driving gameplay.

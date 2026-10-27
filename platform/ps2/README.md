@@ -12,10 +12,13 @@ dependency direction between hardware services, game rules, captured-scene
 adapters and offline recovery. See [PS2 development](../../docs/ps2.md) for build
 commands and current hardware limits.
 
-The latest recovered main-callback components prepare candidate state, update
-one of four contact slots, calculate two signed pair balances, and select a raw
-13-word parameter record. Each has an explicit bounded native contract and an
-offline original-program comparison. Their scopes and evidence are listed in
+The recovered main-callback components now include segment selection and a
+joined candidate-preparation/contact operation. The latter matches 26 sampled
+original calls, including nine active responses, using private course data.
+A separate geometry tail updates two triples and publishes its selected index;
+earlier filtering and event dependencies in that larger helper remain open.
+Each has an explicit bounded native contract and an offline original-program
+comparison. Their scopes and evidence are listed in
 the [main vehicle dependency map](native/main_vehicle_recovery.md); they are
 not a substitute for the unrecovered callback work.
 

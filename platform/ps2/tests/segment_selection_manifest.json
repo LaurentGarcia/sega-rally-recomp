@@ -1,0 +1,6 @@
+{
+  "sources": ["platform/ps2/tests/segment_selection_test.cpp", "platform/ps2/native/segment_selection.cpp", "platform/ps2/native/contact_projection.cpp"],
+  "includes": ["platform/ps2/native", "platform/ps2/tests"],
+  "libraries": [],
+  "embed_iop_modules": false
+}

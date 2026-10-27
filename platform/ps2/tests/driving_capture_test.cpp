@@ -58,7 +58,8 @@ int main(int argc,char **argv) {
         };
         if (mode.starts_with("vehicle-")) {
             constexpr std::uint32_t object=0x210000,parent=0x500200,vehicle_fp=0x500400,helper_fp=0x500800;
-            const bool spilled=mode=="vehicle-spilled";
+            const bool motion=mode.starts_with("vehicle-motion");
+            const bool spilled=mode=="vehicle-spilled" || mode=="vehicle-motion-spilled";
             if (mode=="vehicle-unselected") frame=2301;
             const auto restore_parent=[&]() {
                 cpu.m_r[0]=parent;cpu.m_r[31]=vehicle_fp;
@@ -72,6 +73,22 @@ int main(int argc,char **argv) {
             observe(0x34f40);
             if (mode=="vehicle-nested") observe(0x34f40);
             if (mode=="vehicle-timeout") { instruction+=2000001;observe(0x34f44); }
+            if (motion) {
+                cpu.m_r[0]=vehicle_fp;cpu.m_r[31]=helper_fp;
+                saved_return(vehicle_fp,relocation+0x34fc8,spilled);
+                cpu.m_r[16]=object+0x14;cpu.m_r[17]=object+0x88;
+                if (mode=="vehicle-motion-segment-pointer") cpu.m_r[17]=0x900000;
+                if (mode=="vehicle-motion-segment-caller") saved_return(vehicle_fp,relocation+0x34fcc,spilled);
+                observe(0x2b0b0);
+                if (mode=="vehicle-motion-segment-duplicate") observe(0x2b0b0);
+                bus.values[object+0x88]=0xffffffffu;
+                if (mode=="vehicle-motion-segment-exit-proof") cpu.m_rcache[0][3]^=1;
+                if (mode!="vehicle-motion-segment-no-exit") observe(spilled ? 0x2b170 : 0x2b154);
+                restore_parent();cpu.m_r[16]=0xffffffffu;
+                if (mode=="vehicle-motion-segment-post-frame") cpu.m_r[31]+=64;
+                if (mode=="vehicle-motion-segment-post-proof") cpu.m_rcache[0][3]^=1;
+                observe(0x34fc8);
+            }
             cpu.m_r[28]=object;
             if (mode=="vehicle-prefix-object") cpu.m_r[28]+=0x100;
             if (mode=="vehicle-prefix-ac") cpu.m_AC|=0x40000000;
@@ -129,6 +146,22 @@ int main(int argc,char **argv) {
             if (mode=="vehicle-balance-post-frame") cpu.m_r[31]+=64;
             if (mode=="vehicle-balance-post-proof") cpu.m_rcache[0][3]^=1;
             if (mode!="vehicle-balance-no-post") observe(0x379d0);
+            if (motion) {
+                if (mode=="vehicle-motion-tail-pointer") cpu.m_r[3]=0x900000;
+                if (mode=="vehicle-motion-tail-object") cpu.m_r[9]+=256;
+                if (mode=="vehicle-motion-tail-ac") cpu.m_AC|=0x40000000;
+                if (mode!="vehicle-motion-tail-no-pre") observe(0x382f8);
+                if (mode=="vehicle-motion-tail-duplicate") observe(0x382f8);
+                for (unsigned i=0;i<3;++i) {
+                    bus.values[vehicle_fp+0x120+4*i]=600+i;
+                    bus.values[vehicle_fp+0x150+4*i]=700+i;
+                }
+                bus.values[0x214264]=800;
+                cpu.m_r[3]=cpu.m_r[15]=0xdeadbeef; // Post uses saved pointers.
+                if (mode=="vehicle-motion-tail-post-frame") cpu.m_r[31]+=64;
+                if (mode=="vehicle-motion-tail-post-proof") cpu.m_rcache[0][3]^=1;
+                if (mode!="vehicle-motion-tail-no-post") observe(0x38658);
+            }
             for (unsigned i=0;i<3;++i) bus.values[vehicle_fp+0x150+4*i]=400+i;
             if (mode!="vehicle-balance-no-exit") observe(0x38670);
             cpu.m_r[31]=mode=="vehicle-balance-return-frame" ? vehicle_fp+64 : vehicle_fp;

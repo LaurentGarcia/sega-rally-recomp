@@ -33,6 +33,37 @@ class DrivingCaptureTests(unittest.TestCase):
         path=self.directory/(name or mode)
         return path,subprocess.run([str(self.exe),mode,str(path)],capture_output=True,text=True)
 
+    def test_additive_motion_stream_preserves_saved_pointer_outputs_and_miss_indices(self):
+        for mode in ("vehicle-motion-valid","vehicle-motion-spilled"):
+            path,result=self.run_case(mode)
+            self.assertEqual(result.returncode,0,result.stderr)
+            marker=json.loads((path/"capture.json").read_text())
+            events=[json.loads(line) for line in (path/"main-motion.jsonl").read_text().splitlines()]
+            self.assertEqual([e["event"] for e in events],
+                             ["segment_pre","segment_post","motion_tail_pre","motion_tail_post"])
+            self.assertEqual([e["pc"] for e in events],[0x5ca0b0,0x5d3fc8,0x5d72f8,0x5d7658])
+            self.assertEqual(marker["motion_events"],4)
+            for kind in ("segment","tail"):
+                self.assertEqual([marker["motion_"+kind+s] for s in ("_entries","_completions","_samples")],[1,1,1])
+            block=lambda event,name:next(b for b in event["blocks"] if b["name"]==name)
+            self.assertEqual(block(events[1],"segment_indices")["words"],[0xffffffff])
+            self.assertEqual(block(events[3],"balance_vector")["words"],[600,601,602])
+            self.assertEqual(block(events[3],"balance_output")["words"],[700,701,702])
+            self.assertEqual(block(events[3],"motion_prior")["words"],[800])
+            self.assertNotEqual(events[3]["registers"][3],block(events[3],"balance_vector")["address"])
+            self.assertEqual(len((path/"main-vehicle.jsonl").read_text().splitlines()),18)
+
+    def test_motion_pairs_reject_invalid_operands_proofs_sequence_and_incomplete_return(self):
+        for defect in ("segment-pointer","segment-caller","segment-duplicate","segment-exit-proof",
+                       "segment-no-exit","segment-post-frame","segment-post-proof","tail-pointer",
+                       "tail-object","tail-ac","tail-no-pre","tail-duplicate","tail-post-frame",
+                       "tail-post-proof","tail-no-post"):
+            with self.subTest(defect=defect):
+                path,result=self.run_case("vehicle-motion-"+defect)
+                self.assertNotEqual(result.returncode,0)
+                self.assertFalse((path/"capture.json").exists())
+                self.assertFalse((path/"main-motion.jsonl").exists())
+
     def test_actual_records_raw_bits_pairing_and_optional_block_bounds(self):
         for mode in ("valid","rom","alternate"):
             with self.subTest(mode=mode):

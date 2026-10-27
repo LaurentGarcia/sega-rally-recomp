@@ -48,11 +48,12 @@ Private `callback-validation.json` binds these checks to the validated capture.
 | --- | --- |
 | `0x39a90` called at `0x34f8c` | Recovered [cabinet steering filter](cabinet_steering_filter.md); result stored at object `+0x74` |
 | `0x33e90` called at `0x34fb0` | Conditional render-state consumer; full effect not recovered |
-| `0x2b0b0` called at `0x34fc4` | Segment-selection helper receiving position and signed-index storage |
+| `0x2b0b0` called at `0x34fc4` | Recovered [segment selection](segment_selection.md), including ordered search and the unclamped miss result |
 | `0x34ff0..0x35218` | Recovered [candidate preparation](main_candidate.md): pending-middle clamp, metric gate, conditional state update and candidate triples for the [four-point contact pass](main_contact_pass_recovery.md) |
+| `0x34ff0` through contact return at `0x3521c` | [Joined candidate/contact operation](main_contact_step.md), deriving all contact inputs from the newly prepared vehicle |
 | `0x2abc0` / `0x2acc0` at `0x35704` / `0x35710` | Shared course-query preparation and result interpretation |
 | `0x37200` | Recovered [main contact-slot update](main_contact_slot.md), called four times; bounded scalar/history/type/response behavior, with explicit private normalization coefficients |
-| `0x37870` | Recovered [parameter selection and paired balance](paired_balance.md) inside a larger helper; remaining filtering, geometry and state updates are unrecovered |
+| `0x37870` | Recovered [parameter selection and paired balance](paired_balance.md), plus [final geometry/publication tail](main_balance_geometry.md); intervening filtering and event-related dependencies remain unrecovered |
 | `0x34ce0` | Counter, feedback and event scheduling through return at `0x34e38`; calls `0x261b0` and BAL dependency `0x26e18` remain outside the native recovery |
 | `0x371b0`, `0x371c0`, `0x371d0` | Three calls to the recovered one-step angle fold, without the earlier integrator's final pi/8 clamps |
 | `0x34078` at `0x371dc` | Recovered [main-object pose publication](main_car_pose.md), including raw flags/index words and an external four-word state group |
@@ -75,8 +76,10 @@ It must not be described as a generic force or drivetrain calculation.
 The complete `0x37870` helper spans 3,588 bytes and has nine direct/BAL
 dependencies plus geometry FIFO operations. Both vector pointer arguments are
 in/out: the tail modifies the second and stores a geometry result through the
-first. The recovered pair reduction and raw record copy do not establish the
-whole helper's result or side effects.
+first. The recovered pair reduction, raw record copy and final geometry/publication
+tail do not establish the whole helper's result or side effects. The tail starts
+after the last CPU callee; its explicit inputs remain dependent on unrecovered
+earlier filtering, limiting and event paths.
 
 ## Current comparison scope
 
@@ -100,6 +103,22 @@ inputs and are not original-execution successes. Every sampled candidate prefix
 has a zero pending delta, so live evidence covers the zero-metric branch; clamp
 and active-consumption behavior are covered synthetically. Runtime fixture and live-proof
 details are recorded in the [native rewrite guide](../../../docs/ps2-native-rewrite.md).
+
+Capture 013 adds 26 segment-search pairs and 26 geometry-tail pairs without
+changing any previous stream or the 2,850 replay checkpoints. Each sampled
+segment result matches fresh original execution; all samples hit, so miss and
+signed-wrap behavior rely on synthetic comparisons. The geometry tail matches
+all seven output words in each sample, including three calls taking its
+negative first-longitudinal branch.
+
+The joined candidate/contact checker binds the two streams through the exact
+one-instruction call transition, saved caller words, candidate storage and
+unchanged object state. It matches all 26 composed results, including nine
+active responses, without supplying captured intermediate offsets or replies
+to the native operation. The 46-word result includes a marker preserved by the
+inspected contact callee rather than sampled again at return; the initial
+selected scalar is an unused/reset zero. These derived fields are labeled in
+the private evidence report rather than represented as direct observations.
 
 The callback still contains additional geometry commands, conditional state updates,
 transcendental operations and mixed binary32/binary64 arithmetic. Units, axis

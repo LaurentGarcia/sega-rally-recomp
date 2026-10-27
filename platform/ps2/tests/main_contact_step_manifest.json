@@ -1,0 +1,26 @@
+{
+  "sources": [
+    "platform/ps2/tests/main_contact_step_test.cpp",
+    "platform/ps2/native/candidate_contact_pass.cpp",
+    "platform/ps2/native/contact_point_preparation.cpp",
+    "platform/ps2/native/rounded_affine_transform.cpp",
+    "platform/ps2/native/contact_pass_response.cpp",
+    "platform/ps2/native/contact_response.cpp",
+    "platform/ps2/native/contact_normalization.cpp",
+    "platform/ps2/native/rounded_cross_product.cpp",
+    "platform/ps2/native/recovered_scalar_metric.cpp",
+    "platform/ps2/native/contact_aggregate.cpp",
+    "platform/ps2/native/contact_search.cpp",
+    "platform/ps2/native/contact_projection.cpp",
+    "platform/ps2/native/contact_neighborhood.cpp",
+    "platform/ps2/native/contact_result.cpp",
+    "platform/ps2/native/main_candidate.cpp",
+    "platform/ps2/native/main_contact_step.cpp"
+  ],
+  "includes": [
+    "platform/ps2/native",
+    "platform/ps2/tests"
+  ],
+  "libraries": [],
+  "embed_iop_modules": false
+}

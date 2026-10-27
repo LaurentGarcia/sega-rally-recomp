@@ -146,6 +146,13 @@ def main():
             raise ValueError("capture has no complete sampled main contact pass")
         if not marker.get("vehicle_completions") or not marker.get("vehicle_samples"):
             raise ValueError("capture has no complete sampled main vehicle callback")
+        for kind in ("segment","tail"):
+            if any(marker.get("motion_"+kind+suffix)!=marker["vehicle_completions"]
+                   for suffix in ("_entries","_completions")) or \
+               marker.get("motion_"+kind+"_samples")!=marker["vehicle_samples"]:
+                raise ValueError("capture lacks one complete sampled motion region per vehicle: "+kind)
+        if marker.get("motion_events")!=4*marker["vehicle_samples"]:
+            raise ValueError("capture has an incomplete additive motion stream")
         report.update(status="passed",exact_checkpoint_match=True,matched_frames=args.frames,capture_summary=marker,
                       baseline_sha256=digest(output / "baseline.csv"),captured_sha256=digest(output / "captured.csv"),
                       capture_files_sha256={path.name:digest(path) for path in sorted(capture.iterdir()) if path.is_file()})

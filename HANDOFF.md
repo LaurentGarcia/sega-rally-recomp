@@ -1,5 +1,114 @@
 # Handoff
 
+## Native segment selection and composed contact step (2026-10-26)
+
+The preceding ad0dab3 checkpoint is published; PS2 and source-export CI passed,
+as did Metal and both Vulkan workflows. Its broader desktop Build matrix was
+still running at the last observation. This batch recovers full course-segment
+selection and the final geometry/publication region of the main balance helper,
+and connects candidate preparation to the complete four-point contact pass.
+The governing design remains Platform layer & build's native PS2 exception.
+No arcade processor, mapped bus or device runtime enters the native target.
+The full vehicle callback and continuous native driving loop are still missing;
+the static preview and gameplay-performance status have not changed.
+
+The new resolve_main_contact_step starts at the original candidate prefix and
+ends after its immediately following contact call returns. It derives bases,
+candidate triples and the three response motion components from the newly
+prepared vehicle. All state commits together, including the prefix, four
+contacts and feedback. Capture 013's independently validated streams join by
+object/frame/instruction interval and complete saved caller words, with only
+the call-written return pointer changed. Call-ID coincidence is not a join
+proof. All 26 steps / 104 contacts / nine active responses / 1,196 state words
+match, fingerprint 9a47fb54b88fea84. Evidence:
+build/ps2-native-main-contact-step-live-001/result.json.
+The final marker is derived from observed prefix exit plus the established
+callee-preservation contract, not a separately observed post-contact marker;
+the unused initial scalar is zero because the callee resets it. All captured
+prefixes still have zero pending correction, so their active-consumption path
+is covered synthetically, not by these live samples. The checker calculates
+its intermediate contacts itself and links no original execution engine.
+
+Sixteen authored square controls independently check both prefix branches,
+signs, hits/misses and feedback choices. Four rejection paths include rollback
+after the fourth contact fails, preserving the consumed prefix and earlier
+contacts. Fingerprint 76ae45f11adbe279 is identical on host and corrected EE
+fixture. The first EE test failed because its decimal 0.1f expectation compiled
+to 3dcccccc; the native result was the verified original 3dcccccd. Disassembly
+shows the differing bits in integer constant stores before runtime arithmetic.
+The fixture now uses explicit expected bits for both signs. No production
+arithmetic changed. Failed ee-001 evidence is retained; the passing report is
+build/ps2-native-main-contact-step-ee-002/runtime-validation.json. The final
+ASan/UBSan evidence is main-contact-step-sanitize-002/validation.json under build/.
+
+Segment selection recovers the complete 0x2b0b0 helper and 0x2aed0 predicate,
+including actual geometry command 5c in its offline oracle. It searches in the
+original alternating order, consumes only visited quad vertices, retains signed
+zero edge behavior and publishes both full selected index and wrapped signed16
+current/progression values. A no-match result has all three values -1. The typed
+API accepts explicit bounded immutable assets, not mapped pointers. All 3,634
+synthetic original cases and 26 captured pairs match: 3,660 cases / 1,549 hits /
+2,443,240 CPU instructions / 784,700 geometry instructions, fingerprint
+af7d5f3820082612. Final proof:
+build/ps2-native-segment-selection-live-002/result.json.
+Twenty-five captured calls select immediately and one selects the next candidate;
+miss, wrap and large-index coverage is synthetic. The 69,170-case host corpus
+additionally covers every signed16 progression encoding at count one; that larger
+host set is not claimed as original-execution coverage. Four parser tests,
+ASan/UBSan, 55 atomic rejection checks and two search-order/read-domain controls
+pass. Review removed an overbroad promise about differently typed overlapping
+input/output storage; supported storage does not overlap.
+
+The main balance geometry operation covers the complete region 0x382f8..0x38658,
+not the whole 0x37870 helper. It preserves two recovered polynomial rotations,
+ordered transforms/additions, separately rounded binary64 balance terms, both
+in/out triples and selected-index publication. It requires no external table
+asset. All 20,480 synthetic and 26 captured evaluations match original CPU and
+geometry execution: 3,177,900 CPU instructions / 13,801,262 geometry instructions,
+fingerprint 12f85315dea7bb1c. Source-bound proof:
+build/ps2-native-main-balance-geometry-live-002/result.json. Four portable tests,
+ASan/UBSan and 84 atomic rejection checks pass. Earlier parts of the full helper
+still contain filtering, input/power and sound/event dependencies; recovering
+this tail does not establish those missing effects.
+
+Capture 013 adds only a separate main-motion stream. All 2,850 enabled/disabled
+checkpoints match; all ten older streams and code coverage are byte-identical
+to 012. It records 601 segment pairs and 601 tail pairs, with 26 sampled pairs
+of each in 104 new events. Total stream bytes: 10,036,377, within the 16 MiB
+bound. Validation SHA256 is
+4e3209462468247f583609fd4898e2bb6634357f3fa83562a58d62ad74dd8b97;
+new stream SHA256 is
+e2db2d94769f5da7c0c0dd0b00e8ede09319fdc208e0d4b3edc14b521ae609b0.
+The 120-source capture closure was verified before later inventory integration;
+those sealed historical reports are not silently relabelled as newer builds.
+Original images, captures, disassembly and generated oracle code remain private.
+
+All three final standalone fixtures execute in Play 0.72 HLE with exact markers,
+empty guest stderr and two window captures each. Segment: 3,634 cases /
+1c1c549c187f8285, 55 rejections and two controls. Balance geometry: 1,504 cases /
+3e2a507aab74e9d4, 84 rejections and two controls. Joined contact step: 16 controls /
+76ae45f11adbe279 and four atomic rejections. Each corresponding ee directory has
+a source/build/ELF/log-bound runtime-validation.json. The roughly 20-second
+observation windows are not execution timings; physical PS2 testing is pending.
+
+Native 021 passes the fixed 84-file source boundary, dependency directions and
+forbidden-symbol audit, with all recorded project sources current. The static
+ELF remains 2338119372579ee7012ec95fcd43f5210d8382cb112d6f4dbce9d3fc8f050158,
+2,274,240 file bytes / 593,080 resident bytes; the still-unconnected helpers are
+removed by the linker. The 21-file shared engine identity remains
+8bfba3e1904f90f61cec9230f3ea3f2a66013a37a6a7257d8dbe9055be1094e2.
+CI cross-links all three new fixtures. Independent production, original-oracle,
+joined-parser and domain reviews found no remaining blocker. All 245 portable
+PS2 tests pass in 59.702 seconds; log:
+build/ps2/validation/main-motion-tests-001.log. Exact staged-tree and archive
+source gates remain required before publication.
+
+Next: recover the intervening main-callback calculations and earlier balance
+helper effects, compare a complete car update against the original, then connect
+continuous native driving. Do not substitute captured motion or generic physics
+for those missing operations. Full game rendering/audio, course behavior and
+physical-console validation remain separate work.
+
 ## Native main vehicle operations (2026-10-26)
 
 The preceding ac7f576 checkpoint is published with all five workflows green.

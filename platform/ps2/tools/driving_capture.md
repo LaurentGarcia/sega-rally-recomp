@@ -70,6 +70,7 @@ adjacent objects may share that window.
 | `main-contact-cadence.jsonl` | Every bounded main-pass entry/return, object, frame and completed cross-pair count |
 | `main-vehicle.jsonl` | Independently paired main callback, candidate prefix, four slot helpers and the balance helper's parameter-selection/scalar boundaries |
 | `main-vehicle-cadence.jsonl` | Every bounded main callback entry/return, object, frame and completed slot-pair count |
+| `main-motion.jsonl` | Separate segment-selection and geometry-tail pairs joined to the unchanged main-vehicle parent records |
 | Detailed events | All 32 integer registers, AC, raw bits of four floating registers, object window and named RAM blocks |
 | `code-coverage.jsonl` | Nonzero instruction counts for the bounded ROM `0x20000..0x3ffff` analysis region and its relocated copy |
 
@@ -399,6 +400,41 @@ The later `main_response_*` family likewise records `entries`, `completions`
 and `sampled_pairs` for the complete per-contact response. Historical captures
 through 010 precede these response-input records and cannot establish their
 paired-input contract.
+
+## Additive main-motion capture
+
+Capture 013 adds `main-motion.jsonl` while preserving all ten earlier streams
+and code coverage byte-for-byte from capture 012. It passed all 2,850 exact
+enabled/disabled checkpoints in 122.123 seconds. Each of the 601 observed main
+callbacks contains one completed segment helper and one geometry tail; the
+26 selected parents contribute 104 new records. Combined stream storage is
+10,036,377 bytes, below the unchanged 16 MiB limit. All 120 source identities
+and capture hashes were checked before releasing the compilation freeze.
+The private validation report SHA-256 is
+`4e3209462468247f583609fd4898e2bb6634357f3fa83562a58d62ad74dd8b97`;
+the additive stream SHA-256 is
+`e2db2d94769f5da7c0c0dd0b00e8ede09319fdc208e0d4b3edc14b521ae609b0`.
+
+The ordered additive events are `segment_pre` at ROM `0x2b0b0`,
+`segment_post` at the saved return `0x34fc8`, `motion_tail_pre` at `0x382f8`
+and `motion_tail_post` at `0x38658`. Segment snapshots preserve the three
+position words at object `+0x14`, the packed index pair at `+0x88` and selector
+`0x214354`. The post boundary precedes the caller's index clamp, retaining
+the helper's `-1/-1` miss result. One of the inspected returns at `0x2b154`
+or `0x2b170` must verify the helper's saved caller before the dynamic return.
+The tail uses the already saved helper-entry pointers for both in/out triples
+and records ordinary word `0x214264`. Post registers do not substitute for
+saved pointer identities. Neither observer reads an extra geometry FIFO word.
+
+`main_motion_capture.py` adds validation without changing the older vehicle
+reader. It binds each four-event group to the existing callback/helper proofs,
+instruction intervals and exact ordinary-RAM arguments; counts must establish
+one completed pair of each kind per observed callback. Its file reader requires
+the new stream's own sealed hash and the original enabled/disabled checkpoint
+identities. Five source-only reader regressions and 22 actual-observer tests
+pass, including cached/spilled callers and fifteen invalid new sequences.
+The records establish observed boundaries; numerical component comparisons
+remain separate from capture completion.
 
 ## Limits and tests
 
