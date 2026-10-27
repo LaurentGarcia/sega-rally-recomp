@@ -102,12 +102,20 @@ forces or contact results are supplied.
 The integrated EE driver advances the car under neutral controls in Play.
 The production renderer uses binary32 geometry and both vector units. The
 equivalent initial samples measured approximately **12.5 ms for the native
-update**, **27.6 ms for geometry preparation** and **52.1 ms combined
-update/presentation**, about 19 updates/sec. Geometry is 13.6 times faster than
-the preceding native 026 build's 375.7 ms. The intervening exact-cache path
+update** and **20.5 ms for geometry preparation**. The longer sample remains
+about **50 ms combined update/presentation**, around 20 updates/sec including
+vsync. Geometry was 375.7 ms in native 026 and 27.6 ms in native 030; scratch
+reuse, optional detailed clocks and skipping unused clipping buffers reduce it
+further. The intervening exact-cache path
 measured 224.3 ms; its arithmetic remains available for comparison.
 These are emulator timer observations, not physical-console performance or a
 full-race benchmark. Display refresh shown by the emulator is not game speed.
+
+An optional strict `--optimization O3` build of the same final sources measures
+17.7 ms geometry and 12.2 ms game update. It averages about 26.7 native updates/sec
+over 480 updates, improving on O2 but still missing steady 30. O2 remains the
+build default; both retain the same math settings. The private comparisons and
+limitations are recorded in `HANDOFF.md`.
 
 Conservative course-section rejection, exact clipping classification, shared
 vertex reuse and fewer bounds conversions reduce that geometry cost. The
@@ -162,6 +170,10 @@ the same three paths for the exact scalar comparison, or `--drive-guarded` for
 guarded VU transforms with reference clipping. VU startup failure keeps the
 selected scalar mode, and transport retirement is logged before disabling offload.
 The application establishes DMA master enable before initializing the display.
+`--drive-profile CHECKPOINT COURSE BODY` selects native rendering with detailed
+scene timing. Those per-face clocks are otherwise disabled until the debug page
+is shown; their measurement overhead is included in diagnostic timings. Coarse
+game, geometry and display timings remain available in normal mode.
 
 Cross accelerates, Square brakes, and the left stick or directional buttons
 steer. L1/R1 select gears only when the checkpoint enables manual selection.

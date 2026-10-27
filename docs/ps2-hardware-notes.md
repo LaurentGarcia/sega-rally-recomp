@@ -165,6 +165,38 @@ with the staging reduction, these changes recover 2,490,368 bytes before a
 native-rendered frame needs CPU fallback. Runtime peaks, allocator fragments,
 the stack and live geometry still have to fit together.
 
+## Native vehicle measurements, 27 October 2026
+
+The native vehicle target is separate from the historical machine/reference
+probe above. It runs recovered game systems directly, uses binary32 rendering
+on EE/VU, and keeps exact reference rendering as a diagnostic mode. The default
+O2 build measures 20.481 ms geometry and 12.471 ms game update over the same
+first three states, compared with 27.560 ms geometry before scratch reuse,
+removal of a duplicate DMA cache publication, disabling detailed scene clocks
+and skipping clipping scratch for fully inside triangles.
+These combined builds do not isolate the contribution of each source change.
+The longer run still averages about 50 ms/update including presentation/vsync.
+
+Strict O3 with the final sources measures 17.720 ms geometry and 12.178 ms game
+update. It averages 37.394 ms/update over 480 updates, about 26.7 updates/sec.
+This is still below steady 30. O2 remains the default; no fast-math or floating
+contraction is enabled in either build.
+
+The inside-triangle path preserves the same projection order and failure
+contracts. All 1,803 ordered frame comparisons remain byte-identical; a controlled
+O3 first-pose experiment saves 4.750 ms, while the ordinary O2 driver saves
+2.555 ms against the preceding build. The original pose-preparation hypothesis
+was disproven: it costs about 0.08 ms. An isolated
+first-pose direct-output experiment saves only about 0.08 ms while preserving
+all ordered triangle fields, so it is not adopted as the explanation for the
+remaining cost. Per-stage attribution also depends on the diagnostic clock and
+instrumented build; it is not a cycle-accurate hardware measurement.
+
+These observations use Play 0.72 HLE and its guest timers. They do not establish
+physical-console speed, full-race fidelity or simultaneous VU execution. Source
+identities and exact comparison evidence are recorded in `HANDOFF.md` and the
+[native rewrite guide](ps2-native-rewrite.md).
+
 ## Readable diagnostics
 
 Normal play has no diagnostic overlay. **Select + Start** toggles a full-screen

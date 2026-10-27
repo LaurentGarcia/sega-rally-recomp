@@ -83,6 +83,8 @@ struct Display::Impl {
     bool transport_failed = false, retain_dma_memory = false;
     const char *failure = "NATIVE GS NOT INITIALIZED", *debug = nullptr, *caption = nullptr;
     Stats counters{};
+    DisplayClock clock=nullptr;void* clock_context=nullptr;
+    std::uint64_t now() const noexcept {return clock?clock(clock_context):std::uint64_t{0};}
     struct TextureSlot { texbuffer_t buffer{}; Texture key{}; std::uint64_t age = 0; bool valid = false; } textures[texture_slots];
     struct PaletteSlot {
         clutbuffer_t buffer{};
@@ -213,13 +215,17 @@ struct Display::Impl {
         complete(q);
     }
     void flip(bool decorate = true) {
+        const auto start=now();
         if (decorate) {
             if (debug) page(debug);
             else page(caption,false);
         }
+        const auto vsync_start=now();
+        counters.decoration_ticks=vsync_start-start;
         graph_wait_vsync();
         graph_set_framebuffer_filtered(frames[target].address, 640, GS_PSM_32, 0, 0);
         target ^= 1;
+        counters.vsync_ticks=now()-vsync_start;
     }
 };
 
@@ -238,6 +244,9 @@ const Stats &Display::stats() const { static const Stats empty; return impl_ ? i
 void Display::set_vu0_packing(bool enabled) { if (impl_) impl_->use_vu0 = enabled && vu0_pack_available(); }
 void Display::set_debug_page(const char *text) { if (impl_) impl_->debug = text; }
 void Display::set_caption(const char *text) { if (impl_) impl_->caption = text; }
+void Display::set_profile_clock(DisplayClock clock,void* context) noexcept {
+    if(impl_){impl_->clock=clock;impl_->clock_context=context;}
+}
 void Display::invalidate_textures() noexcept {
     if (!impl_) return;
     for (auto &slot : impl_->textures) {
@@ -326,8 +335,11 @@ bool Display::initialize() {
 bool Display::present(const Frame &frame) {
     if (!impl_ || !impl_->ready) return false;
     auto &d = *impl_;
+    const auto validation_start=d.now();
     if (!valid_frame(frame, d.failure)) return false;
     d.counters = {};
+    const auto build_start=d.now();
+    d.counters.validation_ticks=build_start-validation_start;
     qword_t *q = d.clear(frame.clear_color, frame.depth_test);
     const float sx = 640.f / frame_width, sy = float(d.height) / frame_height;
     for (const auto &triangle : frame.triangles) {
@@ -389,7 +401,10 @@ bool Display::present(const Frame &frame) {
         std::memcpy(q, registers, sizeof registers); q += 5;
         q = draw_prim_end(q, 3, DRAW_STQ_REGLIST);
     }
+    const auto completion_start=d.now();
+    d.counters.build_ticks=completion_start-build_start;
     d.complete(q);
+    d.counters.completion_ticks=d.now()-completion_start;
     d.flip(); d.failure = "NONE";
     return true;
 }

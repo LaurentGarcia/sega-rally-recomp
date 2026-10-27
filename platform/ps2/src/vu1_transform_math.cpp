@@ -129,7 +129,8 @@ TransformGuard guard_prepared_vu1_projection(const TransformVector4&v,const Prep
         if(magnitude[i] && (magnitude[i]<0x00800000u||magnitude[i]>0x47800000u))return TransformGuard::invalid;}
     if(!p.plane_possible_||magnitude[0]>p.plane_[0]||magnitude[1]>p.plane_[1]||raw[2]<p.plane_[2]||raw[2]>p.plane_[3])return TransformGuard::near_clip_plane;
     if(!p.budget_possible_||magnitude[0]>p.budget_limit_[0]||magnitude[1]>p.budget_limit_[1]||raw[2]>p.budget_limit_[2])return TransformGuard::projection_budget;
-    if(out)*out=p.estimate_;return TransformGuard::accepted;
+    if(out)*out=p.estimate_;
+    return TransformGuard::accepted;
 }
 bool transform_reference(const TransformMatrix&a,const TransformMatrix&b,
                          std::span<const TransformVector4>input,std::span<TransformVector4>output) noexcept {

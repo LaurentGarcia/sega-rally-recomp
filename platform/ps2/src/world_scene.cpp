@@ -227,6 +227,10 @@ bool WorldScene::update(std::span<const WorldInstance> instances,const WorldView
     std::uint32_t provider_triangle_corners=0;
     std::uint64_t bounds_ticks=0,transform_ticks=0,clipping_ticks=0;
     auto& batch=storage_->batch;
+    // Every face overwrites all input corners. Clippers commit only their
+    // returned output count, so reuse scratch without clearing its unused tail.
+    std::array<Triangle,clip_triangle_capacity> clipped;
+    ClipTriangle input;
     for(const auto& instance:instances){std::size_t group_index=0;
     batch.count=0;batch.end_face=0;
     if(++storage_->cache_serial==approximate_vertex){for(auto& entry:storage_->vertex_cache)entry.serial=0;storage_->cache_serial=1;}
@@ -240,7 +244,7 @@ bool WorldScene::update(std::span<const WorldInstance> instances,const WorldView
         }
         const auto& face=instance.model.faces[face_index];
         auto& material=bank.materials[material_index++];material.color=face.argb;
-        ClipTriangle input;input.material=&material;
+        input.material=&material;
         std::array<bool,3> approximate{};
         const auto transform_start=now();
         if(transform_batch_&&face_index>=batch.end_face){
@@ -302,7 +306,6 @@ bool WorldScene::update(std::span<const WorldInstance> instances,const WorldView
             }
         }
         transform_ticks+=now()-transform_start;
-        std::array<Triangle,clip_triangle_capacity> clipped;
         const auto clip_start=now();
         const auto result=native?clip_project_triangle_float(input,clipped):clip_project_triangle(input,clipped);
         clipping_ticks+=now()-clip_start;

@@ -120,6 +120,18 @@ ClipResult clip_project_triangle_float(const ClipTriangle &input,
         common_outside &= outside;
     }
     if (common_outside) return {};
+    // Fully inside triangles need no polygon scratch. Preserve projection
+    // order and check degeneracy before capacity; publish only after success.
+    if (!any_outside) {
+        std::array<Vertex, 3> projected;
+        for (unsigned i = 0; i < 3; ++i)
+            if (!project(input.vertices[i], projected[i], true))
+                return {ClipStatus::numerical_failure, 0, 0};
+        if (!nonzero_area(projected)) return {};
+        if (output.empty()) return {ClipStatus::insufficient_capacity, 0, 1};
+        output[0] = {projected, input.material};
+        return {ClipStatus::success, 1, 1};
+    }
     Polygon first{}, second{};
     std::copy(input.vertices.begin(), input.vertices.end(), first.begin());
     auto *from = &first, *to = &second;

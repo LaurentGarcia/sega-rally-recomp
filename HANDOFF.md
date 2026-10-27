@@ -1,5 +1,153 @@
 # Handoff
 
+## Native frame-cost reduction and profiling (2026-10-27)
+
+Continued from fc5695c with measured frame costs. The final O2 native035 default
+measures 20.481 ms geometry versus native031's 27.560 ms on the same initial
+three states, a 25.7% reduction. Native033, before the inside-triangle fast path,
+measured 23.036 ms. Game update remains 12.471 ms. The run reaches update360,
+but still averages 49.952 ms/update including presentation/vsync: no frame-rate
+improvement is established. Measurements and exact log hashes are in
+build/ps2/native-035/performance-comparison.json. All eight common logged state,
+control, motion, triangle and sound-request samples match native033 through
+update300. The two requested window captures failed; stdout is the evidence
+for this run, not screenshots or GS readback.
+
+Native035 and engine-demo015 cross-compile with the same 29 engine input hashes,
+manifest 2b456f18cbac3bece380b2458a746544a8a43e4d03e0daad7d639888415be89e.
+Their reports match all current compiled sources. Native ELF SHA256 is
+2ac1e2aa86076bbe24648eb68ce6ffba643c367ce5bb9a8095500a367d9f155d;
+the game/profile proof's 82 source hashes also remain current. Evidence:
+build/ps2-engine-demo-015/shared-engine-validation.json. The independent demo
+was cross-built in this revision; it was not rerun on console.
+
+Strict O3 with the final sources (native036) measures 17.720 ms geometry and
+12.178 ms game update. Its 480-update run averages 37.394 ms/update, about
+26.7 native updates/sec, versus O2's roughly 20. Nine common logged samples match
+through update360. This is an improvement but not steady 30 or full-race speed.
+The compiler default remains O2. O3 retains no-fast-math and disabled FP
+contraction. Report: build/ps2/native-036-o3/performance-comparison.json;
+ELF SHA256 603cc92aa7ce0438abf1fc3e1b9a9e9099f7aa0e02eab91ee49891eb5853d766.
+
+The separate strict-O3 EE continuity fixture passes all 601 updates with the
+same 96,761 state fields, 13,222 pose words, 458 sound requests and fingerprint
+57e2c98c5de78376. Its independent profiled/unprofiled sequences match, and both
+new 752-byte EE checkpoint exports equal the host proof byte for byte. All 76
+compiled source hashes and 36 strict-O3 compilation commands are bound in
+build/ps2/native-vehicle-o3-ee-001/runtime-validation.json. Fixture runtime
+includes IO, map construction and checking; it is not frame-performance data.
+
+WorldScene reuses its fully overwritten input triangle and bounded output
+scratch once per update instead of repeatedly initializing them per face.
+Five fixtures pass unchanged, including allocation, rollback and provenance
+checks; ASan/UBSan passes 775 float frames / 70,417 checks. A direct comparison
+of 1,803 complete frames (601 poses times reference, float scalar and actual VU
+replay) finds no mismatch in 124,539,359 ordered output bytes. Evidence:
+build/ps2-world-cost-002/comparison.json. This exact-output comparison is
+separate from the existing native-versus-reference image differences.
+The current-source actual-VU replay is sealed in
+build/ps2-world-vu-scratch-003/corpus-result.json and preserves all earlier
+coverage, topology and depth measurements, including excess-callback rejection.
+
+Fully inside triangles now project their three corners directly, preserving
+projection order, area rejection, capacity precedence and atomic output. They
+skip the unused polygon and staged-fan scratch. The isolated O3 first-pose
+comparison saves 20.35% / 4.750 ms; the ordinary O2 driver saves 2.555 ms over
+native033. These are distinct measurements. The final old/new full-frame proof
+is build/ps2-world-inside-frames-002/comparison.json: all 1,803 frames and
+124,539,359 bytes match. ASan/UBSan also passes 105,762 exact old/new calls over
+35,254 inputs and three output capacities, plus 1,934,119 authored checks:
+build/ps2-world-inside-001/final-result.json. Signed zero, empty capacity,
+degeneracy, invalid inputs and untouched tails retain their contracts.
+
+The VU backend no longer repeats cache publication already performed by pinned
+SDK dma_channel_send_normal with flags zero. The SDK disassembly/hash is bound
+in build/ps2-vu-transport-audit-001/result.json. Ownership, packet, fences and
+microcode are unchanged. New executing corpus005 passes all 601 poses,
+1,364,846 vertices and 70,552 submissions. Its 22,119,772 output bytes are
+identical to corpus004; see build/ps2-vu1-corpus-ee-005/runtime-validation.json
+and build/ps2-vu1-native-corpus-002/output-comparison.json. Combined build
+measurements do not isolate the cache-flush saving.
+
+Optional main-update clocks separate entry, contact, force/front, balance and
+motion; display clocks separate validation, packet construction, completion,
+decoration and vsync. Main force/front costs about 6.8 ms and balance about
+4.6 ms in the O2 sample. The profiled/unprofiled 601-step game comparison is
+byte-identical, retaining fingerprint 57e2c98c5de78376, all 96,761 state fields,
+13,222 pose words and 458 sound requests. ASan/UBSan, six malformed records,
+clock wrap and failure-preservation checks pass:
+build/ps2-native-vehicle-profile-002/result.json. Game arithmetic is unchanged.
+
+Detailed scene clocks are off by default, enabled by --drive-profile with the
+usual three private paths or while the debug page is visible. Outer update and
+geometry measurements remain active, and counters distinguish disabled timing
+from absent VU work. This avoids thousands of diagnostic clock calls during
+normal drawing. The body-preparation hypothesis was disproven: its exact pose
+work takes only about 0.08 ms. The remaining unassigned scene cost is not blamed
+on that work or VU waiting without additional evidence.
+
+EE disassembly rejects hidden allocations, per-face palette clearing, software
+double leakage and unconditional callback save/restore as explanations. Triangle
+publication uses nineteen word loads/stores per 76-byte EE triangle, but removing
+that copy in a private first-pose experiment saves only 0.35% / 0.083 ms. All eight
+alternating outputs have identical ordered geometry fingerprints. The experiment
+is not promoted. Its CP0 stage counters attribute more work to clipping than the
+coarse timers, but tiny intervals show emulator granularity and compiler effects;
+they are not physical-cycle measurements. Evidence:
+build/ps2-world-profile-ee-001/runtime-validation.json and
+build/ps2-world-cost-audit-001/result.json.
+
+The previous PS2 CI run failed because GCC's -Werror rejected an ambiguously
+formatted if/return in the projection guard. Splitting those statements changes
+no arithmetic. The two focused tests pass on Apple Clang, macOS GCC16 and Linux
+amd64 GCC, and now include compiler diagnostics when subprocess compilation
+fails. The complete portable PS2 suite passes 288 tests in 87.144 seconds after the final clipping change.
+
+An isolated pad probe confirms all 256 receive-buffer bytes remain at their
+startup contents through 13 samples over 12 EE timer seconds, with both new
+protocol frame counters zero. Reported module version is 0x0306, state5/request2.
+Port close also does not complete in the observation window. This establishes
+missing IOP-to-EE publication in this Play configuration; it does not identify
+an interrupt, SIO2 or transfer root cause. No synthetic input or speculative
+ready-state bypass was added. Evidence: build/ps2-pad-publication-001.
+
+The subsequent passive IOP observer records 720 VBlank start and end callbacks
+over twelve seconds. Padman's TransferThread leaves its event wait and remains
+in a semaphore wait inside the first SIO2 transfer; MainThread waits for transfer
+completion. The receive buffers still do not change. Missing VBlank and the
+game's pad adapter are not supported as the cause. Play's ReferThreadStatus
+does not populate waitId, so its printed zero is not an observed semaphore ID.
+The private probe is build/ps2-pad-publication-002; no controller production
+change is justified by these observations alone.
+
+Observer003 distinguishes the SDK's two SIO2 semaphores using a synchronous
+baseline before padman loads. Transfer-lock semaphore1 starts available, then
+has count0 and one waiter through twelve snapshots; completion semaphore2 has
+count0 and no waiters. Padman's transfer thread is the sole semaphore waiter.
+Thus the observed stall is lock acquisition, not waiting for the SIO2 completion
+interrupt. VBlank still advances and receive buffers stay unchanged. Evidence:
+build/ps2-pad-publication-003/runtime-observation.json. The pinned SDK and Play
+source provide a matching explanation: padman imports sio2man v1.2, with
+ordinal46 for transfer initialization and ordinal49 for transfer. Sio2man
+registers v2.7 before v1.2 under the same name. Play's name-only module registry
+rejects the second registration while loadcore reports success; v2.7 ordinal49
+is another transfer initializer. The apparent transfer therefore locks twice.
+This source-supported explanation still needs confirmation with a corrected
+emulator. No SDK/game workaround, guessed signal or readiness bypass is added.
+
+Next: correct Play's module-version selection and repeat the pad probe, then
+reduce the measured EE scene/game costs enough to sustain the next
+frame cadence. Keep recovery of the original model/world bridge, materials,
+camera, sound playback and complete race flow separate from timing success.
+Physical-console validation remains outstanding.
+
+Source-release validation uses the exact staged tree and matching source tar;
+the initial gate passes at build/ps2-frame-cost-source-release-001/gate.json.
+The final documented revision is gated separately under
+build/ps2-frame-cost-source-release-002 before commit. Private inputs, converted
+data, diagnostic fixtures, output streams, captures and ELF files remain ignored.
+
+
 ## Native binary32 rendering and connected VU pipeline (2026-10-27)
 
 The production vehicle renderer now uses binary32 geometry instead of running

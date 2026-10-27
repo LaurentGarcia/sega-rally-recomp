@@ -72,7 +72,7 @@ CPU or device runtime. Rendering performance, the model/camera relationship,
 game audio and full race flow remain unfinished; this is not a playable release.
 The native renderer now uses 32-bit geometry, VU1 transform batches and VU0 GS
 packing. Initial equivalent-state Play samples reduce geometry preparation
-from 375.7 ms to 27.6 ms; physical-console performance remains unverified.
+from 375.7 ms to 20.5 ms; physical-console performance remains unverified.
 See the [PS2 build guide and limits](docs/ps2.md).
 The [shared engine](docs/ps2-engine-architecture.md) keeps hardware services
 independent of Rally rules and includes an original engine-only sample.

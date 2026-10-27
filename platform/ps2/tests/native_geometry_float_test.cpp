@@ -74,6 +74,24 @@ bool authored() {
     CHECK(out[0].vertices[0].x == 124 && out[0].vertices[0].y == 288);
     CHECK(out[0].vertices[1].x == 372 && out[0].vertices[2].y == 96);
     CHECK(compare(triangle));
+    // The inside-only path has the same atomic capacity contract as clipping.
+    const auto inside_bytes = snapshot(out);
+    r = clip_project_triangle_float(triangle, std::span<Triangle>(out).first(0));
+    CHECK(r.status == ClipStatus::insufficient_capacity && r.count == 0 && r.required == 1);
+    CHECK(unchanged(out, inside_bytes));
+    auto flat_inside = triangle;
+    flat_inside.vertices[2].y = flat_inside.vertices[0].y;
+    r = clip_project_triangle_float(flat_inside, std::span<Triangle>(out).first(0));
+    CHECK(r.status == ClipStatus::success && r.count == 0 && r.required == 0);
+    CHECK(unchanged(out, inside_bytes));
+    triangle.vertices[2].u = -0.0f;
+    out[1].vertices[0].x = 123.0f;
+    const auto tail_bytes = snapshot(out);
+    r = clip_project_triangle_float(triangle, std::span<Triangle>(out).first(1));
+    CHECK(r.status == ClipStatus::success && r.count == 1 && r.required == 1);
+    CHECK(std::bit_cast<std::uint32_t>(out[0].vertices[2].u) == 0x80000000u);
+    CHECK(std::memcmp(out.data() + 1, tail_bytes.data() + sizeof(Triangle),
+                      sizeof(out) - sizeof(Triangle)) == 0);
     for (unsigned plane = 0; plane < 7; ++plane) {
         triangle = inside();
         auto &a = triangle.vertices[0];

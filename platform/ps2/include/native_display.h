@@ -51,7 +51,12 @@ struct Stats {
     std::uint32_t palette_uploads = 0, palette_hits = 0;
     std::uint64_t texture_bytes = 0, palette_bytes = 0;
     std::uint32_t vu0_vertices = 0; // Final XY conversion, excludes padded lanes.
+    // Optional caller-clock units. Build includes any mid-frame transfers;
+    // completion fences final geometry, decoration precedes the vsync wait.
+    std::uint64_t validation_ticks=0,build_ticks=0,completion_ticks=0;
+    std::uint64_t decoration_ticks=0,vsync_ticks=0;
 };
+using DisplayClock=std::uint64_t (*)(void*) noexcept;
 enum class ReadbackStatus {
     ok, not_ready, invalid_rectangle, busy, unsupported_configuration,
     gif_timeout, finish_timeout, receive_timeout, fifo_timeout, cleanup_failed
@@ -103,6 +108,8 @@ public:
     void set_debug_page(const char *text);
     // Optional two-line study label; caller retains text while enabled.
     void set_caption(const char *text);
+    // Null disables profiling; caller retains context and serializes changes.
+    void set_profile_clock(DisplayClock,void* context=nullptr) noexcept;
     const char *error() const;
     unsigned output_height() const;
     const Stats &stats() const;

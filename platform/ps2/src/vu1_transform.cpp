@@ -72,7 +72,8 @@ struct Vu1Transform::Storage {
         // Valid VIF NOPs also avoid the documented Play0.72 final-prefetched-
         // qword resume defect. Keep the ENTIRE source alive through DMA end.
         for(unsigned i=0;i<4;++i)word(0);
-        SyncDCache(packet.data(),packet.data()+used);
+        // The pinned SDK's normal send publishes the full qwc*16-byte packet
+        // through SyncDCache before starting DMA; do not flush that range twice.
         const auto start=ticks();
         if(dma_channel_send_normal(DMA_CHANNEL_VIF1,packet.data(),int(used/4),0,0)<0)
             return retire("VU1 DMA SUBMISSION FAILED");

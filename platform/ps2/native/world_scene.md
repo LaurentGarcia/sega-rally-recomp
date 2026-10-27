@@ -26,6 +26,13 @@ frame refers to owned storage and expires at the next successful update or
 reconfiguration, or owner destruction. Calls must be serialized with display
 submission. `stats().persistent_bytes` reports actual bank/object storage.
 
+Clipping input and its eight-triangle output scratch are initialized once per
+update and reused across faces. Every input corner and material pointer is
+overwritten before clipping; only the returned output count enters the inactive
+frame bank. Unused scratch entries are never copied. This removes repeated
+default initialization without changing allocation, capacity, ordering or
+transactional publication.
+
 Configuration also allocates an exact transformed-vertex cache by default,
 with a power-of-two capacity capped at 4,096 entries / 128 KiB. Its key contains
 the model vertex index and a serial that changes for every instance and every
@@ -213,6 +220,85 @@ Replay revision 001 is superseded: its reader rejected an extra callback but
 did not latch that error, allowing scalar fallback to conceal an excess request.
 Revision 002 latches the error and checks an explicit excess-callback rejection
 after completing the stream. All 601 image measurements remain unchanged.
+
+The subsequent scratch-reuse change passes all five portable fixtures and the
+775-frame native-float fixture under ASan/UBSan. A direct old/new stream
+comparison covers all ordered material colors and six binary32 vertex fields
+in 1,803 complete frames: reference, native scalar and actual-VU replay for
+each of the 601 poses. All 124,539,359 compared bytes, including deterministic
+summaries, match. The source-bound evidence is
+`build/ps2-world-cost-002/comparison.json`; it does not retain another copy of
+the private geometry stream. The refreshed strict VU replay at
+`build/ps2-world-vu-scratch-003/corpus-result.json` preserves every numerical
+and raster measurement above and the excess-callback negative check. This
+binds the subsequent transport fixture's
+`build/ps2-vu1-corpus-ee-005/runtime-validation.json`: its complete 22,119,772-byte
+VU output matches the previous run exactly. The replay uses those sealed
+outputs with byte-matched batch inputs; the replay itself is not another VU
+execution or a physical-console test.
+
+The timing investigation first suspected exact body-pose preparation outside
+the scene stage counters. Native build 031 disproved that explanation in Play:
+pose preparation took about 0.08 ms, while `WorldScene` took 27.33–27.55 ms.
+Roughly 11.2 ms lay outside its four stage counters. Repeated clipping-scratch
+initialization occurred before the clipping counter, making it a measured
+candidate for that residual. A 6,010-frame host diagnostic decreased from
+0.731 s to 0.617 s after scratch reuse; this single host comparison is not a
+PS2 speed claim. Native build 032 subsequently measured about 24.53–24.72 ms
+for the first three geometry preparations in Play, approximately 2.9 ms less
+than build 031. That build also includes a separate VU cache-publication
+change, so the whole difference is not attributed to scratch reuse alone.
+
+The unassigned scene time still measured approximately 11.2 ms in build 032:
+frame one's scene total was 3,605,248 timer ticks, while the four stage totals
+sum to 1,951,744 ticks, at 147,456,000 reported ticks per second. Initialization
+can move across clock calls during compilation; stage attribution alone does
+not establish where the saving occurred. Detailed profiling calls the supplied
+clock four times per processed face, twice per group and twice for validation.
+Only part of each clock call lies inside the accumulated intervals. Native
+build 033 disabled those detailed calls while retaining the outer geometry
+timer: the first-three mean fell to 23.036 ms, about 1.6 ms less. Thus timer
+overhead did not explain the whole previously unassigned interval.
+
+A separate private O3 fixture then used CP0 Count to bracket the complete
+scene work, including material setup and output emission, on one fixed real
+checkpoint pose. Eight updates alternated the existing scratch-copy path and
+a diagnostic direct-output path; all produced the same ordered geometry
+fingerprint and 906 triangles. Baseline mean counts were 6.879 million total,
+2.789 million clipping, 2.069 million transform, 1.227 million bounds,
+0.610 million validation and 0.143 million emission, with about 0.040 million
+unassigned. These finer counters attribute much more work to clipping than
+the coarse timer did. They remain instrumented emulator observations: compiler
+scheduling and emulator counter behavior limit tiny interval attribution
+(material setup read exactly one count per processed face).
+
+Direct output reduced the outer timer mean only from 3,443,392 to 3,431,168
+ticks, approximately 0.35% / 0.083 ms in this fixed-pose experiment. It was not
+adopted into production. The result rules out removing that copy as the large
+remaining improvement sought here; it does not establish console timing or
+cost across every scene. Source, ELF, logs, input identities and all eight
+measurements are bound in
+`build/ps2-world-profile-ee-001/runtime-validation.json`. The ordinary renderer
+retains the tested scratch-reuse implementation.
+
+The next bounded experiment instead specialized wholly inside triangles in the
+native float clipper. After the unchanged input and plane checks, that path
+performs the same three projections, area predicate and capacity check, then
+publishes one triangle atomically. It avoids initializing the general clipping
+polygons, maximum-size projected array and eight-triangle staging array.
+Triangles requiring clipping continue through the previous general path.
+
+The same fixed-pose, same-executable O3 comparison alternated the original and
+inside-specialized clippers while retaining outer scratch copying in both.
+All eight updates again produced identical ordered geometry. Mean outer time
+fell from 3,441,280 to 2,740,928 reported ticks: 20.35%, or about 4.750 ms in
+this instrumented Play experiment. The source/ELF-bound result is
+`build/ps2-world-inside-ee-001/runtime-validation.json`. A separate comparison
+of all 601 poses in reference, native-scalar and actual-VU replay modes matches
+all 124,539,359 output-stream bytes exactly; its evidence is
+`build/ps2-world-inside-frames-002/comparison.json`. This measured fast path was
+selected for production; it adds no numerical approximation or game-state
+change. Emulator timing on one pose does not establish a console frame rate.
 
 The current `RallyBodyScene` integrates a separate raw model-local body asset
 with persistent native position/orientation and an explicit model-to-car bridge.

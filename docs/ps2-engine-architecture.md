@@ -86,11 +86,12 @@ All 94 portable PS2 tests passed. These bounded emulator checks do not establish
 physical-console performance, interactive controller behavior or audible output.
 Fatal reverse-transfer quarantine was reviewed but not fault-injected.
 
-Subsequent native-game recovery adds standalone EE fixtures for steering,
+Early native-game recovery added standalone EE fixtures for steering,
 orientation, course contact, point transforms and contact-result interpretation.
 The native application passes its source-boundary audit while the same 21
 engine input hashes remain unchanged. These recovered semantics stay
-in the game role and are not yet connected to driving gameplay. The latest
+in the game role; the later developer vehicle driver connects the recovered
+main update to live native rendering. The latest
 test counts and source-bound evidence are recorded in `HANDOFF.md` and the
 [native rewrite guide](ps2-native-rewrite.md).
 
@@ -124,6 +125,13 @@ The vehicle application selects native binary32 presentation by default, with
 exact and guarded modes available for comparison. Its game update retains
 separate exact arithmetic. VU1 and VU0 currently execute
 in sequence, so both being active does not establish overlapped work.
+
+Profiling clocks are optional caller-owned callbacks. The display reports
+validation, packet construction, completion, decoration and vsync separately;
+packet construction includes any transfers needed before the final packet.
+WorldScene's detailed per-face timing is disabled during normal vehicle drawing
+and enabled explicitly for diagnostics. Timings include instrumentation cost
+and do not measure hardware-unit utilization or establish console throughput.
 
 The GS path retains native indexed textures, CLUTs, explicit primitive order,
 optional Z16S depth and visible cache/transfer counters. It does not hide these

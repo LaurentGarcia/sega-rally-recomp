@@ -40,6 +40,17 @@ struct MainVehicleOutput {
     std::array<MainBalanceCommand,72> commands{};
     unsigned command_count=0;
 };
+// Optional caller-owned observation. The clock must be side-effect-free with
+// respect to game/asset state. Tick fields publish only after a successful
+// update; rejection leaves the whole profile unchanged. A null clock performs
+// no calls and publishes zero ticks. Total includes wrapper/adaptation work;
+// front/balance/motion include appending their emitted command requests.
+struct MainVehicleProfile {
+    std::uint64_t (*clock)(void*) noexcept=nullptr;
+    void* context=nullptr;
+    std::uint64_t entry_ticks=0,contact_ticks=0,front_ticks=0;
+    std::uint64_t balance_ticks=0,motion_ticks=0,total_ticks=0;
+};
 // Compose the recovered main callback, retaining the resulting state for the
 // next call. The optional surrounding-car entry stage remains unsupported and
 // rejects explicitly. Every constituent domain applies. State and publication
@@ -48,5 +59,6 @@ struct MainVehicleOutput {
                                        const MainVehicleSetup& setup,
                                        const MainVehicleInputs& input,
                                        MainVehicleState& state,
-                                       MainVehicleOutput& output) noexcept;
+                                       MainVehicleOutput& output,
+                                       MainVehicleProfile* profile=nullptr) noexcept;
 } // namespace ps2::native

@@ -16,8 +16,12 @@ bool append(MainVehicleOutput& output,const MainBalanceEffects& source) noexcept
 }
 bool update_main_vehicle(const DrivingAssets& assets,const MainVehicleSetup& setup,
                          const MainVehicleInputs& input,MainVehicleState& output_state,
-                         MainVehicleOutput& output) noexcept {
+                         MainVehicleOutput& output,MainVehicleProfile* profile) noexcept {
     if(!assets.loaded())return false;
+    MainVehicleProfile timing;
+    if(profile){timing.clock=profile->clock;timing.context=profile->context;}
+    const auto now=[&]() noexcept {return timing.clock?timing.clock(timing.context):std::uint64_t{0};};
+    const auto total_start=now();
     MainVehicleState state=output_state;
     MainVehicleOutput published{};
     // The surrounding original course draw publishes this immutable row before
@@ -30,7 +34,9 @@ bool update_main_vehicle(const DrivingAssets& assets,const MainVehicleSetup& set
     MainEntryInput entry_input{assets.selection_vertices(),assets.selection_segments(),
         {car.position[0],car.position[2]},input.steering_sample,input.flag_sample,input.screen,input.surrounding_car_update};
     MainEntryState entry{flags(state),state.steering_history,state.steering,state.segment,state.progression};
+    auto stage_start=now();
     if(!begin_main_update(entry_input,entry))return false;
+    timing.entry_ticks=now()-stage_start;
     state.flags=std::uint16_t(entry.flags);state.steering=entry.steering;state.steering_history=entry.steering_history;
     state.segment=entry.segment;state.progression=entry.progression;
     published.selected_segment=entry.published_segment;published.progression=entry.published_progression;
@@ -40,7 +46,9 @@ bool update_main_vehicle(const DrivingAssets& assets,const MainVehicleSetup& set
     contact_input.local_points=*assets.local_points();contact_input.segment=state.segment;
     contact_input.response_parameter=setup.divisors[0];contact_input.gain_parameter=setup.divisors[1];
     contact_input.scalar_divisor=setup.divisors[2];contact_input.feedback_enabled=state.front.cabinet.mode==0;
+    stage_start=now();
     if(!resolve_main_contact_step(contact_input,state.front.contact))return false;
+    timing.contact_ticks=now()-stage_start;
     MainFrontInputs front_input;
     front_input.course=assets.course();front_input.normal_table=assets.normal_table();
     front_input.local_points=assets.motion_assets()->local_points;front_input.segment=state.segment;
@@ -48,7 +56,9 @@ bool update_main_vehicle(const DrivingAssets& assets,const MainVehicleSetup& set
     front_input.steering=state.steering;front_input.object_parameter=setup.divisors[0];front_input.control=setup.gravity;
     front_input.longitudinal_metric=input.variant_mode!=0;front_input.scene_metric_scale=input.surrounding_car_update;
     MainFrontOutput front_output;MainBalanceEffects effects;
+    stage_start=now();
     if(!update_main_front(front_input,state.front,front_output,effects)||!append(published,effects))return false;
+    timing.front_ticks=now()-stage_start;
 
     MainBalanceUpdateState balance;
     balance.vehicle={flags(state),{car.motion[0],car.motion[1],car.motion[2]},car.orientation[1],state.steering,
@@ -66,7 +76,9 @@ bool update_main_vehicle(const DrivingAssets& assets,const MainVehicleSetup& set
     balance_input.speed_metric=front_output.speed_metric;balance_input.reference_scale=setup.gravity;
     balance_input.angle_history=state.front.angle_history;balance_input.contact_mask=state.front.slots.type_mask;
     balance_input.incoming_moment=front_output.incoming_moment;
+    stage_start=now();
     if(!update_main_balance(*assets.balance_assets(input.manual_selection?1:0),balance_input,balance,effects)||!append(published,effects))return false;
+    timing.balance_ticks=now()-stage_start;
     state.flags=std::uint16_t(balance.vehicle.flags);state.front.slots.packed_types=std::uint16_t(balance.vehicle.flags>>16);
     car.motion={balance.vehicle.motion.x,balance.vehicle.motion.y,balance.vehicle.motion.z};
     car.orientation[1]=balance.vehicle.middle_orientation;state.steering=balance.vehicle.steering;
@@ -91,7 +103,9 @@ bool update_main_vehicle(const DrivingAssets& assets,const MainVehicleSetup& set
     motion.active_contacts=car.response_marker;motion.contact_types=state.front.slots.type_mask;
     motion.quiet_updates=state.quiet_updates;motion.contact_event_active=state.front.contact_event_active;
     motion.sound_active=state.motion_sound_active;motion.random_state=state.power.random_state;motion.diagnostic_marker=state.diagnostic_marker;
+    stage_start=now();
     if(!update_main_motion(motion_input,motion,effects)||!append(published,effects))return false;
+    timing.motion_ticks=now()-stage_start;
     car=motion.vehicle;state.front.cabinet=motion.cabinet;state.front.contact.feedback=motion.feedback;
     car.response_marker=motion.active_contacts;state.front.slots.type_mask=motion.contact_types;
     state.quiet_updates=motion.quiet_updates;state.front.contact_event_active=motion.contact_event_active;
@@ -107,6 +121,9 @@ bool update_main_vehicle(const DrivingAssets& assets,const MainVehicleSetup& set
     pose.flags=flags(state);pose.index=std::uint32_t(std::bit_cast<std::uint16_t>(state.segment))|
         (std::uint32_t(std::bit_cast<std::uint16_t>(state.progression))<<16);
     published.pose=make_main_car_pose(pose,external);published.speed_metric=front_output.speed_metric;
-    output_state=state;output=published;return true;
+    output_state=state;output=published;
+    timing.total_ticks=now()-total_start;
+    if(profile)*profile=timing;
+    return true;
 }
 } // namespace ps2::native

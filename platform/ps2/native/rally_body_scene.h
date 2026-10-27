@@ -6,6 +6,7 @@
 
 namespace ps2::native {
 struct RallyBodyPose { AffinePoint3 position{}, orientation{}; };
+struct RallyBodyTimings { std::uint64_t pose_ticks=0,scene_ticks=0; };
 enum class RallyBodyError {
     none, invalid_file, invalid_header, invalid_geometry, invalid_bridge,
     invalid_pose, capacity, allocation_failed, presentation_failed, not_loaded
@@ -47,6 +48,8 @@ public:
     void set_numeric_mode(WorldNumericMode) noexcept;
     Frame frame() const noexcept;
     WorldSceneStats stats() const noexcept;
+    // Caller-clock units from the last successful update; zero when disabled.
+    RallyBodyTimings timings() const noexcept;
     std::size_t persistent_bytes() const noexcept;
 private:
     struct Storage;
@@ -56,5 +59,6 @@ private:
     WorldSceneTransformBatch transform_batch_=nullptr;
     void* transform_context_=nullptr;
     WorldNumericMode numeric_mode_=WorldNumericMode::reference;
+    RallyBodyTimings timings_{};
 };
 } // namespace ps2::native

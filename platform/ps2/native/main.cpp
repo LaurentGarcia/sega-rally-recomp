@@ -38,9 +38,10 @@ int main(int argc, char **argv) {
         SifInitRpc(0);
         const bool exact_drive = argc > 1 && std::strcmp(argv[1],"--drive-ee")==0;
         const bool guarded_drive = argc > 1 && std::strcmp(argv[1],"--drive-guarded")==0;
-        const bool explicit_drive = exact_drive || guarded_drive || (argc > 1 && std::strcmp(argv[1],"--drive")==0);
+        const bool profile_drive = argc > 1 && std::strcmp(argv[1],"--drive-profile")==0;
+        const bool explicit_drive = exact_drive || guarded_drive || profile_drive || (argc > 1 && std::strcmp(argv[1],"--drive")==0);
         if (explicit_drive && argc != 5)
-            throw std::runtime_error("USE --drive, --drive-ee OR --drive-guarded CHECKPOINT COURSE BODY");
+            throw std::runtime_error("USE --drive, --drive-ee, --drive-guarded OR --drive-profile CHECKPOINT COURSE BODY");
         const char *checkpoint_path = explicit_drive ? argv[2] : nullptr;
         const char *course_path = explicit_drive ? argv[3] : "host:native-course.bin";
         const char *body_path = explicit_drive ? argv[4] : "host:native-body.bin";
@@ -72,7 +73,7 @@ int main(int argc, char **argv) {
                 throw std::runtime_error(ps2::storage_error());
             return ps2::native::run_native_vehicle_demo(display,pad,checkpoint_path,course_path,body_path,
                 exact_drive?ps2::native::NativeVehicleRenderMode::reference:guarded_drive?
-                ps2::native::NativeVehicleRenderMode::guarded_vu:ps2::native::NativeVehicleRenderMode::native_vu);
+                ps2::native::NativeVehicleRenderMode::guarded_vu:ps2::native::NativeVehicleRenderMode::native_vu,profile_drive);
         }
         ps2::native::Mesh mesh;
         ps2::native::StudyScene study;

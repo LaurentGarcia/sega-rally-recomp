@@ -35,12 +35,14 @@ using WorldSceneClock=std::uint64_t (*)(void* context) noexcept;
 // Return true for completed work, marking usable results1;
 //0 means ordinary numerical/visual-budget rejection and uses scalar fallback.
 // Return false for unavailable/failed transport: every output is ignored,
-// failed_batches increments, and all vertices use the scalar reference.
+// failed_batches increments, and all vertices use the selected mode's scalar path.
 // Reference mode requires individually guarded inside results (e.g. the VU1
 // projection guard). Native-float mode accepts bounded outside results too;
 // the provider must implement the supplied two-stage binary32 transform with
 // at most two ulps error per multiply/add, including flush-to-zero. It must not
 // supply arbitrary deformations: conservative group culling assumes this bound.
+// Multiplication by zero or +/-1 and addition of zero must remain exact for
+// normal-or-zero operands, apart from the sign of a zero result.
 using WorldSceneTransformBatch=bool (*)(void*,const WorldMatrix&,const WorldMatrix&,
     std::span<const ps2::TransformVector4>,std::span<ps2::TransformVector4>,
     std::span<std::uint8_t>) noexcept;
@@ -66,7 +68,7 @@ public:
     // Null disables profiling. Caller retains context through update(), and
     // supplies a monotonic clock; calls and setting changes are serialized.
     void set_profile_clock(WorldSceneClock clock,void* context=nullptr) noexcept;
-    // Null restores exact scalar rendering. The callback/context must survive
+    // Null restores the selected mode's scalar path. The callback/context must survive
     // update() and may not reenter this scene or retain any provided span.
     // Changes are serialized outside update(); subsequent instances/frames
     // always start fresh cache serials, including after provider changes.

@@ -92,7 +92,7 @@ bool RallyBodyScene::decode(std::span<const std::uint8_t> bytes,const WorldMatri
         next->scene->set_profile_clock(clock_,clock_context_);
         next->scene->set_transform_provider(transform_batch_,transform_context_);
         next->scene->set_numeric_mode(numeric_mode_);
-        storage_.swap(next);error=RallyBodyError::none;return true;
+        storage_.swap(next);timings_={};error=RallyBodyError::none;return true;
     }catch(const std::bad_alloc&){return failure(error,RallyBodyError::allocation_failed);}
      catch(const std::length_error&){return failure(error,RallyBodyError::capacity);}
 }
@@ -157,12 +157,14 @@ bool RallyBodyScene::attach_course(std::span<const ContactSegment> course,RallyB
         scene->set_numeric_mode(numeric_mode_);
         storage_->course_vertices.swap(vertices);storage_->course_faces.swap(faces);
         storage_->course_groups.swap(groups);
-        storage_->scene.swap(scene);error=RallyBodyError::none;return true;
+        storage_->scene.swap(scene);timings_={};error=RallyBodyError::none;return true;
     }catch(const std::bad_alloc&){return failure(error,RallyBodyError::allocation_failed);}
      catch(const std::length_error&){return failure(error,RallyBodyError::capacity);}
 }
 bool RallyBodyScene::update(const RallyBodyPose& pose,const WorldView& view,RallyBodyError& error) noexcept {
     if(!storage_)return failure(error,RallyBodyError::not_loaded);
+    const auto now=[&]() noexcept {return clock_?clock_(clock_context_):std::uint64_t{0};};
+    const auto pose_start=now();
     ContactPointPreparation prepared;
     if(!prepare_contact_points(pose.orientation,pose.position,{},prepared))return failure(error,RallyBodyError::invalid_pose);
     WorldMatrix car{};
@@ -184,12 +186,15 @@ bool RallyBodyScene::update(const RallyBodyPose& pose,const WorldView& view,Rall
     std::array<WorldInstance,2> instances{};std::size_t count=0;
     if(!storage_->course_faces.empty())instances[count++]={{storage_->course_vertices,storage_->course_faces,storage_->course_groups},identity};
     instances[count++]={{storage_->vertices,storage_->faces},combined};
+    const auto scene_start=now();
     WorldSceneError engine_error;
     if(!storage_->scene->update(std::span(instances.data(),count),view,engine_error))return failure(error,RallyBodyError::presentation_failed);
+    timings_={scene_start-pose_start,now()-scene_start};
     error=RallyBodyError::none;return true;
 }
 Frame RallyBodyScene::frame() const noexcept {return storage_?storage_->scene->frame():Frame{};}
 WorldSceneStats RallyBodyScene::stats() const noexcept {return storage_?storage_->scene->stats():WorldSceneStats{};}
+RallyBodyTimings RallyBodyScene::timings() const noexcept {return timings_;}
 std::size_t RallyBodyScene::persistent_bytes() const noexcept {
     return storage_?sizeof(Storage)+sizeof(WorldScene)+
         (storage_->vertices.capacity()+storage_->course_vertices.capacity())*sizeof(WorldPoint)+

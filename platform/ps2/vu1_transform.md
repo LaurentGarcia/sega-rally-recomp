@@ -36,6 +36,12 @@ DMA source remains alive and cache-published until completion. The EE reads VU
 output only after the marker, DMA completion, and idle command/FIFO checks.
 There is no in-flight buffer reuse, and no claim of simultaneous VU0/VU1 issue.
 
+Packet cache publication uses the pinned SDK's normal DMA send with flags zero.
+Inspection of the installed `libdma.a` confirms that it calls `SyncDCache` over
+the complete `qwc * 16` source range before starting the channel. The backend
+does not repeat that same flush. Source lifetime and completion checks are
+unchanged; this removes redundant publication work without adding overlap.
+
 The generic build driver assembles this `.vsm` with the pinned DVP assembler and
 records its version, source hash, object hash and instruction listing. It does
 not copy a proprietary SDK implementation.
@@ -132,6 +138,13 @@ numeric rejection without output changes or lease loss, and in-place output.
 The compiled native call path was also checked for absence of double helpers.
 The numerical kernel is unchanged between these execution snapshots.
 
+After removing the duplicate packet cache flush, the complete 601-pose corpus
+was executed again with the current backend: 70,552 submissions and 1,364,846
+native/diagnostic result pairs passed. The completed 22,119,772-byte output
+stream is byte-identical to the previous execution, including every frame and
+batch identity. This validates the revised cache-publication path without
+changing the numerical evidence; it does not isolate a performance gain.
+
 The completed raw VU output was then replayed through native float clipping for
 all 601 scenes. Each current matrix, vertex batch and frame identity had to
 match the sealed input byte for byte. Against the binary64 reference, an
@@ -153,6 +166,11 @@ Private evidence:
   `d0ff8f830210fcef732aaa46f5b513ff9d8fdbb4debd4cf43d805f1ddb8c28f0`.
 - `build/ps2-vu1-corpus-ee-004/runtime-validation.json`, ELF
   `cdc4b75b7753bda0bcb2ba808776240200e2edc4ea5c351a391d57f880181cf7`.
+- `build/ps2-vu1-corpus-ee-005/runtime-validation.json`, ELF
+  `ab3e4a8598990a48257ef9fa6aac84a4ee74e086a26b7dca62adf655cfa1f792`,
+  validates the current cache-publication path;
+  `build/ps2-vu1-native-corpus-002/output-comparison.json` binds its exact
+  output identity to the preceding execution.
 - `build/ps2-world-vu-float-002/corpus-result.json` binds the completed VU
   execution report and complete-frame replay inputs/results.
 - Private full input SHA-256
