@@ -1,5 +1,56 @@
 # Handoff
 
+## Native driving critical-path review (2026-10-26)
+
+This checkpoint is an engineering review and documentation correction only.
+No game behavior, executable, performance or playability changed. The latest
+code checkpoint is 6f321d6. Native builds 019, 020 and 021 have the identical
+ELF identity 2338119372579ee7012ec95fcd43f5210d8382cb112d6f4dbce9d3fc8f050158.
+The application never calls the recovered vehicle functions; its linker map
+discards them. Green component tests, cross-links and source-boundary audits
+have not advanced the running car. Reporting successive isolated recoveries
+as if a playable update were about to be connected was misleading.
+
+The missing work is more than wiring. The main caller's central
+0x3521c..0x371a4 span is 8,072 bytes, containing unrecovered calculations as
+well as calls to recovered leaves. The actual motion/orientation/position
+updates are within it at 0x36cc4..0x36ddc. The earlier flag/input/segment
+wrapper, later fold/publication wrapper and callees also require integration.
+The dependency map now divides the caller into six concrete regions; these
+sizes exclude callees and are not a completion percentage. Helper37870 still
+needs earlier filtering/input/event effects to produce its recovered tail's
+inputs. Neither repeated main-contact steps nor captured tail operands close
+the next-frame state.
+
+The current live comparisons reseed individual sampled regions from original
+state. They establish component behavior, not a self-contained sequence of car
+updates. The next acceptance unit is the complete main-player update, starting
+from one validated initial state and immutable course/tuning assets, advancing
+its own persistent state under controls, and comparing state/effects after
+each consecutive update. Original expected outputs are comparison data only.
+Focused component checks remain useful for finding the first difference; new
+leaf counts or standalone hardware fixtures are not integration milestones.
+
+Rendering has an independent obstacle: StudyScene reapplies captured
+object-to-reference-view matrices and recomputes scene center/radius. Repeatedly
+translating a lone model and fitting it again would hide the translation.
+Keep this static study unchanged and develop a separate persistent world/car
+render path with verified transforms. A bounded native course/tuning loader,
+actual pedal/gear consumers, initialized persistent state and verified update
+cadence are also absent from the application. Reuse native GS/clipping/pad
+services; do not relabel captured view matrices as world transforms, remove
+linker garbage collection to fake integration, or animate a substitute model
+and call it recovered gameplay.
+
+The native rewrite guide now makes complete consecutive updates, then their
+input-to-render application connection, the next milestone. Public PS2 status
+leads with the static preview and distinguishes compiled sources from called
+gameplay. The reusable-engine guide's stale source count is removed. These
+changes follow Platform layer & build's existing native PS2 exception; no
+arcade runtime or generic physics fallback is introduced. Local links and
+diff checks are sufficient for this documentation-only change; existing
+runtime evidence is not relabeled as a new executable validation.
+
 ## Native segment selection and composed contact step (2026-10-26)
 
 The preceding ad0dab3 checkpoint is published; PS2 and source-export CI passed,

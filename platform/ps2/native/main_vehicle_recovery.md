@@ -83,6 +83,37 @@ earlier filtering, limiting and event paths.
 
 ## Current comparison scope
 
+### Remaining complete-update work
+
+The contiguous caller span `0x3521c..0x371a4` is still not implemented as a
+native state transition. Its 8,072 bytes include calls to recovered components;
+the size is not a count of missing source code, a runtime cost or a completion
+percentage. Callee bodies add separate work.
+
+| Caller region | Remaining work in the full update |
+| --- | --- |
+| `0x3521c..0x35b5c` | Second candidate/current four-point transforms, conditional course queries, differences, normalization and square-root/atan-derived history |
+| `0x35b5c..0x35c50` | Connect four recovered contact-slot calls and their surrounding packing |
+| `0x35c50..0x36760` | Response/filter/geometry preparation through the call to `0x37870` |
+| `0x36760..0x36cc4` | Angular increments and clamps, feedback, events and correction branches |
+| `0x36cc4..0x36ddc` | Acceleration-to-motion update, gravity subtraction, orientation/angular-motion update, mode gating and position/motion update |
+| `0x36ddc..0x371a4` | Counter/event helper, damping/context corrections and metric cap |
+
+The following fold/publication primitives are recovered, but their caller
+wrapper is not connected. The earlier input/flag/segment wrapper also remains
+part of the full-update work. In `0x37870`, the `0x3a320` dependency and the
+filtering/event region `0x379d0..0x382f8` must supply the recovered geometry
+tail's actual inputs. Passing the tail's isolated tests cannot establish them.
+
+The next comparison must start with one complete validated state and advance
+that state through successive inputs. Captured expected outputs can identify
+the first divergence; captured intermediate values cannot replace missing
+calculations or reset state between updates. Establish typed persistent state,
+immutable course/tuning assets and emitted effects across the whole callback
+before integrating it. See the [integration milestone](../../../docs/ps2-native-rewrite.md#next-integration-milestone).
+
+### Sampled component comparisons
+
 Capture 012 adds a separate main-vehicle stream while retaining all 2,850
 enabled/disabled frame checkpoints and the earlier capture streams unchanged.
 Its 26 complete sampled callbacks contain 104 contact-slot calls, 26 paired

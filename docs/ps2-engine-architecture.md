@@ -88,8 +88,8 @@ Fatal reverse-transfer quarantine was reviewed but not fault-injected.
 
 Subsequent native-game recovery adds standalone EE fixtures for steering,
 orientation, course contact, point transforms and contact-result interpretation.
-The current native application audit passes across 56 project files while the
-same 21 engine input hashes remain unchanged. These recovered semantics stay
+The native application passes its source-boundary audit while the same 21
+engine input hashes remain unchanged. These recovered semantics stay
 in the game role and are not yet connected to driving gameplay. The latest
 test counts and source-bound evidence are recorded in `HANDOFF.md` and the
 [native rewrite guide](ps2-native-rewrite.md).

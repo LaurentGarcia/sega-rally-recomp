@@ -12,7 +12,7 @@ have different purposes:
 
 | Target | Runtime | Purpose |
 | --- | --- | --- |
-| `native-port` | Independently written game systems and direct PS2 platform code | Current rewrite; platform diagnostics or private static mesh study, no connected gameplay |
+| `native-port` | Direct PS2 platform; recovered game sources are compiled but not called by the app | Current rewrite; platform diagnostics or private static mesh study, no connected gameplay |
 | `engine-demo` | Shared native PS2 engine and original sample content | Independent animated cube and service demonstration; no Rally sources or assets |
 | `core-probe` | Explicit manifest-selected sources | Separate translated reference probe, or standalone native contract fixtures with source-only manifests |
 | `bringup` / `audio-fixture` | ROM-free PS2 hardware diagnostics | Display, controller and PCM output checks |

@@ -63,8 +63,10 @@ an original touch interface with a safe-area-aware Pit Stop menu. See the
 [iPhone build guide and current limits](docs/iphone.md). It is not an App Store
 or TestFlight release.
 
-**PlayStation 2 development:** a [native rewrite](docs/ps2-native-rewrite.md)
-targets the EE, VU, GS and IOP/SPU2 directly. Its independent bootstrap excludes
+**PlayStation 2 development:** the current application is a static geometry
+study and platform diagnostic; it has no native driving loop. The
+[native rewrite](docs/ps2-native-rewrite.md) targets the EE, VU, GS and IOP/SPU2
+directly. Its independent bootstrap excludes
 the arcade CPU and device models. Recovered steering and orientation routines
 have private original-program comparisons and standalone EE tests. The composed
 [candidate contact pass](platform/ps2/native/candidate_contact_pass.md) matches

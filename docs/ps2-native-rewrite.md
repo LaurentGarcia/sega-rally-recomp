@@ -60,12 +60,15 @@ RAM decoding must stay in offline conversion/reference tools.
 
 1. Build and execute the independent native platform target with explicitly
    original diagnostic content; prove the forbidden runtime is absent.
-2. Recover small game functions as explicit input/output contracts. Write
-   ordinary C++ against typed state and compare it offline with the original
-   behavior across edge cases and recorded game states.
-3. Recover course/collision data and native car integration before substituting
-   a playable driving model. A generic vehicle simulation is not an authentic
-   implementation of Sega Rally.
+2. Complete the main player's entire state update as the next integration unit.
+   Write ordinary C++ against persistent typed state, explicit inputs and
+   immutable course/tuning assets. Use recovered functions and focused
+   comparisons to diagnose differences inside that update; another isolated
+   helper is not the exit criterion.
+3. Compare consecutive complete updates against the original from one initial
+   state and a control sequence, then connect their output to the native
+   application. Recover the course/collision inputs rather than substituting
+   generic vehicle physics or captured intermediate results.
 4. Migrate race progression, AI, cameras, menus, rendering assets and audio
    events; connect the recovered systems into the native loop.
 5. Compare complete courses, restarts and input replays, then validate memory,
@@ -75,6 +78,42 @@ The initial native target is a **rewrite bootstrap**, not a playable game.
 The existing captured car scene validates a renderer, not migrated gameplay.
 No frame-rate or fidelity claim for the completed native game follows from
 that scene or a ROM-free hardware test.
+
+### Next integration milestone
+
+The present application calls none of the recovered vehicle functions. Native
+builds 019, 020 and 021 have the same executable hash: the linker discards those
+uncalled functions. Their component tests and source-boundary checks remain
+useful, but do not demonstrate progress in the running game. The current live
+comparisons initialize each sampled region from original snapshots; they do
+not show that one native update produces the next update's inputs.
+
+The next milestone must close that loop:
+
+- Recover the complete [main vehicle update](../platform/ps2/native/main_vehicle_recovery.md),
+  including its remaining movement calculations, persistent external state,
+  control consumers and effects. The existing candidate/contact operation is
+  only one region; repeating it is not a valid vehicle tick.
+- Compare successive updates from one validated initial state, private
+  immutable assets and steering/accelerator/brake inputs. Expected original
+  outputs may be observed for comparison, but must not feed the next native
+  update. Check changed state and emitted effects after each update, including
+  the launch, turning and braking paths before claiming a drivable slice.
+- Prepare a bounded native asset loader and a separate renderer that places
+  the car and course in a persistent world. Keep the static study's captured
+  view matrices and automatic centering separate: translating a lone model
+  and fitting its bounds again cancels its apparent movement. Establish the
+  car-local/world relationship instead of relabeling captured view matrices.
+- Call the complete update from the application at its verified cadence,
+  consume its changing pose in the renderer and exercise actual pad input.
+  Display vsync alone does not establish the game's update cadence. Record
+  this integrated run before reporting native driving or gameplay performance.
+
+Complete races, AI, recovered game cameras, textured presentation, game audio
+and physical-console validation remain later work. This milestone does not
+relax the original-behavior requirement or authorize a substitute simulation.
+Leaf test counts, cross-link success and a moving diagnostic scene are not
+equivalent to a complete car update.
 
 ## Recovered components
 
