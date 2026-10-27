@@ -1,4 +1,5 @@
 #include "driving_capture.h"
+#include "full_step_capture.h"
 #include <array>
 #include <bit>
 #include <filesystem>
@@ -302,6 +303,7 @@ void observe_vehicle(Capture &capture,const rt::Cpu &cpu,std::uint64_t instructi
         vehicle.detailed=selected && capture.vehicle_selected_frame!=frame && capture.vehicle_samples<32;
         if (vehicle.detailed) { ++capture.vehicle_samples;capture.vehicle_selected_frame=frame; }
         vehicle_cadence(capture,cpu,"vehicle_entry",instructions,frame,ns);
+        full_step_boundary(cpu,"vehicle_entry",vehicle.id,vehicle.object,instructions,frame,ns);
         vehicle_snapshot(capture,cpu,"vehicle_entry",instructions,frame,ns);return;
     }
     if (!vehicle.id) return;
@@ -326,6 +328,7 @@ void observe_vehicle(Capture &capture,const rt::Cpu &cpu,std::uint64_t instructi
         if (vehicle.balance.phase!=6 || cpu.m_r[31]!=vehicle.frame_pointer)
             throw std::runtime_error("main vehicle balance return identity or completion mismatch");
         vehicle_snapshot(capture,cpu,"balance_helper_post",instructions,frame,ns);
+        full_step_boundary(cpu,"balance_helper_post",vehicle.id,vehicle.object,instructions,frame,ns);
         vehicle.balance.phase=7;++capture.vehicle_balance_returns;
     }
     if (cpu.m_IP==vehicle.returning.pc) {
@@ -335,6 +338,7 @@ void observe_vehicle(Capture &capture,const rt::Cpu &cpu,std::uint64_t instructi
             throw std::runtime_error("main vehicle return has incomplete or mismatched boundaries");
         vehicle_snapshot(capture,cpu,"vehicle_return",instructions,frame,ns);
         vehicle_cadence(capture,cpu,"vehicle_return",instructions,frame,ns);
+        full_step_boundary(cpu,"vehicle_return",vehicle.id,vehicle.object,instructions,frame,ns);
         ++capture.vehicle_completions;vehicle={};return;
     }
     switch(pc) {
@@ -391,7 +395,8 @@ void observe_vehicle(Capture &capture,const rt::Cpu &cpu,std::uint64_t instructi
         if (returning.frame_pointer!=vehicle.frame_pointer || original_pc(returning.pc)!=0x36760)
             throw std::runtime_error("main vehicle balance caller mismatch");
         vehicle.balance={returning,cpu.m_r[31],cpu.m_r[17],0,0,cpu.m_r[18],0,1};
-        ++capture.vehicle_balance_calls;vehicle_snapshot(capture,cpu,"balance_helper_pre",instructions,frame,ns);break;
+        ++capture.vehicle_balance_calls;vehicle_snapshot(capture,cpu,"balance_helper_pre",instructions,frame,ns);
+        full_step_boundary(cpu,"balance_helper_pre",vehicle.id,vehicle.object,instructions,frame,ns);break;
     }
     case 0x3789c:
     case 0x378f4:
@@ -883,6 +888,8 @@ void begin_driving_capture(const char *directory,unsigned first,unsigned last) {
 void observe_driving_instruction(const rt::Cpu &cpu,std::uint64_t instructions,
                                  std::uint64_t frame,std::uint64_t ns) {
     if (!active) return;
+    SuppressStepAccess access_guard;
+    full_step_instruction(instructions);
     auto &capture=*active;
     if (capture.last_count==instructions) return;
     capture.last_count=instructions;

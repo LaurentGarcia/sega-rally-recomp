@@ -110,17 +110,33 @@ bool nonzero_area(const std::array<Vertex, 3> &v) {
 
 ClipResult clip_project_triangle(const ClipTriangle &input, std::span<Triangle> output) noexcept {
     if (!input.material) return {ClipStatus::invalid_material, 0, 0};
-    Polygon first{}, second{};
+    unsigned any_outside = 0, common_outside = 0x7f;
     for (std::size_t i = 0; i < 3; ++i) {
         const auto &v = input.vertices[i];
         if (!accepted_float(v.x) || !accepted_float(v.y) || !accepted_float(v.z) ||
             !accepted_float(v.w) || !accepted_float(v.u) || !accepted_float(v.v))
             return {ClipStatus::invalid_vertex, 0, 0};
+        // Comparisons avoid binary64 conversion/interpolation for a trivial
+        // rejection. All accepted operands are finite normal binary32 or zero;
+        // comparing x with -w has exactly the sign of the reference w+x.
+        const unsigned outside = (v.w < clip_min_w ? 1u : 0u) |
+            (v.x < -v.w ? 2u : 0u) | (v.x > v.w ? 4u : 0u) |
+            (v.y < -v.w ? 8u : 0u) | (v.y > v.w ? 16u : 0u) |
+            (v.z < 0 ? 32u : 0u) | (v.z > v.w ? 64u : 0u);
+        any_outside |= outside;
+        common_outside &= outside;
+    }
+    // Finish validating every vertex before rejecting the geometry, so an
+    // invalid UV/component cannot hide behind an earlier outside vertex.
+    if (common_outside) return {};
+    Polygon first{}, second{};
+    for (std::size_t i = 0; i < 3; ++i) {
+        const auto &v = input.vertices[i];
         first[i] = {v.x, v.y, v.z, v.w, v.u, v.v};
     }
     auto *from = &first, *to = &second;
     std::size_t count = 3;
-    for (unsigned plane = 0; plane < 7 && count; ++plane) {
+    for (unsigned plane = 0; any_outside && plane < 7 && count; ++plane) {
         std::size_t next_count = 0;
         WideVertex previous = (*from)[count - 1];
         bool previous_inside = distance(previous, plane) >= 0;

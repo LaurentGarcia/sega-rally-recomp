@@ -63,21 +63,16 @@ an original touch interface with a safe-area-aware Pit Stop menu. See the
 [iPhone build guide and current limits](docs/iphone.md). It is not an App Store
 or TestFlight release.
 
-**PlayStation 2 development:** the current application is a static geometry
-study and platform diagnostic; it has no native driving loop. The
-[native rewrite](docs/ps2-native-rewrite.md) targets the EE, VU, GS and IOP/SPU2
-directly. Its independent bootstrap excludes
-the arcade CPU and device models. Recovered steering and orientation routines
-have private original-program comparisons and standalone EE tests. The composed
-[candidate contact pass](platform/ps2/native/candidate_contact_pass.md) matches
-all 26 sampled calls, including course searches and response updates.
-An optional [static mesh study](docs/ps2-native-scene.md)
-loads recovered object geometry with diagnostic shading; it is not driving
-gameplay. The complete car update, broader collision system and race loop remain to be migrated.
-The translated game-core probe stays a separate behavioral reference. See the [PS2 build guide and limits](docs/ps2.md).
-The shared [PS2 engine architecture](docs/ps2-engine-architecture.md) keeps
-hardware services independent of Rally rules and includes an original engine-only
-demo as a second application.
+**PlayStation 2 development:** the [native rewrite](docs/ps2-native-rewrite.md)
+now advances a complete recovered car update from its own persistent state.
+It matches 601 consecutive reference updates, including pose and sound
+requests. A developer application connects that update to pad input and a
+flat body/collision-course view through direct PS2 services, without an arcade
+CPU or device runtime. Rendering performance, the model/camera relationship,
+game audio and full race flow remain unfinished; this is not a playable release.
+See the [PS2 build guide and limits](docs/ps2.md).
+The [shared engine](docs/ps2-engine-architecture.md) keeps hardware services
+independent of Rally rules and includes an original engine-only sample.
 
 `v0.1.0-rc.1` remains a separate experimental source prerelease. Developers can
 use the [source build guide](docs/getting-started.md#build-from-source-instead).

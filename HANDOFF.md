@@ -1,5 +1,146 @@
 # Handoff
 
+## Persistent native vehicle and first integrated EE run (2026-10-26)
+
+The previous critical-path review was correct: component proofs were not a
+running car. This change closes the complete main-player callback on persistent
+native state. Platform layer & build remains the governing design: no original
+CPU, register file, mapped bus or arcade device runtime enters native-port.
+The original translated machine is used only by the offline observer/oracles.
+
+The full comparison passes 601 successive updates from ONE initial seed:
+96,761 canonical state fields, 13,222 published pose words and 458 ordered sound
+requests, fingerprint 57e2c98c5de78376. Expected outputs never become subsequent
+inputs. The same checker passes on EE under Play, with identical counts/fingerprint
+and byte-identical initial/driving checkpoint exports; evidence is
+build/ps2/native-vehicle-ee-001/runtime-validation.json. Its total ticks include
+fixture IO, seed-map construction and checks, not just game updates.
+All 161 canonical fields are checked each update, together with the
+published selection, speed, pose and expanded sound-request order. ASan/UBSan
+and six negative fixture mutations pass. Final source-bound evidence is
+build/ps2-native-main-vehicle-live-final-001/result.json. The comparison excludes
+original pointers, temporary stack values and device state; this is not whole
+RAM equivalence or a full race. The optional surrounding-car branch rejects
+explicitly and is not entered by these 601 observations.
+
+Full-step capture 014 preserves all 2,850 observer-on/off reference checkpoints
+and every previous stream. Continuous ordinary-memory replay verifies the
+single seed, callback writes and explicit surrounding-code writes. Capture
+accesses are suppressed while the observer reads state; actual copied-code
+reads remain visible. The CPU bus proxy is compiled only under the existing
+offline driving-capture guard. New capture data stays private under build/.
+
+The wrapper joins entry/filter/segment selection, candidate/contact updates,
+the full force/front region, balance and motion, then pose publication. Shared
+RNG/history values have one canonical owner. Main balance passes 601 observed
+plus 512 authored cases against original execution; final evidence is
+build/ps2-native-main-balance-update-live-004/result.json. Front passes all 601
+recorded boundaries/65,509 words (main-front-live-008 ASan/UBSan report). Motion
+passes 601 boundaries/34,257 words and 95 sound requests. Scene damping is
+separately checked against 4,116 accepted original-program cases; the observed
+601 sequence does not take that branch. Numerical arithmetic/atan implementations
+preserve explicit rounding boundaries without a processor runtime.
+
+Version-3 driving packages add immutable per-segment X/Z guidance. All eight
+course packages pass typed roundtrip/contact checks in
+build/ps2-driving-assets-live-004/result.json. A bounded 752-byte checkpoint
+stores typed state plus course identity/CRC. The moving developer checkpoint
+is retained native state before observation frame 2400 (game counter 2317),
+produced only after the whole comparison succeeds. It is not a recovered race
+initializer. Runtime loading then advances from pad inputs, with no per-frame
+captured collision, motion or force values.
+
+The application now calls the update and renders its position/orientation via
+RallyBodyScene and the independent WorldScene engine. Course geometry stays in
+world coordinates; the original captured-view/autofit StudyScene is unchanged.
+Body, collision course, camera and identity model-to-car bridge are explicitly
+diagnostic, with flat materials. Wheels, textures, recovered camera, race flow,
+AI and game audio playback remain unfinished. Commands are generated but not
+sent to SPU2 in this driver. The initial native 023 Play run showed advancing
+car state and body/course rendering; its first samples measured ~12.4 ms update
+and ~1,331 ms geometry preparation. This is emulator timing, not physical PS2
+speed. The whole-course binary64 transform/clip loop dominates this first run.
+The screenshot also shows unresolved body/course occlusion; do not call it
+arcade-fidelity graphics. Controller input was neutral/unconnected in this
+short first run, so physical or interactive control validation is still open.
+
+The first renderer correction respects each collision polygon's corner count:
+attributes bit 2 selects a quad; otherwise only three corners are used. The
+course contains 260 triangles with unused fourth corners, which had incorrectly
+produced 260 faces to world origin. A nonfinite unused-corner regression prevents
+that mistake. Exact clipping classification also skips common-outside triangles
+and seven clipping passes for fully-inside triangles; a million old/new cases
+match byte-for-byte, with the retained 20k oracle and ASan/UBSan passing. Native 024
+reduces mean geometry cost over the same first three updates from 1331.22 ms to
+1091.21 ms (18.03%), while position, motion, sound count and emitted triangle
+count remain identical for those samples. Evidence is
+build/ps2/native-024/baseline-comparison.json. This is still much too slow, and
+body/course visual alignment remains unresolved. Native 024 and engine-demo 024
+share an identical engine manifest; neither result is physical hardware proof.
+
+WorldScene now accepts optional contiguous face groups; the course supplies one
+per segment. Conservative interval bounds reject only groups wholly outside a
+clip plane, preserving the ordinary ungrouped path as a comparison. Validation
+still checks every input, and culling cannot hide invalid transformed values.
+Raw bit classification handles EE subnormals; bounds extrema use exact binary32
+comparisons before widening just six endpoints. The differential passes 2,052
+authored frames and 60 actual-course views with identical output/error/ordering;
+ASan/UBSan passes. Current reports are build/ps2-world-groups-002 and
+build/ps2-rally-body-sanitized-003. The course comparison removes 89% of corner
+transforms. No VU geometry-offload claim follows from this CPU culling work.
+
+The fragmented car was independently diagnosed downstream of host geometry:
+a host reverse-depth raster had zero body pixels occluded by the course.
+Inspection of the installed SDK's draw_triangle_filled confirmed it reads only
+v0.z and repeats that depth for all three vertices. That 2D helper was unsuitable
+for our sloped 3D surfaces. Solid primitives now submit each corner's own packed
+XYZ2 depth through GIF, using the existing scalar/VU0 XY conversion contract.
+The extended original depth fixture checks rising/falling overlaps, both draw
+orders and solid/textured materials. All 1,536 framebuffer samples pass in Play,
+hash 961912604e681083, including the existing debug-page transitions. Evidence:
+build/ps2/native-depth-sloped-001/runtime-validation.json. Native 025 screenshots
+show the complete diagnostic body silhouette; no height offset or model-axis
+change was needed. Physical GS validation remains open.
+
+Final native 026/engine-demo 026 cross-builds share engine manifest
+443626dd0d4328d88a08d70eaf48b772c64cb82bc626bfe2f2fa79b1df0710fa.
+The native ELF is f1532d4464277d3cb767ca5e1647b4ab4b2c19cd8749f6ddd484a1f51f199e5c.
+Native 026's first three equivalent-state samples average 12.465 ms game update,
+375.705 ms geometry and 396.759 ms combined update/presentation. Geometry is 3.543x
+faster than native 023, but the resulting ~2.5 updates/sec is not playable speed.
+All first-three logged controls/state/triangle/sound fields match across builds;
+later logs show update 60 with retained native motion. These are emulator timer
+observations, not physical-console or full-race measurements. Report:
+build/ps2/native-026/performance-comparison.json. Pad remained disconnected in
+these runs; no interactive input claim is made.
+
+Important rejected assumptions and fixes:
+
+- The recovered metric's point arguments interleave components. Ordinary
+  Euclidean length first diverged by ten ULPs at observation frame 2330.
+- Pose auxiliary order is steering, phase step, phase, then contact histories;
+  a different order passed internal state but failed published pose immediately.
+- Guidance is not invariant setup. Original surrounding code selects it from
+  immutable course data using the previous segment. Supplying captured guidance
+  every frame would conceal this dependency; the native lookup matches all 601.
+- Observation frame identity is not the game's counter. Controls use the latter.
+- EE int32_t/uint32_t typedefs differ from host int/unsigned; explicit min/max/
+  clamp template arguments fix compilation without changing tested arithmetic.
+- Longitudinal metric sign checks use raw sign/nonzero bits so EE handling of
+  negative subnormals cannot silently change the branch.
+
+Final portable regression: all 276 PS2 tests pass in 79.2 seconds. Both native
+applications cross-link with matching engine identities; the 601-update EE
+comparison and 1,536-pixel sloped-depth readback pass independently. Local
+documentation links and whitespace checks pass. Private assets, captures,
+ELFs and reports remain excluded from the source tree.
+
+Next: reduce the remaining EE geometry cost with measured changes;
+exercise real steering/pedals and
+verify cadence/model axes before calling the developer loop a drivable slice.
+Then recover initialization, broader game modes, race flow, rendering and audio.
+Do not restart isolated leaf work as a substitute for those integration gates.
+
 ## Native driving critical-path review (2026-10-26)
 
 This checkpoint is an engineering review and documentation correction only.

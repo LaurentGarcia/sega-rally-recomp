@@ -477,4 +477,64 @@ the already-read status byte, the prior/result scalar, cached and spilled
 caller proofs, and ten missing/duplicated/mismatched-input cases. Event counts
 remain strictly increasing even at the next-query return. Missing response
 inputs and changed caller proofs fail without a completion marker. All 17
-observer tests pass; eight focused response sequences also pass sanitizer runs.
+observer tests passed at that checkpoint; eight focused response sequences also passed sanitizer runs.
+
+## Consecutive whole-callback memory evidence
+
+`capture_driving.py --full-step` additionally observes every main callback in
+the requested interval. The host-only forwarding bus records successful data
+reads and writes once, with original executing PC, completed-instruction
+counter, width, address and value. Fetch and burst-flag operations still reach
+the original bus. Snapshot reads are suppressed from the transaction stream.
+Direct generated/CPU RAM fast paths are rejected at compile time. Normal
+`Model2AMachine` builds retain their original bus and constructor path.
+
+The stream includes generated live-code guard reads and interrupt activity.
+These must not be mistaken for vehicle data dependencies. Device transactions
+are observed without additional FIFO reads; this does not seed complete device
+state. The memory seed contains only ordinary RAM at `0x200000..0x23ffff` and
+`0x500000..0x5fffff`. Between callbacks, the latest ordinary writes from other
+CPU code are retained as explicit patches. Those writes include stack,
+interrupt and transport state as well as actual external game inputs.
+
+Each callback has four full records: entry, balance-helper entry and return,
+and callback return. They retain original registers/FP bits, both saved return
+identities, cabinet pins, the object, the independently recovered balance
+global closure, and both in/out vectors. They are not a collection of
+independently sampled initial states: the binary access stream can replay one
+initial seed continuously through the entire interval.
+
+```sh
+python3 platform/ps2/tools/capture_driving.py \
+  --output build/ps2/driving-capture-014 --full-step
+python3 platform/ps2/tools/full_step_capture.py \
+  --capture build/ps2/driving-capture-014/capture \
+  --output build/ps2/driving-capture-014/full-step-validation.json
+```
+
+Use new output names when reproducing these commands. The reader rejects
+missing transactions, changed identities, nonconsecutive callbacks,
+unaccounted ordinary-memory reads, mismatching boundary snapshots and trailing
+data. Optional read-only memory callbacks provide exact state before an
+original transaction or at a validated boundary. A future native comparison
+must retain its own state and apply only justified external inputs; expected
+writes must never be fed back as replacement native state.
+
+Capture 014 passed all 2,850 enabled/disabled checkpoints and preserved every
+prior 013 stream byte-for-byte. It contains 601 consecutive callbacks across
+frames 2200–2800, 5,339,562 transactions, and 136,573,025 bytes of new evidence,
+below its 256 MiB cap. Continuous ordinary-memory replay passed for all 601
+updates. The union contains 23,248 first-read bytes, including immutable code
+guards, and 1,719 written bytes. This establishes observation continuity;
+it does not claim a complete native car update or physical-console execution.
+
+`extract_main_motion.py` derives compact `MOTTAIL1` fixtures for
+`0x36760..0x371e0` from that same replay. It retains ordered sound-queue byte
+writes and rejects execution of the original queue-overflow path. The sealed
+601-record fixture contains 285 queued bytes and no observed overflow.
+`extract_main_stages.py` derives `ENTSTEP1` for `0x34f40..0x34ff0` and
+`FRONTST1` for `0x35224..0x37870` entry, stopping before the balance helper.
+The front record's final word is the preceding contact pass's observed scalar,
+used only as an isolated-stage input. A complete native update must compute
+that scalar itself. These compact fixtures, RAM seeds and captured values all
+remain private under ignored `build/`.

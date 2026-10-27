@@ -1,10 +1,11 @@
-// Independent PS2-native bootstrap or owner-provided static mesh study.
-// Neither mode connects recovered race systems into a playable game.
+// Independent PS2-native bootstrap, static study, or native vehicle test.
+// The vehicle test starts at one developer checkpoint; race flow is pending.
 #include "native_display.h"
 #include "pad_input.h"
 #include "audio_output.h"
 #include "debug_controls.h"
 #include "native_scene.h"
+#include "native_vehicle_demo.h"
 #include "storage.h"
 #include <kernel.h>
 #include <sifrpc.h>
@@ -24,26 +25,47 @@ int main(int argc, char **argv) {
         if (!display.initialize()) throw std::runtime_error(display.error());
         display.set_vu0_packing(true); // Validated final XYZ conversion only.
         display.present_status("NATIVE PS2 REWRITE\nPLATFORM BOOTSTRAP\nNO ARCADE PROCESSOR CORES\nINITIALIZING INPUT AND AUDIO");
-        // Only this deliberate native mesh name selects a study implicitly.
         // Preserve loader-provided host modules before considering IOP reset.
         SifInitRpc(0);
-        const char *scene_path = argc > 1 ? argv[1] : nullptr;
-        if (!scene_path) {
+        const bool explicit_drive = argc > 1 && std::strcmp(argv[1],"--drive")==0;
+        if (explicit_drive && argc != 5)
+            throw std::runtime_error("USE --drive CHECKPOINT COURSE BODY");
+        const char *checkpoint_path = explicit_drive ? argv[2] : nullptr;
+        const char *course_path = explicit_drive ? argv[3] : "host:native-course.bin";
+        const char *body_path = explicit_drive ? argv[4] : "host:native-body.bin";
+        const char *scene_path = !explicit_drive && argc > 1 ? argv[1] : nullptr;
+        if (argc <= 1) {
+            if (FILE *probe = std::fopen("host:native-driving.bin", "rb")) {
+                std::fclose(probe); checkpoint_path = "host:native-driving.bin";
+            }
+        }
+        if (!scene_path && !checkpoint_path) {
             if (FILE *probe = std::fopen("host:native-scene.bin", "rb")) {
                 std::fclose(probe); scene_path = "host:native-scene.bin";
             }
         }
-        const bool host_scene = scene_path && std::strncmp(scene_path,"host:",5)==0;
-        if (scene_path && !host_scene && std::strncmp(scene_path,"mass:",5)!=0)
-            throw std::runtime_error("NATIVE SCENE PATH MUST USE HOST: OR MASS:");
+        bool retain_host = false, use_storage = false;
+        const auto inspect_path = [&](const char* path) {
+            if (!path) return;
+            if (std::strncmp(path,"host:",5)==0) retain_host=true;
+            else if (std::strncmp(path,"mass:",5)==0) use_storage=true;
+            else throw std::runtime_error("NATIVE ASSET PATH MUST USE HOST: OR MASS:");
+        };
+        inspect_path(scene_path);
+        if (checkpoint_path) {inspect_path(checkpoint_path);inspect_path(course_path);inspect_path(body_path);}
         ps2::PadInput pad;
-        if (!pad.initialize(!host_scene)) std::printf("PAD: %s\n", pad.status());
+        if (!pad.initialize(!retain_host)) std::printf("PAD: %s\n", pad.status());
+        if (use_storage && !ps2::initialize_storage()) throw std::runtime_error(ps2::storage_error());
+        if (checkpoint_path) {
+            if (!ps2::wait_for_file(checkpoint_path)||!ps2::wait_for_file(course_path)||!ps2::wait_for_file(body_path))
+                throw std::runtime_error(ps2::storage_error());
+            return ps2::native::run_native_vehicle_demo(display,pad,checkpoint_path,course_path,body_path);
+        }
         ps2::native::Mesh mesh;
         ps2::native::StudyScene study;
         ps2::native::StudyCamera camera;
         if (scene_path) {
             display.present_status("STATIC GEOMETRY STUDY\nLOADING OWNER PROVIDED NATIVE MESH\nDIAGNOSTIC CAMERA / FLAT MATERIALS\nNO GAMEPLAY OR GAME CAMERA CLAIM");
-            if (!host_scene && !ps2::initialize_storage()) throw std::runtime_error(ps2::storage_error());
             if (!ps2::wait_for_file(scene_path)) throw std::runtime_error(ps2::storage_error());
             ps2::native::MeshError mesh_error;
             if (!ps2::native::load_mesh_file(scene_path,mesh,mesh_error))

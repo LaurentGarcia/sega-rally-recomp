@@ -74,46 +74,77 @@ RAM decoding must stay in offline conversion/reference tools.
 5. Compare complete courses, restarts and input replays, then validate memory,
    timing, controllers and audio on a physical PS2.
 
-The initial native target is a **rewrite bootstrap**, not a playable game.
-The existing captured car scene validates a renderer, not migrated gameplay.
-No frame-rate or fidelity claim for the completed native game follows from
-that scene or a ROM-free hardware test.
+The native target now has a developer vehicle loop alongside the platform
+bootstrap and unchanged static study. It advances recovered game state from
+one validated initial checkpoint, reads the pad, and renders a body against a
+stationary collision course. This is not the complete arcade game: the model
+bridge, camera and flat materials remain diagnostic; race initialization,
+menus, AI, game audio and full-course validation remain open.
 
-### Next integration milestone
+### Continuous vehicle milestone
 
-The present application calls none of the recovered vehicle functions. Native
-builds 019, 020 and 021 have the same executable hash: the linker discards those
-uncalled functions. Their component tests and source-boundary checks remain
-useful, but do not demonstrate progress in the running game. The current live
-comparisons initialize each sampled region from original snapshots; they do
-not show that one native update produces the next update's inputs.
+The [complete main-player update](../platform/ps2/native/main_vehicle_update.md)
+matches **601 consecutive original updates from one initial seed**: 96,761
+canonical state comparisons, 13,222 published pose words and 458 ordered sound
+requests. The same checker passes when compiled for EE and executed in Play,
+including byte-identical exported checkpoints. ASan/UBSan and six malformed-
+fixture checks pass. Expected original
+outputs are comparison data only; the next update uses its own native state.
+Immutable course directions are selected using the previous native segment.
+The original processor/device runtime remains confined to offline observation.
 
-The next milestone must close that loop:
+The application now calls this update and consumes the changing pose. Its
+bounded version-3 course package and 752-byte developer checkpoint carry no
+runtime addresses. The checkpoint is a development start state, not a recovered
+race initializer. Each subsequent input comes from the pad; no recorded motion,
+forces or contact results are supplied.
 
-- Recover the complete [main vehicle update](../platform/ps2/native/main_vehicle_recovery.md),
-  including its remaining movement calculations, persistent external state,
-  control consumers and effects. The existing candidate/contact operation is
-  only one region; repeating it is not a valid vehicle tick.
-- Compare successive updates from one validated initial state, private
-  immutable assets and steering/accelerator/brake inputs. Expected original
-  outputs may be observed for comparison, but must not feed the next native
-  update. Check changed state and emitted effects after each update, including
-  the launch, turning and braking paths before claiming a drivable slice.
-- Prepare a bounded native asset loader and a separate renderer that places
-  the car and course in a persistent world. Keep the static study's captured
-  view matrices and automatic centering separate: translating a lone model
-  and fitting its bounds again cancels its apparent movement. Establish the
-  car-local/world relationship instead of relabeling captured view matrices.
-- Call the complete update from the application at its verified cadence,
-  consume its changing pose in the renderer and exercise actual pad input.
-  Display vsync alone does not establish the game's update cadence. Record
-  this integrated run before reporting native driving or gameplay performance.
+The integrated EE driver advances the car under neutral controls in Play.
+Equivalent initial samples measured approximately **12.5 ms for the native
+update** and **375.7 ms for geometry preparation** after renderer fixes, down
+from 1,331.2 ms for geometry in the first run. The measured combined update and
+presentation cost is about 396.8 ms per update (roughly 2.5 updates/second).
+These are emulator timer observations, not physical-console performance or a
+full-race benchmark. Display refresh shown by the emulator is not game speed.
 
-Complete races, AI, recovered game cameras, textured presentation, game audio
-and physical-console validation remain later work. This milestone does not
-relax the original-behavior requirement or authorize a substitute simulation.
-Leaf test counts, cross-link success and a moving diagnostic scene are not
-equivalent to a complete car update.
+Conservative course-section rejection, exact clipping classification and fewer
+bounds conversions reduce the geometry cost by about 3.5 times. Transform and
+clipping work still runs on the EE; broad VU offload is not implemented here.
+A separate GS correction sends each solid triangle corner's own depth rather
+than using a 2D helper's single depth. All 1,536 readback samples pass in the
+extended constant/sloped depth fixture, and the diagnostic body is visible
+without the previous false road occlusion.
+
+Remaining integration work includes further measured geometry optimization,
+working interactive pad input, verified update cadence and the model-local/world
+bridge before calling the view faithful. The measured runs had no connected pad;
+the car advanced from its moving checkpoint with neutral inputs. Complete races,
+AI, recovered cameras, textured presentation, game audio and physical-console
+validation remain later work.
+
+### Developer vehicle test
+
+Build `native-port` as below. Supply these private files on the loader's
+`host:` filesystem:
+
+- `native-driving.bin`: a validated developer checkpoint exported by the
+  whole-update comparison after every comparison passes.
+- `native-course.bin`: its matching version-3 course/tuning package.
+- `native-body.bin`: the bounded model-local body exported by
+  `platform/ps2/tools/export_rally_body.py`.
+
+The application checks the checkpoint's course selector and asset CRC. An
+explicit loader command also accepts `--drive CHECKPOINT COURSE BODY`; each
+path must use `host:` or `mass:`. Without a developer checkpoint it retains
+the existing static-study/bootstrap selection.
+
+Cross accelerates, Square brakes, and the left stick or directional buttons
+steer. L1/R1 select gears only when the checkpoint enables manual selection.
+Start restores the initial checkpoint; Select+Start toggles the debug page.
+The page and serial log separate update, geometry and presentation timing.
+Game sound requests are generated but playback is not yet connected in this
+mode. These controls are implementation mappings; physical pad validation is
+still required.
 
 ## Recovered components
 

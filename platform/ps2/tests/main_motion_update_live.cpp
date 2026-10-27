@@ -1,0 +1,93 @@
+#include "main_motion_update_adapter.h"
+#include <algorithm>
+#include <array>
+#include <cstdio>
+#include <fstream>
+#include <iterator>
+#include <map>
+#include <stdexcept>
+#include <type_traits>
+#include <vector>
+
+namespace {
+using namespace ps2::native;
+struct Reader {
+    std::vector<std::uint8_t> bytes;
+    std::size_t cursor=0;
+    explicit Reader(const char* path){
+        std::ifstream stream(path,std::ios::binary);
+        if(!stream)throw std::runtime_error("Cannot open private records");
+        bytes={std::istreambuf_iterator<char>(stream),{}};
+        if(bytes.size()>16*1024*1024)throw std::runtime_error("Private record limit");
+    }
+    std::uint32_t word(){
+        if(bytes.size()-cursor<4)throw std::runtime_error("Truncated private record");
+        const auto* p=bytes.data()+cursor;cursor+=4;
+        return p[0]|std::uint32_t(p[1])<<8|std::uint32_t(p[2])<<16|std::uint32_t(p[3])<<24;
+    }
+};
+using Memory=std::map<std::uint32_t,std::uint32_t>;
+std::uint32_t read(const Memory& memory,std::uint32_t address,unsigned size=4){
+    const auto found=memory.find(address&~3u);
+    if(found==memory.end()||(size!=1&&(address&3))){std::fprintf(stderr,"missing word=%08x\n",address);throw std::runtime_error("Missing private state word");}
+    return size==1?(found->second>>(8*(address&3)))&255:found->second;
+}
+template<class Value>std::uint32_t bits(Value value){
+    if constexpr(sizeof(Value)==1)return value;
+    else return std::bit_cast<std::uint32_t>(value);
+}
+void hash_word(std::uint64_t& hash,std::uint32_t value){for(unsigned i=0;i<4;++i){hash^=(value>>(8*i))&255;hash*=1099511628211ull;}}
+}
+int main(int argc,char** argv){try{
+    if(argc!=3)return 2;
+    DrivingAssets assets;DrivingAssetError error;
+    if(!load_driving_assets_file(argv[1],assets,error))throw std::runtime_error(driving_asset_error_message(error));
+    Reader records(argv[2]);
+    constexpr std::array<std::uint8_t,8> magic{'M','O','T','T','A','I','L','1'};
+    if(records.bytes.size()<12||!std::equal(magic.begin(),magic.end(),records.bytes.begin()))throw std::runtime_error("Invalid motion record magic");
+    records.cursor=8;const auto count=records.word();if(!count||count>1201)throw std::runtime_error("Invalid motion count");
+    std::uint64_t hash=14695981039346656037ull;unsigned fields=0,commands=0,previous_frame=0;
+    for(unsigned row=0;row<count;++row){
+        const auto frame=records.word(),fp=records.word(),object=records.word(),blocks=records.word();
+        if((row&&frame!=previous_frame+1)||!blocks||blocks>16384)throw std::runtime_error("Invalid motion row");
+        previous_frame=frame;Memory before,after;
+        for(unsigned block=0;block<blocks;++block){
+            const auto address=records.word(),words=records.word();
+            if(address&3||!words||words>1024||std::uint64_t(address)+4ull*words>0x100000000ull)throw std::runtime_error("Invalid motion block");
+            for(auto* memory:{&before,&after})for(unsigned i=0;i<words;++i)
+                if(!memory->emplace(address+4*i,records.word()).second)throw std::runtime_error("Overlapping motion block");
+        }
+        const auto queued=records.word();if(queued>72)throw std::runtime_error("Motion sound limit");
+        std::vector<std::array<std::uint32_t,2>> expected;
+        for(unsigned i=0;i<queued;++i){const auto address=records.word(),byte=records.word();
+            if(address<0x20b100||address>=0x20b180||byte>255)throw std::runtime_error("Invalid sound observation");
+            expected.push_back({address,byte});}
+        MainMotionState state{};
+        motion_update_test::state_words(state,object,fp,[&](std::uint32_t address,auto& value){
+            using T=std::remove_reference_t<decltype(value)>;
+            if constexpr(sizeof(T)==1)value=T(read(before,address,1));
+            else value=std::bit_cast<T>(read(before,address));
+        });
+        const auto input=motion_update_test::inputs([&](std::uint32_t address){return read(before,address);},object,fp,*assets.motion_assets());
+        if(input.descriptor!=assets.selector())throw std::runtime_error("Motion course asset differs");
+        MainBalanceEffects effects{};
+        if(!update_main_motion(input,state,effects)){std::fprintf(stderr,"motion rejected row=%u frame=%u scene=%u scalar=%08x\n",row,frame,input.scene_correction_active,bits(input.selected_scalar));throw std::runtime_error("Motion rejected original input");}
+        motion_update_test::state_words(state,object,fp,[&](std::uint32_t address,auto value){
+            const auto wanted=read(after,address,sizeof(value)),actual=bits(value);
+            if(wanted!=actual){std::fprintf(stderr,"motion mismatch row=%u frame=%u field=%08x wanted=%08x actual=%08x\n",row,frame,address,wanted,actual);throw std::runtime_error("Motion output differs");}
+            hash_word(hash,actual);++fields;
+        });
+        std::vector<std::array<std::uint32_t,2>> actual;
+        auto cursor=read(before,0x20b184);if(cursor>=128)throw std::runtime_error("Invalid original queue cursor");
+        for(unsigned i=0;i<effects.count;++i){const auto& command=effects.commands[i];
+            if(command.code>=assets.sound_commands().size())throw std::runtime_error("Unknown native sound request");
+            auto bytes=assets.sound_commands()[command.code].bytes;
+            if(command.has_parameter&&bytes[2]==255)bytes[2]=command.parameter&255;
+            for(auto byte:bytes){actual.push_back({0x20b100+cursor,byte});cursor=(cursor+1)&127;hash_word(hash,byte);}
+        }
+        if(actual!=expected){std::fprintf(stderr,"motion sound mismatch row=%u frame=%u wanted=%zu actual=%zu\n",row,frame,expected.size(),actual.size());throw std::runtime_error("Motion sound requests differ");}
+        commands+=effects.count;
+    }
+    if(records.cursor!=records.bytes.size())throw std::runtime_error("Extra motion record bytes");
+    std::printf("MAIN_MOTION_UPDATE_LIVE PASS steps=%u state_words=%u sound_requests=%u hash=%016llx\n",count,fields,commands,(unsigned long long)hash);
+}catch(const std::exception& e){std::fprintf(stderr,"motion comparison failed: %s\n",e.what());return 1;}return 0;}

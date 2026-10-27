@@ -22,6 +22,7 @@ class DrivingCaptureTests(unittest.TestCase):
         result=subprocess.run([compiler,"-std=c++20","-O2","-Wall","-Wextra","-Werror",
             "-I",str(ROOT/"src"),"-I",str(ROOT/"platform/ps2/tools"),
             str(ROOT/"platform/ps2/tools/driving_capture.cpp"),
+            str(ROOT/"platform/ps2/tools/full_step_capture.cpp"),
             str(ROOT/"platform/ps2/tests/driving_capture_test.cpp"),"-o",str(cls.exe)],
             capture_output=True,text=True)
         if result.returncode: raise AssertionError(result.stdout+result.stderr)

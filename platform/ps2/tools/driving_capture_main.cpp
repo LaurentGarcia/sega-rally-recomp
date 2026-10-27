@@ -1,5 +1,6 @@
 // Separate offline host executable. It changes cabinet inputs, never game RAM.
 #include "driving_capture.h"
+#include "full_step_capture.h"
 #include "platform/ps2/game/rom_cache.h"
 #include "runtime/model2a_machine.h"
 #include "runtime/video.h"
@@ -30,7 +31,7 @@ void image(const std::string &path,const rt::Video &video) {
 }
 int main(int argc,char **argv) {
     try {
-        if (argc!=8) throw std::runtime_error("usage: driving-reference PACK INPUTS FRAMES CAPTURE-DIR|- FIRST LAST SAMPLE-IMAGES0|1");
+        if (argc!=9) throw std::runtime_error("usage: driving-reference PACK INPUTS FRAMES CAPTURE-DIR|- FIRST LAST SAMPLE-IMAGES0|1 FULL-STEP0|1");
         const auto frames=number(argv[3]),first=number(argv[5]),last=number(argv[6]);
         if (!frames || frames>10000 || last>=frames || first>last)
             throw std::runtime_error("invalid host capture frame bound");
@@ -42,12 +43,17 @@ int main(int argc,char **argv) {
         rt::Model2AMachine::Options options;options.instruction_boundary_hook=true;options.sound=false;
         rt::Model2AMachine machine(std::move(assets),options);
         if (capture) ps2::offline::begin_driving_capture(argv[4],first,last);
+        if (capture && number(argv[8])) ps2::offline::begin_full_step_capture(argv[4]);
         std::puts("frame,instructions,cycles,board_ns,pc,register_hash,screen_hash");
         for (unsigned frame=1;frame<=frames;++frame) {
             if (replay.apply(frame-1,machine.inputs()))
                 std::fprintf(stderr,"INPUT completed_frame=%u events=%zu in0=%02x axis=%02x gas=%02x brake=%02x\n",
                     frame-1,replay.applied(),machine.inputs().in0,machine.inputs().analog[0],
                     machine.inputs().analog[1],machine.inputs().analog[2]);
+            const auto &pins=machine.inputs();
+            std::array<std::uint8_t,12> controls{pins.in0,pins.in1,pins.in2,pins.switches};
+            std::copy(pins.analog.begin(),pins.analog.end(),controls.begin()+4);
+            ps2::offline::full_step_controls(frame-1,controls);
             rt::Model2AMachine::RunResult result;
             for (unsigned remaining=50000000;remaining;) {
                 const unsigned budget=std::min(remaining,4096u);
@@ -69,7 +75,7 @@ int main(int argc,char **argv) {
                 image(std::string(argv[4])+"/frame-"+std::to_string(frame)+".ppm",machine.video());
         }
         if (replay.applied()!=replay.size()) throw std::runtime_error("reference ended before all input events");
-        if (capture) ps2::offline::end_driving_capture();
+        if (capture) { ps2::offline::end_full_step_capture();ps2::offline::end_driving_capture(); }
         std::fprintf(stderr,"COMPLETE frames=%u input_events=%zu cache_misses=%llu\n",frames,replay.applied(),
                      (unsigned long long)cache->misses());
         return 0;

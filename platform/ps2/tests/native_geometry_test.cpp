@@ -179,6 +179,24 @@ bool failure_cases() {
         CHECK(r.status == ClipStatus::invalid_vertex && r.count == 0 && r.required == 0);
         CHECK(unchanged());
     }
+    // Geometric rejection cannot hide an invalid attribute in a later
+    // vertex. Exercise every trivial outside plane with untouched output.
+    for (unsigned plane = 0; plane < 7; ++plane) {
+        triangle = inside();
+        for (auto &v : triangle.vertices) switch (plane) {
+        case 0: v.w = -1; break;
+        case 1: v.x = -2; break;
+        case 2: v.x = 2; break;
+        case 3: v.y = -2; break;
+        case 4: v.y = 2; break;
+        case 5: v.z = -1; break;
+        default: v.z = 2; break;
+        }
+        triangle.vertices[2].u = std::bit_cast<float>(0x7fc12345u);
+        const auto rejected = clip_project_triangle(triangle, output);
+        CHECK(rejected.status == ClipStatus::invalid_vertex && rejected.count == 0 && rejected.required == 0);
+        CHECK(unchanged());
+    }
     triangle = inside(); triangle.material = nullptr;
     CHECK(clip_project_triangle(triangle, output).status == ClipStatus::invalid_material);
     CHECK(unchanged());

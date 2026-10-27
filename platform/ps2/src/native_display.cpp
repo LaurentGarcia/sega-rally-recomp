@@ -336,14 +336,29 @@ bool Display::present(const Frame &frame) {
         ++d.counters.triangles;
         q = d.test(q, material.cutout);
         if (!material.texture) {
-            triangle_t solid{};
+            // The SDK's 2D filled-triangle helper repeats v0.z for all three
+            // corners. Native 3D surfaces require independently interpolated Z.
+            prim_t primitive{}; primitive.type = PRIM_TRIANGLE;
+            color_t color{};
+            color.r = material.color >> 16; color.g = material.color >> 8; color.b = material.color;
+            color.a = ((material.color >> 24) + 1) / 2; color.q = 1;
+            q = draw_prim_start(q, 0, &primitive, &color);
             const auto &v = triangle.vertices;
-            solid.v0 = {v[0].x * sx, v[0].y * sy, reverse_depth16(v[0].depth)};
-            solid.v1 = {v[1].x * sx, v[1].y * sy, reverse_depth16(v[1].depth)};
-            solid.v2 = {v[2].x * sx, v[2].y * sy, reverse_depth16(v[2].depth)};
-            solid.color.r = material.color >> 16; solid.color.g = material.color >> 8; solid.color.b = material.color;
-            solid.color.a = ((material.color >> 24) + 1) / 2; solid.color.q = 1;
-            q = draw_triangle_filled(q, 0, &solid);
+            GsCoordinates positions[2]{{{2048.f + v[0].x * sx, 2048.f + v[0].y * sy,
+                                        2048.f + v[1].x * sx, 2048.f + v[1].y * sy}},
+                                      {{2048.f + v[2].x * sx, 2048.f + v[2].y * sy, 0, 0}}};
+            GsFixedCoordinates fixed[2];
+            if (d.use_vu0) quantize_gs_xy_vu0(positions, fixed, 2);
+            else quantize_gs_xy_scalar(positions, fixed, 2);
+            std::uint64_t registers[6]{};
+            for (unsigned k = 0; k < 3; ++k) {
+                registers[2*k] = color.rgbaq;
+                registers[2*k+1] = std::uint64_t(fixed[k/2].xy[(k%2)*2]) |
+                    std::uint64_t(fixed[k/2].xy[(k%2)*2+1]) << 16 |
+                    std::uint64_t(reverse_depth16(v[k].depth)) << 32;
+            }
+            std::memcpy(q, registers, sizeof registers); q += 3;
+            q = draw_prim_end(q, 2, DRAW_RGBAQ_REGLIST);
             continue;
         }
         auto &texture = d.texture(*material.texture, q);

@@ -6,6 +6,7 @@
 #error "Driving capture belongs only in the offline host reference"
 #endif
 #include "platform/ps2/tools/driving_capture.h"
+#include "platform/ps2/tools/full_step_capture.h"
 #endif
 #ifdef M2_SRALLY_CONTROL
 #include "runtime/model2a_control.h"
@@ -53,6 +54,9 @@ struct Model2AMachine::Impl {
     Options options;
     Model2AClock clock; // Outlives every callback and attached device.
     Model2ABus bus;
+#ifdef RALLY_OFFLINE_DRIVING_CAPTURE
+    ::ps2::offline::StepCaptureBus capture_bus;
+#endif
     Cpu cpu;
     Lockstep schedule;
     gen::Env env;
@@ -106,8 +110,15 @@ struct Model2AMachine::Impl {
             , images.rom
 #endif
         ),
+#ifdef RALLY_OFFLINE_DRIVING_CAPTURE
+        capture_bus(bus), cpu(&capture_bus), schedule(cpu), env{cpu, schedule}
+#else
         cpu(&bus), schedule(cpu), env{cpu, schedule}
+#endif
     {
+#ifdef RALLY_OFFLINE_DRIVING_CAPTURE
+        capture_bus.bind(cpu);
+#endif
         if (options.video && !options.tgp) throw Fatal("Model2A video requires TGP");
         if (options.screen && !(options.video && options.control)) throw Fatal("Model2A screen requires video and control");
         if (options.uart && !options.control) throw Fatal("Model2A UART requires control");

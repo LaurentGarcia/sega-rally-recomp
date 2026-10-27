@@ -42,6 +42,7 @@ def main():
     parser.add_argument("--first-frame", type=int, default=2200)
     parser.add_argument("--last-frame", type=int, default=2800)
     parser.add_argument("--jobs", type=int, default=4)
+    parser.add_argument("--full-step", action="store_true", help="trace consecutive whole player callbacks and actual CPU data accesses")
     args = parser.parse_args()
     output, native, pack, inputs = (value.resolve() for value in
                                   (args.output, args.native_build, args.pack, args.inputs))
@@ -73,6 +74,7 @@ def main():
         reader.close()
     helpers = module("platform/ps2/build_ps2.py", "drive_build_helpers")
     sources = [ROOT / "platform/ps2/tools/driving_capture_main.cpp", ROOT / "platform/ps2/tools/driving_capture.cpp",
+               ROOT / "platform/ps2/tools/full_step_capture.cpp",
                *generated, *[ROOT / "src/runtime" / (name + ".cpp") for name in prepare.RUNTIME_SOURCES]]
     headers = helpers.project_headers(sources, [ROOT / "src", ROOT])
     source_inputs = sorted(set(sources + headers + [Path(__file__).resolve(), ROOT / "platform/ps2/prepare_core.py",
@@ -95,6 +97,7 @@ def main():
               "inputs":identities,"generation":provenance,"pack_regions":pack_regions,
               "sources_sha256":initial,"frames":args.frames,"first_frame":args.first_frame,"last_frame":args.last_frame,
               "scope":"Original game executes tracked cabinet replay; bounded observer capture, not native driving",
+              "full_step_requested":args.full_step,
               "physical_ps2_verified":False,"arcade_arithmetic_fidelity_certified":False}
     commands = [["cmake", "-S", str(output), "-B", str(output / "host"), "-DCMAKE_BUILD_TYPE=Release"],
                 ["cmake", "--build", str(output / "host"), "-j", str(args.jobs)]]
@@ -109,7 +112,7 @@ def main():
         print("Host reference compiled; starting actual input replay",flush=True)
         for name, directory in (("captured",str(output / "capture")),("baseline","-")):
             command = [str(executable),str(pack),str(inputs),str(args.frames),directory,
-                       str(args.first_frame),str(args.last_frame),"1" if name=="captured" else "0"]
+                       str(args.first_frame),str(args.last_frame),"1" if name=="captured" else "0",str(int(args.full_step))]
             run_started=time.monotonic()
             with (output / (name+".csv")).open("w") as stdout, (output / (name+".log")).open("w") as stderr:
                 result=subprocess.run(command,stdout=stdout,stderr=stderr,timeout=900)
@@ -153,6 +156,12 @@ def main():
                 raise ValueError("capture lacks one complete sampled motion region per vehicle: "+kind)
         if marker.get("motion_events")!=4*marker["vehicle_samples"]:
             raise ValueError("capture has an incomplete additive motion stream")
+        if args.full_step:
+            whole=json.loads((capture / "full-step-summary.json").read_text())
+            if whole.get("complete") is not True or whole.get("steps")!=marker["vehicle_completions"] or \
+               whole.get("first_frame")!=args.first_frame or whole.get("last_frame")!=args.last_frame:
+                raise ValueError("whole-step trace is not complete and consecutive")
+            report["full_step_summary"]=whole
         report.update(status="passed",exact_checkpoint_match=True,matched_frames=args.frames,capture_summary=marker,
                       baseline_sha256=digest(output / "baseline.csv"),captured_sha256=digest(output / "captured.csv"),
                       capture_files_sha256={path.name:digest(path) for path in sorted(capture.iterdir()) if path.is_file()})

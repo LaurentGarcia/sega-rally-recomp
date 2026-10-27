@@ -49,6 +49,7 @@ ENGINE_SOURCES = (
     "platform/ps2/src/native_geometry.cpp",
     "platform/ps2/src/pad_input.cpp", "platform/ps2/src/storage.cpp",
     "platform/ps2/src/audio_output.cpp", "platform/ps2/src/vu0_pack.cpp",
+    "platform/ps2/src/world_scene.cpp",
 )
 STUDY_SOURCES = ("platform/ps2/src/native_mesh.cpp", "platform/ps2/src/native_scene.cpp")
 GAME_SOURCES = ("platform/ps2/native/race_progress.cpp", "platform/ps2/native/car_pose.cpp",
@@ -75,14 +76,27 @@ GAME_SOURCES = ("platform/ps2/native/race_progress.cpp", "platform/ps2/native/ca
                 "platform/ps2/native/vehicle_parameter_selection.cpp",
                 "platform/ps2/native/main_contact_step.cpp",
                 "platform/ps2/native/main_balance_geometry.cpp",
-                "platform/ps2/native/segment_selection.cpp")
+                "platform/ps2/native/segment_selection.cpp",
+                "platform/ps2/native/vehicle_arithmetic.cpp",
+                "platform/ps2/native/recovered_atangent.cpp",
+                "platform/ps2/native/driving_assets.cpp",
+                "platform/ps2/native/main_balance_math.cpp",
+                "platform/ps2/native/main_balance_update.cpp",
+                "platform/ps2/native/scene_contact_damping.cpp",
+                "platform/ps2/native/main_motion_update.cpp",
+                "platform/ps2/native/main_update_entry.cpp",
+                "platform/ps2/native/main_front_update.cpp",
+                "platform/ps2/native/main_vehicle_update.cpp",
+                "platform/ps2/native/main_vehicle_checkpoint.cpp",
+                "platform/ps2/native/rally_body_scene.cpp",
+                "platform/ps2/native/native_vehicle_demo.cpp")
 # Preserve the existing native-port object order while the demo omits study code.
 NATIVE_TOOLKIT_SOURCES = (*ENGINE_SOURCES[:3], *STUDY_SOURCES, *ENGINE_SOURCES[3:])
 NATIVE_SOURCES = ["platform/ps2/native/main.cpp", *GAME_SOURCES, *NATIVE_TOOLKIT_SOURCES]
 ENGINE_DEMO_SOURCES = ["platform/ps2/samples/engine_demo/main.cpp", *ENGINE_SOURCES]
 ENGINE_HEADERS = {
     "audio_output.h", "pcm_protocol.h", "pcm_resampler.h", "pcm_ring.h",
-    "native_display.h", "native_geometry.h",
+    "native_display.h", "native_geometry.h", "world_scene.h",
     "pad_input.h", "pad_state.h", "debug_controls.h", "storage.h", "vu0_pack.h", "diagnostic_font.h",
 }
 STUDY_HEADERS = {"native_mesh.h", "native_scene.h"}
@@ -186,6 +200,7 @@ def native_roles() -> dict[str, str]:
     roles.update({"platform/ps2/include/" + name: "study" for name in STUDY_HEADERS})
     roles.update({name: "game" for name in GAME_SOURCES})
     roles.update({str(Path(name).with_suffix(".h")): "game" for name in GAME_SOURCES})
+    roles["platform/ps2/native/main_vehicle_checkpoint_fields.h"] = "game"
     roles["platform/ps2/native/main.cpp"] = "native_app"
     roles["platform/ps2/samples/engine_demo/main.cpp"] = "demo_app"
     return roles

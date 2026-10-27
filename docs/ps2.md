@@ -3,16 +3,17 @@
 **Current direction:** a [native PS2 rewrite](ps2-native-rewrite.md) with no
 arcade processor/device emulation in its executable. The translated game-core
 probe described below remains the separate behavioral reference. The new
-`native-port` target includes platform diagnostics and an optional
-[static mesh study](ps2-native-scene.md); game systems are being recovered
-and rewritten before it can be called playable.
+`native-port` target includes a developer vehicle loop, platform diagnostics
+and an optional [static mesh study](ps2-native-scene.md). Its complete car
+update has a continuous original-behavior comparison, while rendering,
+controls, game flow and console performance still need integration validation.
 
 This is an experimental homebrew port, not a finished PS2 player. Its targets
 have different purposes:
 
 | Target | Runtime | Purpose |
 | --- | --- | --- |
-| `native-port` | Direct PS2 platform; recovered game sources are compiled but not called by the app | Current rewrite; platform diagnostics or private static mesh study, no connected gameplay |
+| `native-port` | Native typed vehicle state and direct PS2 services; no arcade processor/device runtime | Developer car update and flat body/course view from one private checkpoint; also retains diagnostics/static study |
 | `engine-demo` | Shared native PS2 engine and original sample content | Independent animated cube and service demonstration; no Rally sources or assets |
 | `core-probe` | Explicit manifest-selected sources | Separate translated reference probe, or standalone native contract fixtures with source-only manifests |
 | `bringup` / `audio-fixture` | ROM-free PS2 hardware diagnostics | Display, controller and PCM output checks |

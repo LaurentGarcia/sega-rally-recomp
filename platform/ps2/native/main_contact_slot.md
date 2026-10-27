@@ -9,9 +9,11 @@ are present in the native component.
 
 The governing design is the native exception in
 [Platform layer & build](../../../docs/daytona-usa-recomp-design.md#platform-layer--build).
-The helper is recovered and tested independently. It is not connected to a
-native main callback or playable driving loop. The array names describe observed
-value flow; suspension units, physical axes and tuning meanings remain unproven.
+The helper has independent comparisons and is now connected to the persistent
+[main callback](main_vehicle_update.md), including its 601-update host/EE proof.
+The developer loop remains short of a playable game. The array names describe
+observed value flow; suspension units, physical axes and tuning meanings remain
+unproven.
 
 ## Original boundary and inputs
 

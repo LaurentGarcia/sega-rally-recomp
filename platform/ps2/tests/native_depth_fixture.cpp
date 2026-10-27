@@ -43,28 +43,31 @@ int main() {
             if (pixel!=0xa55aa55au) throw std::runtime_error("READBACK REJECTION MODIFIED OUTPUT");
         unsigned verified_pixels=0;
         std::uint64_t pixel_hash=1469598103934665603ull;
-        const auto verify=[&](const char *phase,std::uint32_t expected) {
-            const unsigned y=160*display.output_height()/frame_height-4;
-            for (unsigned region=0;region<2;++region) {
-                const unsigned x=(region ? 376u : 120u)*640/frame_width-4;
-                const auto result=display.readback_rect(x,y,8,8,sample);
-                if (result!=ReadbackStatus::ok) {
-                    std::printf("DEPTH PIXELS TRANSPORT FAIL phase=%s region=%s status=%u: %s\n",
-                        phase,region?"textured":"solid",unsigned(result),display.error());
-                    throw std::runtime_error("GS READBACK UNAVAILABLE; PIXEL RESULT NOT VERIFIED");
-                }
-                unsigned mismatch=0;
-                for (auto pixel:sample) {
-                    const auto rgb=pixel&0x00ffffffu;
-                    if (rgb!=expected) ++mismatch;
-                    pixel_hash=(pixel_hash^rgb)*1099511628211ull;
-                }
-                std::printf("DEPTH PIXELS %s phase=%s region=%s samples=64 expected_bgr=%06lx first_raw=%08lx mismatch=%u\n",
-                    mismatch?"FAIL":"PASS",phase,region?"textured":"solid",
-                    static_cast<unsigned long>(expected),static_cast<unsigned long>(sample[0]),mismatch);
-                if (mismatch) throw std::runtime_error("GS DEPTH SAMPLE RGB MISMATCH");
-                verified_pixels+=sample.size();
+        const auto verify_at=[&](const char *phase,const char *region,unsigned logical_x,
+                                 unsigned logical_y,std::uint32_t expected) {
+            const unsigned x=logical_x*640/frame_width-4;
+            const unsigned y=logical_y*display.output_height()/frame_height-4;
+            const auto result=display.readback_rect(x,y,8,8,sample);
+            if (result!=ReadbackStatus::ok) {
+                std::printf("DEPTH PIXELS TRANSPORT FAIL phase=%s region=%s status=%u: %s\n",
+                    phase,region,unsigned(result),display.error());
+                throw std::runtime_error("GS READBACK UNAVAILABLE; PIXEL RESULT NOT VERIFIED");
             }
+            unsigned mismatch=0;
+            for (auto pixel:sample) {
+                const auto rgb=pixel&0x00ffffffu;
+                if (rgb!=expected) ++mismatch;
+                pixel_hash=(pixel_hash^rgb)*1099511628211ull;
+            }
+            std::printf("DEPTH PIXELS %s phase=%s region=%s samples=64 expected_bgr=%06lx first_raw=%08lx mismatch=%u\n",
+                mismatch?"FAIL":"PASS",phase,region,
+                static_cast<unsigned long>(expected),static_cast<unsigned long>(sample[0]),mismatch);
+            if (mismatch) throw std::runtime_error("GS DEPTH SAMPLE RGB MISMATCH");
+            verified_pixels+=sample.size();
+        };
+        const auto verify=[&](const char *phase,std::uint32_t expected) {
+            verify_at(phase,"solid",120,160,expected);
+            verify_at(phase,"textured",376,160,expected);
         };
         std::array<std::uint8_t,32> indices{};
         const Texture texture{indices.data(),indices.size(),8,8,1};
@@ -96,7 +99,35 @@ int main() {
             if (frame==181) verify("far_after_page",0x00ff5020u);
             if (frame==241) verify("reversed_orders",0x002020ffu);
         }
-        std::printf("DEPTH FIXTURE PIXEL PASS frames=360 samples=%u hash=%016llx format=PSMCT32+PSMZ16S vram_bytes=%lu output_height=%u; scoped to sampled original regions\n",
+        // A constant-depth overlap cannot detect a triangle API that silently
+        // repeats v0.z for all vertices. These crossing planes must change the
+        // visible color within each triangle, for both native submission paths.
+        // At logical y 125, the two sampled x positions give the blue plane depths
+        // about 0.225 and 0.622 (or their complements). The entire 8x8 physical
+        // sample stays well away from the 0.5 crossing and triangle boundaries.
+        display.set_debug_page(nullptr);
+        display.set_caption("ORIGINAL SLOPED DEPTH FIXTURE\nLEFT AND RIGHT SAMPLES MUST DIFFER");
+        for (unsigned phase=0;phase<4;++phase) {
+            const bool falling=phase>=2,reversed=phase&1u;
+            auto solid_blue=triangle(35,falling?.875f:.125f,&solid_far);
+            auto textured_blue=triangle(291,falling?.875f:.125f,&textured_far);
+            solid_blue.vertices[1].depth=textured_blue.vertices[1].depth=falling?.125f:.875f;
+            const auto solid_red=triangle(35,.5f,&solid_near);
+            const auto textured_red=triangle(291,.5f,&textured_near);
+            const std::array<Triangle,4> crossing=reversed?
+                std::array<Triangle,4>{solid_red,solid_blue,textured_red,textured_blue}:
+                std::array<Triangle,4>{solid_blue,solid_red,textured_blue,textured_red};
+            if (!display.present({crossing,0xff101923u,true})) throw std::runtime_error(display.error());
+            const char *name=falling?(reversed?"slope_falling_reversed":"slope_falling"):
+                                    (reversed?"slope_rising_reversed":"slope_rising");
+            const std::uint32_t left=falling?0x00ff5020u:0x002020ffu;
+            const std::uint32_t right=falling?0x002020ffu:0x00ff5020u;
+            verify_at(name,"solid_left",75,125,left);
+            verify_at(name,"solid_right",165,125,right);
+            verify_at(name,"textured_left",331,125,left);
+            verify_at(name,"textured_right",421,125,right);
+        }
+        std::printf("DEPTH FIXTURE PIXEL PASS frames=364 samples=%u hash=%016llx format=PSMCT32+PSMZ16S vram_bytes=%lu output_height=%u; scoped to sampled original regions\n",
                     verified_pixels,static_cast<unsigned long long>(pixel_hash),
                     static_cast<unsigned long>(display_vram_bytes(display.output_height())),display.output_height());
         while (true) SleepThread();
