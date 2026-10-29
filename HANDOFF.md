@@ -1,5 +1,152 @@
 # Handoff
 
+## Native diagnostic loop reaches the 60 Hz budget (2026-10-28)
+
+Continued from 6d1fed8. Native040 measures 59.991 native updates/sec across
+1,680 complete start-to-start periods in Play 0.72 HLE. Work outside the display
+wait/flip averages 15.039 ms and peaks at 16.413 ms; none of those work intervals
+exceeds the nominal 16.667 ms budget. This is the neutral-input diagnostic
+body/collision-course loop, not a complete race or physical-console benchmark.
+The maximum complete period is 20.832 ms. The first 60-update window takes
+1004.174 ms; subsequent windows take approximately 1000 ms. Do not describe
+every complete period as shorter than 16.667 ms or the remaining 0.254 ms worst-
+case work margin as sufficient for the missing game systems.
+
+The measured progression uses the same initial checkpoint and neutral controls:
+
+| Build | Initial game update | Initial geometry | Complete-period sample | Mean updates/sec | Mean work outside wait/flip |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| native037 | 12.178 ms | 17.720 ms | 420 updates | 26.317 | 33.043 ms |
+| native038, arithmetic and prepared models | 2.748 ms | 13.236 ms | 660 updates | 30.017 | 19.033 ms |
+| native039, indexed batch lookup | 2.748 ms | 10.946 ms | 1,140 updates | 50.959 | 16.451 ms |
+| native040, identity bounds, projection reuse and display | 2.749 ms | 9.793 ms | 1,680 updates | 59.991 | 15.039 ms |
+
+Initial costs are means of the same first three states. Complete-period sample
+lengths differ and inter-build totals do not isolate individual changes.
+All common logged game frames, controls, positions, motion, triangle counts and
+sound-request counts match. Native040 has no VU failure/fallback in its logged
+frames and empty guest stderr. Both requested window captures succeeded; they
+remain private diagnostic images. Evidence and all build/log/ELF identities:
+build/ps2/native-040/performance-comparison.json. Native ELF SHA256:
+1dda95928a54b5a2c091b4ddf67a7df772510d85e386bbcf58ce87a9666dd916.
+
+Coarse cadence counters record complete start-to-start periods, including pad
+processing and previous logging, plus time outside the previous display wait
+and framebuffer flip. That second measure is not hardware busy cycles. The
+over-budget count applies to it, while complete periods establish native rate.
+Detailed per-face clocks remain opt-in. The design's acceptance target is 60
+native updates and presentations per second, not the emulator window counter.
+
+Native-port now defaults to strict O3; other targets retain O2 and explicit
+optimization choices still override defaults. All 56 native C++ commands retain
+no-fast-math and disabled floating contraction. Generated SDK module byte-array
+wrappers remain O2; these are not game/renderer math. Native040 and engine-demo016
+cross-build with identical 30 shared-engine input hashes, manifest
+2852d812b62d079c215b92ca7ad7c90ebb02ead9eed5addf659ebec10580d15b.
+All 120/31 compiled input hashes respectively match current source. The original
+engine-only sample is cross-built, not newly console-tested. Evidence:
+build/ps2-engine-demo-016/shared-engine-validation.json, SHA256
+7c416fe8c9dcc72a39a54a638720e46223feedbef5511c8b82ef64f84348faf1.
+
+Vehicle arithmetic now constructs/extracts 128-bit intermediates using bounded
+32-bit limbs and reduces sticky bits by limb. Rounding and operation order are
+unchanged. A same-executable EE comparison alternates eight 16-update passes per
+variant and preserves all 128 canonical state/pose/request comparisons; mean
+game update falls from 12.088 to 2.776 ms. The final-source strict O3 EE proof passes
+all 601 updates, 96,761 state fields, 13,222 pose words and 458 sound requests,
+fingerprint 57e2c98c5de78376. Both 752-byte checkpoint exports equal the final host
+proof byte for byte. The 595,712 arithmetic comparisons, ASan/UBSan 601-step sequence
+and six negative checks are bound in
+build/ps2/native-vehicle-limbs-ee-001/runtime-validation.json, SHA256
+12d7fa38a04531b83badeae85fca3f7a94a6604b0caa7ae83a759d5bd82394a1.
+
+PreparedWorldModel owns immutable validated geometry and exact local group
+bounds. Assignment is atomic; update_prepared still checks owners, transforms
+and scene capacities. Mutable update remains fully validated. Rally prepares
+body/course once and releases temporary decoded arrays. The private fixed-pose
+EE comparison saves 4.610 ms. Its separate setup counter measures copy/bounds
+construction only, not the preceding validation; do not call it full assign
+cost. Ownership, source mutation/destruction, allocation failure, rollback and
+zero-update-allocation tests pass.
+
+A 2 KiB generation-stamped batch lookup retains first-occurrence vertex order,
+saving 2.267 ms in its same-executable fixed-pose comparison. Collision, maximum
+index, provider failure and generation-wrap controls pass 140,411 sanitizer
+checks. Native bounds skip only an exact identity object transform; reference
+enclosures remain unchanged. This saves 0.304 ms and passes 25,601 functional
+frames/51,207 checks, including every signed-zero identity and near-identity
+false-positive controls.
+
+The native vertex cache retains validated inside projections, adding 24 bytes
+per entry (96 KiB maximum; 224 KiB maximum complete vertex cache). Only internal
+helpers consume this proof; outside/failed projections keep the complete
+clipper and reference rendering remains unchanged. Collision scratch copies,
+instance epochs, provider provenance, degeneracy and capacity failures retain
+their contracts. The fixed-pose EE comparison saves 1.103 ms. Retained ASan/UBSan
+tests pass 1,000 frames/3,023 checks, and all nine WorldScene fixtures pass.
+The final old/new stream is byte-identical across all 1,803 frames/601 poses and
+124,539,359 bytes: build/ps2-world-projection-frames-002/comparison.json, SHA256
+36a7aa4011a800d34be3fdc7651c124e6dfa9e2ee898a01664d84bbd0f46e4d5.
+Current-source strict replay of actual VU output retains the earlier native-
+versus-reference image metrics and rejects excess callbacks:
+build/ps2-world-projection-replay-001/corpus-result.json, SHA256
+b3e232b42212a7c38169f13717a7f015ba2cfe7ef1f4b5cba5f8bb243af95e36.
+This exact optimization comparison does not erase the native-versus-binary64
+differences: 305 color pixels across 114,468,864 compared pixels remain distinct.
+
+Display validation recognizes exact signed-zero UV/unit Q without repeating
+checks those encodings already prove; all other validation remains. Per-frame
+SDK-generated TEST templates are copied at the original packet positions.
+The same-executable 1,024-triangle comparison saves 0.437 ms over eight samples
+per mode. Full tested GIF packets and 640x448 readbacks match exactly. The final
+validator passes 609,453 sanitizer comparisons. The final-source GS fixture
+passes all 2,048 sampled pixels across 368 frames, including every depth/cutout
+combination, hash 2f811ff4bd5d13c3. Source/ELF/log bindings:
+build/ps2-display-depth-ee-001/runtime-validation.json, SHA256
+e15a2d397c3ed6141e197dc88fa1c556b8b9cdfc81bc02578470f39fdba3fac0.
+These sampled fixture regions are not a complete-game image comparison.
+
+All 292 portable PS2 tests pass in 101.011 seconds after the final production
+changes. Independent source reviews found no ownership, cache, arithmetic,
+cadence or display blocker. All five workflows for the preceding 6d1fed8 commit
+also completed successfully. Final artifact-boundary validation is recorded
+against the exact staged tree and matching tar in
+build/ps2-60hz-source-release-001/gate.json; private data/captures/ELFs stay out
+of the source export. The final private evidence index binds 18 reports/logs:
+build/ps2-frame-budget-001/validation.json, SHA256
+b8146116b60a5e0218e4ffbe464ec04d822cebc17e11f4d683beaab271aaced9.
+
+The controller stall is now attributed by a paired headless Play experiment.
+The private patch resolves dynamic IOP imports by name and compatible version,
+retains multiple same-name tables, and preserves them through release/save/load.
+All 46 dispatcher/state checks pass. With the same neutral host pad, guest ELF,
+runner object and dependency archives, only three implementation objects differ
+(185 archive members remain identical). Both runs receive 720/720 VBlank events.
+Unmodified code stays state 5/request 2 with unchanged buffers/frame counters and
+a stalled close. Patched code reaches state 6/request 0, changes 120 buffer bytes,
+advances frame counters to 839/838 and closes. Evidence:
+build/ps2-play-version-dispatch-001/paired-runtime-001.json, SHA256
+815cd2f09b82a1abf554c4d3dbeb3e550d2198ccf8a06756fe9ea689ccae4d02.
+The private experiment occupies 250 MiB. No emulator code enters the game or
+SDK; the GUI Play build used for performance remains unmodified, and physical
+input is unverified. THIRD_PARTY records the pinned source, license and patch.
+
+Rejected hypotheses and limits: group bounds were already affine intervals,
+not eight-corner transforms. Preparing immutable data removed repeated work;
+changing their mathematics was unnecessary. Exact unit-W division elimination
+preserves outputs but saves only 0.059 ms, so it remains private. Earlier direct
+triangle-copy removal (~0.083 ms) and pose preparation (~0.08 ms) are still not
+the major bottleneck. Do not replace exact recovered arithmetic with global
+fast-math, infer 60 game updates from display refresh, or describe VU0/VU1 as
+overlapped. The access interruption was a macOS Documents denial, restored
+before final builds; no filesystem bypass or data deletion was used.
+
+Next: recover interactive input in the GUI/physical environment without changing
+game semantics, verify the original model/camera bridge, and budget the missing
+textured presentation, race flow, AI and audio against 16.667 ms. Then exercise
+complete courses/restarts/input sequences and physical-console timing. Current
+neutral diagnostic cadence is a useful milestone, not full arcade certification.
+
 ## Native frame-cost reduction and profiling (2026-10-27)
 
 Continued from fc5695c with measured frame costs. The final O2 native035 default

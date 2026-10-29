@@ -33,7 +33,7 @@ void run(){
     std::array<WorldInstance,2> instances{{{{vertices,faces},identity()},{{vertices,faces},identity()}}};
     WorldScene uncached,cached;WorldSceneError error;WorldView view{identity()};
     require(uncached.configure(10,80,error,false)&&cached.configure(5,80,error));
-    require(cached.stats().persistent_bytes-uncached.stats().persistent_bytes+10*sizeof(Material)==16*32);
+    require(cached.stats().persistent_bytes-uncached.stats().persistent_bytes+10*sizeof(Material)==16*56);
     std::uint64_t ticks=0;cached.set_profile_clock(clock_tick,&ticks);
     const auto compare=[&](unsigned count){
         ++frames;const auto before=allocations;WorldSceneError a,b;

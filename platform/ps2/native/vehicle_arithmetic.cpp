@@ -16,16 +16,32 @@ int top(const Wide& words) noexcept {
     for(int i=3;i>=0;--i)if(words[i])return 32*i+int(std::bit_width(words[i]))-1;
     return -1;
 }
+// Move whole limbs while retaining every discarded bit for the existing
+// nearest/even rounding. The part guards avoid shifts by the word width.
 Wide shifted(std::uint64_t word,unsigned shift) noexcept {
     Wide out{};
-    for(unsigned i=0;i<64&&i+shift<128;++i)
-        if((word>>i)&1)out[(i+shift)/32]|=std::uint32_t(1)<<((i+shift)%32);
+    if(shift>=128)return out;
+    const unsigned index=shift/32,part=shift%32;
+    const auto low=std::uint32_t(word),high=std::uint32_t(word>>32);
+    out[index]=low<<part;
+    if(index+1<4)out[index+1]=(high<<part)|(part?low>>(32-part):0u);
+    if(part&&index+2<4)out[index+2]=high>>(32-part);
     return out;
 }
 std::uint64_t extract(const Wide& words,unsigned shift) noexcept {
-    std::uint64_t out=0;
-    for(unsigned i=0;i<64&&i+shift<128;++i)if(bit(words,i+shift))out|=std::uint64_t(1)<<i;
+    if(shift>=128)return 0;
+    const unsigned index=shift/32,part=shift%32;
+    std::uint64_t pair=words[index];
+    if(index+1<4)pair|=std::uint64_t(words[index+1])<<32;
+    auto out=pair>>part;
+    if(part&&index+2<4)out|=std::uint64_t(words[index+2])<<(64-part);
     return out;
+}
+bool any_below(const Wide& words,unsigned count) noexcept {
+    if(count>=128)return words[0]||words[1]||words[2]||words[3];
+    const unsigned whole=count/32,part=count%32;
+    for(unsigned i=0;i<whole;++i)if(words[i])return true;
+    return part&&(words[whole]&((std::uint32_t(1)<<part)-1));
 }
 Number checked(Number n) noexcept {
     if(!n.valid)return invalid();
@@ -42,8 +58,7 @@ Number rounded(const Wide& words,int power,bool negative) noexcept {
     if(shift>0){
         mantissa=extract(words,unsigned(shift));
         const bool guard=bit(words,unsigned(shift-1));
-        bool sticky=false;
-        for(int i=0;i+1<shift;++i)sticky|=bit(words,unsigned(i));
+        const bool sticky=any_below(words,unsigned(shift-1));
         if(guard&&(sticky||(mantissa&1)))++mantissa;
         if(mantissa==2*leading){mantissa>>=1;++power;}
     }else mantissa=extract(words,0)<<(-shift);

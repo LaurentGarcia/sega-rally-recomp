@@ -1,5 +1,6 @@
 #include "native_display.h"
 #include "native_depth_checks.h"
+#include <bit>
 #include <cassert>
 #include <limits>
 #include <cstdio>
@@ -57,6 +58,48 @@ int main() {
     triangles[0].vertices[0].depth = 1.001f; assert(!valid_frame(frame, failure));
     triangles[0].vertices[0].depth = 0; assert(valid_frame(frame, failure));
     triangles[0].vertices[0].depth = 1; assert(valid_frame(frame, failure));
+    // Exact flat-geometry encodings must still validate every other field.
+    // Nonzero/subnormal UV and adjacent Q encodings keep their normal checks.
+    for (unsigned corner = 0; corner < 3; ++corner) {
+        for (unsigned signs = 0; signs < 4; ++signs) {
+            triangles[0] = original;
+            auto &vertex = triangles[0].vertices[corner];
+            vertex.u = std::bit_cast<float>(std::uint32_t(signs & 1u) << 31);
+            vertex.v = std::bit_cast<float>(std::uint32_t((signs >> 1) & 1u) << 31);
+            vertex.q = 1;
+            assert(valid_frame(frame, failure));
+            const auto flat = triangles[0];
+            for (unsigned field = 0; field < 3; ++field) {
+                triangles[0] = flat;
+                auto &v = triangles[0].vertices[corner];
+                if (field == 0) v.x = 993;
+                if (field == 1) v.y = -385;
+                if (field == 2) v.depth = std::bit_cast<float>(std::uint32_t{0x3f800001});
+                assert(!valid_frame(frame, failure));
+            }
+        }
+        for (auto bits : {0u, 0x80000000u, 1u, 0x80000001u, 0x49742400u, 0xc9742400u}) {
+            triangles[0] = original;
+            triangles[0].vertices[corner].u = triangles[0].vertices[corner].v = std::bit_cast<float>(std::uint32_t(bits));
+            assert(valid_frame(frame, failure));
+        }
+        for (auto bits : {0x49742401u, 0xc9742401u, 0x7f800000u, 0xff800000u, 0x7fc00001u}) {
+            for (bool use_v : {false, true}) {
+                triangles[0] = original;
+                auto &v = triangles[0].vertices[corner];
+                (use_v ? v.v : v.u) = std::bit_cast<float>(std::uint32_t(bits));
+                assert(!valid_frame(frame, failure));
+            }
+        }
+        for (auto bits : {0x00800000u, 0x3f7fffffu, 0x3f800000u, 0x3f800001u, 0x49742400u}) {
+            triangles[0] = original; triangles[0].vertices[corner].q = std::bit_cast<float>(std::uint32_t(bits));
+            assert(valid_frame(frame, failure));
+        }
+        for (auto bits : {0u, 0x80000000u, 0xbf800000u, 0x49742401u, 0x7f800000u, 0x7fc00001u}) {
+            triangles[0] = original; triangles[0].vertices[corner].q = std::bit_cast<float>(std::uint32_t(bits));
+            assert(!valid_frame(frame, failure));
+        }
+    }
     assert(valid_frame(Frame{}, failure));
     std::vector<Triangle> excessive(16385, original);
     assert(!valid_frame(Frame{excessive}, failure));

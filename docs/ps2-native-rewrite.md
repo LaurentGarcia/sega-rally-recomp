@@ -100,22 +100,26 @@ race initializer. Each subsequent input comes from the pad; no recorded motion,
 forces or contact results are supplied.
 
 The integrated EE driver advances the car under neutral controls in Play.
-The production renderer uses binary32 geometry and both vector units. The
-equivalent initial samples measured approximately **12.5 ms for the native
-update** and **20.5 ms for geometry preparation**. The longer sample remains
-about **50 ms combined update/presentation**, around 20 updates/sec including
-vsync. Geometry was 375.7 ms in native 026 and 27.6 ms in native 030; scratch
-reuse, optional detailed clocks and skipping unused clipping buffers reduce it
-further. The intervening exact-cache path
-measured 224.3 ms; its arithmetic remains available for comparison.
-These are emulator timer observations, not physical-console performance or a
-full-race benchmark. Display refresh shown by the emulator is not game speed.
+Native040 measures **59.99 native updates/sec across 1,680 complete frame
+periods**. Time outside the display wait/flip averages **15.04 ms**, with a
+**16.41 ms maximum** and no measured work interval over the nominal 16.67 ms
+budget. This is the current diagnostic car/course loop, not the complete game
+or a physical-console result. Start-to-start periods include pad work and
+logging; the emulator window's displayed refresh rate is not this measurement.
 
-An optional strict `--optimization O3` build of the same final sources measures
-17.7 ms geometry and 12.2 ms game update. It averages about 26.7 native updates/sec
-over 480 updates, improving on O2 but still missing steady 30. O2 remains the
-build default; both retain the same math settings. The private comparisons and
-limitations are recorded in `HANDOFF.md`.
+Equivalent initial states now take **2.75 ms for the native game update** and
+**9.79 ms for geometry preparation**, versus 12.18 ms and 17.72 ms before this
+optimization pass. Earlier geometry milestones were 375.7 ms in native026 and
+27.6 ms in native030. Exact integer-limb operations replace bit-by-bit work in
+vehicle arithmetic; immutable model preparation, indexed batch lookup and
+cached validated projections remove repeated rendering work. All 601 recovered
+game updates and all 1,803 ordered old/new geometry frames retain their results.
+GS packet and validation changes also retain exact tested packets/readbacks.
+
+`native-port` now defaults to strict O3; other targets retain O2. An explicit
+`--optimization O2`, `O3` or `Os` overrides the target default. No fast-math or
+floating contraction is enabled. The private comparisons, source identities
+and remaining scope are recorded in `HANDOFF.md`.
 
 Conservative course-section rejection, exact clipping classification, shared
 vertex reuse and fewer bounds conversions reduce that geometry cost. The
@@ -138,16 +142,26 @@ rasterization, not GS readback or physical-console validation. Detailed evidence
 and numerical limits are in the [world-scene contract](../platform/ps2/native/world_scene.md).
 
 A separate GS correction sends each solid triangle corner's own depth rather
-than using a 2D helper's single depth. All 1,536 readback samples pass in the
-extended constant/sloped depth fixture, and the diagnostic body is visible
-without the previous false road occlusion.
+than using a 2D helper's single depth. The final fixture passes all 2,048
+sampled pixels across 368 frames, including constant/sloped depth and all four
+depth/cutout combinations. The diagnostic body is visible without the previous
+false road occlusion. These sampled regions are not a complete-game image proof.
 
 Remaining integration work includes further measured geometry optimization,
-working interactive pad input, verified update cadence and the model-local/world
-bridge before calling the view faithful. The measured runs had no connected pad;
+working interactive pad input, cadence under complete-game load and the
+model-local/world bridge before calling the view faithful. The measured runs had no connected pad;
 the car advanced from its moving checkpoint with neutral inputs. Complete races,
 AI, recovered cameras, textured presentation, game audio and physical-console
 validation remain later work.
+
+A private correction to Play's versioned IOP module dispatch restores pad
+receive-buffer publication in a paired headless test: the unmodified core
+stalls at state5/request2, while the corrected core reaches state6/request0,
+advances both DMA frame counters and closes the port. Both receive the same
+neutral host input. This isolates an emulator defect; it does not establish
+physical controller input or a corrected GUI build. The game and SDK pad
+implementation remain unchanged. See `THIRD_PARTY.md` and `HANDOFF.md` for
+the private experiment's source and runtime identities.
 
 ### Developer vehicle test
 

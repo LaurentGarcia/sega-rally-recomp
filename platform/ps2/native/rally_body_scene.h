@@ -14,7 +14,7 @@ enum class RallyBodyError {
 const char* rally_body_error_message(RallyBodyError) noexcept;
 
 // Body-only presentation of externally advanced native game state. Loading
-// copies model-local data and an explicit fixed model-to-car transform; it
+// prepares owned immutable model data and an explicit fixed model-to-car transform; it
 // never imports captured view matrices or fits/recenters the object each frame.
 // A diagnostic bridge/camera must not be labelled recovered arcade rendering.
 class RallyBodyScene {
@@ -33,7 +33,7 @@ public:
     bool decode(std::span<const std::uint8_t>, const WorldMatrix& model_to_car,
                 RallyBodyError&) noexcept;
     bool load(const char* path, const WorldMatrix& model_to_car, RallyBodyError&) noexcept;
-    // Optional diagnostic collision surface, copied once as two triangles per
+    // Optional diagnostic collision surface, prepared once as two triangles per
     // quad in unchanged course/world coordinates. No arcade material claim.
     // Empty input removes it. Total model vertices<=65536, source faces<=32768;
     // output capacity<=16384. Success clears the prior frame, failure retains it.

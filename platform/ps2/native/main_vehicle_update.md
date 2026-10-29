@@ -73,6 +73,23 @@ change during the sequence; several other explicit inputs remain constant.
 Passing this comparison does not expand the supported numeric or asset domains
 of the individual recovered operations.
 
+The shared value-arithmetic implementation now uses bounded 32-bit limb shifts
+and extraction instead of walking individual bits in its 128-bit intermediate.
+Sticky-bit reduction uses whole limbs and one masked remainder. Rounding,
+operation order and supported values are unchanged. The retained host fixture
+checks 595,712 arithmetic comparisons, including exponent gaps around word
+boundaries, halfway rounding, cancellation and signed zero.
+
+A controlled same-executable EE comparison alternates eight passes of sixteen
+persistent updates per implementation. All 128 canonical state/pose/request
+comparisons agree; mean update time falls from 12.088 ms to 2.776 ms in Play
+0.72 HLE. The final-source EE continuity run independently passes all 601
+updates, fingerprint `57e2c98c5de78376`, and exports both 752-byte checkpoints
+identically to the host proof. This is an arithmetic/update result, not a
+complete-frame or physical-console speed claim. The private source-bound report
+is `build/ps2/native-vehicle-limbs-ee-001/runtime-validation.json`, SHA-256
+`12d7fa38a04531b83badeae85fca3f7a94a6604b0caa7ae83a759d5bd82394a1`.
+
 ## Reproduction
 
 All game data and capture outputs remain under ignored `build/` directories.

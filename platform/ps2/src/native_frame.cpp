@@ -29,10 +29,16 @@ bool valid_frame(const Frame &frame, const char *&failure) {
             failure = "INVALID NATIVE PSMT4 TEXTURE"; return false;
         }
         for (const auto &vertex : triangle.vertices) {
+            // Flat native geometry uses exact signed-zero UV and unit Q.
+            // Other encodings retain the original checks, including subnormals.
+            const bool unit_uv =
+                ((std::bit_cast<std::uint32_t>(vertex.u) | std::bit_cast<std::uint32_t>(vertex.v)) & 0x7fffffffu) == 0 &&
+                std::bit_cast<std::uint32_t>(vertex.q) == 0x3f800000u;
             if (!finite(vertex.x) || !finite(vertex.y) || vertex.x < -496 || vertex.x > 992 ||
-                vertex.y < -384 || vertex.y > 768 || !finite(vertex.u) || !finite(vertex.v) ||
-                !finite(vertex.q) || !(vertex.q > 0 && vertex.q <= 1000000) ||
-                std::fabs(vertex.u) > 1000000 || std::fabs(vertex.v) > 1000000 ||
+                vertex.y < -384 || vertex.y > 768 ||
+                (!unit_uv && (!finite(vertex.u) || !finite(vertex.v) || !finite(vertex.q) ||
+                 !(vertex.q > 0 && vertex.q <= 1000000) ||
+                 std::fabs(vertex.u) > 1000000 || std::fabs(vertex.v) > 1000000)) ||
                 !finite(vertex.depth) || vertex.depth < 0 || vertex.depth > 1) {
                 failure = "INVALID NATIVE VERTEX"; return false;
             }

@@ -341,13 +341,18 @@ bool Display::present(const Frame &frame) {
     const auto build_start=d.now();
     d.counters.validation_ticks=build_start-validation_start;
     qword_t *q = d.clear(frame.clear_color, frame.depth_test);
+    // Depth comparison stays fixed for this frame. Preserve the same TEST
+    // writes while constructing each cutout variant only once with the SDK.
+    alignas(16) qword_t pixel_tests[2][2];
+    d.test(pixel_tests[0],false);
+    d.test(pixel_tests[1],true);
     const float sx = 640.f / frame_width, sy = float(d.height) / frame_height;
     for (const auto &triangle : frame.triangles) {
         if (q - d.packet->data > 200) { d.submit(q); q = d.packet->data; }
         const auto &material = *triangle.material;
         ++d.counters.triangles;
         if (d.use_vu0) d.counters.vu0_vertices += 3;
-        q = d.test(q, material.cutout);
+        std::memcpy(q,pixel_tests[material.cutout?1:0],32); q+=2;
         if (!material.texture) {
             // The SDK's 2D filled-triangle helper repeats v0.z for all three
             // corners. Native 3D surfaces require independently interpolated Z.

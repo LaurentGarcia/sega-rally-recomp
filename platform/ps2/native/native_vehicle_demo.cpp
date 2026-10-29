@@ -117,10 +117,32 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
     ps2::PadSnapshot previous_pad;const char* previous_pad_status="";
     int previous_sdk_state=-1,previous_sdk_request=-1;
     char page[1500]{};std::uint64_t total_update_ticks=0,total_draw_ticks=0;
+    std::uint64_t previous_start=0,previous_vsync=0,period_sum=0,period_min=~std::uint64_t{0},period_max=0;
+    std::uint64_t work_sum=0,work_max=0;unsigned measured_frames=0,over_budget=0;
+    constexpr std::uint64_t frame_budget=kBUSCLK/60;
     display.set_caption("NATIVE VEHICLE TEST\nDIAGNOSTIC BODY / COURSE");
     std::printf("NATIVE_VEHICLE_BEGIN course=%lu asset_crc=%08lx checkpoint_frame=%lu body_bytes=%lu\n",
         (unsigned long)assets.selector(),(unsigned long)assets.payload_crc32(),(unsigned long)controls.frame,(unsigned long)body.persistent_bytes());
     for(unsigned frame=1;;++frame){
+        const auto frame_start=GetTimerSystemTime();
+        if(frame>1){
+            // Start-to-start includes pad/control work and the previous log.
+            // The display's vsync interval also includes its framebuffer flip.
+            const auto period=frame_start-previous_start;
+            const auto work=period>=previous_vsync?period-previous_vsync:0;
+            period_sum+=period;work_sum+=work;
+            period_min=std::min(period_min,period);period_max=std::max(period_max,period);
+            work_max=std::max(work_max,work);over_budget+=work>frame_budget;
+            if(++measured_frames==60){
+                std::printf("NATIVE_VEHICLE_CADENCE completed_update=%u frames=%u target_hz=60 budget_ticks=%llu period_total_ticks=%llu period_min_ticks=%llu period_max_ticks=%llu non_vsync_total_ticks=%llu non_vsync_max_ticks=%llu over_budget=%u frequency=%u\n",
+                    frame-1,measured_frames,(unsigned long long)frame_budget,(unsigned long long)period_sum,
+                    (unsigned long long)period_min,(unsigned long long)period_max,(unsigned long long)work_sum,
+                    (unsigned long long)work_max,over_budget,unsigned(kBUSCLK));
+                period_sum=0;period_min=~std::uint64_t{0};period_max=0;
+                work_sum=0;work_max=0;measured_frames=0;over_budget=0;
+            }
+        }
+        previous_start=frame_start;
         auto pad_state=pad.poll();
         const char* pad_status=pad.status();
         if(frame<=3||frame%60==0||std::strcmp(pad_status,previous_pad_status)!=0||
@@ -199,6 +221,7 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
             (unsigned long)body.stats().accepted_batch_vertices);
         display.set_debug_page(diagnostics?page:nullptr);
         if(!display.present(body.frame()))throw std::runtime_error(display.error());
+        previous_vsync=display.stats().vsync_ticks;
         const auto draw_ticks=GetTimerSystemTime()-draw_start;total_draw_ticks+=draw_ticks;
         if(frame<=3||frame%60==0){
             const auto stats=body.stats();

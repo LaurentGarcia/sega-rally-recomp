@@ -99,7 +99,8 @@ NATIVE_SOURCES = ["platform/ps2/native/main.cpp", *GAME_SOURCES, *NATIVE_TOOLKIT
 ENGINE_DEMO_SOURCES = ["platform/ps2/samples/engine_demo/main.cpp", *ENGINE_SOURCES]
 ENGINE_HEADERS = {
     "audio_output.h", "pcm_protocol.h", "pcm_resampler.h", "pcm_ring.h",
-    "native_display.h", "native_geometry.h", "native_geometry_float.h", "world_scene.h",
+    "native_display.h", "native_geometry.h", "native_geometry_float.h",
+    "native_geometry_float_internal.h", "world_scene.h",
     "pad_input.h", "pad_state.h", "debug_controls.h", "storage.h", "vu0_pack.h", "vu1_transform.h", "diagnostic_font.h",
 }
 STUDY_HEADERS = {"native_mesh.h", "native_scene.h"}
@@ -653,9 +654,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--container-platform", choices=tuple(LOCK["platforms"]))
     parser.add_argument("--core-manifest", type=project_path)
     parser.add_argument("--jobs", type=int, default=2)
-    parser.add_argument("--optimization", choices=("O2", "O3", "Os"), default="O2")
+    parser.add_argument("--optimization", choices=("O2", "O3", "Os"),
+                        help="defaults to O3 for native-port, O2 for other targets")
     parser.add_argument("--host-cxx", default=os.environ.get("CXX", "c++"))
     args = parser.parse_args(argv)
+    if args.optimization is None:
+        args.optimization = "O3" if args.target == "native-port" else "O2"
     # argparse only applies the type converter to string defaults. Resolve the
     # Path default too, so a symlink cannot redirect output outside build/.
     args.output = args.output.resolve()

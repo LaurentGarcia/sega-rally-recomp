@@ -43,6 +43,17 @@ bool pair32(float a,float b){
     const auto magnitude=single(bits(a)&0x7fffffffu);
     return same32("sqrt32",vm::sqrt32(magnitude),std::sqrt(magnitude));
 }
+bool pair64(std::uint64_t left,std::uint64_t right){
+    volatile double a=wide(left),b=wide(right);
+    const auto x=vm::from_bits(left),y=vm::from_bits(right);
+    if(!same64("boundary_add64",vm::add(x,y),a+b)||
+       !same64("boundary_sub64",vm::subtract(x,y),a-b)||
+       !same64("boundary_mul64",vm::multiply(x,y),a*b)||
+       !same32("boundary_narrow64",vm::narrow(x),float(a)))return false;
+    if((right&0x7fffffffffffffffull)&&
+       !same64("boundary_div64",vm::divide(x,y),a/b))return false;
+    return true;
+}
 }
 int main(){
     if(std::fegetround()!=FE_TONEAREST||!std::numeric_limits<float>::is_iec559||
@@ -68,6 +79,21 @@ int main(){
         int order=77;
         if(!vm::compare(x,y,order)||order!=((a>b)-(a<b)))return 1;
     }
+    // Observable rounding cases across limb boundaries, including cancellation,
+    // halfway-even/odd sums, a carry into the next exponent and sticky tails.
+    // The oracle remains host IEEE arithmetic, independent of the limb layout.
+    constexpr std::array<std::uint64_t,10> fraction={0,1,2,0x7fffffffull,
+        0x80000000ull,0xffffffffull,0x100000000ull,0x7ffffffffffffull,
+        0xffffffffffffeull,0xfffffffffffffull};
+    for(unsigned exponent:{723u,1023u,1323u})
+        for(unsigned gap:{0u,1u,30u,31u,32u,33u,52u,53u,54u,55u,63u,64u,95u,96u,127u,128u})
+            for(auto a:fraction)for(auto b:fraction)for(unsigned signs=0;signs<4;++signs){
+                const auto left=(std::uint64_t(signs&1)<<63)|(std::uint64_t(exponent)<<52)|a;
+                const auto right=(std::uint64_t(signs>>1)<<63)|(std::uint64_t(exponent-gap)<<52)|b;
+                if(!pair64(left,right))return 1;
+            }
+    for(auto a:{0ull,0x8000000000000000ull})for(auto b:{0ull,0x8000000000000000ull})
+        if(!pair64(a,b))return 1;
     for(auto integer:{std::numeric_limits<std::int32_t>::min(),-16777217,-1,0,1,16777217,std::numeric_limits<std::int32_t>::max()}){
         std::int32_t result=123;
         if(!same64("integer64",vm::from_integer(integer),double(integer))||

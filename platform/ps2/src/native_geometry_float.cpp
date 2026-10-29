@@ -1,4 +1,5 @@
 #include "native_geometry_float.h"
+#include "native_geometry_float_internal.h"
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -173,3 +174,17 @@ ClipResult clip_project_triangle_float(const ClipTriangle &input,
     return {ClipStatus::success, triangles, triangles};
 }
 } // namespace ps2::native
+
+namespace ps2::native::detail {
+bool project_inside_float(const ClipVertex& p,Vertex& result) noexcept {
+    if(!accepted(p.x)||!accepted(p.y)||!accepted(p.z)||!accepted(p.w)||!accepted(p.u)||!accepted(p.v))return false;
+    for(unsigned plane=0;plane<7;++plane)if(distance(p,plane)<0.f)return false;
+    return project(p,result,true);
+}
+ClipResult emit_projected_triangle(const std::array<Vertex,3>& vertices,const Material* material,std::span<Triangle> output) noexcept {
+    if(!material)return {ClipStatus::invalid_material,0,0};
+    if(!nonzero_area(vertices))return {};
+    if(output.empty())return {ClipStatus::insufficient_capacity,0,1};
+    output[0]={vertices,material};return {ClipStatus::success,1,1};
+}
+}

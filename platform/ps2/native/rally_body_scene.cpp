@@ -33,11 +33,8 @@ std::uint32_t crc32(std::span<const std::uint8_t> bytes) noexcept {
 bool failure(RallyBodyError& error,RallyBodyError value) noexcept {error=value;return false;}
 }
 struct RallyBodyScene::Storage {
-    std::vector<WorldPoint> vertices;
-    std::vector<WorldFace> faces;
-    std::vector<WorldPoint> course_vertices;
-    std::vector<WorldFace> course_faces;
-    std::vector<WorldFaceGroup> course_groups;
+    std::unique_ptr<PreparedWorldModel> body,course;
+    std::size_t body_vertices=0,body_faces=0;
     WorldMatrix bridge{};
     std::unique_ptr<WorldScene> scene;
 };
@@ -71,20 +68,26 @@ bool RallyBodyScene::decode(std::span<const std::uint8_t> bytes,const WorldMatri
         return failure(error,RallyBodyError::invalid_header);
     try {
         auto next=std::make_unique<Storage>();next->bridge=bridge;
-        next->vertices.resize(vertices);next->faces.resize(faces);
+        std::vector<WorldPoint> points(vertices);
+        std::vector<WorldFace> polygons(faces);
         for(unsigned i=0;i<vertices;++i){const auto offset=header_bytes+i*12;
             const WorldPoint p{scalar(bytes,offset),scalar(bytes,offset+4),scalar(bytes,offset+8)};
             if(!valid(p.x)||!valid(p.y)||!valid(p.z))return failure(error,RallyBodyError::invalid_geometry);
-            next->vertices[i]=p;
+            points[i]=p;
         }
         for(unsigned i=0;i<faces;++i){const auto offset=header_bytes+vertices*12+i*16;
             const WorldFace f{{word(bytes,offset),word(bytes,offset+4),word(bytes,offset+8)},word(bytes,offset+12)};
             if(f.indices[0]>=vertices||f.indices[1]>=vertices||f.indices[2]>=vertices||
                f.indices[0]==f.indices[1]||f.indices[0]==f.indices[2]||f.indices[1]==f.indices[2]||
                (f.argb>>24)!=255)return failure(error,RallyBodyError::invalid_geometry);
-            next->faces[i]=f;
+            polygons[i]=f;
         }
         WorldSceneError engine_error;next->scene=std::make_unique<WorldScene>();
+        next->body=std::make_unique<PreparedWorldModel>();
+        if(!next->body->assign({points,polygons},engine_error))
+            return failure(error,engine_error==WorldSceneError::allocation_failed?
+                RallyBodyError::allocation_failed:RallyBodyError::invalid_geometry);
+        next->body_vertices=vertices;next->body_faces=faces;
         // Clipping may expand a triangle. Reserve at most the display limit,
         // and reject an overflowing frame rather than dropping geometry.
         if(!next->scene->configure(faces,std::min<std::size_t>(16384,std::size_t(faces)*8),engine_error))
@@ -123,8 +126,8 @@ bool RallyBodyScene::attach_course(std::span<const ContactSegment> course,RallyB
         // Bit 2 selects four active corners; a triangle's fourth corner is
         // unused payload and must neither be drawn nor validated.
         const unsigned corners=(polygon.attributes&4u)?4u:3u;
-        if(corners>65536-storage_->vertices.size()-vertex_count||
-           corners-2>32768-storage_->faces.size()-face_count)
+        if(corners>65536-storage_->body_vertices-vertex_count||
+           corners-2>32768-storage_->body_faces-face_count)
             return failure(error,RallyBodyError::capacity);
         vertex_count+=corners;face_count+=corners-2;
     }
@@ -149,14 +152,20 @@ bool RallyBodyScene::attach_course(std::span<const ContactSegment> course,RallyB
             if(face_index!=first_face)groups.push_back({std::uint32_t(first_face),std::uint32_t(face_index-first_face)});
         }
         auto scene=std::make_unique<WorldScene>();WorldSceneError engine_error;
-        const auto total_faces=storage_->faces.size()+faces.size();
+        std::unique_ptr<PreparedWorldModel> prepared;
+        if(!faces.empty()){
+            prepared=std::make_unique<PreparedWorldModel>();
+            if(!prepared->assign({vertices,faces,groups},engine_error))
+                return failure(error,engine_error==WorldSceneError::allocation_failed?
+                    RallyBodyError::allocation_failed:RallyBodyError::invalid_geometry);
+        }
+        const auto total_faces=storage_->body_faces+faces.size();
         if(!scene->configure(total_faces,std::min<std::size_t>(16384,total_faces*8),engine_error))
             return failure(error,RallyBodyError::allocation_failed);
         scene->set_profile_clock(clock_,clock_context_);
         scene->set_transform_provider(transform_batch_,transform_context_);
         scene->set_numeric_mode(numeric_mode_);
-        storage_->course_vertices.swap(vertices);storage_->course_faces.swap(faces);
-        storage_->course_groups.swap(groups);
+        storage_->course.swap(prepared);
         storage_->scene.swap(scene);timings_={};error=RallyBodyError::none;return true;
     }catch(const std::bad_alloc&){return failure(error,RallyBodyError::allocation_failed);}
      catch(const std::length_error&){return failure(error,RallyBodyError::capacity);}
@@ -183,12 +192,12 @@ bool RallyBodyScene::update(const RallyBodyPose& pose,const WorldView& view,Rall
     }
     if(!affine(combined))return failure(error,RallyBodyError::invalid_pose);
     const WorldMatrix identity{1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};
-    std::array<WorldInstance,2> instances{};std::size_t count=0;
-    if(!storage_->course_faces.empty())instances[count++]={{storage_->course_vertices,storage_->course_faces,storage_->course_groups},identity};
-    instances[count++]={{storage_->vertices,storage_->faces},combined};
+    std::array<PreparedWorldInstance,2> instances{};std::size_t count=0;
+    if(storage_->course)instances[count++]={storage_->course.get(),identity};
+    instances[count++]={storage_->body.get(),combined};
     const auto scene_start=now();
     WorldSceneError engine_error;
-    if(!storage_->scene->update(std::span(instances.data(),count),view,engine_error))return failure(error,RallyBodyError::presentation_failed);
+    if(!storage_->scene->update_prepared(std::span(instances.data(),count),view,engine_error))return failure(error,RallyBodyError::presentation_failed);
     timings_={scene_start-pose_start,now()-scene_start};
     error=RallyBodyError::none;return true;
 }
@@ -197,9 +206,8 @@ WorldSceneStats RallyBodyScene::stats() const noexcept {return storage_?storage_
 RallyBodyTimings RallyBodyScene::timings() const noexcept {return timings_;}
 std::size_t RallyBodyScene::persistent_bytes() const noexcept {
     return storage_?sizeof(Storage)+sizeof(WorldScene)+
-        (storage_->vertices.capacity()+storage_->course_vertices.capacity())*sizeof(WorldPoint)+
-        (storage_->faces.capacity()+storage_->course_faces.capacity())*sizeof(WorldFace)+
-        storage_->course_groups.capacity()*sizeof(WorldFaceGroup)+
+        sizeof(PreparedWorldModel)+storage_->body->persistent_bytes()+
+        (storage_->course?sizeof(PreparedWorldModel)+storage_->course->persistent_bytes():0)+
         storage_->scene->stats().persistent_bytes:0;
 }
 const char* rally_body_error_message(RallyBodyError error) noexcept {

@@ -165,11 +165,38 @@ with the staging reduction, these changes recover 2,490,368 bytes before a
 native-rendered frame needs CPU fallback. Runtime peaks, allocator fragments,
 the stack and live geometry still have to fit together.
 
-## Native vehicle measurements, 27 October 2026
+## Native vehicle measurements, 28 October 2026
+
+Native040 reaches 59.991 native updates/sec over 1,680 complete frame periods
+in Play 0.72 HLE. Work outside the display wait/flip averages 15.039 ms and
+peaks at 16.413 ms, with zero work intervals over the nominal 16.667 ms budget.
+The same initial three states average 2.749 ms game update and 9.793 ms geometry.
+The observation covers neutral input and the diagnostic body/collision course;
+it does not certify a full race, physical-console speed or future textured
+content. Complete periods, including pad processing and logging, establish
+the observed cadence. The time outside the wait is not hardware utilization.
+
+The measured changes retain recovered state and ordered frame output. A
+same-executable game comparison reduces 12.088 ms/update to 2.776 ms by replacing
+individual-bit manipulation with exact 32-bit limb operations. Separate
+fixed-pose geometry comparisons save 4.610 ms through immutable preparation,
+2.267 ms through indexed batch lookup, 0.304 ms by skipping an exact identity
+bounds transform, and 1.103 ms by reusing validated inside projections. These
+isolated savings are not summed as a prediction of complete-frame performance.
+The display comparison saves 0.437 ms for 1,024 authored triangles while
+preserving full tested GIF packets and framebuffer readbacks.
+
+Native-port C++ compilation now defaults to strict O3; other targets retain O2.
+Both disable fast-math and floating contraction. Exact game parity, repeated
+projection/collision/failure tests, and complete ordered geometry comparisons
+remain required. Skipping divisions for exact unit-W measured only 0.060 ms in
+its separate experiment and was not promoted.
+
+### Earlier measurements
 
 The native vehicle target is separate from the historical machine/reference
 probe above. It runs recovered game systems directly, uses binary32 rendering
-on EE/VU, and keeps exact reference rendering as a diagnostic mode. The default
+on EE/VU, and keeps exact reference rendering as a diagnostic mode. The earlier
 O2 build measures 20.481 ms geometry and 12.471 ms game update over the same
 first three states, compared with 27.560 ms geometry before scratch reuse,
 removal of a duplicate DMA cache publication, disabling detailed scene clocks
@@ -177,10 +204,10 @@ and skipping clipping scratch for fully inside triangles.
 These combined builds do not isolate the contribution of each source change.
 The longer run still averages about 50 ms/update including presentation/vsync.
 
-Strict O3 with the final sources measures 17.720 ms geometry and 12.178 ms game
+Strict O3 in native036 measured 17.720 ms geometry and 12.178 ms game
 update. It averages 37.394 ms/update over 480 updates, about 26.7 updates/sec.
-This is still below steady 30. O2 remains the default; no fast-math or floating
-contraction is enabled in either build.
+That revision was still below steady 30. O2 was then the default; no fast-math
+or floating contraction was enabled in either build.
 
 The inside-triangle path preserves the same projection order and failure
 contracts. All 1,803 ordered frame comparisons remain byte-identical; a controlled

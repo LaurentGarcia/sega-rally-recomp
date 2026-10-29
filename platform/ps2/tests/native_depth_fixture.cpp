@@ -127,7 +127,29 @@ int main() {
             verify_at(name,"textured_left",331,125,left);
             verify_at(name,"textured_right",421,125,right);
         }
-        std::printf("DEPTH FIXTURE PIXEL PASS frames=364 samples=%u hash=%016llx format=PSMCT32+PSMZ16S vram_bytes=%lu output_height=%u; scoped to sampled original regions\n",
+        // A transparent overlay tests all depth/cutout TEST combinations.
+        // Left is behind opaque blue, right is in front. Cutout rejects both;
+        // with cutout off, disabling depth also exposes the left red overlay.
+        Material transparent_red;
+        transparent_red.texture = &texture;
+        transparent_red.palette.fill(0x00ff2020u);
+        for (unsigned phase = 0; phase < 4; ++phase) {
+            const bool use_depth = (phase & 1u) != 0;
+            transparent_red.cutout = (phase & 2u) != 0;
+            const std::array<Triangle,4> coverage{
+                triangle(35,.5f,&solid_far), triangle(291,.5f,&solid_far),
+                triangle(35,.25f,&transparent_red), triangle(291,.75f,&transparent_red)};
+            if (!display.present({coverage,0xff101923u,use_depth}))
+                throw std::runtime_error(display.error());
+            const char *name = transparent_red.cutout ?
+                (use_depth ? "cutout_depth" : "cutout_no_depth") :
+                (use_depth ? "alpha_zero_depth" : "alpha_zero_no_depth");
+            verify_at(name,"behind",120,160,
+                transparent_red.cutout || use_depth ? 0x00ff5020u : 0x002020ffu);
+            verify_at(name,"in_front",376,160,
+                transparent_red.cutout ? 0x00ff5020u : 0x002020ffu);
+        }
+        std::printf("DEPTH FIXTURE PIXEL PASS frames=368 samples=%u hash=%016llx format=PSMCT32+PSMZ16S vram_bytes=%lu output_height=%u; scoped to sampled original regions\n",
                     verified_pixels,static_cast<unsigned long long>(pixel_hash),
                     static_cast<unsigned long>(display_vram_bytes(display.output_height())),display.output_height());
         while (true) SleepThread();

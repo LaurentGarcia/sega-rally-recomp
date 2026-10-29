@@ -26,6 +26,31 @@ frame refers to owned storage and expires at the next successful update or
 reconfiguration, or owner destruction. Calls must be serialized with display
 submission. `stats().persistent_bytes` reports actual bank/object storage.
 
+For immutable geometry, `PreparedWorldModel::assign()` validates and owns a
+snapshot of the vertices, faces and optional group partition. It also records
+the exact six local extrema per group, using the same traversal and comparison
+order as ordinary rendering. Sources may be changed or destroyed after a
+successful assignment. Failed validation or allocation preserves the previous
+snapshot. No pointer-identity or content-hash assumption substitutes for this
+ownership. `WorldScene::update_prepared()` receives explicit prepared instances;
+it still checks each current object/view transform and the cumulative scene
+limits, then uses the unchanged interval transforms, culling, batching and
+clipping. The ordinary mutable `update()` path still validates current model
+data on every call. Both paths allocate nothing during updates and publish
+frames transactionally. Model owners must survive an update, but finished
+frames contain no pointers into those owners.
+
+Snapshot storage is reported separately by
+`PreparedWorldModel::persistent_bytes()`: private storage plus actual vector
+capacities for 12-byte points, 16-byte faces, 8-byte groups and 24-byte group
+bounds. The public owner itself and allocator bookkeeping are excluded. The
+maximum accepted counts imply 2,359,296 bytes of element payload when every
+face is a separate group, plus private storage and any vector spare capacity.
+Replacement temporarily retains both old and new snapshots; caller input
+storage is also separate. `RallyBodyScene` releases its temporary decoded
+arrays after assignment, retaining only the owned body/course snapshots and
+their frame banks.
+
 Clipping input and its eight-triangle output scratch are initialized once per
 update and reused across faces. Every input corner and material pointer is
 overwritten before clipping; only the returned output count enters the inactive
@@ -33,14 +58,15 @@ frame bank. Unused scratch entries are never copied. This removes repeated
 default initialization without changing allocation, capacity, ordering or
 transactional publication.
 
-Configuration also allocates an exact transformed-vertex cache by default,
-with a power-of-two capacity capped at 4,096 entries / 128 KiB. Its key contains
+Configuration also allocates a transformed-vertex cache by default,
+with a power-of-two capacity capped at 4,096 entries / 224 KiB. Its key contains
 the model vertex index and a serial that changes for every instance and every
 update. Direct-map collisions replace entries; they do not change geometry.
 Serial wrap clears validity before reuse. No model pointer, transform or vertex
 result survives logically into the next instance, so callers may still edit,
 replace or release their model storage between updates. A hit reuses precisely
-the scalar transform's four narrowed clip components. Materials, clipping,
+the stored transform's four clip components. Native-float mode additionally
+retains successful inside projections, adding 24 bytes per entry. Materials,
 errors and output ordering remain unchanged. The optional fourth
 `configure()` argument disables this cache for the uncached diagnostic path.
 
@@ -106,7 +132,8 @@ does not bound that new intersection. Only wholly inside triangles retain
 approximate results. Counters distinguish prefetched accepted vertices,
 triangles restored for clipping, and approximate corners actually consumed by
 nondegenerate output triangles. The serial's high bit stores provenance while
-the remaining 31 bits identify an instance, keeping cache entries at 32 bytes.
+the remaining 31 bits identify an instance. The transform/provenance portion
+occupies 32 bytes; the inside-projection cache adds 24 bytes per entry.
 Changing providers between updates never reuses old approximate coordinates.
 Native-float mode accepts bounded outside provider results and clips them in
 binary32 without this exact-reference restoration. The provider must implement
@@ -299,6 +326,130 @@ all 124,539,359 output-stream bytes exactly; its evidence is
 `build/ps2-world-inside-frames-002/comparison.json`. This measured fast path was
 selected for production; it adds no numerical approximation or game-state
 change. Emulator timing on one pose does not establish a console frame rate.
+
+The following owned-model experiment isolated repeated immutable validation
+and local group-extrema construction. A private same-executable O3 comparison
+alternated the ordinary and prepared paths on the same checkpoint and actual
+VU1 provider. All eight frames had 906 triangles and the same ordered geometry
+fingerprint. Mean outer time fell from 2,785,088 to 2,105,344 reported timer
+ticks: 24.41%, or 4.610 ms in Play 0.72 HLE. Snapshot copies/bounds took 883,205
+CP0 counts and occupied 271,096 bytes in that prototype. That preparation
+counter excluded the preceding initial validation; it is not a measurement
+of the complete public `assign()` operation. The experiment's source, ELF,
+logs and timings are bound in
+`build/ps2-world-prepared-ee-001/runtime-validation.json`. These fixed-pose
+measurements do not establish physical-console timing or complete-frame cadence.
+
+The promoted owned API and its Rally adapter pass an exact comparison against
+the preceding committed implementation across all 601 poses in reference,
+native-scalar and sealed actual-VU replay modes: 1,803 frames and all
+124,539,359 ordered output bytes match, including the deterministic summary.
+The source-bound result is
+`build/ps2-world-prepared-frames-002/comparison.json`; this is a host replay of
+previously executed VU outputs, not a new VU or GS execution. The refreshed
+strict replay at `build/ps2-world-prepared-replay-001/corpus-result.json` also
+retains the excess-callback rejection and every measured image difference
+reported above, including the maximum raster-depth difference. The focused
+prepared-model fixture additionally passes 776 frame comparisons and 15,689
+checks under ASan/UBSan, including source mutation/destruction, all five
+allocation-failure sites, replacement/frame rollback, transform-domain and
+capacity errors, and allocation-free updates. All five earlier WorldScene
+fixtures also pass. Independent ownership and bounds review found no blocker.
+
+Per-batch vertex lookup now uses a 256-entry table rather than repeatedly
+scanning the list of up to 96 gathered indices. The table maps each validated
+16-bit vertex index to its existing batch slot; first-occurrence order and all
+provider inputs stay unchanged. A generation stamp makes old entries invalid
+without clearing each batch, and all keys are cleared before stamp reuse.
+There are at most 96 occupied slots, so probing always reaches a free slot;
+lookup misses do not modify the table. Storage adds 2 KiB plus its generation
+counter/alignment, included in the scene's persistent-byte accounting.
+
+The same-executable O3 fixed-pose comparison measured 2,065,536 mean timer
+ticks with linear lookup and 1,731,264 with indexed lookup: 16.18%, or
+2.267 ms saved in Play. All eight frames had the same geometry fingerprint.
+Evidence is `build/ps2-world-lookup-ee-001/runtime-validation.json`; this is
+neither physical-console performance nor a complete-frame rate. The retained
+lookup test passes 140,411 checks under ASan/UBSan, including colliding indices,
+index 65,535, a full 96-vertex batch, duplicate vertices, failed/rejected
+provider results and 70,000 updates crossing generation wrap. All seven
+WorldScene fixtures pass. The promoted path's complete 1,803-frame ordered
+byte comparison and strict actual-VU replay are bound in
+`build/ps2-world-lookup-frames-002/comparison.json` and
+`build/ps2-world-lookup-replay-001/corpus-result.json`; every previous geometry
+and raster measurement is unchanged. Independent review found no blocker.
+
+Native interval bounds also skip the first matrix stage when the current
+object matrix is an exact identity. The predicate requires exact positive-one
+diagonal encodings and zero-magnitude off-diagonal encodings, accepting either
+zero sign. Existing interval zero/one operations return precisely those input
+endpoints, so this skips redundant work without narrowing the enclosure. A
+near-identity matrix still follows the full path; reference bounds are unchanged.
+The private O3 A/B saved 0.304 ms (1,720,128 versus 1,675,264 mean timer ticks)
+on the same fixed pose, with eight identical geometry fingerprints, as recorded
+in `build/ps2-world-identity-ee-001/runtime-validation.json`. The retained
+sanitized test compares grouped and ungrouped rendering across 25,601 frames
+and 51,207 checks, including every off-diagonal signed-zero combination,
+one-bit matrix perturbations, and a near-identity scale that brings a face into
+view. All eight WorldScene fixtures pass. Final unchanged full-frame and strict
+actual-VU replay evidence is
+`build/ps2-world-identity-frames-002/comparison.json` and
+`build/ps2-world-identity-replay-001/corpus-result.json`. The timing remains an
+emulator experiment, not proof of a complete 60 Hz frame budget.
+
+A separate private experiment skipped the four projection divisions only when
+W had the exact positive-one encoding. It preserved all eight fixed-pose
+fingerprints, the full 1,803-frame output stream, and 105,762 old/new clipping
+comparisons. The same-executable O3 timing fell from 1,686,848 to 1,678,144 mean
+timer ticks: only 0.059 ms / 0.52% in Play. The source/ELF-bound result is
+`build/ps2-world-unit-w-ee-001/runtime-validation.json`. This shortcut was not
+promoted: the small measured saving did not justify another production branch
+and its test surface at this checkpoint. The ordinary projection divisions
+remain unchanged.
+
+The selected follow-up caches each successful inside projection alongside its
+clip coordinates in native-float mode. A spare index bit records validity;
+validated indices occupy only the low 16 bits. Per-instance serials invalidate
+both results together. Each face copies its corners into scratch before another
+corner can evict a colliding entry. An outside or unsuccessful projection keeps
+its original clip vertex and takes the complete float clipper. Three successful
+cached projections retain the same area, material, capacity and atomic output
+checks through a narrow internal helper. Reference mode is unchanged. No
+allocation occurs during updates; maximum extra cache storage is 96 KiB,
+already included in persistent-byte accounting.
+
+The private same-executable O3 comparison reduced mean timer ticks from
+1,719,488 to 1,556,800: 9.46%, or 1.103 ms in Play. All eight frames had the
+same 906 triangles and ordered geometry fingerprint. The final measured update
+projected 2,418 vertices once, reused 1,518 projections and emitted 880 triangles
+through the inside path. Source, ELF, inputs and logs are bound in
+`build/ps2-world-projection-ee-001/runtime-validation.json`. These are fixed-pose
+emulator measurements, not physical-console timing or proof of 60 Hz cadence.
+
+The promoted implementation matches all 124,539,359 ordered bytes across the
+same 601 poses and three numeric/provider modes (1,803 frames), recorded in
+`build/ps2-world-projection-frames-002/comparison.json`. Strict replay of sealed
+actual-VU outputs at `build/ps2-world-projection-replay-001/corpus-result.json`
+retains the excess-callback rejection and all previously reported reference
+differences, including 305 differing color pixels, 14 coverage differences and
+maximum raster-depth difference 0.027691642484179657. This host raster replay
+is not a new VU execution or GS pixel comparison. The new retained fixture
+passes 1,000 cached/uncached frames and 3,023 checks under ASan/UBSan, covering
+collisions, source/mode changes, rejected and failed providers, invalid input,
+clipping fallback and transactional capacity failure. Independent review found
+no blocker. All nine WorldScene portable fixtures pass (13.883 seconds on the
+development host).
+
+Integrated native build 040, including the separately validated game arithmetic
+and Display changes, measured 59.991 native updates per second across 1,680
+complete frame periods in Play 0.72 HLE. Non-vsync work averaged 15.039 ms and
+peaked at 16.413 ms, with no measured work interval over the 16.67 ms budget.
+That work counter excludes the wait and framebuffer flip; the complete periods
+establish the reported cadence. Common logged state/pose/control checkpoints
+match builds 037 through 039. The bound comparison is
+`build/ps2/native-040/performance-comparison.json`. This meets the requested
+cadence in the measured neutral-input diagnostic view, not yet on a physical
+PS2 or across a complete race.
 
 The current `RallyBodyScene` integrates a separate raw model-local body asset
 with persistent native position/orientation and an explicit model-to-car bridge.

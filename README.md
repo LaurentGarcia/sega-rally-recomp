@@ -70,9 +70,11 @@ requests. A developer application connects that update to pad input and a
 flat body/collision-course view through direct PS2 services, without an arcade
 CPU or device runtime. Rendering performance, the model/camera relationship,
 game audio and full race flow remain unfinished; this is not a playable release.
-The native renderer now uses 32-bit geometry, VU1 transform batches and VU0 GS
-packing. Initial equivalent-state Play samples reduce geometry preparation
-from 375.7 ms to 20.5 ms; physical-console performance remains unverified.
+The native renderer uses 32-bit geometry, VU1 transform batches and VU0 GS
+packing. The diagnostic car/course loop now measures **59.99 native updates/sec
+over 1,680 frames in Play**, with measured work below the 16.67 ms budget in
+every frame. This is an emulator development milestone; full-race and
+physical-console performance remain unverified.
 See the [PS2 build guide and limits](docs/ps2.md).
 The [shared engine](docs/ps2-engine-architecture.md) keeps hardware services
 independent of Rally rules and includes an original engine-only sample.

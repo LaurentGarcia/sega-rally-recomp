@@ -126,12 +126,35 @@ exact and guarded modes available for comparison. Its game update retains
 separate exact arithmetic. VU1 and VU0 currently execute
 in sequence, so both being active does not establish overlapped work.
 
+Static geometry can use `PreparedWorldModel`, an owned immutable snapshot that
+validates vertices, faces and group coverage and constructs local group bounds
+once at load time. Replacement is atomic. `update_prepared` still validates
+each instance transform, owner and combined scene capacity; mutable callers
+retain the fully checked `update` entry point. Both paths share rendering and
+output contracts, allocate nothing per update, and publish frame-owned output.
+Rally releases its temporary decoded geometry after preparing body and course
+models. Preparation cost and persistent storage belong to asset loading, not
+the frame budget.
+
+The bounded vertex cache also retains successfully validated inside projections.
+Their lifetime is one instance update; clipped or failed projections use the
+full clipper. The internal helper contract preserves projection order,
+degenerate-triangle rejection and atomic capacity failures. This adds 24 bytes
+per cache entry, at most 96 KiB, for a maximum 224 KiB vertex cache. A separate
+2 KiB generation-stamped batch lookup preserves first-occurrence vertex order
+without repeated linear searches. Neither cache allocates during an update.
+
 Profiling clocks are optional caller-owned callbacks. The display reports
 validation, packet construction, completion, decoration and vsync separately;
 packet construction includes any transfers needed before the final packet.
 WorldScene's detailed per-face timing is disabled during normal vehicle drawing
 and enabled explicitly for diagnostics. Timings include instrumentation cost
 and do not measure hardware-unit utilization or establish console throughput.
+The vehicle loop also reports complete start-to-start periods and time outside
+the display wait/flip interval in 60-update windows. Its target is 60 native
+updates and presentations per second, with a nominal 16.67 ms complete-frame
+budget. Time outside the wait is not a hardware busy-cycle measurement; both
+that work and the observed cadence must be checked before claiming the target.
 
 The GS path retains native indexed textures, CLUTs, explicit primitive order,
 optional Z16S depth and visible cache/transfer counters. It does not hide these

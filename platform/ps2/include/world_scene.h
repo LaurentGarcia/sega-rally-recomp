@@ -48,6 +48,31 @@ using WorldSceneTransformBatch=bool (*)(void*,const WorldMatrix&,const WorldMatr
     std::span<std::uint8_t>) noexcept;
 const char* world_scene_error_message(WorldSceneError error) noexcept;
 
+// Immutable, owned model snapshot. Assignment validates and copies all source
+// vertices/faces/groups and derives exact local group extrema once. Sources may
+// then change or die. Failed assignment retains the previous snapshot. Calls
+// are serialized with update_prepared(); no borrowed mutable model is trusted.
+class PreparedWorldModel {
+public:
+    PreparedWorldModel() noexcept;~PreparedWorldModel();
+    PreparedWorldModel(const PreparedWorldModel&)=delete;
+    PreparedWorldModel& operator=(const PreparedWorldModel&)=delete;
+    PreparedWorldModel(PreparedWorldModel&&)=delete;
+    PreparedWorldModel& operator=(PreparedWorldModel&&)=delete;
+    // Same model domain as update(), at most65536 vertices and32768 faces.
+    bool assign(WorldModel,WorldSceneError&) noexcept;
+    bool valid() const noexcept;
+    // Owned storage and vector capacities, excluding allocator bookkeeping.
+    std::size_t persistent_bytes() const noexcept;
+private:
+    struct Storage;std::unique_ptr<Storage> storage_;
+    friend class WorldScene;
+};
+struct PreparedWorldInstance {
+    const PreparedWorldModel* model=nullptr;
+    WorldMatrix object_to_world{};
+};
+
 // Explicit fixed-world presentation adapter. It does not fit/recenter bounds,
 // advance game state, recover a game camera, or read reference-view transforms.
 // Caller supplies the proven model-local assembly and world/view transforms.
@@ -59,8 +84,8 @@ public:
     WorldScene(WorldScene&&)=delete;WorldScene& operator=(WorldScene&&)=delete;
     // Allocates two bounded frame banks once.1..32768 source faces and
     //1..16384 output triangles. Reconfiguration is atomic on failure and
-    // discards the old frame on success. The default exact transform cache
-    // holds up to4096 entries (128 KiB), reset logically for every instance.
+    // discards the old frame on success. The default transform/projection cache
+    // holds up to4096 entries (224 KiB), reset logically for every instance.
     // Disable it only for the uncached diagnostic comparison. No allocation
     // occurs in update(). Clock configuration survives configure().
     bool configure(std::size_t source_faces,std::size_t output_triangles,WorldSceneError&,
@@ -87,9 +112,17 @@ public:
     // call; the prepared frame owns its materials/vertices. Returned frame views
     // expire at the next successful update/configure or owner destruction.
     bool update(std::span<const WorldInstance>,const WorldView&,WorldSceneError&) noexcept;
+    // Identical presentation and transactional limits, using owned snapshots.
+    // Owners must be valid and survive this call; instance/view transforms are
+    // checked every time. No allocations occur, and the resulting frame does
+    // not retain pointers to a model owner. Snapshot storage is separate from
+    // WorldSceneStats::persistent_bytes and is reported by each model owner.
+    bool update_prepared(std::span<const PreparedWorldInstance>,const WorldView&,WorldSceneError&) noexcept;
     Frame frame() const noexcept;
     WorldSceneStats stats() const noexcept;
 private:
+    template<class Instance>
+    bool update_impl(std::span<const Instance>,const WorldView&,WorldSceneError&) noexcept;
     struct Storage;std::unique_ptr<Storage> storage_;
     WorldSceneClock clock_=nullptr;void* clock_context_=nullptr;
     WorldSceneTransformBatch transform_batch_=nullptr;void* transform_context_=nullptr;

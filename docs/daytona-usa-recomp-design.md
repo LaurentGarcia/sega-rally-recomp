@@ -394,6 +394,14 @@ merely because both paths use the same assets. No global fast-math option is
 authorized by this distinction. DMA ownership and synchronization remain
 explicit, and emulator observations remain separate from console validation.
 
+**Native PS2 performance target.** The requested target is 60 native game
+updates and presented frames per second: a nominal 16.67 ms budget for the
+complete frame, including input, simulation, geometry and presentation. Record
+whole-frame intervals and work exceeding that budget; display refresh alone
+does not establish game speed. Intermediate 20/30 fps results do not meet this
+target. Preserve recovered game behavior while removing unnecessary work and
+using the EE, VUs and GS efficiently.
+
 **Rally distribution update, 15 October 2026.** The requested deliverable is a
 prebuilt game executable, rather than a compiler bootstrap requiring developer
 tools. Its original runtime importer verifies the player's ZIP and prepares

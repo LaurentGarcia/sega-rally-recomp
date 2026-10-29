@@ -41,7 +41,22 @@ The inspected upstream source reference is
 `8de4a71f5215ef38e357ac77a07948eb3424448f`; its
 [core license](https://github.com/jpd002/Play-/blob/8de4a71f5215ef38e357ac77a07948eb3424448f/License.txt)
 is BSD-2-Clause. Its bundled dependencies retain their own licenses. No
-emulator implementation was copied into this project.
+emulator implementation is included in this project's source release.
+
+A private checkout at that pin, under ignored
+`build/ps2-play-version-dispatch-001/`, corrects dynamic-library version
+resolution: independent major-version export tables coexist, newer minor
+versions replace older ones, and release/save-state handling retains the
+correct table. Built-in HLE fallback remains available. The private patch is
+`version-dispatch.patch`, SHA256
+`ae32008bf3647aef6dbb79c28dfa479ad55341dd53831bfb780ebf1dab8dfd87`.
+Forty-six core checks passed. Paired headless runs of the same SDK pad probe
+reproduced the transfer-lock stall without the patch and verified advancing
+receive buffers and successful pad closure with it; the source-bound record
+is `paired-runtime-001.json` in that directory. These runs used a neutral host
+pad provider. Physical controller input, the unchanged GUI app and real PS2
+hardware remain untested by this experiment. The patch and emulator binaries
+remain private; no SDK or game input workaround was applied.
 
 ## Sega Rally project base and board reference
 
