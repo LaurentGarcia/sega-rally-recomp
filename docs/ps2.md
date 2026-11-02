@@ -37,6 +37,11 @@ The world modes also skip repeated EE setup for validated triangles sharing
 an outside clip plane. `--drive-world-no-reject` retains memoized synchronous
 submission with the original per-face clipper for comparison; it takes the same
 three paths. The generic clipper and VU geometry arithmetic remain unchanged.
+World modes gather owned prepared corners and omit their repeated static
+validation before VU1 submission. Dynamic matrices and transfer/result checks
+remain. `--drive-world-raw` keeps the fully validating corner path with the same
+three file arguments, material reuse and outside rejection. The engine API
+retains raw admission by default.
 The standalone native fixtures use fixed manifests containing only original
 native/test sources; they do not link the translated reference runtime.
 

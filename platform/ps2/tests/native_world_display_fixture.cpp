@@ -10,12 +10,70 @@
 #include <kernel.h>
 #include <algorithm>
 #include <array>
+#include <bit>
+#include <cstddef>
+#include <new>
 #include <cstdio>
 #include <cstring>
 #include <memory>
 #include <stdexcept>
 
+// Private execution recipes may observe the exact submitted DMA stream. The
+// production driver has no observer call. Compare every word except the owned
+// alternating bank address and the per-call header/MARK sequence identifiers.
+#ifdef PS2_WORLD_PACKET_PROOF
 namespace {
+std::array<std::uint32_t,16384> packet_reference;
+std::size_t packet_used=0,packet_cursor=0;
+unsigned packet_mode=0,packet_count=0,packet_expected_count=0;
+[[noreturn]] void packet_fail(const char* label){std::printf("WORLD PREPARED PACKET FAIL: %s\n",label);throw std::runtime_error(label);}
+void packet_word(std::uint32_t value){
+    if(packet_mode==1){if(packet_used==packet_reference.size())packet_fail("PACKET PROOF CAPACITY");packet_reference[packet_used++]=value;}
+    else {if(packet_cursor==packet_used||packet_reference[packet_cursor++]!=value)packet_fail("PREPARED DMA PACKET WORD DIFFERENCE");}
+}
+}
+extern "C" void ps2_world_packet_proof(const std::uint32_t* words,std::size_t count,unsigned bank){
+    if(!packet_mode)return;
+    if(bank>1)packet_fail("PACKET BANK INVALID");
+    ++packet_count;packet_word(std::uint32_t(count));
+    for(std::size_t i=0;i<count;){
+        auto command=words[i++];const unsigned op=command>>24,n=(command>>16)&255u;
+        if(op==0x6c||op==0x6e){
+            const unsigned address=command&1023u;
+            if(address<bank*512u)packet_fail("PACKET ADDRESS INVALID");
+            const unsigned local=address-bank*512u;command=(command&~1023u)|local;
+            packet_word(command);
+            const unsigned input_words=op==0x6c?n*4:n;
+            if(!n||input_words>count-i)packet_fail("PACKET UNPACK INVALID");
+            for(unsigned k=0;k<input_words;++k)packet_word(op==0x6c&&local==0&&n==16&&k==34?0:words[i+k]);
+            i+=input_words;
+        }else{
+            if(op==0x14)command-=bank*3u;
+            else if(op==0x07)command&=0xffff0000u;
+            else if(op!=0&&op!=0x01&&op!=0x10&&op!=0x11)packet_fail("PACKET OPCODE UNEXPECTED");
+            packet_word(command);
+        }
+    }
+}
+#endif
+namespace {
+void begin_packet_pair(bool compare){
+#ifdef PS2_WORLD_PACKET_PROOF
+    packet_mode=compare?2:1;packet_count=0;packet_cursor=0;if(!compare)packet_used=0;
+#else
+    (void)compare;
+#endif
+}
+std::size_t end_packet_pair(bool compare){
+#ifdef PS2_WORLD_PACKET_PROOF
+    packet_mode=0;
+    if(!compare)packet_expected_count=packet_count;
+    else if(!packet_count||packet_count!=packet_expected_count||packet_cursor!=packet_used)throw std::runtime_error("PACKET PROOF INCOMPLETE");
+    return packet_used-packet_count; // Length sentinels are not DMA words.
+#else
+    (void)compare;return 0;
+#endif
+}
 using namespace ps2::native;
 constexpr unsigned face_count=35;
 std::array<std::uint32_t,640*512> reference;
@@ -414,6 +472,144 @@ void trivial_reject_checks(Display& display,ps2::Vu1Transform& unit,Authored& so
     require(*GS_REG_DISPFB1==front1&&*GS_REG_DISPFB2==front2,"INVALID FALLBACK MODE FLIPPED");
     std::puts("WORLD TRIVIAL REJECT PASS pairs=6 positive=3 zero=3 original_counters=34 late_rejections=6 invalid_mode=1");
 }
+
+unsigned prepared_driver_checks(ps2::Vu1Transform& unit,unsigned height){
+    using namespace ps2;
+    unsigned checks=0;const auto check=[&](bool okay,const char* label){require(okay,label);++checks;};
+    const auto matrix=identity();PreparedVu1WorldCorners owned,partial,empty;
+    std::array<Vu1WorldCorner,3> expected;
+    {
+        const std::array<WorldPoint,6> points{{{-.5f,-.5f,.5f},{.5f,-.5f,.5f},{0,.5f,.5f},
+                                             {-.25f,-.25f,.5f},{.25f,-.25f,.5f},{0,.25f,.5f}}};
+        std::array<WorldFace,2> faces;faces[0].indices={0,1,2};faces[1].indices={3,4,5};
+        PreparedWorldModel model;WorldScene planner;WorldSceneError error;
+        check(model.assign({points,faces},error),"OWNED MODEL ASSIGN");
+        check(planner.configure_plan(2,16,error),"OWNED PLAN CONFIGURE");
+        PreparedWorldInstance instance{&model,matrix};
+        check(planner.plan_prepared({&instance,1},{matrix},error),"OWNED PLAN BUILD");
+        check(planner.draw_plan().begin_corners(0,0,1,1,owned),"OWNED CORNER COPY");
+        check(planner.draw_plan().begin_corners(0,0,2,1,partial),"PARTIAL CORNER COPY");
+        std::copy_n(owned.corners().begin(),3,expected.begin());
+    }
+    check(owned.ready()&&!partial.ready()&&!empty.ready(),"OWNED READINESS");
+    const PreparedVu1WorldGeometry geometry{matrix,matrix,owned,height,1300};
+    std::array<TransformVector4,48> clips;for(auto& c:clips)c={7,8,9,10};const auto sentinel=clips;
+    Vu1WorldToken token;Vu1WorldSubmission submission;
+    const auto initial=unit.world_stats();
+    check(unit.prepare_world({matrix,matrix,empty,height,1301},token,clips)==Vu1WorldPrepareResult::rejected,"DEFAULT PROOF ACCEPTED");
+    check(unit.prepare_world({matrix,matrix,partial,height,1302},token,clips)==Vu1WorldPrepareResult::rejected,"PARTIAL PROOF ACCEPTED");
+    check(unit.prepare_world({matrix,matrix,owned,123,1303},token,clips)==Vu1WorldPrepareResult::rejected,"PREPARED HEIGHT ACCEPTED");
+    auto bad_matrix=matrix;bad_matrix[0]=std::bit_cast<float>(0x7fc00000u);
+    check(unit.prepare_world({bad_matrix,matrix,owned,height,1304},token,clips)==Vu1WorldPrepareResult::rejected,"PREPARED MATRIX ACCEPTED");
+    for(unsigned test=0;test<5;++test){auto raw=expected;
+        if(test==0)raw[0].position.x=std::bit_cast<float>(0x7fc00000u);
+        if(test==1)raw[0].position.y=std::bit_cast<float>(1u);
+        if(test==2)raw[0].position.w=0;
+        if(test==3)raw[0].u=131072;
+        if(test==4)raw[0].inv_width=.3f;
+        check(unit.prepare_world(Vu1WorldGeometry{matrix,matrix,raw,height,1310+test},token,clips)==Vu1WorldPrepareResult::rejected,"RAW CORNER SCAN BYPASSED");
+    }
+    std::array<Vu1WorldState,1> states{};states[0].prim=3;states[0].rgba=0x80000000u;
+    check(unit.draw_world(PreparedVu1WorldBatch{matrix,matrix,owned,{},height,1320},clips)==Vu1WorldResult::rejected,"PREPARED SHORT STATE ACCEPTED");
+    states[0].prim=20;
+    check(unit.draw_world(PreparedVu1WorldBatch{matrix,matrix,owned,states,height,1321},clips)==Vu1WorldResult::rejected,"PREPARED PRIM ACCEPTED");
+    states[0].prim=3;states[0].rgba=0x81000000u;
+    check(unit.draw_world(PreparedVu1WorldBatch{matrix,matrix,owned,states,height,1322},clips)==Vu1WorldResult::rejected,"PREPARED ALPHA ACCEPTED");
+    states[0].rgba=0x80000000u;
+    struct alignas(16) Box {PreparedVu1WorldCorners value;std::array<std::byte,64> tail{};} box;
+    box.value=owned;std::array<std::byte,sizeof(Box)> old_box;std::memcpy(old_box.data(),&box,sizeof box);
+    auto* metadata=reinterpret_cast<std::byte*>(&box.value)+sizeof(box.value)-16;
+    const auto alias_clips=std::span(reinterpret_cast<TransformVector4*>(metadata),3);
+    const PreparedVu1WorldGeometry boxed{matrix,matrix,box.value,height,1330};
+    check(unit.prepare_world(boxed,token,alias_clips)==Vu1WorldPrepareResult::rejected,"OPAQUE METADATA CLIP ALIAS ACCEPTED");
+    check(unit.prepare_world(boxed,*reinterpret_cast<Vu1WorldToken*>(metadata),clips)==Vu1WorldPrepareResult::rejected,"OPAQUE METADATA TOKEN ALIAS ACCEPTED");
+    check(unit.submit_prepare_world(boxed,*reinterpret_cast<Vu1WorldSubmission*>(metadata))==Vu1WorldSubmitResult::rejected,"OPAQUE METADATA SUBMISSION ALIAS ACCEPTED");
+    check(unit.draw_world(PreparedVu1WorldBatch{matrix,matrix,box.value,states,height,1331},alias_clips)==Vu1WorldResult::rejected,"OPAQUE FUSED CLIP ALIAS ACCEPTED");
+    check(!std::memcmp(old_box.data(),&box,sizeof box),"OPAQUE ALIAS MUTATED PROOF");
+    check(!std::memcmp(clips.data(),sentinel.data(),sizeof clips),"PREPARED REJECTION MUTATED OUTPUT");
+    check(unit.world_stats().dma_qwords==initial.dma_qwords&&unit.world_stats().batches==initial.batches,"PREPARED REJECTION SUBMITTED DMA");
+    check(unit.prepare_world(geometry,token,clips)==Vu1WorldPrepareResult::ready,"EXPIRED SOURCE PROOF REJECTED");
+    const auto stale=token;Vu1WorldToken newer;
+    check(unit.prepare_world(geometry,newer,clips)==Vu1WorldPrepareResult::ready,"OWNED COPY SECOND PREPARE");
+    check(unit.cancel_world(stale,clips)==Vu1WorldResult::rejected,"OWNED STALE TOKEN ACCEPTED");
+    check(unit.cancel_world(newer,clips)==Vu1WorldResult::fallback,"OWNED CURRENT CANCEL");
+    for(unsigned i=0;i<3;++i)check(!std::memcmp(&clips[i],&expected[i].position,sizeof clips[i]),"OWNED CLIP BITS CHANGED");
+    // DMA owns its copied input. Destroy the typed source and reuse exactly
+    // that address for valid finish output; no retained caller-address guard.
+    union Reuse {PreparedVu1WorldCorners source;std::array<TransformVector4,48> output;Reuse(){}~Reuse(){}} reuse;
+    new(&reuse.source) PreparedVu1WorldCorners(owned);
+    auto dynamic=matrix;
+    check(unit.submit_prepare_world(PreparedVu1WorldGeometry{dynamic,matrix,reuse.source,height,1340},submission)==Vu1WorldSubmitResult::submitted,"OWNED ASYNC SUBMIT");
+    reuse.source.~PreparedVu1WorldCorners();new(&reuse.output) std::array<TransformVector4,48>;
+    for(auto& c:reuse.output){c={7,8,9,10};}dynamic[0]=9;
+    check(unit.finish_prepare_world(submission,token,reuse.output)==Vu1WorldPrepareResult::ready,"OWNED REUSED STORAGE FINISH");
+    check(!std::memcmp(reuse.output.data(),sentinel.data(),sizeof sentinel),"READY REUSED OUTPUT CHANGED");
+    check(unit.cancel_world(token,reuse.output)==Vu1WorldResult::fallback,"OWNED REUSED STORAGE CANCEL");
+    for(unsigned i=0;i<3;++i)check(!std::memcmp(&reuse.output[i],&expected[i].position,sizeof reuse.output[i]),"OWNED DMA READ REUSED SOURCE");
+    check(unit.finish_prepare_world(submission,token,clips)==Vu1WorldPrepareResult::rejected,"OWNED STALE SUBMISSION ACCEPTED");
+    std::printf("WORLD PREPARED DRIVER PASS checks=%u partial_rejected=1 raw_invalid=5 whole_object_aliases=4 source_expired=1 source_reused=1\n",checks);
+    return checks;
+}
+void prepared_geometry_checks(Display& display,ps2::Vu1Transform& unit,Authored& source,OutsideTextures& outside,
+                              std::uint64_t& words,unsigned& rejections,std::uint64_t& combined){
+    WorldSceneError error=WorldSceneError::none;PreparedWorldModel model,outside_model,inside,huge;
+    require(model.assign(source.model(),error),world_scene_error_message(error));
+    require(outside_model.assign(outside.model(),error),world_scene_error_message(error));
+    require(inside.assign({std::span(source.vertices).first(48),std::span(source.faces).first(16),{},source.materials},error),world_scene_error_message(error));
+    const std::array<WorldPoint,3> huge_vertices{{{65536,0,.5f},{65536,.5f,.5f},{65536,0,.75f}}};
+    WorldFace huge_face;huge_face.indices={0,1,2};require(huge.assign({huge_vertices,{&huge_face,1}},error),world_scene_error_message(error));
+    WorldScene planner,limited;require(planner.configure_plan(face_count,face_count*8,error),world_scene_error_message(error));
+    require(limited.configure_plan(face_count,16,error),world_scene_error_message(error));
+    WorldView view{identity()};view.clear_color=0xff203040u;
+    std::uint64_t packet_words=0;
+    for(unsigned test=0;test<2;++test){PreparedWorldInstance instance{test?&model:&outside_model,identity()};
+        require(planner.plan_prepared({&instance,1},view,error),world_scene_error_message(error));
+        for(auto mode:{WorldSubmissionMode::fused,WorldSubmissionMode::classify_first,WorldSubmissionMode::classify_async}){
+            require(display.present_world(planner.draw_plan(),unit,mode,WorldMaterialMode::memoized,WorldFallbackMode::reject_outside),display.error());
+            const auto before=unit.world_stats();begin_packet_pair(false);
+            require(display.present_world(planner.draw_plan(),unit,mode,WorldMaterialMode::memoized,WorldFallbackMode::reject_outside,WorldGeometryMode::raw),display.error());
+            const auto control_words=end_packet_pair(false);const auto control=display.stats();const auto middle=unit.world_stats();
+            require(!control.texture_uploads&&!control.palette_uploads,"PREPARED CONTROL NOT WARM");
+            const auto expected=framebuffer(display,false,50+test,words);begin_packet_pair(true);
+            require(display.present_world(planner.draw_plan(),unit,mode,WorldMaterialMode::memoized,WorldFallbackMode::reject_outside,WorldGeometryMode::prepared),display.error());
+            const auto candidate_words=end_packet_pair(true);const auto candidate=display.stats();const auto after=unit.world_stats();
+            require(control_words==candidate_words,"PREPARED PACKET COUNT CHANGED");packet_words+=candidate_words;
+            require(fallback_control_counts(control)==fallback_control_counts(candidate)&&control.world_trivial_rejects==candidate.world_trivial_rejects,"PREPARED COUNTERS CHANGED");
+            require(middle.batches-before.batches==after.batches-middle.batches&&middle.corners-before.corners==after.corners-middle.corners&&
+                    middle.dma_qwords-before.dma_qwords==after.dma_qwords-middle.dma_qwords,"PREPARED VU TRANSPORT CHANGED");
+            require(framebuffer(display,true,50+test,words)==expected,"PREPARED PIXELS CHANGED");combined=(combined^expected)*1099511628211ull;
+            std::printf("WORLD PREPARED PAIR PASS case=%u mode=%u original_counters=35 packet_words=%u driver_equal=1 hash=%016llx\n",
+                test,unsigned(mode),unsigned(candidate_words),(unsigned long long)expected);
+        }
+    }
+    std::array<PreparedWorldInstance,2> pair{{{&inside,identity()},{&inside,identity()}}};
+    require(planner.plan_prepared(pair,view,error),world_scene_error_message(error));require(limited.plan_prepared(pair,view,error),world_scene_error_message(error));
+    require(display.present_world(planner.draw_plan(),unit,WorldSubmissionMode::classify_first,WorldMaterialMode::memoized,WorldFallbackMode::reject_outside),display.error());
+    const auto expected=framebuffer(display,false,52,words);
+    for(auto mode:{WorldSubmissionMode::fused,WorldSubmissionMode::classify_first,WorldSubmissionMode::classify_async}){
+        const auto front1=*GS_REG_DISPFB1,front2=*GS_REG_DISPFB2;
+        require(!display.present_world(limited.draw_plan(),unit,mode,WorldMaterialMode::memoized,WorldFallbackMode::reject_outside,WorldGeometryMode::prepared),"PREPARED LATE CAPACITY ACCEPTED");++rejections;
+        require(display.stats().world_drawn_batches==1&&display.stats().world_gs_finishes==1,"PREPARED CAPACITY DID NOT DRAIN");
+        require(*GS_REG_DISPFB1==front1&&*GS_REG_DISPFB2==front2,"PREPARED CAPACITY FLIPPED");
+        require(display.present_world(planner.draw_plan(),unit,mode,WorldMaterialMode::memoized,WorldFallbackMode::reject_outside,WorldGeometryMode::prepared),display.error());
+        require(framebuffer(display,true,52,words)==expected,"PREPARED CAPACITY RECOVERY");
+        auto bad=pair;bad[1].model=&huge;bad[1].object_to_world[0]=65536;WorldScene numerical;
+        require(numerical.configure_plan(face_count,face_count*8,error),world_scene_error_message(error));require(numerical.plan_prepared(bad,view,error),world_scene_error_message(error));
+        const auto numeric1=*GS_REG_DISPFB1,numeric2=*GS_REG_DISPFB2;
+        require(!display.present_world(numerical.draw_plan(),unit,mode,WorldMaterialMode::memoized,WorldFallbackMode::reject_outside,WorldGeometryMode::prepared),"PREPARED NUMERIC FAILURE HIDDEN");++rejections;
+        require(display.stats().world_drawn_batches==1&&display.stats().world_rejected_batches==1&&display.stats().world_gs_finishes==1,"PREPARED NUMERIC DID NOT DRAIN");
+        require(*GS_REG_DISPFB1==numeric1&&*GS_REG_DISPFB2==numeric2,"PREPARED NUMERIC FLIPPED");
+        require(display.present_world(planner.draw_plan(),unit,mode,WorldMaterialMode::memoized,WorldFallbackMode::reject_outside,WorldGeometryMode::prepared),display.error());
+        require(framebuffer(display,true,52,words)==expected,"PREPARED NUMERIC RECOVERY");
+        std::printf("WORLD PREPARED RECOVERY PASS mode=%u capacity=1 numerical=1\n",unsigned(mode));
+    }
+    const auto front1=*GS_REG_DISPFB1,front2=*GS_REG_DISPFB2;
+    require(!display.present_world(planner.draw_plan(),unit,WorldSubmissionMode::classify_first,WorldMaterialMode::memoized,
+        WorldFallbackMode::reject_outside,static_cast<WorldGeometryMode>(255)),"INVALID GEOMETRY MODE ACCEPTED");++rejections;
+    require(*GS_REG_DISPFB1==front1&&*GS_REG_DISPFB2==front2,"INVALID GEOMETRY MODE FLIPPED");
+    std::printf("WORLD PREPARED PASS pairs=6 modes=3 original_counters=35 late_rejections=6 invalid_mode=1 packet_words=%llu\n",(unsigned long long)packet_words);
+}
+
 }
 int main(){
     std::setvbuf(stdout,nullptr,_IONBF,0);std::setvbuf(stderr,nullptr,_IONBF,0);
@@ -784,6 +980,8 @@ int main(){
         std::puts("WORLD DISPLAY ASYNC FULL FINISH PASS finish=1 drain=1 other_bank_retained=2");
         material_memo_checks(display,unit,words,rejections,combined);
         trivial_reject_checks(display,unit,source,outside_source,words,rejections,combined);
+        prepared_driver_checks(unit,display.output_height());
+        prepared_geometry_checks(display,unit,source,outside_source,words,rejections,combined);
         std::printf("WORLD DISPLAY ASYNC POLLS pending=%u already_complete=%u hardware_overlap_not_inferred=1\n",async_pending_polls,async_complete_polls);
         std::printf("WORLD DISPLAY PASS phases=4 consecutive_pair=1 fallback_pair=1 eviction_pair=1 classified_triplets=4 outside_triplet=1 full_finish_pair=1 token_checks=%u legacy_direct=%u legacy_fallback=%u no_flip_rejections=%u pixel_words=%llu hash=%016llx\n",tokens,drawn,fallback,rejections,(unsigned long long)words,(unsigned long long)combined);
     }catch(const std::exception& error){std::printf("WORLD DISPLAY FAIL: %s\n",error.what());}

@@ -33,6 +33,12 @@ World modes skip repeated setup for validated VU fallback triangles wholly
 outside a clip plane. `--drive-world-no-reject` selects memoized synchronous
 submission with the original per-face clipper for comparison.
 
+World modes also use owned prepared corners, with reciprocal texture dimensions
+stored once and repeated static numeric checks omitted. `--drive-world-raw`
+selects fully validated raw corners while retaining material reuse and early
+rejection. The no-memo/no-reject controls keep prepared corners; all three
+controls take the same checkpoint, course and visual-directory arguments.
+
 `build_ps2.py --help` lists the native application, original engine sample,
 hardware fixtures and separate arcade-reference probe workflows. None is a
 finished PS2 player release. All original game data, generated reference source,
@@ -53,7 +59,7 @@ directory. The output directory must be new or empty:
 ```sh
 python3 platform/ps2/tools/preview_play.py \
   --emulator build/ps2/emulator/Play.app/Contents/MacOS/Play \
-  --elf build/ps2/native-056/segarally-ps2-native-port.elf \
+  --elf build/ps2/native-057/segarally-ps2-native-port.elf \
   --host "build/ps2/emulator/Play Data Files/vfs/host" \
   --output build/ps2-preview-001 --mode raw --seconds 20
 ```

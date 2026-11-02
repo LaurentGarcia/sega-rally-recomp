@@ -8,6 +8,9 @@
 namespace ps2 {
 struct Vu1WorldBatch;
 struct Vu1WorldGeometry;
+struct PreparedVu1WorldGeometry;
+struct PreparedVu1WorldBatch;
+class PreparedVu1WorldCorners;
 struct Vu1WorldState;
 class Vu1WorldToken;
 class Vu1WorldSubmission;
@@ -126,11 +129,20 @@ public:
     // permits EE-only gathering while one owned hardware operation is pending.
     bool initialize_world() noexcept;
     Vu1WorldResult draw_world(const Vu1WorldBatch&,std::span<TransformVector4> fallback_clip) noexcept;
+    Vu1WorldResult draw_world(const PreparedVu1WorldBatch&,std::span<TransformVector4> fallback_clip) noexcept;
     // Geometry before residency. No GS packet is emitted by preparation.
     // Ready writes token only and retains ST/XYZ; fallback writes clip only.
     // Rejected/failed calls preserve both caller outputs. Empty is rejected.
     // Requires idle VIF/DMA/GIF transport, but not completed GS raster work.
     Vu1WorldPrepareResult prepare_world(const Vu1WorldGeometry&,Vu1WorldToken&,
+                                       std::span<TransformVector4> fallback_clip) noexcept;
+    // Typed owned corners skip only the static corner scan. Matrices, count,
+    // height, complete opaque-object output aliases and all transport/result
+    // checks are retained. The raw overload remains fully validating.
+    // Whole-object alias checks apply to the call receiving that object.
+    // Async submit retains no caller address after copying input; subsequent
+    // finish may use reused source storage under its ordinary output contract.
+    Vu1WorldPrepareResult prepare_world(const PreparedVu1WorldGeometry&,Vu1WorldToken&,
                                        std::span<TransformVector4> fallback_clip) noexcept;
     // A successful emit or cancel consumes every copy of the token. Invalid
     // token/state/output arguments reject before mutation and leave a current
@@ -148,6 +160,7 @@ public:
     // At most one hardware operation is in flight; up to two completed ready
     // bank tokens may coexist. Async preparation preserves the other bank.
     Vu1WorldSubmitResult submit_prepare_world(const Vu1WorldGeometry&,Vu1WorldSubmission&) noexcept;
+    Vu1WorldSubmitResult submit_prepare_world(const PreparedVu1WorldGeometry&,Vu1WorldSubmission&) noexcept;
     Vu1WorldSubmitResult submit_emit_world(const Vu1WorldToken&,std::span<const Vu1WorldState>,
                                           Vu1WorldCompletion,Vu1WorldSubmission&) noexcept;
     // Poll does not wait or read mapped VU memory; complete means it is safe
@@ -175,6 +188,12 @@ public:
     const char* error() const noexcept;
     Vu1TransformStats stats() const noexcept;
 private:
+    Vu1WorldResult draw_world_checked(const Vu1WorldBatch&,std::span<TransformVector4>,
+                                      const PreparedVu1WorldCorners*) noexcept;
+    Vu1WorldPrepareResult prepare_world_checked(const Vu1WorldGeometry&,Vu1WorldToken&,
+                                                std::span<TransformVector4>,const PreparedVu1WorldCorners*) noexcept;
+    Vu1WorldSubmitResult submit_prepare_world_checked(const Vu1WorldGeometry&,Vu1WorldSubmission&,
+                                                      const PreparedVu1WorldCorners*) noexcept;
     void invalidate_world() noexcept;
     bool world_pending() noexcept;
     bool transform_validated(const TransformMatrix&,const TransformMatrix&,

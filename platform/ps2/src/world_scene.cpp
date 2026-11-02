@@ -17,6 +17,7 @@ struct PreparedWorldModel::Storage {
     std::vector<WorldFaceGroup> groups;
     std::vector<std::array<float,6>> bounds;
     std::vector<Material> materials;
+    std::vector<std::array<float,2>> texture_scales;
     std::vector<Texture> textures;
     std::vector<std::uint8_t> indices;
 };
@@ -329,6 +330,7 @@ std::size_t PreparedWorldModel::persistent_bytes()const noexcept{
     return storage_?sizeof(Storage)+storage_->vertices.capacity()*sizeof(WorldPoint)+
         storage_->faces.capacity()*sizeof(WorldFace)+storage_->groups.capacity()*sizeof(WorldFaceGroup)+
         storage_->bounds.capacity()*sizeof(std::array<float,6>)+storage_->materials.capacity()*sizeof(Material)+
+        storage_->texture_scales.capacity()*sizeof(std::array<float,2>)+
         storage_->textures.capacity()*sizeof(Texture)+storage_->indices.capacity():0;
 }
 bool PreparedWorldModel::assign(WorldModel model,WorldSceneError& error)noexcept{
@@ -364,6 +366,13 @@ bool PreparedWorldModel::assign(WorldModel model,WorldSceneError& error)noexcept
                     }
                     mapped=std::uint32_t(replacement->materials.size());
                     replacement->materials.push_back(material);texture_slots.push_back(slot);
+                    // Validated dimensions are powers of two in8..256. Their
+                    // reciprocals are exact binary32 values, matching1.f/n.
+                    const auto reciprocal=[](unsigned n){return std::bit_cast<float>(
+                        std::uint32_t(127u-(std::bit_width(n)-1u))<<23);};
+                    replacement->texture_scales.push_back(material.texture?
+                        std::array<float,2>{reciprocal(material.texture->width),reciprocal(material.texture->height)}:
+                        std::array<float,2>{1,1});
                 }
                 face.material_index=mapped;
             }
@@ -465,7 +474,7 @@ bool WorldScene::plan_prepared(std::span<const PreparedWorldInstance> instances,
             bank.selected[selected++]=std::uint32_t(face_index);
         }
         bank.instances[instance_index++]={model.vertices,model.faces,model.materials,source.object_to_world,
-            std::span<const std::uint32_t>(bank.selected).subspan(first,selected-first)};
+            std::span<const std::uint32_t>(bank.selected).subspan(first,selected-first),model.texture_scales};
     }
     plan.active^=1;plan.count=instances.size();plan.view=view.world_to_clip;plan.clear=view.clear_color;plan.published=true;
     plan.stats={std::uint32_t(instances.size()),std::uint32_t(vertices),std::uint32_t(faces),0,plan.stats.persistent_bytes};
@@ -479,6 +488,33 @@ WorldDrawPlan WorldScene::draw_plan()const noexcept{
     return WorldDrawPlan({p.banks[p.active].instances.data(),p.count},p.view,p.clear,p.output_capacity);
 }
 WorldSceneStats WorldScene::plan_stats()const noexcept{return plan_storage_?plan_storage_->stats:WorldSceneStats{};}
+void WorldDrawPlan::copy_corners(const WorldDrawInstance& instance,std::size_t first,
+                                 std::size_t faces,ps2::Vu1WorldCorner* output)const noexcept{
+    for(std::size_t i=0;i<faces;++i){
+        const auto& face=instance.faces[instance.visible_face_indices[first+i]];
+        const bool textured=face.material_index!=world_flat_material&&instance.materials[face.material_index].texture;
+        const auto scale=textured?instance.texture_scales[face.material_index]:std::array<float,2>{1,1};
+        for(unsigned c=0;c<3;++c){const auto& p=instance.vertices[face.indices[c]];
+            output[i*3+c]={{p.x,p.y,p.z,1},textured?face.uv[c].u:0,textured?face.uv[c].v:0,scale[0],scale[1]};}
+    }
+}
+bool WorldDrawPlan::begin_corners(std::size_t instance,std::size_t first,std::size_t target,
+                                  std::size_t fill,ps2::PreparedVu1WorldCorners& out)const noexcept{
+    if(instance>=instances_.size()||!target||target>ps2::vu1_world_triangle_capacity||fill>target)return false;
+    const auto& source=instances_[instance];
+    if(first>source.visible_face_indices.size()||target>source.visible_face_indices.size()-first)return false;
+    copy_corners(source,first,fill,out.values_.data());
+    out.target_count_=target*3;out.filled_count_=fill*3;return true;
+}
+bool WorldDrawPlan::append_corners(std::size_t instance,std::size_t first,std::size_t fill,
+                                   ps2::PreparedVu1WorldCorners& out)const noexcept{
+    if(instance>=instances_.size()||!fill||!out.target_count_||out.target_count_>ps2::vu1_world_corner_capacity||
+       out.filled_count_>=out.target_count_||fill>(out.target_count_-out.filled_count_)/3)return false;
+    const auto& source=instances_[instance];
+    if(first>source.visible_face_indices.size()||fill>source.visible_face_indices.size()-first)return false;
+    copy_corners(source,first,fill,out.values_.data()+out.filled_count_);
+    out.filled_count_+=fill*3;return true;
+}
 void WorldScene::set_profile_clock(WorldSceneClock clock,void* context)noexcept{clock_=clock;clock_context_=context;}
 void WorldScene::set_transform_provider(WorldSceneTransformBatch provider,void* context)noexcept{
     transform_batch_=provider;transform_project_batch_=nullptr;transform_context_=context;

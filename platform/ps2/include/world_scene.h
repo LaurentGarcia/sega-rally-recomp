@@ -1,6 +1,7 @@
 #pragma once
 #include "native_geometry.h"
 #include "vu1_transform.h"
+#include "vu1_world.h"
 #include <memory>
 
 namespace ps2::native {
@@ -123,6 +124,9 @@ struct WorldDrawInstance {
     std::span<const Material> materials;
     WorldMatrix object_to_world{};
     std::span<const std::uint32_t> visible_face_indices;
+    // Exact reciprocal dimensions for each immutable remapped material.
+    // Untextured entries are {1,1}; prepared assignment derives these once.
+    std::span<const std::array<float,2>> texture_scales;
 };
 class WorldDrawPlan {
 public:
@@ -132,7 +136,22 @@ public:
     std::uint32_t clear_color() const noexcept{return clear_color_;}
     bool depth_test() const noexcept{return depth_test_;}
     std::size_t output_triangle_capacity() const noexcept{return output_triangle_capacity_;}
+    // Build an owned numerical proof from this plan's immutable source data.
+    // Counts and ranges are in selected faces; at most16 faces fit a batch.
+    // begin copies only fill_faces of the admitted target range (possibly0).
+    // append adds a nonempty range to an incomplete batch. The caller selects
+    // source order; the driver accepts only a complete batch. No allocation,
+    // transform or mutable source pointer is retained. Failed calls preserve
+    // out. Completed copies survive later model/plan replacement/destruction.
+    // Reading this borrowed plan still requires its documented valid lifetime.
+    bool begin_corners(std::size_t instance,std::size_t first_selected,
+                       std::size_t target_faces,std::size_t fill_faces,
+                       ps2::PreparedVu1WorldCorners& out) const noexcept;
+    bool append_corners(std::size_t instance,std::size_t first_selected,
+                        std::size_t fill_faces,ps2::PreparedVu1WorldCorners& out) const noexcept;
 private:
+    void copy_corners(const WorldDrawInstance&,std::size_t first_selected,
+                      std::size_t faces,ps2::Vu1WorldCorner* output) const noexcept;
     friend class WorldScene;
     WorldDrawPlan(std::span<const WorldDrawInstance> instances,const WorldMatrix& view,
                   std::uint32_t clear,std::size_t capacity) noexcept

@@ -270,36 +270,64 @@ counters equal. VU instructions, batch partition and projection are unchanged.
 Authored tests retain 24,371,200 exact pixel comparisons and 32 no-flip rejection
 cases, including scalar retry, clipping and all three submission modes.
 
+World modes also gather owned prepared corner batches from the immutable
+model snapshot. Their private numeric proof removes repeated corner validation
+before VU1 submission; reciprocal texture dimensions are stored once at model
+assignment. Dynamic matrices, transport ownership and numerical result checks
+remain. `--drive-world-raw CHECKPOINT COURSE VISUAL_DIRECTORY` retains raw
+corner admission with memoized materials and early outside rejection.
+`--drive-world-no-memo` and `--drive-world-no-reject` retain prepared geometry
+while disabling only their named optimization. Automatic Frame startup is
+unchanged.
+
+The matched strict-O3 601-update comparison preserves all 4,874,240 sampled
+color words, 885,445 output triangles and 15,201,330 driver DMA qwords per path.
+All 35 preexisting counters match over 593 stable warm pairs. Warm draw work
+falls from 14.538 ms with raw corners to 12.482 ms with prepared corners, a
+2.055 ms saving (14.1%). The preceding native056 fixture measured 14.384 ms;
+the current raw control is 0.154 ms slower, so the same-build comparison is
+reported separately. These intervals exclude shared game/planning, vsync and
+framebuffer checking; complete-app measurements below determine the integration
+gain. Authored tests retain 27,811,840 literal pixel comparisons, 39 no-flip
+rejections and 7,172 packet words equal after declared bank/sequence normalization.
+
 The opt-in fixes native binary32 presentation for that run, so Triangle does
 not cycle renderers. Start still restores the initial checkpoint, and the
 diagnostic page reports the previous submitted GS triangle count. Game
 arithmetic, camera history and input behavior are shared with the normal path.
 
-The final native056 builds were measured over matching 660 complete periods in
+The final native057 builds were measured over matching 660 complete periods in
 Play 0.72, with identical inputs and rendering preferences:
 
 | Renderer | Native updates/sec | Mean work | Mean complete period |
 | --- | ---: | ---: | ---: |
-| Default VU1 transforms / EE projection | 29.361 | 31.043 ms | 34.059 ms |
-| Optional VU1 world / memoized clip-each control | 29.985 | 22.427 ms | 33.350 ms |
-| Optional VU1 world / memoized outside rejection | 29.985 | 21.370 ms | 33.350 ms |
-| Optional VU1 world / outside rejection and async EE gather | 29.985 | 21.393 ms | 33.350 ms |
+| Default VU1 transforms / EE projection | 29.364 | 31.043 ms | 34.056 ms |
+| Optional VU1 world / raw corner control | 29.988 | 21.322 ms | 33.347 ms |
+| Optional VU1 world / prepared corners | 29.988 | 19.261 ms | 33.347 ms |
+| Optional VU1 world / prepared corners and async EE gather | 29.988 | 19.354 ms | 33.347 ms |
 | Previous native051 world / resource-first control | 20.945 | 34.285 ms | 47.744 ms |
 
-Work excludes measured vsync/flip time but includes input, simulation, rendering
-and logging. Every measured work interval exceeds the 16.667 ms target. The
-default retains its preceding cadence. Early outside rejection saves 1.057 ms
-(4.7%) against the same-build memoized clip-each control. Its mean work still
-exceeds the 60 Hz budget by 4.703 ms. Async gathering adds 0.023 ms relative to
-synchronous rejection; it does not produce an emulator speedup. The control
-is 0.140 ms slower than native055's 22.287 ms, so the same-build comparison is
-reported separately from historical results. At native055, material reuse
-reduced complete work from 25.268 to 22.287 ms against its uncached control.
-Complete logged record/field comparisons retain game, geometry and resource
-values, with declared memo/rejection/scheduling diagnostics checked separately.
-Rejection counts match between synchronous and asynchronous modes. These logs
-do not compare every internal state. The four-run result is retained in
-`build/ps2-world-reject-final-001/cadence-validation.json`.
+All three current world modes use memoized materials and early outside
+rejection. Work excludes measured vsync/flip time but includes input,
+simulation, rendering and logging. Every measured work interval exceeds the
+16.667 ms target. Prepared corners save 2.060 ms (9.7%) against the same-build
+raw control. Their mean work remains 2.595 ms above budget, with a measured
+maximum of 26.630 ms. Async gathering adds 0.093 ms; it does not produce an
+emulator speedup. The default renderer's mean work is unchanged within 0.000006 ms.
+
+Against native056's 21.370 ms world path, prepared corners reduce mean work
+by 2.109 ms. The current raw control is 0.048 ms faster than that historical
+path; the same-build comparison separates this difference. Complete logged
+record/field comparisons retain game, geometry and resource values. All 728
+non-timing values match between raw and prepared modes; only 42 declared
+scheduling values differ between prepared synchronous/asynchronous runs.
+These logs do not compare every internal state. The four-run result is retained
+in `build/ps2-world-prepared-final-001/cadence-validation.json`.
+
+The earlier native056 outside-rejection checkpoint reduced whole-app work
+from 22.427 to 21.370 ms. At native055, material reuse reduced work from
+25.268 to 22.287 ms against its uncached control. Those are separate historical
+comparisons, not additional savings measured in the current build.
 
 The earlier native052 classification checkpoint compares resource-first and
 geometry-first world submission using the same immutable plans over 601 updates.

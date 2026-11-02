@@ -133,6 +133,24 @@ that require scalar retry. No VU instruction, projection, batch partition,
 primitive order or resource access changes. The generic clipper keeps its
 public validation; the engine API defaults to `clip_each` for comparison.
 
+`WorldGeometryMode::prepared` gathers corners through the immutable plan into
+an owning `PreparedVu1WorldCorners` value. Its private aligned storage has no
+mutable view or raw-span constructor. A bounded begin/append interface copies
+only the requested suffix; the driver rejects incomplete values. The model
+snapshot stores exact reciprocal texture dimensions once, using eight bytes
+per remapped material. Completed corner values remain valid after their source
+model or scene is destroyed. The driver copies submitted data before returning
+and retains no address or lifetime requirement on that source value.
+
+The typed driver overloads omit the repeated corner-domain scan. Dynamic
+matrices, counts, output height, GS state, call-scoped output aliases, ownership,
+deadlines and returned VU data remain checked. The generic raw APIs retain full
+validation, and `raw` remains the engine presentation API default. Display uses
+a union for raw/prepared scratch storage: the prepared value occupies 1,552
+bytes, versus 1,536 bytes of raw corners, without a second corner array. Two
+buffers retain the existing incremental asynchronous gathering schedule. Packet
+copying, VU instructions, projection and source primitive order are unchanged.
+
 Tokens belong to one exclusive VU owner and one preparation. Copies cannot
 extend their lifetime. With no pending submission, another synchronous
 transform, draw or prepare attempt invalidates them. Texture transfers between

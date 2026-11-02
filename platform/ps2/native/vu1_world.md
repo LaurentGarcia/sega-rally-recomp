@@ -99,7 +99,7 @@ texture, palette and primitive-writing functions are unchanged.
 
 ## Validated fallback rejection
 
-The trailing `WorldFallbackMode` selects `clip_each` (the default control) or
+The fifth `present_world` argument, `WorldFallbackMode`, selects `clip_each` (the default control) or
 `reject_outside`. The application selects `reject_outside` for its explicit
 world modes; `--drive-world-no-reject CHECKPOINT COURSE VISUAL_DIRECTORY`
 retains synchronous classification and memoized materials with `clip_each`.
@@ -125,6 +125,45 @@ successful empty output without changing caller storage. Optimized and
 sanitizer runs pass. The report is
 `build/ps2-common-outside-001/validation.json`, SHA-256
 `c9c56654ed5f1cd4c3bda6ee121f34fc6e4ed05e856c42cbe579856fdad00676`.
+
+## Owned prepared corners
+
+The sixth `present_world` argument, `WorldGeometryMode`, selects `raw` (the API
+default control) or `prepared`. The application selects prepared corners for
+its explicit world modes; `--drive-world-raw CHECKPOINT COURSE VISUAL_DIRECTORY`
+keeps synchronous classification, memoized materials and outside rejection
+with raw corner admission. Automatic Frame startup is unchanged.
+
+`PreparedVu1WorldCorners` owns at most 48 aligned XYZ/W/UV/scale records. Only
+`WorldDrawPlan::begin_corners` and `append_corners` can populate its private
+storage, using a still-valid borrowed plan's immutable snapshots. Assignment
+precomputes exact power-of-two texture reciprocals once per copied material.
+Gathering preserves selected-face and corner order, per-corner UV seams, unit W,
+and the raw route's zero UV/unit scale for flat materials. It does not transform
+vertices. Partial batches are inadmissible until the target count is filled.
+Failed range admission leaves the output unchanged.
+
+The owning value has no raw-span constructor or mutable accessor. Completed
+copies remain numerically valid after the source model or plan is destroyed;
+there is no per-batch reference count, source-address check or generation token.
+This does not extend the borrowed plan's lifetime while gathering. The two CPU
+batch buffers use explicitly constructed unions, each containing either raw
+corners or the 1,552-byte prepared object. Async gathering appends only the new
+suffix, without copying earlier corners again or changing its schedule.
+
+Typed `PreparedVu1WorldGeometry` and `PreparedVu1WorldBatch` overloads skip only
+the already-proven static corner scan. Their matrix references are borrowed for
+the call and copied before submission returns. Dynamic matrix domains and affine
+shape, completed count, height, GS state, ownership, deadlines, numerical results
+and completion remain checked. The raw API retains its full validation.
+Packet construction still copies the same corner bytes into persistent DMA
+storage; the VU program and GS/resource order are unchanged.
+
+Calls receiving an opaque corner object reject clip, token or submission outputs
+that overlap any part of that object, including its count metadata. Async submit
+retains no caller address after copying inputs. Later finish calls keep their
+ordinary output-alias contract and may use storage that previously held the
+destroyed source object. No pending DMA depends on that source lifetime.
 
 ## Prepared geometry handles
 
@@ -259,6 +298,54 @@ report the work that actually occurred. Fused mode leaves the new counters zero.
 
 ## Evidence and limits
 
+The prepared-corner authored generation passes **27,811,840 literal pixel-word
+comparisons**, **39 no-flip rejections** and forty new driver checks. The driver
+rejects default/partial proofs, malformed raw corners, unsupported dynamic
+matrices, heights and GS state, and four output aliases into private metadata
+without DMA or output changes. Completed copied values remain usable after
+source destruction. A positive async test destroys the submitted source and
+reuses that same address as valid finish output, preserving the originally
+copied geometry and matrices.
+
+Six raw/prepared pairs cover all three submission modes, including direct,
+crossing, degenerate and common-outside geometry. All 35 prior Display counters,
+VU transfer counts and completed pixels match. The private driver observer also
+compares **7,172 submitted packet words** exactly after normalizing only the
+owned alternating bank addresses and per-call header/MARK sequence identifiers.
+Corner, matrix, state, color, command and padding words otherwise remain exact.
+The observer does not modify submitted packets; its execution is not a speed
+measurement. Late capacity and numerical failures drain prior draws without
+flipping, then recover in every mode. Invalid geometry mode rejects before
+rendering. The prior material and async lifecycle tests remain included.
+
+All ten C++ compilation commands use strict O3. The source/archive, executed ELF,
+two private diagnostic deltas and closed runtime are bound in
+`build/ps2-world-prepared-display-ee-001/runtime-validation.json`, SHA-256
+`d5c191cb923b8ef8517cf5cff97b7e31cf2928f81c2e2ab4558f6ed8c885fb5f`.
+The separate portable producer proof passes **309,068 checks** for ordered bytes,
+numeric domains, malformed ranges, failed-call preservation and owned lifetime:
+`build/ps2-world-prepared-proof-001/validation-final.json`, SHA-256
+`d0059d77931917f46dae988baf90833df1c940456e6b0af98ff7a6aaede2f985`.
+
+The strict-O3 paired scene run compares raw and prepared corners in the same
+executable over **601 native updates**. Both paths emit **885,445 triangles**;
+all 35 original Display counters match on 593 stable warm pairs, and all
+**4,874,240 literal pixel words** match across 17 sampled frames. Mean draw work
+is **14.555402 ms raw versus 12.491117 ms prepared** across all 601 updates.
+The stable warm means are **14.537770 versus 12.482440 ms**, a **2.055330 ms**
+reduction. These are paired renderer measurements, excluding shared game update
+and planning work, rather than whole-application cadence or physical PS2 timing.
+All 48 C++ translation units use strict O3. The report is
+`build/ps2-world-prepared-scene-ee-002/runtime-validation.json`, SHA-256
+`e15ef478e15050a24234900fed77489570b893d2bdae774738832cbcb0d63a98`.
+
+The initial O2 comparison remains at
+`build/ps2-world-prepared-scene-ee-001/runtime-validation.json`, SHA-256
+`d55e8e0b54c958fda6503ffdfa2660bbf1437ca1ad2b87ce98a7c1dd51ba218b`.
+Its same-executable correctness and timing results retain that optimization
+scope; they do not establish a change against earlier O3 measurements.
+
+The following early-rejection results retain their prior raw-corner identities.
 The early-rejection authored generation passed **24,371,200 literal pixel-word
 comparisons** and **32 no-flip rejections**. Six new pairs compare `clip_each`
 and `reject_outside` in all three submission modes, preserving all 34 previous

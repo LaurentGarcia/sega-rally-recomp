@@ -4,6 +4,7 @@
 #include <bit>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <new>
 #include <type_traits>
 #include <vector>
@@ -82,5 +83,53 @@ void lifetime_and_atomicity(){Source source;WorldScene scene;WorldSceneError err
  // Planning is not a vertex transform/domain or expanded-capacity proof.
  PreparedWorldModel huge;for(auto&p:points)p.x=65536;R(huge.assign({points,{&face,1}},error));PreparedWorldInstance h{&huge,identity()};h.object_to_world[0]=65536;R(scene.plan_prepared({&h,1},{identity()},error));R(!after.render(scene.draw_plan()));
 }
+void corner_transactions(){
+ Source source;PreparedWorldModel model;WorldScene scene;WorldSceneError error;
+ R(model.assign(source.model(),error));R(scene.configure_plan(6,48,error));
+ PreparedWorldInstance instance{&model,identity()};R(scene.plan_prepared({&instance,1},{identity()},error));
+ auto plan=scene.draw_plan();ps2::PreparedVu1WorldCorners batch;
+ const auto before=allocations;
+ R(plan.begin_corners(0,0,3,1,batch));R(!batch.ready()&&batch.corners().size()==3);
+ std::array<std::byte,sizeof(batch)> partial;std::memcpy(partial.data(),&batch,sizeof(batch));
+ R(!plan.append_corners(0,1,3,batch));R(std::memcmp(partial.data(),&batch,sizeof(batch))==0);
+ R(!plan.begin_corners(0,0,17,0,batch));R(std::memcmp(partial.data(),&batch,sizeof(batch))==0);
+ R(plan.append_corners(0,1,2,batch));R(batch.ready()&&batch.corners().size()==9);
+ R(allocations==before);
+ std::array<std::byte,sizeof(batch)> complete;std::memcpy(complete.data(),&batch,sizeof(batch));
+ const auto retained=[&](){R(batch.ready());R(std::memcmp(complete.data(),&batch,sizeof(batch))==0);};
+ const auto model_bytes=model.persistent_bytes();
+ // Exercise every fallible allocation in a textured replacement. Reciprocal
+ // storage participates in the same transaction as all copied model data.
+ unsigned failures=0;bool succeeded=false;
+ source.points[0].x+=.125f;source.texture.width=16;source.texture.height=8;
+ std::array<std::uint8_t,64> larger_pixels{};source.texture.indices=larger_pixels.data();source.texture.bytes=larger_pixels.size();
+ for(long fail=0;fail<100;++fail){fail_after=fail;const bool ok=model.assign(source.model(),error);fail_after=-1;
+  if(ok){succeeded=true;break;}
+  ++failures;R(error==WorldSceneError::allocation_failed&&model.persistent_bytes()==model_bytes);
+  ps2::PreparedVu1WorldCorners copied;const auto count=allocations;
+  R(plan.begin_corners(0,0,3,3,copied));R(allocations==count);
+  R(copied.ready()&&copied.corners().size()==batch.corners().size());
+  R(std::memcmp(copied.corners().data(),batch.corners().data(),batch.corners().size_bytes())==0);retained();
+ }
+ R(succeeded&&failures>5);retained();
+ // Reassignment keeps an existing plan's entire snapshot, including scales.
+ ps2::PreparedVu1WorldCorners previous;R(plan.begin_corners(0,0,3,3,previous));
+ R(std::memcmp(previous.corners().data(),batch.corners().data(),batch.corners().size_bytes())==0);
+ auto bad=instance;bad.object_to_world[0]=std::bit_cast<float>(0x7f800000u);
+ R(!scene.plan_prepared({&bad,1},{identity()},error));R(scene.draw_plan().instances().data()==plan.instances().data());retained();
+ R(scene.plan_prepared({&instance,1},{identity()},error));plan=scene.draw_plan();
+ ps2::PreparedVu1WorldCorners changed;R(plan.begin_corners(0,0,3,3,changed));
+ R(std::bit_cast<std::uint32_t>(changed.corners()[0].position.x)!=std::bit_cast<std::uint32_t>(batch.corners()[0].position.x));
+ R(changed.corners()[3].inv_width==.0625f&&batch.corners()[3].inv_width==.125f);retained();
+ R(scene.configure_plan(6,48,error));retained();
+ // These values no longer depend on a model or scene's lifetime.
+ ps2::PreparedVu1WorldCorners survivor;
+ {WorldScene temporary;PreparedWorldModel owner;R(owner.assign(source.model(),error));
+  R(temporary.configure_plan(6,48,error));PreparedWorldInstance local{&owner,identity()};
+  R(temporary.plan_prepared({&local,1},{identity()},error));R(temporary.draw_plan().begin_corners(0,0,3,3,survivor));}
+ R(survivor.ready());R(std::memcmp(survivor.corners().data(),changed.corners().data(),changed.corners().size_bytes())==0);
+ const auto copy=survivor;R(copy.ready());R(std::memcmp(copy.corners().data(),survivor.corners().data(),survivor.corners().size_bytes())==0);
+ std::puts("WORLD_PLAN_CORNERS PASS atomic_replacement=1 owned_values=1 no_gather_allocations=1");
 }
-int main(){parity();lifetime_and_atomicity();std::printf("WORLD_PLAN PASS frames=%u checks=%u ordered_geometry=1 immutable_leases=1 atomic_failure=1 no_plan_allocations=1\n",frames,checks);}
+}
+int main(){parity();lifetime_and_atomicity();corner_transactions();std::printf("WORLD_PLAN PASS frames=%u checks=%u ordered_geometry=1 immutable_leases=1 atomic_failure=1 no_plan_allocations=1\n",frames,checks);}

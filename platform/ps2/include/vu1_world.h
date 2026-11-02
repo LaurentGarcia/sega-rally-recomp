@@ -2,6 +2,7 @@
 #include "vu1_transform.h"
 
 namespace ps2 {
+namespace native { class WorldDrawPlan; }
 inline constexpr std::size_t vu1_world_triangle_capacity=16;
 inline constexpr std::size_t vu1_world_corner_capacity=3*vu1_world_triangle_capacity;
 // Model-space corners preserve per-face UV seams. The two texture scales are
@@ -9,6 +10,27 @@ inline constexpr std::size_t vu1_world_corner_capacity=3*vu1_world_triangle_capa
 struct alignas(16) Vu1WorldCorner {
     TransformVector4 position;
     float u=0,v=0,inv_width=1,inv_height=1;
+};
+// Owned immutable corner values. Only a validated, borrowed WorldDrawPlan may
+// populate them; no raw-span constructor or mutable view is provided. Partial
+// incremental gathering is not admissible until the entire target is filled.
+// Copies retain their numeric proof after the source plan/model is destroyed.
+// As with all input objects, callers must not modify storage through aliases.
+class PreparedVu1WorldCorners {
+public:
+    PreparedVu1WorldCorners() noexcept=default;
+    std::span<const Vu1WorldCorner> corners() const noexcept {
+        return std::span(values_).first(filled_count_);
+    }
+    bool ready() const noexcept {
+        return target_count_&&target_count_<=vu1_world_corner_capacity&&
+            target_count_%3==0&&filled_count_==target_count_;
+    }
+private:
+    alignas(16) std::array<Vu1WorldCorner,vu1_world_corner_capacity> values_;
+    std::size_t target_count_=0,filled_count_=0;
+    friend class native::WorldDrawPlan;
+    friend class Vu1Transform;
 };
 // Renderer-owned, already resolved GS context-1 values. This is an internal
 // engine handoff: the Display retains texture/CLUT residency until completion.
@@ -37,6 +59,24 @@ struct Vu1WorldGeometry {
     std::span<const Vu1WorldCorner> corners;
     unsigned output_height=448;
     std::uint32_t sequence=0;
+};
+// Dynamic transforms, shape and hardware parameters are still checked for
+// every call. Only the corner-domain scan is discharged by the owning value.
+struct PreparedVu1WorldGeometry {
+    const TransformMatrix& object_to_world;
+    const TransformMatrix& world_to_clip;
+    const PreparedVu1WorldCorners& corners;
+    unsigned output_height=448;
+    std::uint32_t sequence=0;
+};
+struct PreparedVu1WorldBatch {
+    const TransformMatrix& object_to_world;
+    const TransformMatrix& world_to_clip;
+    const PreparedVu1WorldCorners& corners;
+    std::span<const Vu1WorldState> states;
+    unsigned output_height=448;
+    std::uint32_t sequence=0;
+    Vu1WorldCompletion completion=Vu1WorldCompletion::gs_finished;
 };
 // A copy is another handle to the SAME single-use preparation, not a new lease.
 // The process-wide nonwrapping ticket prevents owner-address reuse from making
@@ -80,4 +120,6 @@ bool valid_native_vu1_world_input(const Vu1WorldBatch&) noexcept;
 // Same numerical admission as fused input, without requiring resident state.
 // Empty geometry is invalid for preparation; fused empty draws remain valid.
 bool valid_native_vu1_world_geometry(const Vu1WorldGeometry&) noexcept;
+bool valid_native_vu1_world_geometry(const PreparedVu1WorldGeometry&) noexcept;
+bool valid_native_vu1_world_input(const PreparedVu1WorldBatch&) noexcept;
 } // namespace ps2

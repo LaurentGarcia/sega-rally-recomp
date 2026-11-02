@@ -17,5 +17,6 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,
                             bool detailed_profiling=false,bool textured_presentation=false,bool world_presentation=false,
                             WorldSubmissionMode world_submission=WorldSubmissionMode::classify_first,
                             WorldMaterialMode world_materials=WorldMaterialMode::resolve_each,
-                            WorldFallbackMode world_fallback=WorldFallbackMode::clip_each);
+                            WorldFallbackMode world_fallback=WorldFallbackMode::clip_each,
+                            WorldGeometryMode world_geometry=WorldGeometryMode::raw);
 }

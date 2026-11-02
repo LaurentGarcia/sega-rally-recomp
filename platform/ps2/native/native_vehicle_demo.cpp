@@ -84,7 +84,7 @@ WorldView view(const std::array<float,3>& target,float yaw) {
 int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* checkpoint_path,
                             const char* course_path,const char* body_path,NativeVehicleRenderMode mode,bool detailed_profiling,
                             bool textured_presentation,bool world_presentation,WorldSubmissionMode world_submission,
-                            WorldMaterialMode world_materials,WorldFallbackMode world_fallback) {
+                            WorldMaterialMode world_materials,WorldFallbackMode world_fallback,WorldGeometryMode world_geometry) {
     if(world_presentation&&(!textured_presentation||mode!=NativeVehicleRenderMode::native_vu))
         throw std::runtime_error("WORLD VU1 MODE REQUIRES TEXTURED NATIVE FLOAT PRESENTATION");
     if(world_submission!=WorldSubmissionMode::classify_first&&
@@ -96,6 +96,9 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
     if(world_fallback!=WorldFallbackMode::clip_each&&
        (!world_presentation||world_fallback!=WorldFallbackMode::reject_outside))
         throw std::runtime_error("UNSUPPORTED WORLD FALLBACK MODE");
+    if(world_geometry!=WorldGeometryMode::raw&&
+       (!world_presentation||world_geometry!=WorldGeometryMode::prepared))
+        throw std::runtime_error("UNSUPPORTED WORLD GEOMETRY MODE");
     const bool async_world=world_presentation&&world_submission==WorldSubmissionMode::classify_async;
     display.present_status(textured_presentation?
         "NATIVE TEXTURED DRIVING TEST\nLOADING ONE INITIAL CHECKPOINT\nRECOVERED CAR AND CHASE VIEW\nFIXED VISUAL COURSE NEIGHBORHOOD":
@@ -144,6 +147,8 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
         world_materials==WorldMaterialMode::memoized?64u:0u);
     if(world_presentation)std::printf("NATIVE_VEHICLE_CLIP mode=%s\n",
         world_fallback==WorldFallbackMode::reject_outside?"REJECT_OUTSIDE":"CLIP_EACH");
+    if(world_presentation)std::printf("NATIVE_VEHICLE_CORNERS mode=%s\n",
+        world_geometry==WorldGeometryMode::prepared?"PREPARED":"RAW");
     auto state=initial.state;auto controls=initial.input;
     const float camera_yaw=state.front.contact.vehicle.orientation[1]+.35f;
     MainVehicleOutput result;ps2::DebugPageToggle debug_toggle;
@@ -289,7 +294,7 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
             world_presentation?"WORLD VU1 RENDERER FIXED":"TRIANGLE CYCLE RENDERER");
         display.set_debug_page(diagnostics?page:nullptr);
         const bool presented=world_presentation?
-            display.present_world(visual.draw_plan(),vu.unit,world_submission,world_materials,world_fallback):
+            display.present_world(visual.draw_plan(),vu.unit,world_submission,world_materials,world_fallback,world_geometry):
             display.present(scene_frame());
         if(!presented)throw std::runtime_error(display.error());
         previous_vsync=display.stats().vsync_ticks;

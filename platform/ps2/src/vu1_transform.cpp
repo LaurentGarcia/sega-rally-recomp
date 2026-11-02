@@ -122,6 +122,28 @@ bool valid_native_vu1_world_geometry(const Vu1WorldGeometry& geometry) noexcept 
            !value(c.u)||!value(c.v)||!scale(c.inv_width)||!scale(c.inv_height))return false;
     return true;
 }
+namespace {
+bool prepared_world_geometry(const TransformMatrix& a,const TransformMatrix& b,
+                             const PreparedVu1WorldCorners& corners,unsigned height) noexcept {
+    return corners.ready()&&aligned(corners.corners().data())&&
+        (height==448||height==512)&&valid_native_vu1_transform_input(a,b,{});
+}
+bool prepared_world_states(const PreparedVu1WorldCorners& corners,
+                           std::span<const Vu1WorldState> states,Vu1WorldCompletion completion) noexcept {
+    if(states.size()!=corners.corners().size()/3||!states.data()||
+       (completion!=Vu1WorldCompletion::gs_finished&&completion!=Vu1WorldCompletion::path1_retired))return false;
+    for(const auto& state:states)
+        if((state.prim!=3u&&state.prim!=19u)||(state.rgba>>24)>128u)return false;
+    return true;
+}
+}
+bool valid_native_vu1_world_geometry(const PreparedVu1WorldGeometry& geometry) noexcept {
+    return prepared_world_geometry(geometry.object_to_world,geometry.world_to_clip,geometry.corners,geometry.output_height);
+}
+bool valid_native_vu1_world_input(const PreparedVu1WorldBatch& batch) noexcept {
+    return prepared_world_geometry(batch.object_to_world,batch.world_to_clip,batch.corners,batch.output_height)&&
+        prepared_world_states(batch.corners,batch.states,batch.completion);
+}
 struct Vu1Transform::Storage {
     struct World {
         using Quad=std::array<std::uint32_t,4>;
@@ -367,16 +389,29 @@ bool Vu1Transform::initialize_world() noexcept {
 #endif
 }
 Vu1WorldResult Vu1Transform::draw_world(const Vu1WorldBatch& batch,std::span<TransformVector4> clip) noexcept {
+    return draw_world_checked(batch,clip,nullptr);
+}
+Vu1WorldResult Vu1Transform::draw_world(const PreparedVu1WorldBatch& batch,std::span<TransformVector4> clip) noexcept {
+    const Vu1WorldBatch raw{batch.object_to_world,batch.world_to_clip,batch.corners.corners(),
+        batch.states,batch.output_height,batch.sequence,batch.completion};
+    return draw_world_checked(raw,clip,&batch.corners);
+}
+Vu1WorldResult Vu1Transform::draw_world_checked(const Vu1WorldBatch& batch,std::span<TransformVector4> clip,
+                                              const PreparedVu1WorldCorners* prepared) noexcept {
     if(world_pending())return Vu1WorldResult::rejected;
     invalidate_world();
     if(quarantined)return Vu1WorldResult::failed;
     if(!storage_||!storage_->ready||!storage_->world||!storage_->world->ready)return Vu1WorldResult::rejected;
     auto&s=*storage_;auto&w=*s.world;const auto count=batch.corners.size();
     const auto reject=[&](const char*why){s.failure=why;++w.counters.rejected_batches;return Vu1WorldResult::rejected;};
-    if(!valid_native_vu1_world_input(batch)||clip.size()<count||
+    const bool input_valid=prepared?
+        prepared_world_geometry(batch.object_to_world,batch.world_to_clip,*prepared,batch.output_height)&&
+        prepared_world_states(*prepared,batch.states,batch.completion):valid_native_vu1_world_input(batch);
+    if(!input_valid||clip.size()<count||
        (count&&(!clip.data()||!aligned(clip.data())||
         ranges_overlap(clip.data(),count*sizeof(TransformVector4),batch.corners.data(),batch.corners.size_bytes())||
-        ranges_overlap(clip.data(),count*sizeof(TransformVector4),batch.states.data(),batch.states.size_bytes()))))
+        ranges_overlap(clip.data(),count*sizeof(TransformVector4),batch.states.data(),batch.states.size_bytes())||
+        (prepared&&ranges_overlap(clip.data(),count*sizeof(TransformVector4),prepared,sizeof(*prepared))))))
         return reject("VU1 WORLD INPUT UNSUPPORTED");
     if(!count){s.failure="NONE";return Vu1WorldResult::drawn;}
 #ifdef _EE
@@ -478,13 +513,28 @@ Vu1WorldResult Vu1Transform::draw_world(const Vu1WorldBatch& batch,std::span<Tra
 }
 Vu1WorldSubmitResult Vu1Transform::submit_prepare_world(const Vu1WorldGeometry& geometry,
                                                        Vu1WorldSubmission& submission) noexcept {
+    return submit_prepare_world_checked(geometry,submission,nullptr);
+}
+Vu1WorldSubmitResult Vu1Transform::submit_prepare_world(const PreparedVu1WorldGeometry& geometry,
+                                                       Vu1WorldSubmission& submission) noexcept {
+    const Vu1WorldGeometry raw{geometry.object_to_world,geometry.world_to_clip,geometry.corners.corners(),
+        geometry.output_height,geometry.sequence};
+    return submit_prepare_world_checked(raw,submission,&geometry.corners);
+}
+Vu1WorldSubmitResult Vu1Transform::submit_prepare_world_checked(const Vu1WorldGeometry& geometry,
+                                                              Vu1WorldSubmission& submission,
+                                                              const PreparedVu1WorldCorners* prepared) noexcept {
     if(world_pending())return Vu1WorldSubmitResult::rejected;
     if(quarantined)return Vu1WorldSubmitResult::failed;
     if(!storage_||!storage_->ready||!storage_->world||!storage_->world->ready)return Vu1WorldSubmitResult::rejected;
     auto&s=*storage_;auto&w=*s.world;
     const auto reject=[&](const char*why){s.failure=why;++w.counters.rejected_batches;return Vu1WorldSubmitResult::rejected;};
-    if(!valid_native_vu1_world_geometry(geometry)||
-       ranges_overlap(&submission,sizeof(submission),geometry.corners.data(),geometry.corners.size_bytes()))
+    const bool input_valid=prepared?
+        prepared_world_geometry(geometry.object_to_world,geometry.world_to_clip,*prepared,geometry.output_height):
+        valid_native_vu1_world_geometry(geometry);
+    if(!input_valid||
+       ranges_overlap(&submission,sizeof(submission),geometry.corners.data(),geometry.corners.size_bytes())||
+       (prepared&&ranges_overlap(&submission,sizeof(submission),prepared,sizeof(*prepared))))
         return reject("VU1 WORLD PREPARE INPUT UNSUPPORTED");
     const unsigned bank=w.banks[w.bank].phase?w.bank^1:w.bank;
     if(w.banks[bank].phase)return reject("VU1 WORLD BANKS OCCUPIED");
@@ -686,6 +736,17 @@ Vu1WorldResult Vu1Transform::cancel_world(const Vu1WorldToken& token,std::span<T
 }
 Vu1WorldPrepareResult Vu1Transform::prepare_world(const Vu1WorldGeometry& geometry,Vu1WorldToken& token,
                                                  std::span<TransformVector4> clip) noexcept {
+    return prepare_world_checked(geometry,token,clip,nullptr);
+}
+Vu1WorldPrepareResult Vu1Transform::prepare_world(const PreparedVu1WorldGeometry& geometry,Vu1WorldToken& token,
+                                                 std::span<TransformVector4> clip) noexcept {
+    const Vu1WorldGeometry raw{geometry.object_to_world,geometry.world_to_clip,geometry.corners.corners(),
+        geometry.output_height,geometry.sequence};
+    return prepare_world_checked(raw,token,clip,&geometry.corners);
+}
+Vu1WorldPrepareResult Vu1Transform::prepare_world_checked(const Vu1WorldGeometry& geometry,Vu1WorldToken& token,
+                                                         std::span<TransformVector4> clip,
+                                                         const PreparedVu1WorldCorners* prepared) noexcept {
     if(world_pending())return Vu1WorldPrepareResult::rejected;
     invalidate_world();
     if(quarantined)return Vu1WorldPrepareResult::failed;
@@ -694,12 +755,14 @@ Vu1WorldPrepareResult Vu1Transform::prepare_world(const Vu1WorldGeometry& geomet
     if(count>vu1_world_corner_capacity||clip.size()<count||!clip.data()||!aligned(clip.data())||
        ranges_overlap(clip.data(),count*sizeof(TransformVector4),geometry.corners.data(),geometry.corners.size_bytes())||
        ranges_overlap(clip.data(),count*sizeof(TransformVector4),&token,sizeof(token))||
-       ranges_overlap(&token,sizeof(token),geometry.corners.data(),geometry.corners.size_bytes())){
+       ranges_overlap(&token,sizeof(token),geometry.corners.data(),geometry.corners.size_bytes())||
+       (prepared&&(ranges_overlap(clip.data(),count*sizeof(TransformVector4),prepared,sizeof(*prepared))||
+                   ranges_overlap(&token,sizeof(token),prepared,sizeof(*prepared))))){
         storage_->failure="VU1 WORLD PREPARE INPUT UNSUPPORTED";++storage_->world->counters.rejected_batches;
         return Vu1WorldPrepareResult::rejected;
     }
     Vu1WorldSubmission submission;
-    const auto result=submit_prepare_world(geometry,submission);
+    const auto result=submit_prepare_world_checked(geometry,submission,prepared);
     if(result==Vu1WorldSubmitResult::failed)return Vu1WorldPrepareResult::failed;
     if(result!=Vu1WorldSubmitResult::submitted)return Vu1WorldPrepareResult::rejected;
     return finish_prepare_world(submission,token,clip);

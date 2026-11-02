@@ -1,5 +1,162 @@
 # Handoff
 
+## Native PS2 owned prepared corner batches (2026-11-02)
+
+Continued from c67f1443. WorldDrawPlan now gathers into an opaque, owning
+PreparedVu1WorldCorners value. Only the immutable plan can populate its private
+aligned storage; default/partial values are inadmissible. begin/append checks
+ranges, preserves the previous value on failure, and copies only the requested
+suffix. Valid values survive source model/scene destruction. Prevalidated model
+snapshots retain exact reciprocal texture dimensions at eight bytes per remapped
+material. Gather performs no allocation and retains no source pointer.
+
+Typed VU driver overloads skip only repeated static corner-domain admission.
+Dynamic matrices, shape/height, GS states, explicit-call output aliases over the
+whole opaque object, bank ownership, deadlines and VU result validation remain.
+Matrices are borrowed through the call, then copied once into the original
+request/packet path. Input data is copied before asynchronous submit returns;
+no original source address is retained to falsely constrain later stack reuse.
+The generic raw APIs retain full numeric validation. Packet copying, VU program,
+projection, batch partition, primitive order and resource fences are unchanged.
+
+Display adds a sixth trailing WorldGeometryMode argument, default raw. A union
+uses either the old 1,536-byte corner array or the 1,552-byte prepared value,
+without doubling buffers. Explicit construction/trivial destruction preserve
+C++ object lifetime. Two CPU batches retain the prior half/full asynchronous
+lookahead schedule and one hardware job at a time. Existing 35 resource/path
+statistics retain their meanings. The application selects prepared geometry
+for explicit world modes; --drive-world-raw is synchronous raw admission with
+memoized materials and outside rejection. --drive-world-no-memo and
+--drive-world-no-reject retain prepared geometry while disabling only their
+named optimization. Automatic Frame startup remains unchanged. CORNERS boot
+records declare RAW or PREPARED; gameplay, controls, camera and reset are shared.
+
+The focused producer proof passes all 13 WorldScene tests and ASan/UBSan over
+97 authored frames and 6,687 checks. Transaction tests exhaust allocation failure
+points during textured model replacement, verify retained previous-plan scales,
+partial failure atomicity, no gather allocations and source-owner destruction.
+After the request headers were finalized, the proof was rerun in a fresh 002
+directory; proof 001 remains an earlier dependency snapshot. Current report:
+build/ps2-world-prepared-corners-002/validation.json, SHA-256
+cfc4857f07b092c17198ff465e7f0564c536a95da1334d412ea7534fb0178f51.
+
+The independent portable differential covers 309,068 checks and 50,288,640
+literal corner bytes, hash a10a86494b161a08, under optimized and ASan/UBSan
+execution. It compares full raw/typed dynamic admission, valid boundary domains,
+all supported reciprocal sizes, incremental ranges and owned-value lifetime.
+The completed dependency closure is retained in
+build/ps2-world-prepared-proof-001/validation-final.json, SHA-256
+d0059d77931917f46dae988baf90833df1c940456e6b0af98ff7a6aaede2f985.
+
+Authored GS/driver validation passes 27,811,840 literal pixel comparisons and
+39 no-flip rejection/recovery cases. Forty new driver checks include default
+and partial prepared values, five invalid raw numeric controls, dynamic matrix,
+height and state rejection, four whole-object metadata-region aliases, source
+owner destruction, stale ready tokens and positive asynchronous source-address
+reuse before finish. Six raw/prepared pairs cover all three submission modes,
+all 35 prior counters and transfer totals. A source-bound private driver copy
+observes 7,172 packet words before DMA; equality normalizes only declared bank
+addresses, per-call sequence and MARK. Input/state/padding words remain exact.
+The production packet builder is unchanged. Every one of ten C++ commands uses
+strict O3. Report: build/ps2-world-prepared-display-ee-001/runtime-validation.json,
+SHA-256 d5c191cb923b8ef8517cf5cff97b7e31cf2928f81c2e2ab4558f6ed8c885fb5f.
+
+The final matched-O3 scene pair advances one native simulation for 601 updates.
+Both paths use classify_first, memoized materials and common-outside rejection;
+only geometry mode changes. Each emits 885,445 triangles with 83,064 VU batches,
+3,862,383 corners and 15,201,330 driver DMA qwords. All 35 prior counters match
+on 593 stable warm pairs. Seventeen full framebuffer pairs compare 4,874,240
+literal color words exactly, retaining pixel hash af08a568c3638e99 and plan hash
+3e8769a247c136f3. Warm draw work falls from 14.537770 to 12.482440 ms, saving
+2.055330 ms (14.14%). Across all 601 pairs it falls from 14.555402 to 12.491117 ms.
+Eight cold/transition pairs are recorded separately because the two paths share
+one resource cache. Draw intervals exclude shared simulation/planning, vsync
+and framebuffer verification. This does not establish whole-app throughput.
+Report: build/ps2-world-prepared-scene-ee-002/runtime-validation.json, SHA-256
+e15ef478e15050a24234900fed77489570b893d2bdae774738832cbcb0d63a98.
+All 48 C++ commands explicitly use O3, no fast math and no FP contraction. The
+109-file archive is 180,422 bytes, SHA-256
+23eb0455df69e693369c1656737289b4f30a435aa57371a5759f4387e1980684.
+
+The earlier prepared-scene-ee-001 used the core-probe default O2. Its 601-update
+correctness proof and same-ELF raw/prepared comparison remain recorded, but its
+15.557/13.338 ms warm times cannot be compared directly to historical O3 builds.
+Review identified the configuration mismatch before publication; the same 101
+compiled input hashes were rebuilt under O3 in 002 and rerun. The audit is
+build/ps2-world-prepared-timing-audit-001/configuration.json, SHA-256
+34c4f95e4e5f99c6ea86d90a0a1b3dabf96488101349dc01841fa74e2f03697c.
+Even under matched O3, the current raw control is 0.153835 ms slower than the
+prior 056 warm fixture's 14.383935 ms; use the current paired result for isolated
+saving and the final app runs for net integration. Source/code-layout/material
+pointer-hash changes are not separately attributed by this comparison.
+
+Native057, engine-demo057 and argv-only wrappers013/014/015 cross-build with
+strict O3. Native/demo role/symbol checks pass; all 35 shared engine source
+identities agree and each wrapper retains 71 byte-identical non-entry objects.
+The 147-input archive SHA-256 is
+4f87ef8609ba6cc82c49c015a0e950fc9a4276ab4732fc346f1b45fc6e4fce35.
+Build-set report: build/ps2/native-057/build-set-validation.json, SHA-256
+97c7d19091a78edffc1796597403a5a171b0d1f037785d336dbc7246adddf4d3.
+Engine-demo is cross-built, not reexecuted. The private CLI harness passes 89
+checks: 84 legacy argument/path/material/rejection cases plus five raw-control
+arities. The portable PS2 suite passes all 308 tests in 105.931 seconds with no
+source drift across 496 inputs. Report:
+build/ps2-world-prepared-final-001/portable-final-tests.json, SHA-256
+0d60ad2ce9d40ed4c97ef94fa186268840f2f9e96c66d2d4a6b15dcdefea61c8.
+
+Four final closed Play 0.72 runs retain the same seven private assets, rendering
+preferences, initial frame 2318 and neutral disconnected-pad input. First 660
+complete periods:
+
+| Path | Native updates/sec | Mean work ms | Maximum work ms |
+| --- | ---: | ---: | ---: |
+| Default Frame057 | 29.363651 | 31.043434 | 37.277778 |
+| Memoized raw control057 | 29.987971 | 21.321659 | 28.664931 |
+| Memoized prepared057 | 29.987971 | 19.261374 | 26.630208 |
+| Memoized async prepared057 | 29.987966 | 19.354077 | 26.750000 |
+
+All 660 work intervals per run exceed 16.667 ms. Prepared geometry saves 2.060285 ms
+(9.663%) against current raw; async adds 0.092703 ms. Against prior 056's 21.369905 ms,
+prepared saves 2.108531 ms; current raw is 0.048245 ms faster than 056. Default mean work
+is unchanged within 0.000006 ms. The remaining mean gap is 2.595 ms; cold/peak work
+also exceeds budget. No frame-rate target is declared achieved.
+
+The final sealer binds all 147 current/archive inputs, five strict-O3 builds,
+seven assets and four closed runtimes. All 98 record keysets and timing field
+names are checked. Raw/prepared match all 728 non-timing values, including memo
+counters; prepared/async differ only 42 declared scheduling values. Thirty-six
+negative parser/policy controls pass. Independent parsing/arithmetic agrees.
+Report: build/ps2-world-prepared-final-001/cadence-validation.json, SHA-256
+9b23ae53c5e656d349069f6de10980267d20ab8eed8d9111bbca3b7cff56c652.
+
+Matched-O3 static review finds the raw geometry validator, finish_prepare and
+submit_emit instruction sequences unchanged before relocation. Raw prepare's
+stack grows 48 to 80 bytes and shared submit 64 to 80 bytes; there is no extra raw
+matrix-copy loop. This is not an attribution of timing. The large preliminary
+raw regression was confounded by optimization level; final whole-app raw is
+slightly faster. Details remain in
+build/ps2-world-prepared-timing-audit-001/o3-static-review.json.
+
+Next work should separate recovered camera/body preparation from scene
+selection before targeting the remaining CPU cost. The paired fixture's
+4.118 ms plan_ticks surrounds RallyVisualScene::update, including both phases;
+it is not a pure culling/facing measurement. The adapter already exposes
+pose_ticks and scene_ticks when its clock is enabled. An identity-facing
+shortcut is not demonstrated to help this workload: road instance 0 receives
+camera.world_to_view, and all seven retained first-pose instance matrices are
+nonidentity. Do not move camera operations to manufacture identity; it changes
+ordered geometry. The historical 0.623550 ms preparation-assembly interval is
+another candidate, but covers headers/matrices/corners together, not memcpy
+alone. Any direct packet-gather change must preserve bytes and source lifetime.
+
+This remains a bounded developer vehicle loop with a fixed visual neighborhood.
+Full race flow, AI/HUD/audio, live-controller input and physical-console
+performance remain open; the original 66 measured world-versus-Frame color
+differences remain. Neither exact sampled images nor host timing establishes
+full arcade fidelity, simultaneous hardware execution or a finished game.
+Source gate/archive, committed tree and PS2 CI are bound after publication in
+build/ps2-world-prepared-final-001/checkpoint-validation.json.
+
 ## Native PS2 validated outside-face rejection (2026-11-02)
 
 Continued from f553f60c. The direct world renderer now has a bounded early

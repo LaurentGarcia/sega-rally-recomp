@@ -99,6 +99,7 @@ using DisplayClock=std::uint64_t (*)(void*) noexcept;
 enum class WorldSubmissionMode : std::uint8_t { fused, classify_first, classify_async };
 enum class WorldMaterialMode : std::uint8_t { resolve_each, memoized };
 enum class WorldFallbackMode : std::uint8_t { clip_each, reject_outside };
+enum class WorldGeometryMode : std::uint8_t { raw, prepared };
 enum class ReadbackStatus {
     ok, not_ready, invalid_rectangle, busy, unsupported_configuration,
     gif_timeout, finish_timeout, receive_timeout, fifo_timeout, cleanup_failed
@@ -153,10 +154,14 @@ public:
     // reject_outside omits common-plane outside triangles only after the VU
     // publishes validated fallback clips. Rejected/scalar retries retain the
     // complete clipper; clip_each preserves the default comparison path.
+    // prepared gathers owned corners from the immutable plan and discharges
+    // only their static domain scan. Dynamic matrices, output alias checks,
+    // transport and result admission remain unchanged. raw is the control.
     bool present_world(const WorldDrawPlan&, ps2::Vu1Transform&,
                        WorldSubmissionMode = WorldSubmissionMode::fused,
                        WorldMaterialMode = WorldMaterialMode::resolve_each,
-                       WorldFallbackMode = WorldFallbackMode::clip_each);
+                       WorldFallbackMode = WorldFallbackMode::clip_each,
+                       WorldGeometryMode = WorldGeometryMode::raw);
     bool present_status(const char *message);
     // Between calls, forget all cached texture identities. The next use uploads
     // its index bytes; copied-content CLUT entries remain valid. No allocation,
