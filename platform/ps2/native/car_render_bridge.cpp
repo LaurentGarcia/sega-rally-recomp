@@ -44,9 +44,13 @@ bool render_sine(float angle,float& output) noexcept {
 }
 // Existing project-authored polynomial/value arithmetic; each product and sum
 // has its own binary32 boundary. No host trigonometric approximation is used.
-bool rotate(AffineTransform3& matrix,unsigned axis,float angle) noexcept {
-    float sine,cosine;
-    if(!render_sine(angle,sine)||!render_sine(math::add32(angle,value(0x3fc90fdb)),cosine))return false;
+struct Rotation {float sine,cosine;};
+bool rotation(float angle,Rotation& output) noexcept {
+    return render_sine(angle,output.sine)&&
+        render_sine(math::add32(angle,value(0x3fc90fdb)),output.cosine);
+}
+void apply_rotation(AffineTransform3& matrix,unsigned axis,const Rotation& rotation) noexcept {
+    const auto sine=rotation.sine,cosine=rotation.cosine;
     const unsigned first=axis==0?1:0,second=axis==2?1:2;
     const auto a=matrix.columns[first],b=matrix.columns[second];
     const std::array<float,3> av{a.x,a.y,a.z},bv{b.x,b.y,b.z};
@@ -57,7 +61,12 @@ bool rotate(AffineTransform3& matrix,unsigned axis,float angle) noexcept {
         x[i]=math::add32(ca,axis==1?sb:negative(sb));
         y[i]=axis==1?math::sub32(cb,sa):math::add32(sa,cb);
     }
-    matrix.columns[first]={x[0],x[1],x[2]};matrix.columns[second]={y[0],y[1],y[2]};return true;
+    matrix.columns[first]={x[0],x[1],x[2]};matrix.columns[second]={y[0],y[1],y[2]};
+}
+bool rotate(AffineTransform3& matrix,unsigned axis,float angle) noexcept {
+    Rotation values;
+    if(!rotation(angle,values))return false;
+    apply_rotation(matrix,axis,values);return true;
 }
 bool translate(AffineTransform3& matrix,AffinePoint3 offset) noexcept {
     return rounded_affine_transform(matrix,offset,matrix.translation);
@@ -79,21 +88,31 @@ bool build_car_render_bridge(const RenderPose& pose,const CarRenderGeometry& geo
        !bounded(steering,0x41000000u)||!bounded(spin,0x49800000u)||!valid_matrix(view))return false;
     CarRenderBridge result;
     result.body=view;
-    if(!translate(result.body,position)||!rotate(result.body,1,orientation.y)||
-       !rotate(result.body,0,orientation.x)||!rotate(result.body,2,orientation.z))return false;
+    // These angles repeat within this call. Calculate each pair at its first
+    // original use; all matrix products and sums retain their original order.
+    Rotation yaw,steering_rotation,spin_rotation;
+    if(!translate(result.body,position)||!rotation(orientation.y,yaw))return false;
+    apply_rotation(result.body,1,yaw);
+    if(!rotate(result.body,0,orientation.x)||!rotate(result.body,2,orientation.z))return false;
     for(unsigned i=0;i<4;++i){
         auto offset=geometry.wheel_offsets[i];offset.y=math::add32(offset.y,suspension[i]);
         result.wheels[i]=result.body;
-        if(!translate(result.wheels[i],offset)||(i<2&&!rotate(result.wheels[i],1,steering))||
-           !rotate(result.wheels[i],0,negative(spin)))return false;
+        if(!translate(result.wheels[i],offset))return false;
+        if(i<2){
+            if(i==0&&!rotation(steering,steering_rotation))return false;
+            apply_rotation(result.wheels[i],1,steering_rotation);
+        }
+        if(i==0&&!rotation(negative(spin),spin_rotation))return false;
+        apply_rotation(result.wheels[i],0,spin_rotation);
     }
     const auto mean=scaled(math::add32(math::add32(math::add32(heights[0],heights[1]),heights[2]),heights[3]),0x3fd0000000000000ull);
     const auto shadow_y=math::narrow(math::subtract(math::from_single(mean),math::from_bits(0x3f947ae147ae147bull)));
     const auto pitch=scaled(math::sub32(math::add32(heights[0],heights[1]),math::add32(heights[2],heights[3])),0x3fce76c8b4395810ull);
     const auto roll=scaled(math::sub32(math::add32(heights[0],heights[2]),math::add32(heights[1],heights[3])),0x3fd54fdf3b645a1dull);
     result.shadow=view;
-    if(!translate(result.shadow,{position.x,shadow_y,position.z})||!rotate(result.shadow,1,orientation.y)||
-       !rotate(result.shadow,0,pitch)||!rotate(result.shadow,2,roll))return false;
+    if(!translate(result.shadow,{position.x,shadow_y,position.z}))return false;
+    apply_rotation(result.shadow,1,yaw);
+    if(!rotate(result.shadow,0,pitch)||!rotate(result.shadow,2,roll))return false;
     if(!valid_matrix(result.body)||!valid_matrix(result.shadow))return false;
     for(const auto& wheel:result.wheels)if(!valid_matrix(wheel))return false;
     output=result;return true;

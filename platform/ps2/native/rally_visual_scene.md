@@ -25,6 +25,14 @@ The existing render path uses screen coordinates
 128 gives that logical center. Thus positive focus Y is retained in clip space.
 The recovered camera currently supplies focus 300 on both axes.
 
+The car bridge reuses exact sine/cosine results within each update: body/shadow
+yaw, front-wheel steering and the four wheels' common spin. Each pair is
+calculated at its first original use. This reduces sine evaluations from 24 to
+14 without changing the polynomial, matrix operation order or binary64
+expressions. There is no cache across updates, allocation or approximate
+trigonometric substitution. The bridge still publishes all six matrices only
+after complete validation, including when an input matrix aliases its output.
+
 Near and far Z are explicit native presentation configuration, not a claim to
 reproduce the original clipping planes or polygon priority. They must satisfy
 `1/1024 <= near < far <= 65536`, with bounded projection coefficients. The

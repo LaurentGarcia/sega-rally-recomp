@@ -75,11 +75,11 @@ packing. The textured scene measures **29.36 native updates/sec over 660 frames
 in Play**. An optional [world renderer](platform/ps2/native/vu1_world.md) now
 performs transforms, projection and direct GS packet production on VU1, with
 ordered clipping fallback. Geometry classification, bounded material reuse,
-outside-face rejection and prepared corner batches bring that path to about
-**30 native updates/sec**, with **19.26 ms mean work per frame** over the same
-660-period Play test. Prepared corners reduce work by **9.7%** against the
-same-build raw control, preserving all 4.87 million sampled color words in the
-separate scene comparison. It remains an explicit experimental mode. The textured
+outside-face rejection, prepared corners and exact rotation reuse bring that
+path to about **30 native updates/sec**, with **18.79 ms mean work per frame**
+over a 660-period Play test. The latest rotation change reduces work by **2.4%**
+against the preceding build, preserving all 4.87 million sampled color words in
+the separate scene comparison. It remains an explicit experimental mode. The textured
 scene has not reached 60 updates/sec; full-race and physical-console performance
 remain unverified.
 An additional asynchronous scheduler now gathers the next EE batch between

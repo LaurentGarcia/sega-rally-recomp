@@ -302,6 +302,15 @@ updates and presentations per second, with a nominal 16.67 ms complete-frame
 budget. Time outside the wait is not a hardware busy-cycle measurement; both
 that work and the observed cadence must be checked before claiming the target.
 
+The Rally adapter's outer `pose_ticks` includes camera/body transforms, seven
+instance matrices and perspective setup. Its `scene_ticks` includes planning
+and successful history publication. A separate 601-update coarse fixture keeps
+inner clocks disabled: before rotation reuse, those buckets measured 2.034 ms
+and 2.086 ms respectively. The later paired comparison reduces pose work to
+1.537 ms by reusing exact sine/cosine pairs within one car-bridge call. This
+game-side optimization changes no engine or VU/DMA contract. Complete-frame
+results and remaining limits are in the [native rewrite report](ps2-native-rewrite.md).
+
 The GS path retains native indexed textures, CLUTs, explicit primitive order,
 optional Z16S depth and visible cache/transfer counters. It does not hide these
 behind a desktop-style graphics API or reorder primitive work for convenience.

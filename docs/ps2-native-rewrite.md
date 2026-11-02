@@ -296,7 +296,38 @@ not cycle renderers. Start still restores the initial checkpoint, and the
 diagnostic page reports the previous submitted GS triangle count. Game
 arithmetic, camera history and input behavior are shared with the normal path.
 
-The final native057 builds were measured over matching 660 complete periods in
+The latest native058 car bridge reuses exact sine/cosine pairs for body/shadow
+yaw, front-wheel steering and common wheel spin within each update. Its 12
+rotations need 14 rather than 24 sine evaluations. Each pair is calculated at
+its first original use; matrix arithmetic, binary64 expressions, validation and
+camera history retain their existing behavior.
+
+The paired strict-O3 601-update test reduces camera/body/instance preparation
+from 2.034 to 1.537 ms. Planner/publication time remains about 2.086 ms, and total
+adapter time falls from 4.128 to 3.632 ms. All ordered plans and planner counters
+match; 17 framebuffer pairs retain all 4,874,240 color words and historical
+hashes. A separate portable differential compares all 72 matrix words and
+success/failure for 1,294 calls, including aliases and 483 rejected calls, under
+optimized and sanitizer builds.
+
+Fresh complete-app runs compare 660 periods of the preceding prepared world
+path with native058 under the same inputs and rendering preferences:
+
+| Prepared world path | Native updates/sec | Mean work | Maximum work |
+| --- | ---: | ---: | ---: |
+| Native057 control | 29.987971 | 19.261 ms | 26.630 ms |
+| Native058 rotation reuse | 29.987285 | 18.791 ms | 26.141 ms |
+
+Mean work falls by 0.471 ms (2.4%). Every measured work interval still exceeds
+16.667 ms; the mean gap is 2.124 ms and peaks need more headroom. All 98 logged
+record/field sets match. The 658 non-memo values are identical; 70 pointer-hash
+memo diagnostics are checked separately, with 36 values differing across the
+ELF layouts. Geometry, resource work, game state fields and controls agree.
+These logs do not compare every internal state. Default and async presentation
+were not remeasured for this change. The complete-app report is
+`build/ps2-bridge-reuse-final-001/cadence-validation.json`.
+
+The preceding native057 builds were measured over matching 660 complete periods in
 Play 0.72, with identical inputs and rendering preferences:
 
 | Renderer | Native updates/sec | Mean work | Mean complete period |

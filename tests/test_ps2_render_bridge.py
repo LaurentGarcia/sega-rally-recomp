@@ -42,6 +42,7 @@ class RenderBridgeTests(unittest.TestCase):
             self.assertEqual(build.returncode,0,build.stdout+build.stderr)
             run=subprocess.run([str(exe)],capture_output=True,text=True)
             self.assertEqual(run.returncode,0,run.stdout+run.stderr)
+            self.assertIn("RENDER_BRIDGE_ROTATIONS cases=512 accepted=443 rejected=69 hash=9ef0ab3306a9f778",run.stdout)
             self.assertIn("RENDER_BRIDGE PASS",run.stdout)
 
     def test_original_authored_call_proofs(self):

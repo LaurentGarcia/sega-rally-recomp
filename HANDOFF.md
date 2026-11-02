@@ -1,5 +1,121 @@
 # Handoff
 
+## Native PS2 exact car-rotation reuse (2026-11-02)
+
+Continued from 4651015. The next optimization was chosen after separating
+camera/body setup from scene planning. A source-bound strict-O3 coarse fixture
+advanced one native simulation through 601 updates and supplied identical poses
+to two independently owned visual scenes. Only the outer adapter clock was
+enabled for one scene; three private forwarding-site changes kept all inner
+WorldScene clocks disabled. Updates alternated order. Every ordered plan and
+planner counter matched; 17 framebuffer pairs retained all 4,874,240 literal
+color words, plan hash 3e8769a247c136f3 and pixel hash af08a568c3638e99.
+
+Coarse mean adapter time was 4.119959 ms with clocks off and 4.127998 ms with
+clocks on. The latter contains 2.034500 ms pose work, 2.085500 ms planner/publication
+work and 0.007999 ms residual. The observed on/off difference also includes
+independent owner/layout effects; it is not isolated timer-call overhead.
+This corrects attribution of the earlier roughly 4.118 ms plan_ticks bucket:
+about half was recovered camera/body/instance preparation. The first archived
+sealer rejected an uppercase BEGIN key; its original bytes remain archived,
+and seal_v2.py records its parser-only key-spelling correction. Coarse report:
+build/ps2-world-coarse-profile-ee-001/runtime-validation.json, SHA-256
+9ffed0d3451ab6b903997db512fdd326535f476957b7938b7a8d7e5a255e2ddd.
+
+The only production change is car_render_bridge.cpp. It calculates exact
+sine/cosine pairs at their first original use, then reuses body/shadow yaw,
+front-wheel steering and common wheel spin within that call. Twelve rotations
+now require 14 rather than 24 render_sine evaluations. All matrix products,
+sums, polynomial arithmetic, binary64 expressions and staged final validation
+remain ordered as before. There is no cross-call cache, allocation, native-FPU
+substitution or change to the engine, VU programs, DMA, camera history or controls.
+
+A direct old/new portable differential passes 1,294 calls under strict O3 and
+ASan/UBSan, comparing success and all 72 matrix words. Its 483 rejected calls
+retain output sentinels. Coverage includes 512 authored cases, 768 matrix-alias
+calls, two retained original matrix observations and 12 aliases of those inputs.
+The retained portable corpus covers signed zero, subnormal/normal boundaries,
+polynomial transitions, invalid encodings, angle endpoints and late derived
+shadow failure. Its 443 accepted/69 rejected base cases retain fingerprint
+9ef0ab3306a9f778. Report: build/ps2-render-rotation-reuse-001/validation.json,
+SHA-256 6fb9b8bf0784ef1b85f5fb5e70703045190b1eaf04979401037a1ac6fe9ffad1.
+All 308 portable PS2 tests pass in 104.490 seconds, with no drift across 496
+source inputs. Report: build/ps2-bridge-reuse-final-001/portable-final-tests.json,
+SHA-256 6331cab1872a6fd30a82c5dc9c87463750b060978469bc05c3005623143ade8a.
+
+The paired EE fixture compiles the exact 4651015 bridge beside the candidate,
+renaming only the baseline's exported entry. One common indirect dispatcher
+selects the implementation before each of two independent scene updates.
+Both modes use three outer timestamps and no inner clocks, alternating AB/BA.
+All 49 C++ commands use strict O3; the 113-file archive binds 103 compiled inputs.
+Every one of 601 plans/counter sets agrees, and the same 17 full-frame pairs
+retain all 4,874,240 color words and historical hashes. Both paths emit the
+same sampled geometry; the baseline trajectory contains 885,445 triangles.
+
+| Paired phase | Baseline ms | Reuse ms |
+| --- | ---: | ---: |
+| Adapter total | 4.128131 | 3.631708 |
+| Camera/body/instance preparation | 2.033804 | 1.537186 |
+| Planner/publication | 2.085861 | 2.085130 |
+| Residual | 0.008467 | 0.009391 |
+
+The 0.496424 ms adapter saving is localized to 0.496617 ms less pose work.
+These phase intervals exclude shared simulation, drawing, checks and readback.
+Ancillary draw timing is not comparable to the earlier single-owner fixture:
+17 counterpart draws switch independent material identities. No complete-app
+or physical-console throughput is inferred from this pair. Report:
+build/ps2-bridge-reuse-scene-ee-001/runtime-validation.json, SHA-256
+6d411d8163041fcd4328746d19a92a7ca2dd0a6de055b39bc91b28746dcc848f.
+
+Native058 and argv-only prepared wrapper016 cross-build with strict O3. Their
+71 non-entry objects agree byte-for-byte. All 35 shared engine identities match
+the retained engine-demo057; no engine source changed. The only native input
+change from 057 is car_render_bridge.cpp. The 138-input source archive is
+191,586 bytes, SHA-256
+64ad4bf28a3ee95dfe920404bf4021cc77cd274ba9c6c268576d0b5dc7ca0b83.
+Build-set report: build/ps2/native-058/build-set-validation.json, SHA-256
+ba5af8dae96405d3e168304976f8899103b0928bac703965ee7aefcb228e3367.
+
+Two closed 60-second Play observations use the same seven staged assets,
+rendering preferences, frame 2318 and neutral disconnected-pad input. The fresh
+control uses the exact prior prepared057 ELF; its first 660 timing equals the
+previous sealed observation. The new run uses prepared058. First 660 periods:
+
+| Prepared world path | Updates/sec | Mean work ms | Maximum work ms |
+| --- | ---: | ---: | ---: |
+| Fresh057 control | 29.987971 | 19.261374 | 26.630208 |
+| Reuse058 | 29.987285 | 18.790599 | 26.140625 |
+
+Mean work saves 0.470775 ms (2.444%). Every one of the 660 work intervals per
+run still exceeds 16.667 ms. The mean gap is 2.124 ms; peaks remain over budget.
+All 98 complete record/field sets and 308 timing field names match. The 658
+non-memo values match exactly. Seventy pointer-hash memo diagnostics are retained
+and checked separately, with 36 actual differences limited to memo_hits,
+state_hits, memo_misses and memo_invalidations; request totals agree. These
+layout-sensitive counters are not silently excluded or called equal. Actual
+geometry/resource/game/control values agree, but logs are not a complete-state
+proof. Thirty-one negative parser/policy controls pass; independent parsing
+and arithmetic agree. Default/async modes are not remeasured for this change.
+Cadence report: build/ps2-bridge-reuse-final-001/cadence-validation.json, SHA-256
+21bdaa9d2384e6e4f30a34f87c97bf14d99dac6711f340b4072509f8e04402bc.
+
+Next optimization candidates are immutable adjacent-facing continuation flags
+or an ordered matrix-coefficient schedule for bounds. The retained scene has
+1,463 adjacent exact facing repeats among 3,224 enabled descriptors; a byte per
+face costs 3,380 bytes across four unique owners. Cull, disabled-face and instance
+resets must remain. Bounds currently visits 3,648 coefficient slots across 114
+groups; a per-instance/view schedule could classify 128 coefficients once while
+retaining every interval multiply/add and outward rounding step. These are
+static opportunities, not measured savings or approved arithmetic changes.
+
+This remains a bounded developer vehicle loop with a fixed visual neighborhood.
+Full race flow, AI/HUD/game audio, live-controller validation, physical-console
+performance and the prior 66 world-versus-Frame color differences remain open.
+One pending hardware job still limits asynchronous scheduling; no new overlap
+or 60 Hz claim is made. Exact staged source archive, committed tree and PS2 CI
+are bound after publication by
+build/ps2-bridge-reuse-final-001/checkpoint-validation.json.
+
 ## Native PS2 owned prepared corner batches (2026-11-02)
 
 Continued from c67f1443. WorldDrawPlan now gathers into an opaque, owning
