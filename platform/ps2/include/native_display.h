@@ -90,10 +90,15 @@ struct Stats {
     std::uint32_t world_material_memo_hits=0,world_material_state_hits=0;
     std::uint32_t world_material_residency_fast=0;
     std::uint32_t world_material_memo_misses=0,world_material_memo_invalidations=0;
+    // Validated VU fallback triangles omitted by a common outside clip plane.
+    // Skips the fallback primitive writer and its resource access. Fused mode
+    // may already have preloaded resources before geometry classification.
+    std::uint32_t world_trivial_rejects=0;
 };
 using DisplayClock=std::uint64_t (*)(void*) noexcept;
 enum class WorldSubmissionMode : std::uint8_t { fused, classify_first, classify_async };
 enum class WorldMaterialMode : std::uint8_t { resolve_each, memoized };
+enum class WorldFallbackMode : std::uint8_t { clip_each, reject_outside };
 enum class ReadbackStatus {
     ok, not_ready, invalid_rectangle, busy, unsupported_configuration,
     gif_timeout, finish_timeout, receive_timeout, fifo_timeout, cleanup_failed
@@ -145,9 +150,13 @@ public:
     // uploads invalidate its fast residency proof. Source-order resource
     // touches/counters and overwrite fences remain unchanged. resolve_each
     // retains the original resolver as the default comparison path.
+    // reject_outside omits common-plane outside triangles only after the VU
+    // publishes validated fallback clips. Rejected/scalar retries retain the
+    // complete clipper; clip_each preserves the default comparison path.
     bool present_world(const WorldDrawPlan&, ps2::Vu1Transform&,
                        WorldSubmissionMode = WorldSubmissionMode::fused,
-                       WorldMaterialMode = WorldMaterialMode::resolve_each);
+                       WorldMaterialMode = WorldMaterialMode::resolve_each,
+                       WorldFallbackMode = WorldFallbackMode::clip_each);
     bool present_status(const char *message);
     // Between calls, forget all cached texture identities. The next use uploads
     // its index bytes; copied-content CLUT entries remain valid. No allocation,

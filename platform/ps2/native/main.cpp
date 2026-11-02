@@ -41,11 +41,12 @@ int main(int argc, char **argv) {
         const bool profile_drive = argc > 1 && std::strcmp(argv[1],"--drive-profile")==0;
         const bool async_world_drive = argc > 1 && std::strcmp(argv[1],"--drive-world-async")==0;
         const bool resolve_world_drive = argc > 1 && std::strcmp(argv[1],"--drive-world-no-memo")==0;
-        const bool world_drive = async_world_drive || resolve_world_drive || (argc > 1 && std::strcmp(argv[1],"--drive-world-vu")==0);
+        const bool full_clip_world_drive = argc > 1 && std::strcmp(argv[1],"--drive-world-no-reject")==0;
+        const bool world_drive = async_world_drive || resolve_world_drive || full_clip_world_drive || (argc > 1 && std::strcmp(argv[1],"--drive-world-vu")==0);
         bool textured_drive = world_drive || (argc > 1 && std::strcmp(argv[1],"--drive-textured")==0);
         const bool explicit_drive = exact_drive || guarded_drive || profile_drive || textured_drive || (argc > 1 && std::strcmp(argv[1],"--drive")==0);
         if (explicit_drive && argc != 5)
-            throw std::runtime_error("USE --drive CHECKPOINT COURSE BODY OR --drive-textured/--drive-world-vu/--drive-world-async/--drive-world-no-memo CHECKPOINT COURSE VISUAL_DIRECTORY");
+            throw std::runtime_error("USE --drive CHECKPOINT COURSE BODY OR --drive-textured/--drive-world-vu/--drive-world-async/--drive-world-no-memo/--drive-world-no-reject CHECKPOINT COURSE VISUAL_DIRECTORY");
         const char *checkpoint_path = explicit_drive ? argv[2] : nullptr;
         const char *course_path = explicit_drive ? argv[3] : "host:native-course.bin";
         const char *body_path = explicit_drive ? argv[4] : "host:native-body.bin";
@@ -83,7 +84,8 @@ int main(int argc, char **argv) {
                 exact_drive?ps2::native::NativeVehicleRenderMode::reference:guarded_drive?
                 ps2::native::NativeVehicleRenderMode::guarded_vu:ps2::native::NativeVehicleRenderMode::native_vu,profile_drive,textured_drive,world_drive,
                 async_world_drive?ps2::native::WorldSubmissionMode::classify_async:ps2::native::WorldSubmissionMode::classify_first,
-                world_drive&&!resolve_world_drive?ps2::native::WorldMaterialMode::memoized:ps2::native::WorldMaterialMode::resolve_each);
+                world_drive&&!resolve_world_drive?ps2::native::WorldMaterialMode::memoized:ps2::native::WorldMaterialMode::resolve_each,
+                world_drive&&!full_clip_world_drive?ps2::native::WorldFallbackMode::reject_outside:ps2::native::WorldFallbackMode::clip_each);
         }
         ps2::native::Mesh mesh;
         ps2::native::StudyScene study;

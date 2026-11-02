@@ -56,7 +56,7 @@ of ready-but-nonresident fallbacks is not evidence that this branch was exercise
 
 ## Immutable material resolution
 
-The trailing `WorldMaterialMode` selects `resolve_each` (the default control)
+The optional `WorldMaterialMode` selects `resolve_each` (the default control)
 or `memoized`, independently of fused, classified or async submission.
 The application explicitly selects `memoized` for `--drive-world-vu` and
 `--drive-world-async`; `--drive-world-no-memo CHECKPOINT COURSE VISUAL_DIRECTORY`
@@ -96,6 +96,35 @@ epoch observations. `world_material_state_hits` counts reused SDK state records;
 unchanged epochs. These diagnostics do not replace existing cache counters or
 establish a speedup without a paired target measurement. The ordinary Frame
 texture, palette and primitive-writing functions are unchanged.
+
+## Validated fallback rejection
+
+The trailing `WorldFallbackMode` selects `clip_each` (the default control) or
+`reject_outside`. The application selects `reject_outside` for its explicit
+world modes; `--drive-world-no-reject CHECKPOINT COURSE VISUAL_DIRECTORY`
+retains synchronous classification and memoized materials with `clip_each`.
+Automatic Frame startup is unchanged. The rejection gate applies only after the VU owner successfully
+publishes a fully validated fallback clip prefix, including ready cancellation.
+Before constructing a `ClipTriangle` and copying its UVs, it checks whether all
+three vertices share a strict outside plane. The seven comparisons are exactly
+the float clipper's signed-W comparisons; vertices on a plane remain inside.
+The VU CLIP instruction's absolute-W behavior is not substituted for this test.
+
+Every remaining face uses the unchanged clipper, fan order, capacity checks and
+primitive writer. Rejected VU submissions and scalar retries always take that
+complete path, preserving their numerical errors. This adds no transform,
+projection, VU program or resource-order change. `world_trivial_rejects` counts
+source fallback faces that skip construction and clipping, not removed output
+triangles or guaranteed avoided material requests: fused mode may already have
+preloaded them. A late failure retains the same GS drain and no-flip recovery.
+
+The internal predicate requires already validated normal-or-zero bounded clip
+coordinates. Its separate host proof checks 100,233 cases, including signed W
+and all seven boundaries; all 82,901 true results match the public clipper's
+successful empty output without changing caller storage. Optimized and
+sanitizer runs pass. The report is
+`build/ps2-common-outside-001/validation.json`, SHA-256
+`c9c56654ed5f1cd4c3bda6ee121f34fc6e4ed05e856c42cbe579856fdad00676`.
 
 ## Prepared geometry handles
 
@@ -230,6 +259,36 @@ report the work that actually occurred. Fused mode leaves the new counters zero.
 
 ## Evidence and limits
 
+The early-rejection authored generation passed **24,371,200 literal pixel-word
+comparisons** and **32 no-flip rejections**. Six new pairs compare `clip_each`
+and `reject_outside` in all three submission modes, preserving all 34 previous
+Display counters and VU batch, corner and DMA counts. Each outside case rejects
+fifteen source faces; the mixed inside, crossing and degenerate case rejects
+none. Late capacity and rejected/scalar numerical failures follow an already
+drawn batch, drain without flipping, and recover in every submission mode.
+Invalid mode admission also rejects without a flip. The prior material, resource,
+token and async lifecycle tests remain in this generation. Its report is
+`build/ps2-world-trivial-display-ee-001/runtime-validation.json`, SHA-256
+`5d956e3a37dfde5dc203df80a6b86d6274c669536bf1a0804d1581df17b0ff8c`.
+The report binds the executed ELF, archived compiled sources, configuration and
+closed runtime. It is correctness evidence, not a fixture-speed measurement.
+
+The paired actual-scene run uses synchronous classification and memoized
+materials in both paths over **601 native updates**. The fallback argument is
+the only rendering-mode difference. Both emit 885,445 triangles, and all
+**4,874,240 literal pixel words** from seventeen sampled frame pairs match.
+The new path skips setup and clipping for **422,477** validated outside source
+faces. All 34 previous counters match on 593 stable warm pairs; eight
+cold/transition pairs remain separately reported because the modes share a cache
+and alternate execution order. VU batch, corner and DMA totals are unchanged.
+Mean draw work falls from **15.452 ms to 14.392 ms**, a **1.060 ms** reduction on
+pinned Play. This is draw work, excluding measured vsync and readback, rather
+than complete application cadence, physical-console timing or universal pixel
+equality. Report: `build/ps2-world-reject-scene-ee-001/runtime-validation.json`,
+SHA-256 `8dd64e0e0519bae0ea43319310be8889df12824f4194534f0021c70c1265a40d`.
+
+The following material-memo results retain their earlier identities, before
+the early-rejection gate.
 The material-memo authored generation passed **20,930,560 literal pixel-word
 comparisons** and **25 no-flip rejections**. It compares memoized and ordinary
 resolution in all three world submission modes, including repeated pointers,

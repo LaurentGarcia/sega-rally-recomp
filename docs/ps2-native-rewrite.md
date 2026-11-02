@@ -259,34 +259,47 @@ pixel comparisons across collisions, eviction, replacement immutable snapshots,
 all three submission modes and 25 no-flip rejection cases. These compare renderer
 paths; they do not certify complete arcade fidelity.
 
+World modes now also reject a triangle before repeated EE setup when its three
+validated VU clip vectors share an outside plane. All nontrivial faces retain
+the original clipper. `--drive-world-no-reject CHECKPOINT COURSE VISUAL_DIRECTORY`
+selects synchronous memoized rendering with this gate disabled; `--drive-world-no-memo`
+disables material reuse while retaining the gate. In the paired 601-update test,
+422,477 source faces avoid repeated setup and all 4,874,240 sampled color words
+match. Stable warmed draw work falls from 15.438 to 14.384 ms, with all 34 old
+counters equal. VU instructions, batch partition and projection are unchanged.
+Authored tests retain 24,371,200 exact pixel comparisons and 32 no-flip rejection
+cases, including scalar retry, clipping and all three submission modes.
+
 The opt-in fixes native binary32 presentation for that run, so Triangle does
 not cycle renderers. Start still restores the initial checkpoint, and the
 diagnostic page reports the previous submitted GS triangle count. Game
 arithmetic, camera history and input behavior are shared with the normal path.
 
-The final native055 builds were measured over matching 660 complete periods in
+The final native056 builds were measured over matching 660 complete periods in
 Play 0.72, with identical inputs and rendering preferences:
 
 | Renderer | Native updates/sec | Mean work | Mean complete period |
 | --- | ---: | ---: | ---: |
-| Default VU1 transforms / EE projection | 29.361 | 31.065 ms | 34.059 ms |
-| Optional VU1 world / uncached synchronous control | 29.985 | 25.268 ms | 33.350 ms |
-| Optional VU1 world / synchronous material reuse | 29.985 | 22.287 ms | 33.350 ms |
-| Optional VU1 world / material reuse and async EE gather | 29.985 | 22.298 ms | 33.350 ms |
+| Default VU1 transforms / EE projection | 29.361 | 31.043 ms | 34.059 ms |
+| Optional VU1 world / memoized clip-each control | 29.985 | 22.427 ms | 33.350 ms |
+| Optional VU1 world / memoized outside rejection | 29.985 | 21.370 ms | 33.350 ms |
+| Optional VU1 world / outside rejection and async EE gather | 29.985 | 21.393 ms | 33.350 ms |
 | Previous native051 world / resource-first control | 20.945 | 34.285 ms | 47.744 ms |
 
 Work excludes measured vsync/flip time but includes input, simulation, rendering
 and logging. Every measured work interval exceeds the 16.667 ms target. The
-default retains its preceding cadence. Material reuse saves 2.981 ms (11.8%)
-against the same-build uncached path. Its mean work still exceeds the 60 Hz
-budget by 5.620 ms. Async gathering adds 0.011 ms relative to synchronous material
-reuse; it does not produce an emulator speedup. The uncached control is 0.066 ms
-slower than native054's 25.202 ms, so the same-build comparison is reported
-separately from historical results. Complete logged record/field comparisons
-retain game, geometry and resource values, with declared memo/scheduling
-diagnostics checked separately. These logs do not compare every internal state.
-The four-run result is retained in
-`build/ps2-world-material-final-001/cadence-validation.json`.
+default retains its preceding cadence. Early outside rejection saves 1.057 ms
+(4.7%) against the same-build memoized clip-each control. Its mean work still
+exceeds the 60 Hz budget by 4.703 ms. Async gathering adds 0.023 ms relative to
+synchronous rejection; it does not produce an emulator speedup. The control
+is 0.140 ms slower than native055's 22.287 ms, so the same-build comparison is
+reported separately from historical results. At native055, material reuse
+reduced complete work from 25.268 to 22.287 ms against its uncached control.
+Complete logged record/field comparisons retain game, geometry and resource
+values, with declared memo/rejection/scheduling diagnostics checked separately.
+Rejection counts match between synchronous and asynchronous modes. These logs
+do not compare every internal state. The four-run result is retained in
+`build/ps2-world-reject-final-001/cadence-validation.json`.
 
 The earlier native052 classification checkpoint compares resource-first and
 geometry-first world submission using the same immutable plans over 601 updates.

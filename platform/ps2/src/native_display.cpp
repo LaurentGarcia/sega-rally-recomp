@@ -4,6 +4,7 @@
 #include "vu0_pack.h"
 #include "world_scene.h"
 #include "native_geometry_float.h"
+#include "native_geometry_float_internal.h"
 #include "vu1_world.h"
 #include <dma.h>
 #include <dma_registers.h>
@@ -569,7 +570,7 @@ bool Display::present(const Frame &frame) {
     d.flip(); d.failure = "NONE";
     return true;
 }
-bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit,WorldSubmissionMode mode,WorldMaterialMode material_mode) {
+bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit,WorldSubmissionMode mode,WorldMaterialMode material_mode,WorldFallbackMode fallback_mode) {
     if(!impl_||!impl_->ready)return false;
     auto& d=*impl_;const auto validation_start=d.now();
     const auto reject=[&d](const char* reason){d.failure=reason;return false;};
@@ -577,6 +578,8 @@ bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit,Wo
         return reject("INVALID WORLD SUBMISSION MODE");
     if(material_mode!=WorldMaterialMode::resolve_each&&material_mode!=WorldMaterialMode::memoized)
         return reject("INVALID WORLD MATERIAL MODE");
+    if(fallback_mode!=WorldFallbackMode::clip_each&&fallback_mode!=WorldFallbackMode::reject_outside)
+        return reject("INVALID WORLD FALLBACK MODE");
     const bool memoized=material_mode==WorldMaterialMode::memoized;
     if(!plan.output_triangle_capacity()||plan.output_triangle_capacity()>16384||plan.instances().size()>1024)
         return reject("INVALID WORLD DRAW PLAN");
@@ -894,6 +897,11 @@ bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit,Wo
                 for(std::size_t i=0;i<count;++i)d.counters.checker_triangles+=materials[i]->checker;
             }else{
                 ++d.counters.world_fallback_batches;
+                // Only a successful VU fallback proves the complete clip
+                // prefix valid. A rejected submission's scalar retry must
+                // retain the public clipper's full validation/error behavior.
+                const bool reject_outside=fallback_mode==WorldFallbackMode::reject_outside&&
+                    result==ps2::Vu1WorldResult::fallback;
                 if(result==ps2::Vu1WorldResult::rejected){++d.counters.world_rejected_batches;
                     for(std::size_t i=0;i<count*3;++i)
                         if(!world_scalar_clip(instance.object_to_world,plan.world_to_clip(),corners[i].position,clips[i]))
@@ -902,7 +910,11 @@ bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit,Wo
                 // The kernel emits no prefix on fallback. Preserve every
                 // source triangle and each clipped fan's order through the
                 // same primitive writer as the ordinary Frame path.
-                for(std::size_t i=0;i<count;++i){ClipTriangle input;input.material=materials[i];
+                for(std::size_t i=0;i<count;++i){
+                    if(reject_outside&&detail::common_outside_validated(clips[i*3],clips[i*3+1],clips[i*3+2])){
+                        ++d.counters.world_trivial_rejects;continue;
+                    }
+                    ClipTriangle input;input.material=materials[i];
                     for(unsigned c=0;c<3;++c){const auto& v=clips[i*3+c];const auto& uv=corners[i*3+c];
                         input.vertices[c]={v.x,v.y,v.z,v.w,uv.u,uv.v};}
                     const auto clipped_result=clip_project_triangle_float(input,clipped);

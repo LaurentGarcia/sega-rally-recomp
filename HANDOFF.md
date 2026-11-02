@@ -1,5 +1,132 @@
 # Handoff
 
+## Native PS2 validated outside-face rejection (2026-11-02)
+
+Continued from f553f60c. The direct world renderer now has a bounded early
+rejection gate before constructing a fallback ClipTriangle and copying UVs.
+It ANDs the float clipper's exact seven strict outside masks on three validated
+clip vectors, including signed w and plane equality. Successful VU fallback
+already validates every returned position as normal-or-zero and bounded by
+65536; immutable prepared plans retain valid UVs/materials. Every nontrivial
+face still uses the original float clipper. Rejected submissions and scalar
+retry retain complete validation and failure behavior. There is no VU program,
+transform/projection, batch partition, primitive-order or resource-fence change.
+The public float and reference clipper source files are byte-identical to f553f60.
+
+The new WorldFallbackMode is independent of submission and material modes;
+the engine API defaults to clip_each. Production --drive-world-vu and
+--drive-world-async select reject_outside with memoized materials. The existing
+--drive-world-no-memo disables material reuse but retains early rejection;
+--drive-world-no-reject selects synchronous memoized rendering with clip_each.
+Automatic Frame startup remains unchanged. A boot CLIP record declares the
+selection and world_trivial_rejects counts skipped source fallback faces. Fused
+submission may already have preloaded their materials; this is not a count of
+avoided uploads or additional GPU-cull work.
+
+The prior clipper already had a common-plane early return and an inside fast
+path. This optimization removes duplicate construction/validation/outcode/call
+work, not polygon clipping that was already avoided. The preceding host census
+is retained in build/ps2-world-fallback-census-001/validation.json, SHA-256
+ce3b4c8b73490ea55f83bcf5cc24b1bcc23a84f73ef07c824004306f559174ff.
+Its host/target partition totals differ in 136 frames. In particular, ordinary
+VU CLIP flags use absolute w and are not the full signed-w EE mask; no VU flag
+or kernel ABI is repurposed in this change.
+
+The helper proof tests all seven plane boundaries, adjacent values, both zero
+signs, negative w and mixed planes, plus 100,000 deterministic domain cases.
+Optimized and ASan/UBSan runs pass 2,747,189 checks each: 100,233 shortcut cases,
+82,901 proven zero-output results and 20,010 retained reference comparisons.
+The generic clipper still rejects invalid public inputs. Both focused Python
+cases pass. Report: build/ps2-common-outside-001/validation.json, SHA-256
+c9c56654ed5f1cd4c3bda6ee121f34fc6e4ed05e856c42cbe579856fdad00676.
+
+The actual-scene pair advances one native simulation for 601 updates. Both
+paths use classify_first and memoized materials; only fallback mode changes.
+All 885,445 output triangles, 83,064 batches, 33,706 fallback batches and
+15,201,330 driver DMA qwords agree. The new gate skips 422,477 source faces.
+All 4,874,240 literal color words from seventeen paired frames match, retaining
+pixel hash af08a568c3638e99 and plan hash 3e8769a247c136f3. All 34 preexisting
+counters match on 593 stable warm pairs. Warm draw work falls from 15.437766
+to 14.383935 ms (1.053831 ms, 6.83%); the all-601 result is 15.452050 to
+14.391671 ms (1.060380 ms). Eight cold/transition pairs remain explicitly
+reported because both paths share one resource cache. These draw intervals
+exclude shared game/planning, vsync and framebuffer checking. Report:
+build/ps2-world-reject-scene-ee-001/runtime-validation.json, SHA-256
+8dd64e0e0519bae0ea43319310be8889df12824f4194534f0021c70c1265a40d.
+
+Authored GS tests preserve 24,371,200 literal pixel words and 32 no-flip
+rejections. Six added pairs cover outside and mixed clipped/inside geometry in
+all three submission modes, comparing all 34 prior counters and driver
+batches/corners/DMA. Only the outside cases count rejected faces. All three
+modes exercise late-capacity rejection and scalar numerical rejection without
+shortcut use, drain and successful retry; invalid mode also rejects before flip.
+Report: build/ps2-world-trivial-display-ee-001/runtime-validation.json, SHA-256
+5d956e3a37dfde5dc203df80a6b86d6274c669536bf1a0804d1581df17b0ff8c.
+
+Native056, engine-demo056 and argv-only wrappers010/011/012 cross-build under
+strict O3, no fast math and disabled FP contraction. Native/demo role and symbol
+checks pass, all 35 shared engine identities agree, and each wrapper retains
+71 byte-identical non-entry objects with an equivalent forbidden-runtime symbol
+audit. The 147-input source/evidence archive is 191,156 bytes, SHA-256
+0cd455c8b4a67dad0d2f93ccabc5341352a3c3b00498d0834dce9d3bfa58fb36.
+Build-set report: build/ps2/native-056/build-set-validation.json, SHA-256
+289ac1847822ef4d3e8e92cccde604fe102cbb43f87b4deea7ef47d299a92b10.
+The engine demo is cross-built, not rerun. The private CLI harness passes 82
+checks: 77 legacy argument/path/material cases plus five new control arities.
+Explicit world modes intentionally enable early rejection. All 307 portable
+PS2 tests pass in 115.756 seconds with no source drift across 494 inputs;
+build/ps2-world-reject-final-001/portable-final-tests.json binds that run.
+
+The final four closed Play 0.72 runs use identical seven assets, preferences,
+initial frame 2318 and neutral disconnected-pad input. First 660 complete periods:
+
+| Path | Native updates/sec | Mean work ms | Maximum work ms |
+| --- | ---: | ---: | ---: |
+| Default Frame056 | 29.360823 | 31.043440 | 37.279514 |
+| Memoized clip-each control056 | 29.984821 | 22.426957 | 29.251736 |
+| Memoized reject056 | 29.984818 | 21.369905 | 28.586806 |
+| Memoized async reject056 | 29.984816 | 21.392622 | 28.590278 |
+
+Each run has 660/660 work intervals over 16.667 ms. Rejection saves 1.057052 ms
+(4.71331%) against the current control; async adds 0.022717 ms. Work excludes
+only measured Display vsync/flip, not input, simulation, planning or logging.
+The current control is 0.140036 ms slower than historical memo055, so the
+same-build comparison is the optimization evidence. The default cadence is
+unchanged. All 98 complete logged records/keysets and timing-field names are
+checked per comparison: default 602 exact non-timing fields; control/reject 644
+shared exact values plus 84 declared memo/rejection fields; async/reject 616
+exact values plus 112 declared memo/scheduling fields. Rejection counts agree
+across sync/async, totaling 9303 across 14 logged updates, not the full run.
+The sealer binds all 147 compiled/current input hashes, seven private assets,
+five ELF builds and four closed runtimes. Its 24 negative parser/policy tests
+pass. Report: build/ps2-world-reject-final-001/cadence-validation.json, SHA-256
+88af6ec9830c63ef35d5c0c53e3e8c1cbb3eab072e6929b080bd986d0a887463.
+Portable report SHA-256:
+aa071dc259a201c4af19b90ac7f97e2d7bd38ba2580d21ae0e760cbed1a2e47b.
+
+The independent source review found no correctness blocker. This checkpoint
+reduces duplicate EE work; it does not establish hardware overlap, 60 Hz,
+full-race flow, AI/HUD/audio, live-pad operation or physical-console performance.
+It retains the fixed visual neighborhood, neutral-input limitation and original
+66 measured world-versus-Frame color differences. Literal comparison frames
+remain exact between optimized/control world paths; no new screenshot is used
+as a fidelity claim. Source archive/gate and CI bind the committed tree in
+build/ps2-world-reject-final-001/checkpoint-validation.json after publication.
+
+Next candidate: a fixed-capacity prepared batch constructed only from the
+WorldDrawPlan's leased immutable model. Static positions, UVs, indices and
+power-of-two dimensions are already validated; dynamic matrices remain checked
+per plan. An opaque prepared type can retain this proof across ordered corner
+gathering, while the public geometry API keeps full validation. First retain
+packet copying and all count, alias, ownership, bank, deadline and result checks
+so measurement isolates redundant numeric validation. The historical detailed
+profile attributed 2.193 ms to admission, 0.624 ms to packet assembly, 1.968 ms to DMA
+send and 0.128 ms to fallback publication across three sampled poses; the outer
+4.874 ms prepare interval is not all removable checking. The 601-scene proof
+submits 3,862,383 corners, about 51,413 repeated scalar-field checks and 205,651
+bytes of corner copying per update. Exact packet/order/pixel and malformed,
+stale and lifetime comparisons must precede promotion; no saving is promised.
+
 ## Native PS2 immutable material binding reuse (2026-11-02)
 
 Continued from 52e5e847. Added a bounded per-presentation cache to the direct

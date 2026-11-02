@@ -2,6 +2,25 @@
 #include "native_geometry_float.h"
 
 namespace ps2::native::detail {
+// Trusted early rejection only: each x/y/z/w field is a normal binary32 value
+// or signed zero with abs<=65536, already validated by the caller. These are
+// the float clipper's exact seven strict comparisons, including signed w (not
+// abs(w)). True proves zero output for otherwise valid material/UV inputs;
+// false makes no claim about visibility. No public input validation is skipped.
+// Position needs only float x/y/z/w fields: no UV construction or VU dependency.
+template<class Position>
+inline bool common_outside_validated(const Position& a, const Position& b,
+                                     const Position& c) noexcept {
+    const auto outside = [](const Position& p) {
+        return (p.w < clip_min_w ? 1u : 0u) |
+               (p.x < -p.w ? 2u : 0u) | (p.x > p.w ? 4u : 0u) |
+               (p.y < -p.w ? 8u : 0u) | (p.y > p.w ? 16u : 0u) |
+               (p.z < 0.0f ? 32u : 0u) | (p.z > p.w ? 64u : 0u);
+    };
+    const unsigned ab = outside(a) & outside(b);
+    return ab != 0 && (ab & outside(c)) != 0;
+}
+
 // Internal WorldScene cache contract, not an unchecked public draw API.
 // Accepts the float clipper's normal-or-zero bounded domain and only vertices
 // inside every clip plane. On success, result is the unchanged float clipper's

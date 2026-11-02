@@ -34,6 +34,8 @@ class NativeFloatGeometryTests(unittest.TestCase):
             self.assertEqual(tested.returncode, 0, tested.stdout + tested.stderr)
             self.assertIn("FLOAT GEOMETRY PASS", tested.stdout)
             self.assertIn("compared=20010 ", tested.stdout)
+            self.assertRegex(tested.stdout,
+                r"COMMON OUTSIDE PASS cases=100[0-9]{3} rejected=[1-9][0-9]+ randomized=100000")
 
 
 if __name__ == "__main__":

@@ -84,7 +84,7 @@ WorldView view(const std::array<float,3>& target,float yaw) {
 int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* checkpoint_path,
                             const char* course_path,const char* body_path,NativeVehicleRenderMode mode,bool detailed_profiling,
                             bool textured_presentation,bool world_presentation,WorldSubmissionMode world_submission,
-                            WorldMaterialMode world_materials) {
+                            WorldMaterialMode world_materials,WorldFallbackMode world_fallback) {
     if(world_presentation&&(!textured_presentation||mode!=NativeVehicleRenderMode::native_vu))
         throw std::runtime_error("WORLD VU1 MODE REQUIRES TEXTURED NATIVE FLOAT PRESENTATION");
     if(world_submission!=WorldSubmissionMode::classify_first&&
@@ -93,6 +93,9 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
     if(world_materials!=WorldMaterialMode::resolve_each&&
        (!world_presentation||world_materials!=WorldMaterialMode::memoized))
         throw std::runtime_error("UNSUPPORTED WORLD MATERIAL MODE");
+    if(world_fallback!=WorldFallbackMode::clip_each&&
+       (!world_presentation||world_fallback!=WorldFallbackMode::reject_outside))
+        throw std::runtime_error("UNSUPPORTED WORLD FALLBACK MODE");
     const bool async_world=world_presentation&&world_submission==WorldSubmissionMode::classify_async;
     display.present_status(textured_presentation?
         "NATIVE TEXTURED DRIVING TEST\nLOADING ONE INITIAL CHECKPOINT\nRECOVERED CAR AND CHASE VIEW\nFIXED VISUAL COURSE NEIGHBORHOOD":
@@ -139,6 +142,8 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
     if(world_presentation)std::printf("NATIVE_VEHICLE_MATERIAL mode=%s entries=%u lifetime=presentation\n",
         world_materials==WorldMaterialMode::memoized?"MEMOIZED":"RESOLVE_EACH",
         world_materials==WorldMaterialMode::memoized?64u:0u);
+    if(world_presentation)std::printf("NATIVE_VEHICLE_CLIP mode=%s\n",
+        world_fallback==WorldFallbackMode::reject_outside?"REJECT_OUTSIDE":"CLIP_EACH");
     auto state=initial.state;auto controls=initial.input;
     const float camera_yaw=state.front.contact.vehicle.orientation[1]+.35f;
     MainVehicleOutput result;ps2::DebugPageToggle debug_toggle;
@@ -284,7 +289,7 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
             world_presentation?"WORLD VU1 RENDERER FIXED":"TRIANGLE CYCLE RENDERER");
         display.set_debug_page(diagnostics?page:nullptr);
         const bool presented=world_presentation?
-            display.present_world(visual.draw_plan(),vu.unit,world_submission,world_materials):
+            display.present_world(visual.draw_plan(),vu.unit,world_submission,world_materials,world_fallback):
             display.present(scene_frame());
         if(!presented)throw std::runtime_error(display.error());
         previous_vsync=display.stats().vsync_ticks;
@@ -309,7 +314,7 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
                 (unsigned long)stats.transformed_vertices,(unsigned long)stats.vertex_cache_hits,
                 (unsigned long)stats.groups,(unsigned long)stats.culled_groups,
                 (unsigned long)stats.backface_rejected_faces);
-            if(world_presentation)std::printf("NATIVE_VEHICLE_WORLD update=%u source=%lu batches=%lu direct=%lu fallback=%lu rejected=%lu vu1_triangles=%lu vu0_vertices=%lu triangles=%lu prepared=%lu ready=%lu residency_fallback=%lu emit_calls=%lu skipped_preloads=%lu async_prepares=%lu async_emits=%lu async_gathered=%lu memo_hits=%lu state_hits=%lu residency_fast=%lu memo_misses=%lu memo_invalidations=%lu status=\"%s\"\n",
+            if(world_presentation)std::printf("NATIVE_VEHICLE_WORLD update=%u source=%lu batches=%lu direct=%lu fallback=%lu rejected=%lu vu1_triangles=%lu vu0_vertices=%lu triangles=%lu prepared=%lu ready=%lu residency_fallback=%lu emit_calls=%lu skipped_preloads=%lu async_prepares=%lu async_emits=%lu async_gathered=%lu memo_hits=%lu state_hits=%lu residency_fast=%lu memo_misses=%lu memo_invalidations=%lu trivial_rejects=%lu status=\"%s\"\n",
                 frame,(unsigned long)display_stats.world_source_triangles,(unsigned long)display_stats.world_batches,
                 (unsigned long)display_stats.world_drawn_batches,(unsigned long)display_stats.world_fallback_batches,
                 (unsigned long)display_stats.world_rejected_batches,(unsigned long)display_stats.world_vu1_triangles,
@@ -321,7 +326,8 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
                 (unsigned long)display_stats.world_async_gathered_triangles,
                 (unsigned long)display_stats.world_material_memo_hits,(unsigned long)display_stats.world_material_state_hits,
                 (unsigned long)display_stats.world_material_residency_fast,(unsigned long)display_stats.world_material_memo_misses,
-                (unsigned long)display_stats.world_material_memo_invalidations,vu.unit.error());
+                (unsigned long)display_stats.world_material_memo_invalidations,
+                (unsigned long)display_stats.world_trivial_rejects,vu.unit.error());
             else std::printf("NATIVE_VEHICLE_VU_FRAME update=%u batches=%lu vertices=%lu accepted=%lu used_corners=%lu clipped_fallbacks=%lu failed_batches=%lu near_plane=%u budget=%u invalid=%u unsupported=%u transform_ticks=%llu guard_ticks=%llu max_bound_pixels=%.7g max_bound_depth=%.7g vu0_vertices=%lu status=\"%s\"\n",
                 frame,(unsigned long)stats.batch_calls,(unsigned long)stats.batch_vertices,
                 (unsigned long)stats.accepted_batch_vertices,(unsigned long)stats.provider_triangle_corners,

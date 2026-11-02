@@ -135,6 +135,16 @@ auto material_counts(const Stats& s){
         s.world_source_triangles,s.world_batches,s.world_drawn_batches,s.world_fallback_batches,
         s.world_path3_handoffs,s.world_path3_stream_retirements,s.world_gs_finishes};
 }
+auto fallback_control_counts(const Stats& s){
+    return std::array<std::uint64_t,34>{s.triangles,s.texture_uploads,s.texture_hits,s.palette_uploads,s.palette_hits,
+        s.texture_bytes,s.palette_bytes,s.vu0_vertices,s.checker_triangles,s.texture_evictions,s.texture_pages,
+        s.world_source_triangles,s.world_batches,s.world_drawn_batches,s.world_fallback_batches,s.world_rejected_batches,
+        s.world_vu1_triangles,s.world_path3_handoffs,s.world_path3_empty_skips,s.world_gs_finishes,
+        s.world_path3_stream_retirements,s.world_prepared_batches,s.world_ready_batches,s.world_residency_fallback_batches,
+        s.world_emit_calls,s.world_skipped_preload_materials,s.world_async_prepare_submissions,s.world_async_emit_submissions,
+        s.world_async_gathered_triangles,s.world_material_memo_hits,s.world_material_state_hits,s.world_material_residency_fast,
+        s.world_material_memo_misses,s.world_material_memo_invalidations};
+}
 std::uint64_t framebuffer(Display& display,bool compare,unsigned phase,std::uint64_t& words){
     require(display.output_height()<=512,"UNSUPPORTED FIXTURE HEIGHT");
     std::uint64_t hash=1469598103934665603ull;unsigned different=0;
@@ -334,6 +344,75 @@ void material_memo_checks(Display& display,ps2::Vu1Transform& unit,std::uint64_t
     require(*GS_REG_DISPFB1==front1&&*GS_REG_DISPFB2==front2,"INVALID MATERIAL MODE FLIPPED");
     std::printf("WORLD MATERIAL MEMO PASS phases=3 modes=3 collisions=%u mutations=%u warm_hits=%llu state_hits=%llu cold_invalidations=%llu late_rejections=9\n",
         collision_cases,mutations,(unsigned long long)memo_hits,(unsigned long long)state_hits,(unsigned long long)epoch_invalidations);
+}
+void trivial_reject_checks(Display& display,ps2::Vu1Transform& unit,Authored& source,OutsideTextures& outside,
+                           std::uint64_t& words,unsigned& rejections,std::uint64_t& combined){
+    WorldSceneError error=WorldSceneError::none;PreparedWorldModel model,outside_model,inside,huge;
+    require(model.assign(source.model(),error),world_scene_error_message(error));
+    require(outside_model.assign(outside.model(),error),world_scene_error_message(error));
+    require(inside.assign({std::span(source.vertices).first(48),std::span(source.faces).first(16),{},source.materials},error),world_scene_error_message(error));
+    const std::array<WorldPoint,3> huge_vertices{{{65536,0,.5f},{65536,.5f,.5f},{65536,0,.75f}}};
+    WorldFace huge_face;huge_face.indices={0,1,2};
+    require(huge.assign({huge_vertices,{&huge_face,1}},error),world_scene_error_message(error));
+    WorldScene planner,limited;require(planner.configure_plan(face_count,face_count*8,error),world_scene_error_message(error));
+    require(limited.configure_plan(face_count,16,error),world_scene_error_message(error));
+    WorldView view{identity()};view.clear_color=0xff203040u;
+    // The retained outside case has15 common-plane outside textured faces.
+    // The other has crossing faces, a zero-area face, and a fully inside batch;
+    // it must keep the public clipper and must report no trivial rejections.
+    for(unsigned test=0;test<2;++test){
+        PreparedWorldInstance instance{test?&model:&outside_model,identity()};
+        require(planner.plan_prepared({&instance,1},view,error),world_scene_error_message(error));
+        for(auto mode:{WorldSubmissionMode::fused,WorldSubmissionMode::classify_first,WorldSubmissionMode::classify_async}){
+            require(display.present_world(planner.draw_plan(),unit,mode,WorldMaterialMode::memoized),display.error()); // Warm resident control.
+            const auto before=unit.world_stats();
+            require(display.present_world(planner.draw_plan(),unit,mode,WorldMaterialMode::memoized,WorldFallbackMode::clip_each),display.error());
+            const auto control=display.stats();const auto middle=unit.world_stats();
+            require(!control.world_trivial_rejects&&!control.texture_uploads&&!control.palette_uploads,"TRIVIAL CONTROL NOT WARM");
+            const auto expected=framebuffer(display,false,40+test,words);
+            require(display.present_world(planner.draw_plan(),unit,mode,WorldMaterialMode::memoized,WorldFallbackMode::reject_outside),display.error());
+            const auto candidate=display.stats();const auto after=unit.world_stats();
+            require(fallback_control_counts(control)==fallback_control_counts(candidate),"TRIVIAL ORIGINAL COUNTERS CHANGED");
+            require(candidate.world_trivial_rejects==(test?0u:15u),"TRIVIAL REJECTION COUNT");
+            require(control.world_fallback_batches&&(!test||control.world_drawn_batches),"TRIVIAL PATH NOT EXERCISED");
+            require(middle.batches-before.batches==after.batches-middle.batches&&
+                    middle.corners-before.corners==after.corners-middle.corners&&
+                    middle.dma_qwords-before.dma_qwords==after.dma_qwords-middle.dma_qwords,"TRIVIAL VU TRANSPORT CHANGED");
+            require(framebuffer(display,true,40+test,words)==expected,"TRIVIAL PIXELS CHANGED");
+            combined=(combined^expected)*1099511628211ull;
+            std::printf("WORLD TRIVIAL REJECT PAIR PASS case=%u mode=%u rejected=%lu original_counters=34 driver_equal=1 hash=%016llx\n",
+                test,unsigned(mode),(unsigned long)candidate.world_trivial_rejects,(unsigned long long)expected);
+        }
+    }
+    std::array<PreparedWorldInstance,2> pair{{{&inside,identity()},{&inside,identity()}}};
+    require(planner.plan_prepared(pair,view,error),world_scene_error_message(error));
+    require(limited.plan_prepared(pair,view,error),world_scene_error_message(error));
+    require(display.present_world(planner.draw_plan(),unit,WorldSubmissionMode::classify_first,WorldMaterialMode::memoized),display.error());
+    const auto expected=framebuffer(display,false,42,words);
+    for(auto mode:{WorldSubmissionMode::fused,WorldSubmissionMode::classify_first,WorldSubmissionMode::classify_async}){
+        const auto front1=*GS_REG_DISPFB1,front2=*GS_REG_DISPFB2;
+        require(!display.present_world(limited.draw_plan(),unit,mode,WorldMaterialMode::memoized,WorldFallbackMode::reject_outside),"TRIVIAL LATE CAPACITY ACCEPTED");++rejections;
+        require(display.stats().world_drawn_batches==1&&display.stats().world_gs_finishes==1&&!display.stats().world_trivial_rejects,"TRIVIAL CAPACITY DID NOT DRAIN");
+        require(*GS_REG_DISPFB1==front1&&*GS_REG_DISPFB2==front2,"TRIVIAL CAPACITY FLIPPED");
+        require(display.present_world(planner.draw_plan(),unit,mode,WorldMaterialMode::memoized,WorldFallbackMode::reject_outside),display.error());
+        require(framebuffer(display,true,42,words)==expected,"TRIVIAL CAPACITY RECOVERY");
+        auto bad=pair;bad[1].model=&huge;bad[1].object_to_world[0]=65536;
+        WorldScene numerical;require(numerical.configure_plan(face_count,face_count*8,error),world_scene_error_message(error));
+        require(numerical.plan_prepared(bad,view,error),world_scene_error_message(error));
+        const auto numeric_front1=*GS_REG_DISPFB1,numeric_front2=*GS_REG_DISPFB2;
+        require(!display.present_world(numerical.draw_plan(),unit,mode,WorldMaterialMode::memoized,WorldFallbackMode::reject_outside),"TRIVIAL SCALAR FAILURE HIDDEN");++rejections;
+        require(display.stats().world_rejected_batches==1&&!display.stats().world_trivial_rejects&&
+                display.stats().world_drawn_batches==1&&display.stats().world_gs_finishes==1,"TRIVIAL SCALAR FAILURE NOT PRESERVED");
+        require(*GS_REG_DISPFB1==numeric_front1&&*GS_REG_DISPFB2==numeric_front2,"TRIVIAL SCALAR FAILURE FLIPPED");
+        require(display.present_world(planner.draw_plan(),unit,mode,WorldMaterialMode::memoized,WorldFallbackMode::reject_outside),display.error());
+        require(framebuffer(display,true,42,words)==expected,"TRIVIAL SCALAR FAILURE RECOVERY");
+        std::printf("WORLD TRIVIAL REJECT RECOVERY PASS mode=%u capacity=1 numerical=1 rejected_gate=0\n",unsigned(mode));
+    }
+    const auto front1=*GS_REG_DISPFB1,front2=*GS_REG_DISPFB2;
+    require(!display.present_world(planner.draw_plan(),unit,WorldSubmissionMode::classify_first,WorldMaterialMode::memoized,
+        static_cast<WorldFallbackMode>(255)),"INVALID FALLBACK MODE ACCEPTED");++rejections;
+    require(*GS_REG_DISPFB1==front1&&*GS_REG_DISPFB2==front2,"INVALID FALLBACK MODE FLIPPED");
+    std::puts("WORLD TRIVIAL REJECT PASS pairs=6 positive=3 zero=3 original_counters=34 late_rejections=6 invalid_mode=1");
 }
 }
 int main(){
@@ -704,6 +783,7 @@ int main(){
         }
         std::puts("WORLD DISPLAY ASYNC FULL FINISH PASS finish=1 drain=1 other_bank_retained=2");
         material_memo_checks(display,unit,words,rejections,combined);
+        trivial_reject_checks(display,unit,source,outside_source,words,rejections,combined);
         std::printf("WORLD DISPLAY ASYNC POLLS pending=%u already_complete=%u hardware_overlap_not_inferred=1\n",async_pending_polls,async_complete_polls);
         std::printf("WORLD DISPLAY PASS phases=4 consecutive_pair=1 fallback_pair=1 eviction_pair=1 classified_triplets=4 outside_triplet=1 full_finish_pair=1 token_checks=%u legacy_direct=%u legacy_fallback=%u no_flip_rejections=%u pixel_words=%llu hash=%016llx\n",tokens,drawn,fallback,rejections,(unsigned long long)words,(unsigned long long)combined);
     }catch(const std::exception& error){std::printf("WORLD DISPLAY FAIL: %s\n",error.what());}

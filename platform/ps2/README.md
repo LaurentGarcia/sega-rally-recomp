@@ -29,6 +29,9 @@ submission; `--drive-world-async` schedules EE gathering between submit and
 finish. Both use per-presentation material binding/state reuse.
 `--drive-world-no-memo` retains the uncached synchronous comparison. All take
 checkpoint, course and visual-directory paths; automatic startup retains Frame.
+World modes skip repeated setup for validated VU fallback triangles wholly
+outside a clip plane. `--drive-world-no-reject` selects memoized synchronous
+submission with the original per-face clipper for comparison.
 
 `build_ps2.py --help` lists the native application, original engine sample,
 hardware fixtures and separate arcade-reference probe workflows. None is a
@@ -50,7 +53,7 @@ directory. The output directory must be new or empty:
 ```sh
 python3 platform/ps2/tools/preview_play.py \
   --emulator build/ps2/emulator/Play.app/Contents/MacOS/Play \
-  --elf build/ps2/native-055/segarally-ps2-native-port.elf \
+  --elf build/ps2/native-056/segarally-ps2-native-port.elf \
   --host "build/ps2/emulator/Play Data Files/vfs/host" \
   --output build/ps2-preview-001 --mode raw --seconds 20
 ```

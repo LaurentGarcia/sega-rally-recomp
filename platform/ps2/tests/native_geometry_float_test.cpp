@@ -1,5 +1,6 @@
 // Original diagnostic geometry only. Reference arithmetic is test-only.
 #include "native_geometry_float.h"
+#include "native_geometry_float_internal.h"
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -11,6 +12,7 @@ namespace {
 using namespace ps2::native;
 Material material;
 unsigned checks = 0, compared = 0, nonempty = 0;
+unsigned outside_cases = 0, outside_rejects = 0;
 float max_pixels = 0, max_depth = 0, max_uv = 0, max_relative_q = 0;
 using Output = std::array<Triangle, clip_triangle_capacity>;
 #define CHECK(c) do { ++checks; if (!(c)) { std::printf("FLOAT GEOMETRY FAIL line=%u %s\n", unsigned(__LINE__), #c); return false; } } while (0)
@@ -193,10 +195,144 @@ bool randomized() {
     CHECK(nonempty > 10000);
     return true;
 }
+// A four-field type exercises the trusted helper without UV or VU types.
+struct Position { float x, y, z, w; };
+bool outside_case(const ClipTriangle& t, int expected = -1) {
+    const auto &v = t.vertices;
+    const bool rejected = detail::common_outside_validated(
+        Position{v[0].x,v[0].y,v[0].z,v[0].w},
+        Position{v[1].x,v[1].y,v[1].z,v[1].w},
+        Position{v[2].x,v[2].y,v[2].z,v[2].w});
+    CHECK(rejected == detail::common_outside_validated(v[0],v[1],v[2]));
+    if (expected >= 0) CHECK(rejected == bool(expected));
+    // Independent wider plane-distance oracle. No valid binary32 operand can
+    // overflow/underflow binary64 here; equality must remain inside.
+    unsigned common = 0x7f;
+    for (const auto& p : v) {
+        const std::array<double,7> d{{double(p.w)-double(clip_min_w),
+            double(p.w)+double(p.x),double(p.w)-double(p.x),
+            double(p.w)+double(p.y),double(p.w)-double(p.y),
+            double(p.z),double(p.w)-double(p.z)}};
+        unsigned mask = 0;
+        for (unsigned plane=0;plane<7;++plane) if(d[plane]<0) mask |= 1u<<plane;
+        common &= mask;
+    }
+    CHECK(rejected == (common != 0));
+    Output output{};
+    output[0].vertices[0].x = 123.0f;
+    output.back().vertices.back().u = -456.0f;
+    const auto bytes = snapshot(output);
+    const auto result = clip_project_triangle_float(t,output);
+    CHECK(result.status == ClipStatus::success || result.status == ClipStatus::numerical_failure);
+    if(rejected) {
+        ++outside_rejects;
+        CHECK(result.status == ClipStatus::success && result.count == 0 && result.required == 0);
+        CHECK(unchanged(output,bytes));
+        const auto empty = clip_project_triangle_float(t,std::span<Triangle>(output).first(0));
+        CHECK(empty.status == ClipStatus::success && empty.count == 0 && empty.required == 0);
+        CHECK(unchanged(output,bytes));
+    } else if(result.status == ClipStatus::success && result.count) {
+        CHECK(valid(output,result.count));
+    }
+    ++outside_cases;
+    return true;
+}
+bool common_outside() {
+    CHECK(outside_case(inside(),0));
+    // Isolate every plane at equality and on either adjacent valid encoding.
+    for(unsigned plane=0;plane<7;++plane) for(float w : {clip_min_w,1.0f,32768.0f}) {
+        ClipTriangle t{}; t.material=&material;
+        for(auto& p:t.vertices) p={0,0,0,w,65536,-65536};
+        const float boundary = plane==0 ? clip_min_w :
+            (plane==1||plane==3 ? -w : (plane==5 ? 0.0f : w));
+        const auto field=[plane](ClipVertex& p)->float& {
+            if(plane==0)return p.w;
+            if(plane<3)return p.x;
+            if(plane<5)return p.y;
+            return p.z;
+        };
+        for(auto& p:t.vertices) field(p)=boundary;
+        CHECK(outside_case(t,0));
+        const bool lower=plane==0||plane==1||plane==3||plane==5;
+        const float outward=plane==5 ? -0x1p-126f :
+            std::nextafter(boundary,lower ? -65536.0f : 65536.0f);
+        const float inward=plane==5 ? 0x1p-126f :
+            std::nextafter(boundary,lower ? 65536.0f : -65536.0f);
+        for(auto& p:t.vertices)field(p)=outward;
+        CHECK(outside_case(t,1));
+        // One equality/inside corner breaks the common-plane proof regardless
+        // of its position in the triangle or short-circuit evaluation order.
+        for(unsigned corner=0;corner<3;++corner) {
+            field(t.vertices[corner])=boundary;
+            CHECK(outside_case(t,0));
+            field(t.vertices[corner])=inward;
+            CHECK(outside_case(t,0));
+            field(t.vertices[corner])=outward;
+        }
+    }
+    // Both zero encodings at the z plane and in all independent x/y signs.
+    for(unsigned signs=0;signs<8;++signs) {
+        auto t=inside();
+        for(auto& p:t.vertices) {p.x=(signs&1)?-0.0f:0.0f;p.y=(signs&2)?-0.0f:0.0f;p.z=(signs&4)?-0.0f:0.0f;}
+        CHECK(outside_case(t,0));
+        for(float w : {0.0f,-0.0f,-1.0f,-65536.0f,0x1p-126f,-0x1p-126f}) {
+            for(auto& p:t.vertices)p.w=w;
+            CHECK(outside_case(t,1));
+        }
+    }
+    // Different outside planes do not justify a common-plane rejection.
+    auto t=inside();t.vertices[0].x=-2;t.vertices[1].x=2;t.vertices[2].y=2;
+    CHECK(outside_case(t,0));
+    t.vertices[0].w=-1;t.vertices[0].z=-1;
+    CHECK(outside_case(t,0));
+    // Only one corner is behind the eye: minimum-w is no longer common.
+    // Its signed-w side/far comparisons still participate in rejection;
+    // substituting abs(w), as a VU CLIP test would, would miss these cases.
+    for(unsigned plane : {1u,2u,3u,4u,6u}) {
+        t=inside();t.vertices[0]={0,0,0,-1,0,0};
+        for(unsigned corner=1;corner<3;++corner) {
+            auto& p=t.vertices[corner];
+            if(plane==1)p.x=-2;
+            if(plane==2)p.x=2;
+            if(plane==3)p.y=-2;
+            if(plane==4)p.y=2;
+            if(plane==6)p.z=2;
+        }
+        CHECK(outside_case(t,1));
+    }
+    t=inside();for(auto& p:t.vertices){p.x=-65536;p.y=65536;p.z=65536;p.w=65536;}
+    CHECK(outside_case(t,0));
+    // Public validation still runs even when positions alone prove rejection.
+    t=inside();for(auto& p:t.vertices)p.x=-2;
+    Output output{};const auto bytes=snapshot(output);
+    t.material=nullptr;
+    CHECK(clip_project_triangle_float(t,output).status==ClipStatus::invalid_material);
+    CHECK(unchanged(output,bytes));t.material=&material;
+    for(std::uint32_t invalid : {1u,0x007fffffu,0x47800001u,0x7f800000u,0x7fc00001u}) {
+        t.vertices[2].u=std::bit_cast<float>(invalid);
+        CHECK(clip_project_triangle_float(t,output).status==ClipStatus::invalid_vertex);
+        CHECK(unchanged(output,bytes));
+    }
+    // Full bounded normal exponent/mantissa range, signed zeros and varying UV.
+    // Fresh seed leaves the quantitative reference corpus unchanged.
+    std::uint32_t state=0x243f6a88u;
+    const auto word=[&](){state^=state<<13;state^=state>>17;state^=state<<5;return state;};
+    const auto value=[&](){const auto r=word();const auto sign=r&0x80000000u;
+        const auto magnitude=(r&15u)==0 ? 0u : 0x00800000u+word()%0x47000001u;
+        return std::bit_cast<float>(sign|magnitude);};
+    for(unsigned i=0;i<100000;++i) {
+        t.material=&material;
+        for(auto& p:t.vertices)p={value(),value(),value(),value(),value(),value()};
+        CHECK(outside_case(t));
+    }
+    CHECK(outside_rejects>10000 && outside_rejects<outside_cases);
+    return true;
+}
 } // namespace
 int main() {
-    if (!authored() || !failures() || !randomized()) return 1;
+    if (!authored() || !failures() || !randomized() || !common_outside()) return 1;
     std::printf("FLOAT GEOMETRY PASS checks=%u compared=%u nonempty=%u max_pixels=%.9g max_depth=%.9g max_uv=%.9g max_relative_q=%.9g\n",
                 checks, compared, nonempty, double(max_pixels), double(max_depth), double(max_uv), double(max_relative_q));
+    std::printf("COMMON OUTSIDE PASS cases=%u rejected=%u randomized=100000\n",outside_cases,outside_rejects);
     return 0;
 }

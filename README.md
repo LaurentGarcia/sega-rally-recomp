@@ -74,12 +74,12 @@ The default renderer uses 32-bit geometry, VU1 transform batches and VU0 GS
 packing. The textured scene measures **29.36 native updates/sec over 660 frames
 in Play**. An optional [world renderer](platform/ps2/native/vu1_world.md) now
 performs transforms, projection and direct GS packet production on VU1, with
-ordered clipping fallback. Geometry classification and bounded material reuse
-bring that path to **29.98 native updates/sec**, with **22.29 ms mean work per
-frame** over the same 660-period Play test. Material reuse reduces work by
-**11.8%** against the same-build uncached world path, preserving all 4.87 million
-sampled color words in the separate scene comparison. It remains an explicit
-experimental mode. The textured
+ordered clipping fallback. Geometry classification, bounded material reuse and
+early rejection of validated outside faces bring that path to **29.98 native
+updates/sec**, with **21.37 ms mean work per frame** over the same 660-period
+Play test. The latest change reduces work by **4.7%** against the same-build
+control, preserving all 4.87 million sampled color words in the separate scene
+comparison. It remains an explicit experimental mode. The textured
 scene has not reached 60 updates/sec; full-race and physical-console performance
 remain unverified.
 An additional asynchronous scheduler now gathers the next EE batch between

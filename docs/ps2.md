@@ -33,6 +33,10 @@ checkpoint, course and visual-directory arguments. The async schedule preserves 
 world-renderer pixels but has not demonstrated a speedup in Play or overlap on
 physical hardware. The reference probe's hardware table below does not
 describe this native path.
+The world modes also skip repeated EE setup for validated triangles sharing
+an outside clip plane. `--drive-world-no-reject` retains memoized synchronous
+submission with the original per-face clipper for comparison; it takes the same
+three paths. The generic clipper and VU geometry arithmetic remain unchanged.
 The standalone native fixtures use fixed manifests containing only original
 native/test sources; they do not link the translated reference runtime.
 

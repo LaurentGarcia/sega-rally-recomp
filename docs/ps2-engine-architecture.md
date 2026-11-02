@@ -123,6 +123,16 @@ collisions cannot supply another material's state. Calls and retries start with
 empty tags. Geometry, arithmetic, primitive order and overwrite fences are
 unchanged. `resolve_each` remains the engine API default and comparison path.
 
+`WorldFallbackMode::reject_outside` skips repeated EE setup for a triangle
+whose three validated clip vectors share an outside plane. It uses the float
+clipper's seven strict comparisons and signed-w convention. Successful VU
+fallback has already validated every returned position; immutable plans retain
+valid UVs and materials. The gate runs before building a `ClipTriangle` or
+copying UVs. Other faces use the original clipper, as do rejected submissions
+that require scalar retry. No VU instruction, projection, batch partition,
+primitive order or resource access changes. The generic clipper keeps its
+public validation; the engine API defaults to `clip_each` for comparison.
+
 Tokens belong to one exclusive VU owner and one preparation. Copies cannot
 extend their lifetime. With no pending submission, another synchronous
 transform, draw or prepare attempt invalidates them. Texture transfers between
@@ -371,6 +381,13 @@ comparison excluding shared game/plan work, vsync and readback; complete-loop
 results are recorded in the [native guide](ps2-native-rewrite.md). The original
 Frame path and VU program are unchanged. These results demonstrate reduced EE
 material work, not simultaneous execution or physical-console throughput.
+
+The subsequent validated fallback gate preserves those same 4,874,240 sampled
+color words and skips repeated setup for 422,477 source faces. Across 593 stable
+warmed pairs, all 34 preexisting counters match and draw work falls from 15.438
+to 14.384 ms (6.8%). The earlier clipper already rejected these faces before
+polygon clipping; this saving comes from repeated construction, validation and
+outcode work. It is separate from the remaining cost of clipping crossing faces.
 
 The manuals describe a different scheduling opportunity: upload one bank while
 VU1 processes another and the previous output travels to the GS. Direct GIF
