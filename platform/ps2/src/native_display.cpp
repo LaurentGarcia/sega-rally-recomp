@@ -569,10 +569,12 @@ bool Display::present(const Frame &frame) {
     d.flip(); d.failure = "NONE";
     return true;
 }
-bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit) {
+bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit,WorldSubmissionMode mode) {
     if(!impl_||!impl_->ready)return false;
     auto& d=*impl_;const auto validation_start=d.now();
     const auto reject=[&d](const char* reason){d.failure=reason;return false;};
+    if(mode!=WorldSubmissionMode::fused&&mode!=WorldSubmissionMode::classify_first)
+        return reject("INVALID WORLD SUBMISSION MODE");
     if(!plan.output_triangle_capacity()||plan.output_triangle_capacity()>16384||plan.instances().size()>1024)
         return reject("INVALID WORLD DRAW PLAN");
     if(!unit.available())return reject("WORLD VU1 OWNER UNAVAILABLE");
@@ -645,27 +647,34 @@ bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit) {
                     corner.inv_width=material.texture?1.f/material.texture->width:1;
                     corner.inv_height=material.texture?1.f/material.texture->height:1;
                 }
-                if(material.texture){
-                    auto& image=d.texture(*material.texture,q);if(!d.ready)return false;
-                    texture_slots_used[i]=unsigned(&image-d.textures);
-                    palette_slots_used[i]=&d.palette(material.palette,q);if(!d.ready)return false;
-                }else palette_slots_used[i]=nullptr;
             }
-            // Resolve every slot after all preload operations. No eviction,
-            // material upload or other producer runs until this batch retires.
-            bool resident=true;
-            for(std::size_t i=0;i<count;++i){const auto& material=*materials[i];
-                if(!material.texture)continue;
-                const auto& entry=d.texture_cache.entry(texture_slots_used[i]);const auto& key=*material.texture;
-                resident=resident&&entry.valid&&entry.key.indices==key.indices&&entry.key.generation==key.generation&&
-                    entry.key.width==key.width&&entry.key.height==key.height&&palette_slots_used[i]->valid&&
-                    palette_slots_used[i]->colors==material.palette;
-            }
-            bool direct=resident&&count<=plan.output_triangle_capacity()-d.counters.triangles;
-            if(direct){
+            const auto preload_materials=[&](){
+                for(std::size_t i=0;i<count;++i){const auto& material=*materials[i];
+                    if(material.texture){
+                        auto& image=d.texture(*material.texture,q);if(!d.ready)return false;
+                        texture_slots_used[i]=unsigned(&image-d.textures);
+                        palette_slots_used[i]=&d.palette(material.palette,q);if(!d.ready)return false;
+                    }else palette_slots_used[i]=nullptr;
+                }
+                return true;
+            };
+            const auto materials_resident=[&](){
+                // Recheck after every preload: no retained slot may silently
+                // refer to a different texture or CLUT after an eviction.
+                bool resident=true;
+                for(std::size_t i=0;i<count;++i){const auto& material=*materials[i];
+                    if(!material.texture)continue;
+                    const auto& entry=d.texture_cache.entry(texture_slots_used[i]);const auto& key=*material.texture;
+                    resident=resident&&entry.valid&&entry.key.indices==key.indices&&entry.key.generation==key.generation&&
+                        entry.key.width==key.width&&entry.key.height==key.height&&palette_slots_used[i]->valid&&
+                        palette_slots_used[i]->colors==material.palette;
+                }
+                return resident;
+            };
+            const auto resolve_states=[&](){
                 for(std::size_t i=0;i<count;++i){const auto& material=*materials[i];auto& state=states[i];
                     std::memcpy(&state.test,pixel_tests[material.cutout?1:0][material.checker?1:0]+1,8);
-                    state.tex0=0;state.clamp=0; // Existing WRAP_REPEAT in both axes.
+                    state.tex0=0;state.clamp=0;
                     if(material.texture){
                         alignas(16) qword_t resolved[8];
                         const auto end=draw_texturebuffer(resolved,0,&d.textures[texture_slots_used[i]].buffer,&palette_slots_used[i]->buffer);
@@ -675,15 +684,65 @@ bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit) {
                     state.prim=GS_SET_PRIM(PRIM_TRIANGLE,0,material.texture?1:0,0,0,0,0,0,0);
                     state.rgba=material.texture?0x80808080u:gs_color(material.color);
                 }
-                if(!d.retire_path3(q))return false;
-            }
+                return true;
+            };
+            const auto skipped_preloads=[&](){
+                for(std::size_t i=0;i<count;++i)
+                    d.counters.world_skipped_preload_materials+=materials[i]->texture!=nullptr;
+            };
             ps2::Vu1WorldResult result=ps2::Vu1WorldResult::rejected;
             ++d.counters.world_batches;
-            if(direct){
-                const ps2::Vu1WorldBatch batch{instance.object_to_world,plan.world_to_clip(),
-                    std::span(corners).first(count*3),std::span(states).first(count),d.height,++d.world_sequence,
-                    ps2::Vu1WorldCompletion::path1_retired};
-                result=unit.draw_world(batch,std::span(clips).first(count*3));
+            if(mode==WorldSubmissionMode::fused){
+                // Retain the original resource-first route as a paired control.
+                if(!preload_materials())return false;
+                const bool direct=materials_resident()&&count<=plan.output_triangle_capacity()-d.counters.triangles;
+                if(direct){
+                    if(!resolve_states()||!d.retire_path3(q))return false;
+                    const ps2::Vu1WorldBatch batch{instance.object_to_world,plan.world_to_clip(),
+                        std::span(corners).first(count*3),std::span(states).first(count),d.height,++d.world_sequence,
+                        ps2::Vu1WorldCompletion::path1_retired};
+                    result=unit.draw_world(batch,std::span(clips).first(count*3));
+                }
+            }else{
+                // Preparation transforms/classifies without GS emission or any
+                // material lookup. Retire a queued EOP0 PATH3 stream first;
+                // GS completion itself remains owned by the existing fences.
+                if(!d.retire_path3(q))return false;
+                ps2::Vu1WorldToken token;
+                const ps2::Vu1WorldGeometry geometry{instance.object_to_world,plan.world_to_clip(),
+                    std::span(corners).first(count*3),d.height,++d.world_sequence};
+                ++d.counters.world_prepared_batches;
+                const auto prepared=unit.prepare_world(geometry,token,std::span(clips).first(count*3));
+                if(prepared==ps2::Vu1WorldPrepareResult::failed)return d.retire_world(unit.error());
+                if(prepared==ps2::Vu1WorldPrepareResult::ready){
+                    ++d.counters.world_ready_batches;
+                    const bool capacity=count<=plan.output_triangle_capacity()-d.counters.triangles;
+                    bool resident=false;
+                    if(capacity){
+                        if(!preload_materials())return false;
+                        resident=materials_resident();
+                        if(!resident)++d.counters.world_residency_fallback_batches;
+                    }else skipped_preloads();
+                    if(resident){
+                        if(!resolve_states()||!d.retire_path3(q))return false;
+                        ++d.counters.world_emit_calls;
+                        result=unit.emit_world(token,std::span(states).first(count),ps2::Vu1WorldCompletion::path1_retired);
+                        if(result==ps2::Vu1WorldResult::failed)return d.retire_world(unit.error());
+                    }
+                    if(result!=ps2::Vu1WorldResult::drawn){
+                        // Uploads may have submitted PATH3 after preparation.
+                        // Finish its stream before retrieving mapped clip data.
+                        // Never recompute a valid prepared packet numerically.
+                        if(!d.retire_path3(q))return false;
+                        result=unit.cancel_world(token,std::span(clips).first(count*3));
+                        if(result==ps2::Vu1WorldResult::failed)return d.retire_world(unit.error());
+                        if(result!=ps2::Vu1WorldResult::fallback)
+                            return reject_frame("WORLD PREPARED CLIP RETRIEVAL FAILED");
+                    }
+                }else{
+                    skipped_preloads();
+                    if(prepared==ps2::Vu1WorldPrepareResult::fallback)result=ps2::Vu1WorldResult::fallback;
+                }
             }
             if(result==ps2::Vu1WorldResult::failed)return d.retire_world(unit.error());
             if(result==ps2::Vu1WorldResult::drawn){

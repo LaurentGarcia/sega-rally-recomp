@@ -76,12 +76,20 @@ The optional [ordered world renderer](../platform/ps2/native/vu1_world.md)
 accepts immutable model geometry instead of a projected EE triangle array:
 
 ```text
-EE game/camera -> ordered WorldDrawPlan -> VIF1 -> VU1 -> PATH1 -> GS
-                                                |
-                                       retained clipped batch
-                                                v
-                                      EE clip / VU0 XY -> PATH3 -> GS
-EE texture/CLUT ownership ------------------------------> PATH3 -> GS
+EE game/camera -> ordered WorldDrawPlan -> VIF1 -> VU1 prepare
+                                                      |
+                                  +-------------------+------------------+
+                                  | ready                                | clip
+                                  v                                      v
+                         retained VU ST/XYZ                       EE ordered clip
+                                  |                                      |
+                         EE texture/CLUT residency                 surviving fans
+                                  |                                      |
+                         VIF1 state -> VU1 emit                   VU0 XY / PATH3
+                                  |                                      |
+                                PATH1 ---------------------------------> GS
+                                                                         |
+                                                   resource/flip fence <- FINISH
 ```
 
 VU1 performs the two transforms, whole-batch admission, projection and packet
@@ -92,6 +100,24 @@ The single VIF1 owner manages two bounded VU banks and persistent CPU staging.
 Display owns resource residency, GS state, failure quarantine and presentation.
 Generic authored fixtures exercise this interface without Rally data; the PS2
 CI cross-links the fixture, while execution/pixel proofs remain separate.
+
+`WorldSubmissionMode::classify_first` separates geometry preparation from
+material residency. Preparation emits no GS packet. A ready result retains
+projected ST/XYZ in VU memory behind a single-use token while Display resolves
+the batch's textures and palettes through PATH3. Emit supplies fresh state and colors, then
+kicks that retained packet. A clipping result returns clip coordinates before
+any source-face texture preload; only emitted fallback fans request materials.
+If a ready batch cannot be submitted, cancellation retrieves its retained clip
+coordinates for the same ordered fallback. The resource-first `fused` mode
+remains available as the comparison path.
+
+Tokens belong to one exclusive VU owner and one preparation. Copies cannot
+extend their lifetime, and another transform, draw or prepare attempt
+invalidates them. Texture transfers between prepare and emit are permitted
+under Display's ownership; another VU/VIF producer is not. VU, VIF and GIF must
+all be idle before the EE reads mapped VU memory. This split avoids unnecessary
+resource work but still uses synchronous handoffs; it does not claim DMA/VU
+overlap or a measured speed improvement by itself.
 
 SDK and standard-library dependencies are external to this project-file gate.
 Application entry points still call SDK startup, clock and sleep functions
@@ -263,6 +289,17 @@ that the scene never consumes. Transform-only rendering remains the default.
 The rebuilt native048 default measures 29.361 updates/sec and 31.085 ms mean
 work over 660 periods, with every work interval still over the 16.667 ms budget.
 
+The subsequent direct-world path now separates VU1 geometry preparation from
+texture residency. In a same-plan, 601-update comparison, classification before
+resource lookup reduces draw work from 27.072 to 18.926 ms and preserves all
+4,874,240 sampled color words. The complete native052 world loop measures
+29.985 updates/sec and 25.252 ms mean work, versus the resource-first native051
+loop's 20.945 updates/sec and 34.285 ms. These are Play measurements with every
+work interval still above the 16.667 ms target. The world mode remains explicit;
+automatic Frame startup is unchanged. See the
+[current evidence](../platform/ps2/native/vu1_world.md#evidence-and-limits) and
+[whole-loop comparison](ps2-native-rewrite.md) for the separate scopes.
+
 The manuals describe a different scheduling opportunity: upload one bank while
 VU1 processes another and the previous output travels to the GS. Direct GIF
 output needs an explicit material-order, bank-lifetime and submission contract;
@@ -276,6 +313,7 @@ with the following implementation constraints:
 | --- | --- |
 | EE User's Manual, section 6.3.8, pp. 99–101 | Use explicit VIF bank addresses and TOP/TOPS ownership to overlap upload and processing. Input and output must remain live until their respective consumers finish. |
 | EE User's Manual, pp. 111–113 | FLUSHE, FLUSH and FLUSHA wait for different consumers. A VU-only fence cannot retire a packet still being read by GIF. |
+| EE User's Manual, section 6.2.3 | EE mapped access to VU1 data memory requires VU1, VIF1 and GIF stopped. Retained geometry does not permit reading another bank while those units are active. |
 | EE User's Manual, p. 155 | Concurrent PATH3 A+D traffic and PATH1 have a documented hang hazard. Retire the current Display state/upload path before a new XGKICK producer runs. |
 | VU User's Manual, section 3.6.1, p. 55 | EE access to VU data memory requires VU idle. Reading another bank through the existing callback does not establish supported asynchronous readback. |
 | VU User's Manual, XGKICK, p. 196 | Starting an output transfer does not make its source memory reusable. Model completion separately from command issue. |

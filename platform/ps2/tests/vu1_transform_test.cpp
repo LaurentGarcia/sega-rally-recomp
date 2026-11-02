@@ -84,6 +84,63 @@ bool world_admission(){
 #endif
     return true;
 }
+bool prepared_admission(){
+    std::array<Vu1WorldCorner,51> corners{};
+    std::array<Vu1WorldState,17> states{};
+    for(auto&c:corners)c.position={0,0,.5f,1};
+    for(auto&s:states)s.prim=3;
+    Vu1WorldGeometry geometry{identity(),identity(),{corners.data(),3},448,0xffffffffu};
+    const auto paired=[&](){
+        Vu1WorldBatch fused{geometry.object_to_world,geometry.world_to_clip,geometry.corners,
+            {states.data(),geometry.corners.size()/3},geometry.output_height,geometry.sequence};
+        return valid_native_vu1_world_geometry(geometry)==
+            (!geometry.corners.empty()&&valid_native_vu1_world_input(fused));
+    };
+    for(unsigned n:{0u,1u,3u,45u,48u,51u}){
+        geometry.corners={corners.data(),n};
+        if(!check(paired(),"prepared/fused corner admission agrees"))return false;
+    }
+    geometry.corners={corners.data(),48};
+    if(!check(valid_native_vu1_world_geometry(geometry),"prepared maximum geometry needs no GS state"))return false;
+    for(unsigned h:{0u,384u,448u,449u,512u,513u}){
+        geometry.output_height=h;if(!check(paired(),"prepared/fused height admission agrees"))return false;
+    }
+    geometry.output_height=448;
+    // The last corner must be checked, including seams and texture reciprocals.
+    for(auto bits:{0u,0x80000000u,1u,0x007fffffu,0x00800000u,0x47800000u,
+                   0x47800001u,0xc7800000u,0x7f800000u,0x7fc00000u}){
+        for(unsigned lane=0;lane<8;++lane){
+            const auto saved=corners[47];
+            auto words=std::bit_cast<std::array<std::uint32_t,8>>(saved);words[lane]=bits;
+            corners[47]=std::bit_cast<Vu1WorldCorner>(words);
+            if(!check(paired(),"prepared/fused late corner domains agree"))return false;
+            corners[47]=saved;
+        }
+        for(unsigned lane=0;lane<16;++lane){
+            geometry.world_to_clip[lane]=std::bit_cast<float>(bits);
+            if(!check(paired(),"prepared/fused matrix domains agree"))return false;
+            geometry.world_to_clip=identity();
+        }
+    }
+    for(float scale:{1.f,.125f,.0625f,.03125f,.015625f,.0078125f,.00390625f}){
+        corners[47].inv_width=corners[47].inv_height=scale;
+        if(!check(valid_native_vu1_world_geometry(geometry),"prepared reciprocal dimensions"))return false;
+    }
+#ifndef _EE
+    Vu1Transform unavailable,foreign;
+    Vu1WorldToken token;const auto copied=token;
+    std::array<TransformVector4,48> clips{};for(auto&c:clips)c={11,12,13,14};
+    const auto before=clips;
+    std::array<unsigned char,sizeof token> token_bytes{};std::memcpy(token_bytes.data(),&token,sizeof token);
+    if(!check(unavailable.prepare_world(geometry,token,clips)==Vu1WorldPrepareResult::rejected&&
+              unavailable.emit_world(token,{states.data(),16},Vu1WorldCompletion::gs_finished)==Vu1WorldResult::rejected&&
+              foreign.cancel_world(copied,clips)==Vu1WorldResult::rejected&&
+              !std::memcmp(clips.data(),before.data(),sizeof clips)&&
+              !std::memcmp(&token,token_bytes.data(),sizeof token)&&
+              unavailable.world_stats().dma_qwords==0,"unavailable/default/foreign token preserves outputs"))return false;
+#endif
+    return true;
+}
 std::array<float,4> lanes(const TransformVector4&v){return std::bit_cast<std::array<float,4>>(v);}
 // Host diagnostic only: independently ordered binary32 multiply/add with
 // contraction disabled. It tests the enclosure; it is not a VU emulator.
@@ -201,7 +258,7 @@ bool projection_contract(Vu1Transform&backend){
 }
 #endif
 bool run(){
-    if(!world_admission())return false;
+    if(!world_admission()||!prepared_admission())return false;
     Vu1Transform backend;
 #ifdef _EE
     dma_channel_initialize(DMA_CHANNEL_VIF1,nullptr,0);

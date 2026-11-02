@@ -32,6 +32,24 @@ struct Vu1WorldBatch {
     std::uint32_t sequence=0;
     Vu1WorldCompletion completion=Vu1WorldCompletion::gs_finished;
 };
+struct Vu1WorldGeometry {
+    TransformMatrix object_to_world{},world_to_clip{};
+    std::span<const Vu1WorldCorner> corners;
+    unsigned output_height=448;
+    std::uint32_t sequence=0;
+};
+// A copy is another handle to the SAME single-use preparation, not a new lease.
+// The process-wide nonwrapping ticket prevents owner-address reuse from making
+// an old handle valid. Only the exclusive, caller-serialized owner may use it.
+class Vu1WorldToken {
+public:
+    Vu1WorldToken() noexcept=default;
+private:
+    const Vu1Transform* owner_=nullptr;
+    std::uint64_t ticket_=0;
+    friend class Vu1Transform;
+};
+enum class Vu1WorldPrepareResult : std::uint8_t { ready,fallback,rejected,failed };
 enum class Vu1WorldResult : std::uint8_t {
     drawn,     // Packet retired to requested completion; clip stays untouched.
     fallback,  // No GIF emission; complete valid clip output is published.
@@ -42,8 +60,12 @@ struct Vu1WorldStats {
     std::uint32_t batches=0,drawn_batches=0,fallback_batches=0,rejected_batches=0;
     std::uint64_t corners=0,dma_qwords=0;
     std::size_t persistent_bytes=0;
+    std::uint32_t prepared_batches=0,ready_batches=0,cancelled_batches=0;
 };
 // Bounded numerical and packet-shape admission, independent of hardware.
 // Resolved TEST/TEX0/CLAMP values remain the Display owner's responsibility.
 bool valid_native_vu1_world_input(const Vu1WorldBatch&) noexcept;
+// Same numerical admission as fused input, without requiring resident state.
+// Empty geometry is invalid for preparation; fused empty draws remain valid.
+bool valid_native_vu1_world_geometry(const Vu1WorldGeometry&) noexcept;
 } // namespace ps2

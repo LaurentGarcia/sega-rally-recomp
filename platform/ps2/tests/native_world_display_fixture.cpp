@@ -3,12 +3,15 @@
 #include "native_display.h"
 #include "world_scene.h"
 #include "vu1_transform.h"
+#include "vu1_world.h"
 #include <dma_registers.h>
+#include <gs_gp.h>
 #include <gs_privileged.h>
 #include <kernel.h>
 #include <algorithm>
 #include <array>
 #include <cstdio>
+#include <cstring>
 #include <memory>
 #include <stdexcept>
 
@@ -74,6 +77,26 @@ struct Eviction {
     }
     WorldModel model(){return {vertices,faces,{},materials};}
 };
+struct OutsideTextures {
+    std::array<std::uint8_t,32> pixels{};
+    std::array<Texture,15> textures{};
+    std::array<Material,15> materials{};
+    std::array<WorldPoint,48> vertices{};
+    std::array<WorldFace,16> faces{};
+    OutsideTextures(){
+        pixels.fill(0x11);
+        for(unsigned i=0;i<16;++i){
+            const float x=i?2.f+float(i)*.125f:-.5f;
+            vertices[i*3]={x,-.5f,.5f};vertices[i*3+1]={x+.25f,-.5f,.5f};
+            vertices[i*3+2]={x,-.25f,.5f};faces[i].indices={i*3,i*3+1,i*3+2};
+            faces[i].argb=0xffc06020u;
+            if(i){const auto m=i-1;textures[m]={pixels.data(),pixels.size(),8,8,5000+i};
+                materials[m].texture=&textures[m];materials[m].palette.fill(0xff000000u|((i*17)<<16)|(i*13));
+                faces[i].material_index=m;faces[i].uv={{{0,0},{8,0},{0,8}}};}
+        }
+    }
+    WorldModel model(){return {vertices,faces,{},materials};}
+};
 std::uint64_t framebuffer(Display& display,bool compare,unsigned phase,std::uint64_t& words){
     require(display.output_height()<=512,"UNSUPPORTED FIXTURE HEIGHT");
     std::uint64_t hash=1469598103934665603ull;unsigned different=0;
@@ -90,6 +113,47 @@ std::uint64_t framebuffer(Display& display,bool compare,unsigned phase,std::uint
         if(compare)words+=count;
     }
     require(!different,"FRAME/PATH1 PIXEL DIFFERENCE");return hash;
+}
+unsigned token_checks(ps2::Vu1Transform& unit,unsigned height){
+    using namespace ps2;
+    unsigned checks=0;
+    const auto check=[&](bool okay,const char* label){require(okay,label);++checks;};
+    const std::array<Vu1WorldCorner,3> corners{{{{-.5f,-.5f,.5f,1},0,0,1,1},
+                                              {{.5f,-.5f,.5f,1},0,0,1,1},
+                                              {{0,.5f,.5f,1},0,0,1,1}}};
+    Vu1WorldGeometry geometry{identity(),identity(),corners,height,700};
+    const std::array<TransformVector4,3> sentinel{{{7,8,9,10},{11,12,13,14},{15,16,17,18}}};
+    auto clips=sentinel;Vu1WorldToken token;
+    check(unit.cancel_world(token,clips)==Vu1WorldResult::rejected,"DEFAULT TOKEN ACCEPTED");
+    check(std::memcmp(clips.data(),sentinel.data(),sizeof clips)==0,"REJECTED TOKEN CHANGED CLIPS");
+    check(unit.prepare_world(geometry,token,clips)==Vu1WorldPrepareResult::ready,"TOKEN PREPARATION");
+    check(std::memcmp(clips.data(),sentinel.data(),sizeof clips)==0,"READY PREPARATION PUBLISHED CLIPS");
+    const auto copy=token;
+    check(unit.emit_world(token,{},Vu1WorldCompletion::gs_finished)==Vu1WorldResult::rejected,"SHORT STATE ACCEPTED");
+    check(unit.cancel_world(token,std::span(clips).first(2))==Vu1WorldResult::rejected,"SHORT CLIP OUTPUT ACCEPTED");
+    Vu1Transform foreign;
+    check(foreign.cancel_world(token,clips)==Vu1WorldResult::rejected,"FOREIGN OWNER ACCEPTED TOKEN");
+    check(std::memcmp(clips.data(),sentinel.data(),sizeof clips)==0,"INVALID TOKEN ARGUMENTS PUBLISHED CLIPS");
+    check(unit.cancel_world(copy,clips)==Vu1WorldResult::fallback,"VALID COPIED TOKEN CANCEL FAILED");
+    for(unsigned i=0;i<3;++i)
+        check(std::memcmp(&clips[i],&corners[i].position,sizeof clips[i])==0,"CANCEL DID NOT RETAIN EXACT CLIPS");
+    const auto retained=clips;
+    check(unit.cancel_world(token,clips)==Vu1WorldResult::rejected,"CONSUMED TOKEN ACCEPTED");
+    check(std::memcmp(clips.data(),retained.data(),sizeof clips)==0,"CONSUMED TOKEN CHANGED OUTPUT");
+    check(unit.prepare_world(geometry,token,clips)==Vu1WorldPrepareResult::ready,"STALE TOKEN PREPARATION");
+    const auto stale=token;Vu1WorldToken newer;
+    ++geometry.sequence;
+    check(unit.prepare_world(geometry,newer,clips)==Vu1WorldPrepareResult::ready,"NEW TOKEN PREPARATION");
+    check(unit.cancel_world(stale,clips)==Vu1WorldResult::rejected,"OLDER PREPARATION ACCEPTED");
+    check(unit.cancel_world(newer,clips)==Vu1WorldResult::fallback,"NEW TOKEN LOST BY STALE REJECTION");
+    check(unit.prepare_world(geometry,token,clips)==Vu1WorldPrepareResult::ready,"INVALIDATION PREPARATION");
+    auto invalid=geometry;invalid.corners={};
+    check(unit.prepare_world(invalid,newer,clips)==Vu1WorldPrepareResult::rejected,"EMPTY PREPARATION ACCEPTED");
+    check(unit.cancel_world(token,clips)==Vu1WorldResult::rejected,"INVALID PREPARATION DID NOT INVALIDATE");
+    check(unit.prepare_world(geometry,token,clips)==Vu1WorldPrepareResult::ready,"EMPTY TRANSFORM PREPARATION");
+    check(unit.transform_native(identity(),identity(),{},{}),"EMPTY TRANSFORM FAILED");
+    check(unit.cancel_world(token,clips)==Vu1WorldResult::rejected,"EMPTY TRANSFORM DID NOT INVALIDATE");
+    return checks;
 }
 }
 int main(){
@@ -241,7 +305,141 @@ int main(){
         require(framebuffer(display,true,8,words)==eviction_expected,"DEFERRED RESOURCE FRAMEBUFFER");
         combined=(combined^eviction_expected)*1099511628211ull;drawn+=eviction_stats.world_drawn_batches;
         std::printf("WORLD DISPLAY EVICTION PASS direct=%lu texture_evictions=%lu clut_uploads=%lu gs_finishes=%lu hash=%016llx\n",(unsigned long)eviction_stats.world_drawn_batches,(unsigned long)eviction_stats.texture_evictions,(unsigned long)eviction_stats.palette_uploads,(unsigned long)eviction_stats.world_gs_finishes,(unsigned long long)eviction_expected);
-        std::printf("WORLD DISPLAY PASS phases=4 consecutive_pair=1 fallback_pair=1 eviction_pair=1 direct=%u fallback=%u no_flip_rejections=%u pixel_words=%llu hash=%016llx\n",drawn,fallback,rejections,(unsigned long long)words,(unsigned long long)combined);
+        // The same immutable plans compare Frame, fused world and geometry-first
+        // world. Cache counters may differ; emitted pixels/order may not.
+        for(unsigned phase=0;phase<4;++phase){
+            view.clear_color=0xff102030u+phase*0x070b11u;
+            instance.object_to_world=identity();instance.object_to_world[12]=(phase&1)?.0625f:0;
+            instance.object_to_world[13]=(phase&2)?-.0625f:0;
+            display.set_vu0_packing((phase&1)!=0);
+            require(normal.update_prepared({&instance,1},view,error),world_scene_error_message(error));
+            require(planner.plan_prepared({&instance,1},view,error),world_scene_error_message(error));
+            require(display.present(normal.frame()),display.error());
+            const auto triplet_expected=framebuffer(display,false,10+phase,words);
+            require(display.present_world(planner.draw_plan(),unit,WorldSubmissionMode::fused),display.error());
+            const auto fused=display.stats();
+            require(framebuffer(display,true,10+phase,words)==triplet_expected,"FUSED TRIPLET PIXELS");
+            require(display.present_world(planner.draw_plan(),unit,WorldSubmissionMode::classify_first),display.error());
+            const auto classified=display.stats();
+            require(classified.triangles==fused.triangles&&classified.world_drawn_batches==fused.world_drawn_batches&&
+                    classified.world_fallback_batches==fused.world_fallback_batches,"CLASSIFIED PATH COUNTS");
+            require(classified.world_prepared_batches==3&&classified.world_ready_batches==classified.world_drawn_batches&&
+                    classified.world_emit_calls==classified.world_drawn_batches,"CLASSIFIED PREPARE/EMIT COUNTS");
+            require(framebuffer(display,true,10+phase,words)==triplet_expected,"CLASSIFIED TRIPLET PIXELS");
+            combined=(combined^triplet_expected)*1099511628211ull;
+            std::printf("WORLD DISPLAY TRIPLET PASS phase=%u prepared=%lu ready=%lu direct=%lu fallback=%lu skipped_preloads=%lu hash=%016llx\n",phase,
+                (unsigned long)classified.world_prepared_batches,(unsigned long)classified.world_ready_batches,
+                (unsigned long)classified.world_drawn_batches,(unsigned long)classified.world_fallback_batches,
+                (unsigned long)classified.world_skipped_preload_materials,(unsigned long long)triplet_expected);
+        }
+        // Geometry rejection must happen before cold texture residency. The
+        // first flat face survives;15 unrelated textured faces lie wholly offscreen.
+        OutsideTextures outside_source;PreparedWorldModel outside_model;
+        require(outside_model.assign(outside_source.model(),error),world_scene_error_message(error));
+        PreparedWorldInstance outside_instance{&outside_model,identity()};view.clear_color=0xff203040u;
+        require(normal.update_prepared({&outside_instance,1},view,error),world_scene_error_message(error));
+        require(planner.plan_prepared({&outside_instance,1},view,error),world_scene_error_message(error));
+        require(normal.frame().triangles.size()==1,"OUTSIDE FIXTURE VISIBILITY");
+        display.invalidate_textures();require(display.present(normal.frame()),display.error());
+        const auto outside_expected=framebuffer(display,false,14,words);
+        display.invalidate_textures();require(display.present_world(planner.draw_plan(),unit,WorldSubmissionMode::fused),display.error());
+        const auto outside_fused=display.stats();
+        require(outside_fused.texture_uploads==15&&outside_fused.world_fallback_batches==1,"OUTSIDE FUSED PRELOADS");
+        require(framebuffer(display,true,14,words)==outside_expected,"OUTSIDE FUSED PIXELS");
+        display.invalidate_textures();require(display.present_world(planner.draw_plan(),unit,WorldSubmissionMode::classify_first),display.error());
+        const auto outside_classified=display.stats();
+        require(outside_classified.triangles==1&&outside_classified.texture_uploads==0&&outside_classified.texture_hits==0&&
+                outside_classified.palette_uploads==0&&outside_classified.palette_hits==0,"OUTSIDE CLASSIFIED TOUCHED MATERIALS");
+        require(outside_classified.world_prepared_batches==1&&outside_classified.world_ready_batches==0&&
+                outside_classified.world_fallback_batches==1&&outside_classified.world_skipped_preload_materials==15,"OUTSIDE CLASSIFIED COUNTS");
+        require(framebuffer(display,true,14,words)==outside_expected,"OUTSIDE CLASSIFIED PIXELS");
+        std::printf("WORLD DISPLAY OUTSIDE PASS fused_uploads=%lu classified_uploads=%lu skipped_preloads=%lu hash=%016llx\n",
+            (unsigned long)outside_fused.texture_uploads,(unsigned long)outside_classified.texture_uploads,
+            (unsigned long)outside_classified.world_skipped_preload_materials,(unsigned long long)outside_expected);
+        const auto token_front1=*GS_REG_DISPFB1,token_front2=*GS_REG_DISPFB2;
+        const auto tokens=token_checks(unit,display.output_height());
+        require(*GS_REG_DISPFB1==token_front1&&*GS_REG_DISPFB2==token_front2,"TOKEN TEST FLIPPED");
+        require(framebuffer(display,true,15,words)==outside_expected,"TOKEN TEST EMITTED GEOMETRY");
+        require(!display.present_world(planner.draw_plan(),unit,static_cast<WorldSubmissionMode>(255)),"INVALID WORLD MODE ACCEPTED");++rejections;
+        require(*GS_REG_DISPFB1==token_front1&&*GS_REG_DISPFB2==token_front2,"INVALID MODE FLIPPED");
+        std::printf("WORLD DISPLAY TOKEN PASS checks=%u no_emission=1\n",tokens);
+        // Capacity rejection of a second ready batch retrieves its retained
+        // clips; it does not silently recompute, emit, or drop the first batch.
+        require(normal.update_prepared(consecutive,view,error),world_scene_error_message(error));
+        require(planner.plan_prepared(consecutive,view,error),world_scene_error_message(error));
+        require(display.present(normal.frame()),display.error());
+        const auto ready_expected=framebuffer(display,false,16,words);
+        require(late.configure_plan(face_count,16,error),world_scene_error_message(error));
+        require(late.plan_prepared(consecutive,view,error),world_scene_error_message(error));
+        const auto ready_front1=*GS_REG_DISPFB1,ready_front2=*GS_REG_DISPFB2;
+        require(!display.present_world(late.draw_plan(),unit,WorldSubmissionMode::classify_first),"CLASSIFIED LATE CAPACITY ACCEPTED");++rejections;
+        const auto cancelled=display.stats();
+        require(cancelled.world_prepared_batches==2&&cancelled.world_ready_batches==2&&cancelled.world_emit_calls==1&&
+                cancelled.world_drawn_batches==1&&cancelled.world_gs_finishes==1,"CLASSIFIED READY CANCEL/DRAIN");
+        require(*GS_REG_DISPFB1==ready_front1&&*GS_REG_DISPFB2==ready_front2,"CLASSIFIED CAPACITY FLIPPED");
+        require(framebuffer(display,true,16,words)==ready_expected,"CLASSIFIED CAPACITY CHANGED FRONT");
+        require(display.present_world(planner.draw_plan(),unit,WorldSubmissionMode::classify_first),display.error());
+        require(framebuffer(display,true,16,words)==ready_expected,"CLASSIFIED CAPACITY RECOVERY");
+        require(late.configure_plan(face_count,face_count*8,error),world_scene_error_message(error));
+        require(late.plan_prepared(bad,view,error),world_scene_error_message(error));
+        const auto failed_front1=*GS_REG_DISPFB1,failed_front2=*GS_REG_DISPFB2;
+        require(!display.present_world(late.draw_plan(),unit,WorldSubmissionMode::classify_first),"CLASSIFIED NUMERICAL FAILURE ACCEPTED");++rejections;
+        require(display.stats().world_drawn_batches==1&&display.stats().world_gs_finishes==1,"CLASSIFIED NUMERICAL DRAIN");
+        require(*GS_REG_DISPFB1==failed_front1&&*GS_REG_DISPFB2==failed_front2,"CLASSIFIED NUMERICAL FLIPPED");
+        require(framebuffer(display,true,17,words)==ready_expected,"CLASSIFIED NUMERICAL CHANGED FRONT");
+        require(display.present_world(planner.draw_plan(),unit,WorldSubmissionMode::classify_first),display.error());
+        require(framebuffer(display,true,17,words)==ready_expected,"CLASSIFIED NUMERICAL RECOVERY");
+        std::puts("WORLD DISPLAY CLASSIFIED REJECTION PASS capacity=1 numerical=1 drained=2 recovered=2");
+        // Actual uploads between ready preparation and emission must preserve
+        // retained geometry and complete preceding GS work before eviction.
+        require(normal.update_prepared({&eviction_instance,1},view,error),world_scene_error_message(error));
+        require(planner.plan_prepared({&eviction_instance,1},view,error),world_scene_error_message(error));
+        display.invalidate_textures();require(display.present(normal.frame()),display.error());
+        const auto classified_eviction_expected=framebuffer(display,false,18,words);
+        display.invalidate_textures();require(display.present_world(planner.draw_plan(),unit,WorldSubmissionMode::classify_first),display.error());
+        const auto classified_eviction=display.stats();
+        require(classified_eviction.world_prepared_batches==18&&classified_eviction.world_ready_batches==18&&
+                classified_eviction.world_emit_calls==18&&classified_eviction.world_drawn_batches==18&&
+                classified_eviction.texture_evictions>0&&classified_eviction.palette_uploads==Eviction::count,
+                "CLASSIFIED RETAINED GEOMETRY/RESOURCE EVICTION");
+        require(framebuffer(display,true,18,words)==classified_eviction_expected,"CLASSIFIED EVICTION PIXELS");
+        combined=(combined^classified_eviction_expected)*1099511628211ull;
+        std::printf("WORLD DISPLAY CLASSIFIED EVICTION PASS ready=%lu direct=%lu texture_evictions=%lu clut_uploads=%lu hash=%016llx\n",
+            (unsigned long)classified_eviction.world_ready_batches,(unsigned long)classified_eviction.world_drawn_batches,
+            (unsigned long)classified_eviction.texture_evictions,(unsigned long)classified_eviction.palette_uploads,
+            (unsigned long long)classified_eviction_expected);
+        // Exercise the separate full-FINISH packet tail. The fixture owns the
+        // idle GS exclusively: after an empty Frame it draws into the currently
+        // bound framebuffer without changing DISPFB. Full completion precedes
+        // readback and every subsequent Display operation.
+        std::array<Vertex,3> finished_vertices{{{124,288,0,0,1,.5f},{372,288,0,0,1,.5f},{248,96,0,0,1,.5f}}};
+        Material finished_material;finished_material.color=0xff2040c0u;
+        Triangle finished_triangle{finished_vertices,&finished_material};
+        const Frame finished_frame{{&finished_triangle,1},0xff112233u,false};
+        require(display.present(finished_frame),display.error());
+        const auto finished_expected=framebuffer(display,false,19,words);
+        require(display.present({{},finished_frame.clear_color,false}),display.error());
+        require(display.readback_rect(320,display.output_height()/2,8,4,std::span(stripe).first(32))==ReadbackStatus::ok,
+                "FULL FINISH CLEAR TARGET READBACK");
+        require(stripe[0]!=reference[(display.output_height()/2)*640+320],"FULL FINISH TARGET STILL BASELINE");
+        const auto finished_front1=*GS_REG_DISPFB1,finished_front2=*GS_REG_DISPFB2;
+        const std::array<ps2::Vu1WorldCorner,3> finished_corners{{{{-.5f,-.5f,.5f,1},0,0,1,1},
+                                                               {{.5f,-.5f,.5f,1},0,0,1,1},
+                                                               {{0,.5f,.5f,1},0,0,1,1}}};
+        const ps2::Vu1WorldGeometry finished_geometry{identity(),identity(),finished_corners,display.output_height(),900};
+        std::array<ps2::TransformVector4,3> finished_clips{};ps2::Vu1WorldToken finished_token;
+        require(unit.prepare_world(finished_geometry,finished_token,finished_clips)==ps2::Vu1WorldPrepareResult::ready,"FULL FINISH PREPARE");
+        ps2::Vu1WorldState finished_state;
+        finished_state.test=GS_SET_TEST(1,1,0x80,0,0,1,1,1);
+        finished_state.prim=3;finished_state.rgba=0x80c04020u;
+        const auto finished_copy=finished_token;
+        require(unit.emit_world(finished_token,{&finished_state,1},ps2::Vu1WorldCompletion::gs_finished)==ps2::Vu1WorldResult::drawn,"FULL FINISH EMIT");
+        require(unit.emit_world(finished_copy,{&finished_state,1},ps2::Vu1WorldCompletion::gs_finished)==ps2::Vu1WorldResult::rejected,"EMIT TOKEN REUSED");
+        require(*GS_REG_DISPFB1==finished_front1&&*GS_REG_DISPFB2==finished_front2,"LOW LEVEL EMIT FLIPPED");
+        require(framebuffer(display,true,19,words)==finished_expected,"FULL FINISH PIXELS");
+        combined=(combined^finished_expected)*1099511628211ull;
+        std::printf("WORLD DISPLAY FULL FINISH PASS emitted=1 consumed_copy_rejected=1 hash=%016llx\n",(unsigned long long)finished_expected);
+        std::printf("WORLD DISPLAY PASS phases=4 consecutive_pair=1 fallback_pair=1 eviction_pair=1 classified_triplets=4 outside_triplet=1 full_finish_pair=1 token_checks=%u legacy_direct=%u legacy_fallback=%u no_flip_rejections=%u pixel_words=%llu hash=%016llx\n",tokens,drawn,fallback,rejections,(unsigned long long)words,(unsigned long long)combined);
     }catch(const std::exception& error){std::printf("WORLD DISPLAY FAIL: %s\n",error.what());}
     while(true)SleepThread();
 }

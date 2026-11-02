@@ -240,22 +240,34 @@ not cycle renderers. Start still restores the initial checkpoint, and the
 diagnostic page reports the previous submitted GS triangle count. Game
 arithmetic, camera history and input behavior are shared with the normal path.
 
-The final native051 builds were measured over matching 660 complete periods in
+The final native052 builds were measured over matching 660 complete periods in
 Play 0.72, with identical inputs and rendering preferences:
 
 | Renderer | Native updates/sec | Mean work | Mean complete period |
 | --- | ---: | ---: | ---: |
-| Default VU1 transforms / EE projection | 29.361 | 31.055 ms | 34.059 ms |
-| Optional VU1 world / direct GS | 20.945 | 34.285 ms | 47.744 ms |
+| Default VU1 transforms / EE projection | 29.361 | 31.046 ms | 34.059 ms |
+| Optional VU1 world / geometry before residency | 29.985 | 25.252 ms | 33.350 ms |
+| Previous native051 world / resource-first control | 20.945 | 34.285 ms | 47.744 ms |
 
 Work excludes measured vsync/flip time but includes input, simulation, rendering
 and logging. Every measured work interval exceeds the 16.667 ms target. The
-default reproduces the preceding cadence after restoring hot-loop inlining;
-the world path remains slower and is not enabled automatically. Selected logged
-game/pose/triangle fields agree between paths. Authored pixel comparisons pass,
-but the separate actual-scene comparison still records pixel differences.
-Evidence is bound in `build/ps2-world-final-003/cadence-validation.json`;
-physical-console performance is unverified.
+default retains its preceding cadence. The world path is now faster after
+separating VU1 preparation from material residency, and stays explicitly
+selectable. Its 196 selected non-timing fields across 42 common records agree
+with both the default and preceding world run; this is logged pose/input/motion
+and triangle evidence, not comparison of every internal state.
+
+A separate 601-update comparison submits the same immutable plan to both world
+modes. Seventeen sampled pairs match all 4,874,240 color words. Draw work falls
+from 27.072 to 18.926 ms, excluding shared planning, vsync and readback; 525,887
+textured-face preload requests are omitted. This preserves the preceding world
+image but does not resolve its previously measured 66 differing color words
+against Frame. Authored geometry adds 9,175,040 exact pixel comparisons, including
+resource eviction, no-flip recovery and both completion modes. The complete-app
+evidence is bound in
+`build/ps2-world-classify-final-001/cadence-validation.json`. Physical-console
+performance remains unverified; handoffs remain synchronous and the 60 Hz
+target is unmet.
 
 In native042 versus native043 at update 60, the last-
 palette shortcut reduces packet construction from 34.911 to 11.215 ms, while

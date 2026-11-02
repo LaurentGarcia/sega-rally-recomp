@@ -271,7 +271,9 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
             (unsigned long)(world_presentation?display.stats().world_vu1_triangles*3:scene_stats().accepted_batch_vertices),
             world_presentation?"WORLD VU1 RENDERER FIXED":"TRIANGLE CYCLE RENDERER");
         display.set_debug_page(diagnostics?page:nullptr);
-        const bool presented=world_presentation?display.present_world(visual.draw_plan(),vu.unit):display.present(scene_frame());
+        const bool presented=world_presentation?
+            display.present_world(visual.draw_plan(),vu.unit,WorldSubmissionMode::classify_first):
+            display.present(scene_frame());
         if(!presented)throw std::runtime_error(display.error());
         previous_vsync=display.stats().vsync_ticks;
         const auto draw_ticks=GetTimerSystemTime()-draw_start;total_draw_ticks+=draw_ticks;
@@ -295,11 +297,14 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
                 (unsigned long)stats.transformed_vertices,(unsigned long)stats.vertex_cache_hits,
                 (unsigned long)stats.groups,(unsigned long)stats.culled_groups,
                 (unsigned long)stats.backface_rejected_faces);
-            if(world_presentation)std::printf("NATIVE_VEHICLE_WORLD update=%u source=%lu batches=%lu direct=%lu fallback=%lu rejected=%lu vu1_triangles=%lu vu0_vertices=%lu triangles=%lu status=\"%s\"\n",
+            if(world_presentation)std::printf("NATIVE_VEHICLE_WORLD update=%u source=%lu batches=%lu direct=%lu fallback=%lu rejected=%lu vu1_triangles=%lu vu0_vertices=%lu triangles=%lu prepared=%lu ready=%lu residency_fallback=%lu emit_calls=%lu skipped_preloads=%lu status=\"%s\"\n",
                 frame,(unsigned long)display_stats.world_source_triangles,(unsigned long)display_stats.world_batches,
                 (unsigned long)display_stats.world_drawn_batches,(unsigned long)display_stats.world_fallback_batches,
                 (unsigned long)display_stats.world_rejected_batches,(unsigned long)display_stats.world_vu1_triangles,
-                (unsigned long)display_stats.vu0_vertices,(unsigned long)display_stats.triangles,vu.unit.error());
+                (unsigned long)display_stats.vu0_vertices,(unsigned long)display_stats.triangles,
+                (unsigned long)display_stats.world_prepared_batches,(unsigned long)display_stats.world_ready_batches,
+                (unsigned long)display_stats.world_residency_fallback_batches,(unsigned long)display_stats.world_emit_calls,
+                (unsigned long)display_stats.world_skipped_preload_materials,vu.unit.error());
             else std::printf("NATIVE_VEHICLE_VU_FRAME update=%u batches=%lu vertices=%lu accepted=%lu used_corners=%lu clipped_fallbacks=%lu failed_batches=%lu near_plane=%u budget=%u invalid=%u unsupported=%u transform_ticks=%llu guard_ticks=%llu max_bound_pixels=%.7g max_bound_depth=%.7g vu0_vertices=%lu status=\"%s\"\n",
                 frame,(unsigned long)stats.batch_calls,(unsigned long)stats.batch_vertices,
                 (unsigned long)stats.accepted_batch_vertices,(unsigned long)stats.provider_triangle_corners,

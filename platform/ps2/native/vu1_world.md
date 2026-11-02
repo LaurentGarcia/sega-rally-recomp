@@ -7,6 +7,12 @@ The development application selects the new path with
 `--drive-world-vu CHECKPOINT COURSE VISUAL_DIRECTORY`; it does not change the
 native vehicle arithmetic or load a reference runtime.
 
+The trailing `WorldSubmissionMode` argument selects `fused` or `classify_first`.
+The API's default remains `fused` for compatibility and comparison. The
+application's explicit `--drive-world-vu` mode selects `classify_first` after
+the paired validation below. Automatic textured startup still selects Frame,
+which retains its specialized, inlined primitive writer and texture lookup.
+
 ## Ownership and lifetime
 
 `WorldScene::configure_plan` allocates two plan banks separately from Frame
@@ -25,11 +31,47 @@ must be no concurrent VIF1, GIF or GS producer.
 
 Display owns GS state and texture/CLUT residency. A batch contains at most
 16 consecutive source triangles (48 corners), with independent per-corner UVs
-and mixed materials. Display preloads their textures and palettes, then rechecks
+and mixed materials. In fused mode, Display preloads their textures and palettes, then rechecks
 every texture identity and palette's complete content. An eviction during
 preloading makes the batch use ordered scalar fallback. The next resource
 overwrite waits for GS completion of preceding draws. Neither plan consumption nor drawing
 allocates memory per frame.
+
+In `classify_first`, Display gathers source corners and UV scales before any
+texture/CLUT lookup. VU1 transforms, classifies and prepares the projected packet
+without emitting to GS. A crossing or numerically unsupported batch goes directly
+to ordered clipping; only emitted fallback fans acquire material resources.
+A ready batch checks remaining triangle capacity, preloads resources, rechecks
+every resident identity, and supplies state/color to the retained packet.
+If a ready batch cannot be emitted because of capacity or residency, Display
+retrieves its original retained clips rather than recomputing them. Capacity
+failure still follows the existing no-flip drain and recovery contract.
+
+The current sixteen-texture batch can require at most 64 of 96 texture pages and
+sixteen of 256 CLUT slots. Residency rechecking remains defensive; a zero count
+of ready-but-nonresident fallbacks is not evidence that this branch was exercised.
+
+## Prepared geometry handles
+
+`Vu1Transform::prepare_world` accepts `Vu1WorldGeometry`, with the two matrices,
+corners, output height and sequence but no resident GS state. Its result is
+`ready`, `fallback`, `rejected` or `failed`. Ready publishes only an opaque
+`Vu1WorldToken`; fallback publishes the complete clip prefix atomically.
+Rejected or failed preparation preserves both caller outputs. Empty preparation
+is rejected, unlike the existing empty fused draw.
+
+`emit_world` supplies resolved per-triangle state and an explicit completion
+mode. `cancel_world` publishes the retained clips without emission. Successful
+emit or cancel consumes all copies of a token. A copied token is another handle
+to the same preparation, not another lease. A process-wide nonwrapping ticket
+also prevents a recycled owner address from reviving an old handle.
+
+Invalid token, state or output arguments reject without consuming a current
+ticket. Any transform, draw or preparation attempt invalidates older preparation,
+including empty or rejected attempts; actual program initialization does too.
+Idempotent initialization preserves it. Display returns no token to the caller.
+All operations use the same serialized VIF1 owner, persistent storage and two
+VU banks; this split introduces no asynchronous ownership or transfer overlap.
 
 ## Submission and fallback
 
@@ -71,6 +113,16 @@ The VIF owner waits for bounded DMA/FLUSH/MARK and full GIF-idle completion befo
 reading the kernel's count/sequence status or reusing a VU bank. Two disjoint VU
 data banks do not imply transfer overlap.
 
+Preparation also requires retired VIF/DMA/GIF transport before mapped status
+access, although GS raster work may remain pending. Display retires an EOP0
+PATH3 stream before preparation, and again after any resource upload before
+emit or cancel. The separate emit entry preserves retained ST/XYZ while uploading
+fresh packet headers and colors. Both the full `gs_finished` tail and deferred
+`path1_retired` tail retain their existing completion obligations. These boundaries
+follow EE User Manual v6 sections6.2.3–6.2.4 (mapped VU memory ownership),
+sections6.3.4–6.3.5 (UNPACK/STCYCL), and the FLUSHE/FLUSH descriptions on
+pages111–112; packet retirement is distinct from GS raster completion.
+
 Display tracks CPU-queued words, unretired PATH3 streams and pending GS work
 separately. Its `path1_retired` batch emits EOP on the last triangle and omits
 FINISH. A forced GS FINISH remains before texture/CLUT overwrite, after late
@@ -86,10 +138,62 @@ The latter is not a count of every GS FINISH used for resource uploads. The VIF
 packet sends fresh state tags and compact colors every batch; it does not assume
 output memory survived an intervening use of the optional projection kernel.
 
+Geometry-first diagnostics count preparation calls (`world_prepared_batches`),
+ready results (`world_ready_batches`), attempted emissions (`world_emit_calls`)
+and ready residency refusals (`world_residency_fallback_batches`).
+`world_skipped_preload_materials` counts textured source-face preload requests
+actually omitted before clipping. It does not count avoided uploads or net cache
+calls: emitted fans still use normal lookup. Existing hit/upload/byte counters
+report the work that actually occurred. Fused mode leaves the new counters zero.
+
 ## Evidence and limits
 
 The original authored fixture is
 [`native_world_display_fixture.cpp`](../tests/native_world_display_fixture.cpp).
+Its new geometry-first cases compare Frame, fused and classified pixels;
+check cold offscreen textures, prepared-token rejection/invalidation, both
+completion modes, late capacity/numeric failure and resource eviction between
+prepare and emit. The source-bound Play run passed **9,175,040 literal pixel-word
+comparisons**, 24 token checks and thirteen no-flip rejections. Each of four
+Frame/fused/classified triplets has one direct and two fallback batches with
+exact framebuffer equality. An authored batch with one visible flat face and
+fifteen offscreen textured faces uploads fifteen textures in fused mode and none
+in classify-first mode, with the same pixels.
+
+The ready-then-capacity-rejected case retrieves retained clips, drains the prior
+direct batch and recovers; numerical rejection follows the same no-flip contract.
+The classified eviction case preserves prepared geometry across 264 texture
+evictions and 288 CLUT uploads. The separate `gs_finished` emit compares literally
+against Frame after verifying that the cleared target differs from the baseline;
+it consumes copied handles and leaves the framebuffer selection unchanged.
+The report is `build/ps2-world-classified-display-ee-001/runtime-validation.json`,
+SHA-256 `795311872bd26eff122989dbd4aaec1a107ce21c96368163618dd53f4c251c7c`.
+
+No natural ready-but-nonresident failure occurred in this run; that defensive
+branch is source-reviewed, while ready cancellation is exercised through capacity
+refusal. The fixture establishes authored pixels and lifecycle behavior, not
+actual-scene speed, universal pixel equality, transport-fault injection or
+physical PS2 execution. Owner-address reuse and ticket exhaustion are reviewed
+in the implementation; the fixture does not exercise those cases.
+
+A separate actual-scene comparison advances 601 native updates and submits one
+immutable plan per update to both world modes, alternating their order. Each
+mode emits 885,445 triangles through 49,358 direct and 33,706 fallback batches.
+All per-frame geometry counts and **4,874,240 literal color words** across
+seventeen sampled frame pairs agree. This compares the two world modes; it does
+not resolve the earlier 66 differing words between world rendering and Frame.
+
+Mean draw work, excluding measured vsync and readback, falls from **27.072 ms**
+for fused submission to **18.926 ms** for geometry-first submission, a 30.09%
+reduction. Shared scene planning costs 4.119 ms per update and is measured
+separately. The classified path omits 525,887 textured source-face preload
+requests. Both modes share a warm resource cache, so their differing upload
+counts do not establish independently cold-cache savings for this scene.
+Whole-application cadence is a separate measurement. Report:
+`build/ps2-world-classify-scene-ee-001/runtime-validation.json`, SHA-256
+`36705f11ee6cd1f121917c53844cfa8e7cc2d641e0d3c6ec733ae156e4c3d733`.
+
+The historical resource-first proofs follow.
 Revision004 compared four complete Frame/PATH3 and world/PATH1 framebuffer pairs
 and four recovery images: **2,293,760 literal pixel words**, four direct batches,
 eight clipping/degenerate fallback batches, and eight no-flip rejections passed.
@@ -161,7 +265,7 @@ The source-bound report is
 Mean render work is **34.452 ms** for the world path versus **32.317 ms** for
 Frame in that alternating comparison, excluding vsync and readback. The final
 EOP-only handoff changes the preceding candidate by only 0.004 ms; it does not
-establish a material speed improvement. The world path reduces scene preparation
-but increases draw cost, so it remains explicit opt-in. These timings share warm
+establish a material speed improvement. That candidate reduced scene preparation
+but increased draw cost and stayed explicit opt-in. These timings share warm
 renderer resources and are not full-game cadence or independently cold-cache
 measurements.

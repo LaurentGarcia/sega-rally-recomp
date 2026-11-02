@@ -3,12 +3,14 @@
 # Upload at microinstruction512; entry offsets0/3 select data bank0/512.
 # Relative qwords (both banks have512 qwords):
 # 0..7: two column-major matrices, object-to-world then world-to-clip.
-# 8: integer corner_count, triangle_count, sequence, zero (max48/16).
+# 8: integer corner_count, triangle_count, sequence, mode (max48/16).
+# mode0 is fused; mode1 prepares ST/XYZ without reading tags or kicking GIF.
 # 9: {248,192,0,1/1024};10: {640/496,height/384,2048,65536}.
 # 11: {496,384,1,65536};14: {65536,.5,0,2^-17}.
 # 15: {2^-16,1024,65536,65536}.
 # 12: output decision, clip_count, emitted_triangle_count, reason.
-# 13: exact echo of q8. Decision1=fallback/no GIF;2=whole batch emitted.
+# 13: exact echo of q8. Decision1=fallback/no GIF;2=whole batch emitted;
+# decision3=prepared/no GIF, clip_count retained, emitted count/reason zero.
 # Reasons1=clip plane,2=numerical domain,3=zero/uncertain projected area.
 # 16..111:48 ordered corners, each {XYZ1},{u,v,inv_width,inv_height}.
 # 112..159:retained clip vectors;160..207:logical XY/reverse-depth/Q.
@@ -23,11 +25,18 @@
 # conversion of the produced binary32 depth. FLUSH/MARK and full VIF/GIF idle
 # retire the stream before status reads or bank reuse. GS completion is separate;
 # neither two data banks nor deferred raster completion implies VIF/VU overlap.
+# Separate emit entry stubs perform no geometry arithmetic: the owner uploads
+# fresh tags/state/color, then consumes its single-use prepared-bank ticket.
+# FLUSHE fences preparation; FLUSH fences emission (EE Manual6.3,p111-112).
+# Full VU/VIF/GIF retirement precedes any mapped VU read. V4-8 color uploads
+# use USN and CL3/WL1 (EE Manual6.3.4-5,p89-95); ST/XYZ slots remain intact.
 .vu
 .align 4
 .global native_vu1_world_begin
 .global native_vu1_world_bank1
 .global native_vu1_world_end
+.global native_vu1_world_emit
+.global native_vu1_world_emit_bank1
 # Original fused native presentation kernel, 16 triangles / 48 corners.
 # Explicit entry stubs select one exclusively owned512-qword bank.
 native_vu1_world_begin:
@@ -304,6 +313,11 @@ world_depth_store:
     nop nop
     nop ibne vi14,vi00,world_packet_triangle
     nop nop
+    nop ilw.w vi01,8(vi15)
+    nop nop
+    nop ibne vi01,vi00,world_prepared
+    nop nop
+world_emit_packet:
     nop iaddiu vi05,vi00,2
     nop ilw.x vi06,8(vi15)
     nop ilw.y vi07,8(vi15)
@@ -318,6 +332,15 @@ world_depth_store:
     nop xgkick vi04
     nop nop
     nop nop
+    nop[e] nop
+    nop nop
+world_prepared:
+    nop iaddiu vi05,vi00,3
+    nop ilw.x vi06,8(vi15)
+    nop isw.x vi05,12(vi15)
+    nop isw.y vi06,12(vi15)
+    nop isw.z vi00,12(vi15)
+    nop isw.w vi00,12(vi15)
     nop[e] nop
     nop nop
 world_clipped:
@@ -338,6 +361,14 @@ world_fallback:
     nop isw.y vi07,12(vi15)
     nop isw.z vi00,12(vi15)
     nop[e] nop
+    nop nop
+native_vu1_world_emit:
+    nop iaddiu vi15,vi00,0
+    nop b world_emit_packet
+    nop nop
+native_vu1_world_emit_bank1:
+    nop iaddiu vi15,vi00,512
+    nop b world_emit_packet
     nop nop
 native_vu1_world_end:
 .align 4

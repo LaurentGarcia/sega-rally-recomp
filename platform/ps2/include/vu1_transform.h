@@ -7,8 +7,13 @@
 
 namespace ps2 {
 struct Vu1WorldBatch;
+struct Vu1WorldGeometry;
+struct Vu1WorldState;
+class Vu1WorldToken;
 struct Vu1WorldStats;
 enum class Vu1WorldResult : std::uint8_t;
+enum class Vu1WorldPrepareResult : std::uint8_t;
+enum class Vu1WorldCompletion : std::uint8_t;
 struct alignas(16) TransformVector4 { float x=0,y=0,z=0,w=1; };
 // Native logical496x384 screen coordinates, reverse depth and reciprocal w.
 // An all-zero value (q==0) asks the caller to project/clip the retained clip
@@ -117,11 +122,30 @@ public:
     // No per-call allocation, concurrent producer or transfer overlap.
     bool initialize_world() noexcept;
     Vu1WorldResult draw_world(const Vu1WorldBatch&,std::span<TransformVector4> fallback_clip) noexcept;
+    // Geometry before residency. No GS packet is emitted by preparation.
+    // Ready writes token only and retains ST/XYZ; fallback writes clip only.
+    // Rejected/failed calls preserve both caller outputs. Empty is rejected.
+    // Requires idle VIF/DMA/GIF transport, but not completed GS raster work.
+    Vu1WorldPrepareResult prepare_world(const Vu1WorldGeometry&,Vu1WorldToken&,
+                                       std::span<TransformVector4> fallback_clip) noexcept;
+    // A successful emit or cancel consumes every copy of the token. Invalid
+    // token/state/output arguments reject before mutation and leave a current
+    // ticket reusable. Fatal ownership/transport errors invalidate it.
+    // Display may upload textures between prepare and emit, retaining the same
+    // exclusive renderer ownership and retiring PATH3 before either operation.
+    Vu1WorldResult emit_world(const Vu1WorldToken&,std::span<const Vu1WorldState>,
+                              Vu1WorldCompletion) noexcept;
+    Vu1WorldResult cancel_world(const Vu1WorldToken&,std::span<TransformVector4>) noexcept;
+    // Every transform/draw/prepare attempt invalidates any older preparation,
+    // including empty/invalid attempts. Idempotent initialization retains it;
+    // actual initialization/program uploads invalidate it. Calls are serialized
+    // process-wide; the global ticket allocator rejects exhaustion, never wraps.
     Vu1WorldStats world_stats() const noexcept;
     bool available() const noexcept;
     const char* error() const noexcept;
     Vu1TransformStats stats() const noexcept;
 private:
+    void invalidate_world() noexcept;
     bool transform_validated(const TransformMatrix&,const TransformMatrix&,
                              std::span<const TransformVector4>,std::span<TransformVector4>,
                              std::span<TransformProjectedVertex> = {}) noexcept;

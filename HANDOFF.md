@@ -1,5 +1,93 @@
 # Handoff
 
+## Native PS2 geometry before material residency (2026-11-02)
+
+Continued from 5daf6b78. The direct world pipeline now separates VU1 geometry
+preparation from GS material submission. `prepare_world` transforms, classifies
+and prepares ST/XYZ without XGKICK. A ready result publishes an opaque single-use
+ticket; `emit_world` supplies fresh state/color and emits the retained packet.
+`cancel_world` retrieves the original clips for ordered fallback. A nonwrapping
+process-wide ticket prevents copied handles or recycled owner addresses from
+reviving consumed preparations. Invalid emit/cancel arguments retain a current
+ticket; any transform/draw/prepare attempt invalidates older preparation.
+Mapped VU reads still require full VU/VIF/GIF retirement. The shared arithmetic
+block and fused bank entries are preserved; the assembled program is 308
+instructions, with fused offsets 0/3 and emit offsets 302/305.
+
+Display's `classify_first` mode gathers corners before texture lookup. Clipped
+batches acquire resources only for emitted fans. Ready batches retain geometry
+while Display resolves textures/CLUTs, rechecks residency and emits; capacity or
+residency refusal retrieves retained clips. Source/fan order, no-flip rejection,
+resource-overwrite fences and final GS completion remain explicit. Ordinary
+Frame's hot primitive specialization and texture inlining are unchanged. The
+API's fused default remains available as a control. The application's explicit
+`--drive-world-vu` selects classify-first; automatic textured startup stays Frame.
+There is no VIF/VU transfer overlap, global fast math or recovered game/camera
+arithmetic change in this checkpoint.
+
+Evidence, retained privately with source/archive/ELF/configuration bindings:
+
+- `build/ps2-world-prepare-001/driver-validation.json` binds strict EE compile,
+  VU assembly/symbol offsets, two portable test cases and 146,703 sanitizer
+  checks. SHA-256: a6247187f47b9906f1a745a74395e554f7bae61d3490cd96ec6c3cd51a91bbff.
+- `build/ps2-world-classified-display-ee-001/runtime-validation.json` passes
+  9,175,040 literal pixel comparisons, 24 token checks and thirteen no-flip
+  rejections. Four Frame/fused/classified triplets agree. The cold offscreen
+  fixture avoids fifteen texture uploads with identical pixels. Classified
+  resource eviction preserves prepared geometry across 264 texture evictions
+  and 288 CLUT uploads; both deferred and full-FINISH emit modes execute.
+  SHA-256: 795311872bd26eff122989dbd4aaec1a107ce21c96368163618dd53f4c251c7c.
+- `build/ps2-world-classify-scene-ee-001/runtime-validation.json` advances 601
+  native updates, submitting one immutable plan twice in alternating mode order.
+  Both modes emit 885,445 triangles through 49,358 direct and 33,706 fallback
+  batches. All per-frame geometry counts and 4,874,240 literal color words from
+  seventeen sampled frame pairs agree. Mean draw work falls from 27.071510 to
+  18.925526 ms, excluding measured vsync/readback and shared 4.119390 ms planning.
+  It omits 525,887 textured source-face preload requests. SHA-256:
+  36705f11ee6cd1f121917c53844cfa8e7cc2d641e0d3c6ec733ae156e4c3d733.
+- `build/ps2-world-classify-final-001/portable-app-tests.json` records 307 passing
+  portable tests on the final application sources, with no source drift. The
+  earlier 307-test run before explicit application selection is also retained.
+
+Native052, engine-demo052 and the explicit-world entry adapter003 cross-build
+with all 35 shared engine source identities matching. The adapter retains all
+71 non-entry objects byte-for-byte. Native/demo role and symbol gates exclude
+the translated arcade runtime; the adapter passes a separate equivalent audit.
+Strict O3, disabled FP contraction and no fast math are checked. The 137-file
+compiled source archive is `build/ps2/native-052/source-snapshot.tar.gz`, SHA-256
+3827226c1bf3c5c5da07458e11f104353fbf2db65d6d90b0d7443ee9d318e341.
+`build-set-validation.json` in the same directory has SHA-256
+920c3848fcb458c2d586c66127f664df8d05e18c2c00c03a859c2ca4697eb2d6.
+The original engine sample is cross-built, not re-executed in this checkpoint.
+
+The complete application comparison uses the first 660 periods, identical
+private inputs/preferences and pinned Play 0.72. Default native052 measures
+29.360821 updates/sec, 34.058994 ms mean period and 31.046044 ms mean work,
+preserving the preceding default's cadence and 588 non-timing fields across
+98 common records. Classified world052 measures 29.984821 updates/sec,
+33.350208 ms mean period and 25.252212 ms mean work, versus resource-first
+world051's 20.944985 updates/sec and 34.285206 ms work. Maximum world052 work
+is 31.104167 ms. Its 196 selected semantic fields across 42 common records agree
+with both the default and preceding world run. These are logged controls,
+pose/motion, frame, sound-request and triangle fields, not every internal state.
+All 660 work intervals on both paths still exceed 16.667 ms. Report:
+`build/ps2-world-classify-final-001/cadence-validation.json`, SHA-256
+87114e2b48e53fe0d6455badc8e31a1afca7772fd96c5693a17b0b7c6383923e.
+
+Limits and rejected inferences: the actual-scene modes share a warm resource
+cache, so their upload-count difference is not an independently cold-cache
+saving. Only the authored cold fixture proves avoided uploads. No natural
+ready-but-nonresident refusal occurs with the current bounded batch/cache;
+that branch is reviewed, while ready cancellation executes through capacity
+refusal. Owner-address reuse and ticket exhaustion are source-reviewed, not
+runtime stress-tested. The sampled world-mode pixel equality does not erase
+the earlier 66 differing color words against Frame. No depth-buffer comparison,
+transport-fault injection, physical PS2, live-controller or game-audio result
+is added. This remains a developer vehicle loop with a fixed visual neighborhood;
+full race flow and 60 native updates/presentations per second are unfinished.
+Next performance work must reduce the remaining complete-frame workload while
+preserving ordering and ownership; two banks alone do not establish overlap.
+
 ## Native PS2 ordered VU1/GS world pipeline (2026-11-01)
 
 Continued from 158a5476. The generic engine now accepts an immutable ordered

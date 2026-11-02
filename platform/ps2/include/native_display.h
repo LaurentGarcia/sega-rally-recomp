@@ -73,8 +73,16 @@ struct Stats {
     std::uint32_t world_gs_finishes=0;
     // EOP-delimited PATH3 stream handoffs without waiting for GS completion.
     std::uint32_t world_path3_stream_retirements=0;
+    // Geometry-first mode only. Ready packets retain projected geometry until
+    // their material state is resolved or they are cancelled for clip fallback.
+    std::uint32_t world_prepared_batches=0,world_ready_batches=0;
+    std::uint32_t world_residency_fallback_batches=0,world_emit_calls=0;
+    // Textured source-face preload requests omitted before clipping. Emitted
+    // fallback fans still perform normal lookup; this is not avoided uploads.
+    std::uint32_t world_skipped_preload_materials=0;
 };
 using DisplayClock=std::uint64_t (*)(void*) noexcept;
+enum class WorldSubmissionMode : std::uint8_t { fused, classify_first };
 enum class ReadbackStatus {
     ok, not_ready, invalid_rectangle, busy, unsupported_configuration,
     gif_timeout, finish_timeout, receive_timeout, fifo_timeout, cleanup_failed
@@ -107,14 +115,19 @@ public:
     // must already have initialized its optional world kernel; no other VIF1,
     // GIF or GS producer may run concurrently. Display resolves and retains
     // each bounded batch's texture/CLUT residency, then retires PATH3 before
-    // VU1 emits PATH1. Its VIF/GIF packet retires before reuse; GS completion
+    // VU1 emits PATH1. classify_first prepares geometry without material
+    // residency or GS emission; only ready batches preload resources, while
+    // clipped fallback looks up resources for emitted fans. fused preserves
+    // the original ordering as an explicit comparison/default mode.
+    // Its VIF/GIF packet retires before reuse; GS completion
     // may be deferred until a resource overwrite, frame end or rejection.
     // No deferred GS work survives a return except after fatal quarantine.
     // Unsupported batches use the existing float clipper and
     // triangle writer before any primitive from that batch has been emitted.
     // No allocation per call. Rejection never flips a partial backbuffer;
     // transport faults quarantine the Display and require process restart.
-    bool present_world(const WorldDrawPlan&, ps2::Vu1Transform&);
+    bool present_world(const WorldDrawPlan&, ps2::Vu1Transform&,
+                       WorldSubmissionMode = WorldSubmissionMode::fused);
     bool present_status(const char *message);
     // Between calls, forget all cached texture identities. The next use uploads
     // its index bytes; copied-content CLUT entries remain valid. No allocation,
