@@ -112,14 +112,20 @@ bool valid_model(WorldModel model){
         }
     return true;
 }
+#ifndef _EE
 bool facing_value(float x){const auto bits=std::bit_cast<std::uint32_t>(x)&0x7fffffffu;
     return !bits||(bits>=0x00800000u&&bits<0x7f800000u);}
+#endif
 bool same_facing(const WorldFacing& a,const WorldFacing& b){
     const auto same=[](float x,float y){return std::bit_cast<std::uint32_t>(x)==std::bit_cast<std::uint32_t>(y);};
     return same(a.normal.x,b.normal.x)&&same(a.normal.y,b.normal.y)&&same(a.normal.z,b.normal.z)&&
         same(a.point.x,b.point.x)&&same(a.point.y,b.point.y)&&same(a.point.z,b.point.z);
 }
 bool facing_visible(const WorldFacing& face,const WorldMatrix& matrix,WorldPoint origin,bool& visible){
+    // Callers validate all inputs as normal-or-zero with magnitude <=2^16.
+    // Ordered normal/relative-point products and sums keep the dot below 2^72.
+    // EE arithmetic flushes underflow to signed zero, so these intermediates
+    // cannot become nonfinite or subnormal. Portable hosts retain the checks.
     const std::array<float,3> n{face.normal.x,face.normal.y,face.normal.z},
         p{face.point.x,face.point.y,face.point.z},o{origin.x,origin.y,origin.z};
     std::array<float,3> transformed_normal,relative_point;
@@ -132,13 +138,17 @@ bool facing_visible(const WorldFacing& face,const WorldMatrix& matrix,WorldPoint
         transformed_normal[row]=ns+nz;
         const float point=ps+pz,translated=point+matrix[row+12];
         relative_point[row]=translated-o[row];
+#ifndef _EE
         for(float x:{nx,ny,nz,px,py,pz,ns,ps,transformed_normal[row],point,translated,relative_point[row]})
             if(!facing_value(x))return false;
+#endif
     }
     const float x=transformed_normal[0]*relative_point[0],
         y=transformed_normal[1]*relative_point[1],z=transformed_normal[2]*relative_point[2];
     const float xy=x+y,dot=xy+z;
+#ifndef _EE
     for(float v:{x,y,z,xy,dot})if(!facing_value(v))return false;
+#endif
     visible=dot>=0.f;return true;
 }
 std::array<float,6> local_bounds(WorldModel model,const WorldFaceGroup& group){

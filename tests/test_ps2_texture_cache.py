@@ -17,4 +17,21 @@ class TextureCache(unittest.TestCase):
             result=subprocess.run([str(executable)],capture_output=True,text=True,check=True)
             self.assertIn("TEXTURE_CACHE PASS",result.stdout)
             self.assertIn("page_ownership=1 eviction=1 generation=1 atomic_rejection=1 no_allocations=1",result.stdout)
+    def test_age_wrap_preserves_last_hit_and_lru(self):
+        compiler=shutil.which("clang++") or shutil.which("g++")
+        if not compiler:self.skipTest("C++20 compiler unavailable")
+        with tempfile.TemporaryDirectory(prefix="texture-cache-age-") as directory:
+            temporary=Path(directory)
+            # Expose only private fields in a temporary copy so the actual
+            # 64-bit counter boundary is reachable without a production hook.
+            header=(ROOT/"platform/ps2/include/native_texture_cache.h").read_text()
+            self.assertEqual(header.count("private:"),1)
+            (temporary/"native_texture_cache.h").write_text(header.replace("private:","public:"))
+            executable=temporary/"test"
+            subprocess.run([compiler,"-std=c++20","-O2","-Wall","-Wextra","-Werror",
+                "-DRALLY_TEST_CACHE_AGE","-I",str(temporary),"-I",str(ROOT/"platform/ps2/include"),
+                str(ROOT/"platform/ps2/tests/native_texture_cache_test.cpp"),"-o",str(executable)],
+                capture_output=True,text=True,check=True)
+            result=subprocess.run([str(executable)],capture_output=True,text=True,check=True)
+            self.assertIn("TEXTURE_CACHE AGE_WRAP PASS",result.stdout)
 if __name__=="__main__":unittest.main()

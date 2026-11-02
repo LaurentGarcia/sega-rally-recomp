@@ -193,12 +193,18 @@ The [visual adapter contract](../platform/ps2/native/rally_visual_scene.md) and
 describe the files and their limits. No per-frame reference matrices or pose
 recordings are consumed by this path.
 
-The native044 textured run measures 20.003 native updates/sec across 660
-complete periods in Play 0.72 HLE. Mean work outside wait/flip is 34.893 ms;
+The native046 textured run measures 29.383 native updates/sec across 660
+complete periods in Play 0.72 HLE. Mean work outside wait/flip is 30.992 ms;
 this scene does not meet the 16.667 ms target. The earlier flat diagnostic's
 59.991 updates/sec does not apply to it. The debug page and log report the
 measured native rate after each 60-update window; the ordinary textured view
-has no timing banner. In native042 versus native043 at update 60, the last-
+has no timing banner. Native044 measured 20.003 updates/sec / 34.893 ms of work
+over the same number of periods. Native045 adds an exact last-texture shortcut;
+native046 removes redundant EE facing-intermediate checks under the validated
+input bounds and hardware signed-zero-underflow contract. Portable checks and
+recovered game arithmetic remain unchanged. The next structural work is the
+[VU1 rendering pipeline](ps2-engine-architecture.md#rendering-throughput-and-the-hardware-pipeline).
+In native042 versus native043 at update 60, the last-
 palette shortcut reduces packet construction from 34.911 to 11.215 ms, while
 exact repeated-facing reuse reduces geometry from 23.747 to 20.866 ms.
 These are observed integration costs; the paired fixtures and their narrower

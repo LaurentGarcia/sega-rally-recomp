@@ -60,8 +60,14 @@ int main(){try{
         require(!scene.update(std::span(&instance,1),view,error));require(error==WorldSceneError::invalid_model);
         require(scene.frame().triangles.data()==old.triangles.data()&&scene.frame().triangles.size()==old.triangles.size());
         faces[1].facing.normal={number(0x00800000),0,0};instance.object_to_world[0]=.5f;
+#ifdef _EE
+        // EE underflow produces signed zero, which is within the accepted
+        // intermediate domain; a portable host retains gradual underflow.
+        require(scene.update(std::span(&instance,1),view,error));require(scene.frame().triangles.size()==2);
+#else
         require(!scene.update(std::span(&instance,1),view,error));require(error==WorldSceneError::invalid_transform);
         require(scene.frame().triangles.data()==old.triangles.data());
+#endif
         // Disabled authored data remains unread, and the origin is relevant
         // only when the view explicitly enables facing.
         for(auto& f:faces){f.facing.enabled=false;f.facing.normal.x=number(0x7fc12345);}

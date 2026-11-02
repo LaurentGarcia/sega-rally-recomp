@@ -1,5 +1,123 @@
 # Handoff
 
+## Native PS2 frame-budget investigation (2026-11-01)
+
+Continued from b68004ff. Native045 adds a last-texture-slot shortcut to the
+generic page cache. Every request still validates pointer, dimensions and byte
+capacity before mutation, compares the complete defined identity and updates
+the same LRU age. Clear, replacement, eviction and counter rebasing preserve
+their previous behavior. No draw order, texture data, game arithmetic or camera
+change accompanies this optimization.
+
+Its complete moving run remains below target: the first 660 complete periods
+measure 20.013 updates/sec, 49.968 ms mean period and 34.357 ms mean work outside
+wait/flip; all 660 work periods exceed 16.667 ms. Native044's corresponding work
+was 34.893 ms. The roughly 0.535 ms saving does not cross the display-refresh
+threshold. Native045 ELF SHA256 is
+362edfb02def9c13e308c2aa8cabaa872981951f8c3dab0c9c375c1757f2f714;
+the run is build/ps2-native-motion-003/native045-run-001. These are Play 0.72
+observations; physical-console timing remains unverified.
+
+Native046 then omits redundant facing-intermediate classification on the EE
+only. Validated normal-or-zero inputs are bounded by 2^16; ordered arithmetic
+keeps the final dot below 2^72 and EE underflow produces signed zero. All input
+validation, ordered operations and portable-host intermediate checks remain.
+The matching 660 periods now measure 29.383 updates/sec, 34.034 ms mean period
+and 30.992 ms mean work outside wait/flip. This removes another 3.365 ms of work
+versus native045, but every measured work period still exceeds 16.667 ms;
+maximum work is 37.222 ms. Native046 ELF SHA256 is
+96509827e7df3b29d2da298c867d9a6202ff6d37207889e2589a35bbbd6dd1b8.
+The run is build/ps2-native-motion-003/native046-run-001; its source, ELF, input
+and timing binding is build/ps2-native-motion-003/native046-validation.json.
+All 700 non-timing fields across 98 common logged records match native044 and
+native045. This sampled comparison does not establish full GS pixel parity.
+Native046 and the
+rebuilt independent engine-demo046 share the same 33 engine inputs, manifest
+b3e6c97ac64f645476a1da5b0db4939b87b549cb02a492600fad7a35ea8aed4b.
+
+The host differential compares complete cache state across 601 actual native
+frame request lists / 735,387 requests, plus authored boundary cases. Lookup
+probes fall from 13,610,165 to 2,758,908 with identical results. The isolated EE
+test reports 194,506,869 versus 99,513,396 CP0 Count ticks, hash
+cc086af6c3344866. Its nominal saving is 0.536 ms/request-list at 294.912 MHz.
+Do not use the 147.456 MHz timer-API rate for CP0 Count. The first loader used
+per-byte reads and did not finish in its observation window; the second uses
+bounded bulk input and reports all phases. Evidence is in
+build/ps2-texture-mru-001/validation.json and
+build/ps2-texture-mru-ee-002/runtime-validation.json.
+
+A same-ELF Display comparison also passes six phases in both modes, including
+invalidation, generation edits and churn. Ordered packet, texture-cache,
+palette-cache and framebuffer fingerprints agree; readback hashes cover
+1,720,320 corresponding pixels, rather than a retained literal pixel diff.
+Sixteen warm AB/BA samples save about 1.108 ms in this authored renderer fixture.
+It uses actual texture dimensions/request order but authored triangles and
+texels, so its saving is not the complete game's saving. The existing private
+unique-DBP synchronous readback diagnostic remains necessary for Play's stale
+readback behavior. The run is
+build/ps2/emulator/native-texture-mru-display-001-ps2_stdout.txt.
+All 305 portable PS2 tests pass on the final native046 source snapshot in
+99.837 seconds without source drift; the source-bound report is
+build/ps2-native-motion-003/portable-tests-clean.json. New retained checks cover
+last-hit identity mutations, invalid-request atomicity, LRU/clear and the actual
+64-bit age-counter boundary without adding a shipping test hook. Two earlier
+final-snapshot runs exhausted disk space; their failure logs remain retained.
+Old reproducible compiler objects, source archives and superseded host capture
+executables were removed before the successful serial rerun. The manifests
+old-object-cleanup.json and old-archive-cleanup.json in the same evidence
+directory record removed paths and hashes; current binaries, captures, inputs
+and validation reports remain local.
+
+The coarse/detailed native044 profiling pair isolates 2.030 ms of recovered
+camera/body work and 18.921 ms of WorldScene work over six steady samples.
+Detailed scene profiling adds 2.073 ms. All nine logged checkpoints agree with
+native044's controls, printed pose/motion and geometry/resource counters.
+This rejects camera/body arithmetic as the dominant geometry cost. The detailed
+unassigned residual includes facing, materials, copying, bookkeeping and
+instrumentation; it is not a measurement of facing alone. Evidence:
+build/ps2-native-stage-profile-001/runtime-comparison-001.json.
+
+The separate facing experiment compares identical ordered arithmetic with and
+without intermediate classification on 1,761 initial-pose planes, including
+offscreen groups. Corrected timing is 902,969 versus 155,657 CP0 Count ticks per
+pass, nominally 3.062 versus 0.528 ms. Its first attempt allowed pure-call
+hoisting and produced invalid one-tick timings; retain it as a rejected timing
+control. The second puts no-IPA calls visibly between compiler-barrier timer
+reads. Evidence: build/ps2-world-facing-cost-ee-002/runtime-validation.json.
+Before promotion, the actual EE domain/frame-equivalence experiment passes
+864 boundary controls and 601 native poses with independent camera histories:
+35,272,503 checks, 885,445 ordered triangle pairs, 53 textures, 1,040,522 facing
+calls per mode and fingerprint 9fa7ee5e3989d0b7. It compares complete geometry,
+materials/CLUT/texture contents and counters using scalar EE transforms; VU
+transport and GS pixels are outside that fixture. Its host/sanitizer companion
+separately passes 885,448 triangle pairs, so this is old/new equality on each
+backend, not host-to-EE bit parity. Source/ELF/input/log binding:
+build/ps2-world-facing-ee-build-001/runtime-validation.json. All eleven focused
+WorldScene tests pass after promotion.
+
+The manual review covers EE/VIF DMA and bank/fence rules, VU instructions and
+memory ownership, GS/GIF paths, cache/scratchpad publication, Sony's optimization
+slides and public buffered-rendering examples. It identifies the structural
+gap: VU1 returns clip coordinates to the EE, which projects/clips/materializes
+triangles before Display builds another packet stream. A private VU1 projection
+continuation now passes 101 authored cases and 69,513 vertices across 17 sampled
+native poses. Clip outputs remain exact; the maximum isolated screen-projection
+difference is 0.00003052 pixels. The same-ELF synchronous batch path falls from
+5.945 to 4.346 ms per sampled pose, including the additional result readback
+and admission checks. This narrow 1.599 ms saving is not an integrated game
+or GS result. The first attempt admitted a zero-depth vertex because an integer
+condition write immediately preceded its branch; adding the VU manual's
+required instruction spacing resolves the authored failure. Both attempts are
+retained, with the passing source/ELF/input/log binding in
+build/ps2-vu-projection-002/runtime-validation.json. The prototype remains
+private and unintegrated; it does not change the native046 performance figure.
+
+Direct VU1-to-GIF output next needs its own ordered batch/lifetime contract;
+concurrent PATH1 and the current PATH3 A+D state traffic are specifically
+unsupported by the manual. See docs/ps2-engine-architecture.md and private
+build/ps2-vif-pipeline-study-001/study.md and
+build/ps2-gs-memory-study-001/findings.md. No overlap or 60 Hz result is claimed.
+
 ## Native textured motion and recovered visual assembly (2026-11-01)
 
 Continued from 12ef097e. The native application now renders the Martini Lancia

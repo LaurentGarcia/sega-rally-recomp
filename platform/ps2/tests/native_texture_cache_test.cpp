@@ -20,6 +20,41 @@ void invariant(const Cache&c){std::array<bool,96> owned{};unsigned total=0;
   for(unsigned p=e.first_page;p<e.first_page+e.pages;++p){REQUIRE(!owned[p]);owned[p]=true;++total;}}
  REQUIRE(total==c.used_pages()&&total<=96);
 }
+void last_hit_boundaries(){
+ Cache cache;auto original=key(500);const auto first=cache.acquire(original);REQUIRE(!first.hit);
+ for(unsigned i=0;i<8;++i){const auto age=cache.entry(first.slot).age;const auto hit=cache.acquire(original);
+  REQUIRE(hit.hit&&hit.slot==first.slot&&hit.evictions==0);REQUIRE(cache.entry(first.slot).age==age+1);}
+ // A recently used identity cannot bypass byte-count or pointer validation.
+ const auto before=digest(cache);auto short_buffer=original;--short_buffer.bytes;
+ REQUIRE(cache.acquire(short_buffer).slot==96);REQUIRE(digest(cache)==before);
+ auto missing=original;missing.indices=nullptr;REQUIRE(cache.acquire(missing).slot==96);REQUIRE(digest(cache)==before);
+ // Extra declared bytes do not change an otherwise identical texture key.
+ auto extra=original;++extra.bytes;REQUIRE(cache.acquire(extra).hit);
+ REQUIRE(cache.entry(first.slot).key.bytes==original.bytes);
+ auto moved=original;moved.indices=pixels.data()+1;REQUIRE(!cache.acquire(moved).hit);
+ auto generation=moved;++generation.generation;REQUIRE(!cache.acquire(generation).hit);
+ auto dimensions=generation;dimensions.width=64;REQUIRE(!cache.acquire(dimensions).hit);
+ cache.clear();REQUIRE(cache.used_pages()==0);REQUIRE(!cache.acquire(dimensions).hit);
+ // Repeated last-slot hits must update LRU, not merely return the same slot.
+ cache.clear();for(unsigned i=1;i<=96;++i)REQUIRE(!cache.acquire(key(i)).hit);
+ for(unsigned i=0;i<8;++i)REQUIRE(cache.acquire(key(1)).hit);
+ const auto replacement=cache.acquire(key(97));REQUIRE(!replacement.hit&&replacement.evictions==1&&replacement.slot==1);
+ REQUIRE(cache.entry(0).key.generation==1&&cache.entry(1).key.generation==97);
+ REQUIRE(cache.acquire(key(1)).hit);const auto next=cache.acquire(key(98));REQUIRE(!next.hit&&next.evictions==1&&next.slot==2);
+ invariant(cache);
+#ifdef RALLY_TEST_CACHE_AGE
+ // Only the temporary test header exposes the counter. No shipping API or
+ // counter-width change is needed to exercise its2^64 boundary.
+ cache.clear();const auto a=cache.acquire(key(7));const auto b=cache.acquire(key(8));REQUIRE(cache.acquire(key(7)).hit);
+ cache.age_=std::numeric_limits<std::uint64_t>::max();const auto saved=digest(cache);
+ short_buffer=key(7);--short_buffer.bytes;REQUIRE(cache.acquire(short_buffer).slot==96);
+ REQUIRE(cache.age_==std::numeric_limits<std::uint64_t>::max()&&digest(cache)==saved);
+ REQUIRE(cache.acquire(key(7)).hit);REQUIRE(cache.entry(a.slot).age==3&&cache.entry(b.slot).age==1&&cache.age_==3);
+ cache.age_=std::numeric_limits<std::uint64_t>::max();const auto added=cache.acquire(key(9));
+ REQUIRE(!added.hit&&cache.entry(added.slot).age==3&&cache.entry(a.slot).age==2&&cache.entry(b.slot).age==1);
+ invariant(cache);std::puts("TEXTURE_CACHE AGE_WRAP PASS");
+#endif
+}
 void cases(){Cache cache;std::array<std::uint64_t,96> content{};unsigned requests=0;
  const auto request=[&](Texture k){bool known=false;
   for(unsigned i=0;i<96;++i){const auto&e=cache.entry(i);known|=e.valid&&e.key.indices==k.indices&&e.key.generation==k.generation&&e.key.width==k.width&&e.key.height==k.height;}
@@ -49,4 +84,4 @@ void cases(){Cache cache;std::array<std::uint64_t,96> content{};unsigned request
  std::printf("TEXTURE_CACHE PASS requests=%u checks=%u page_ownership=1 eviction=1 generation=1 atomic_rejection=1 no_allocations=1\n",requests,checks);
 }
 }
-int main(){cases();}
+int main(){last_hit_boundaries();cases();}

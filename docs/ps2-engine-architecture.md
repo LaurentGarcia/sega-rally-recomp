@@ -189,6 +189,83 @@ transfer staging buffer is 64 KiB. The display allocates bounded VRAM/cache and
 transfer buffers. Games choose asset lifetimes and frame storage; there is no
 implicit entity store, task scheduler or per-object allocation policy.
 
+## Rendering throughput and the hardware pipeline
+
+The textured native046 scene takes 30.992 ms of work outside display wait/flip
+and presents 29.383 native updates/sec across 660 complete periods in Play 0.72.
+The last-texture shortcut and EE-specific facing optimization improve on
+native044's 34.893 ms / 20.003 updates/sec, but every measured work period still
+exceeds the complete 60 Hz budget of 16.667 ms. A paired native044 profiling
+experiment separates approximately 2.030 ms of camera/body pose work from
+18.921 ms in WorldScene. Detailed scene
+instrumentation itself adds 2.073 ms, so its per-stage totals cannot be treated
+as free measurements. These are emulator observations, not console timings.
+
+The current data flow remains sequential:
+
+```mermaid
+flowchart LR
+    E[EE gathers vertices] --> V[VIF upload and VU1 transform]
+    V --> R[Wait and copy clip coordinates to EE]
+    R --> C[EE projects, clips and assembles triangles]
+    C --> P[EE builds GS commands with VU0 coordinate packing]
+    P --> G[GIF submission and GS drawing]
+```
+
+Using both VUs does not establish concurrent execution. The transform provider
+returns clip coordinates and acceptance flags; it has no projected-vertex or
+GS-packet continuation. Display later consumes a complete Frame. Each transform
+batch fences execution and returns through the EE before the next stage.
+
+The manuals describe a different scheduling opportunity: upload one bank while
+VU1 processes another and the previous output travels to the GS. A private
+bounded VU1 projection experiment now passes 101 authored cases and 69,513
+vertices, retaining exact clip coordinates and admission decisions for the EE
+fallback. Its isolated projection difference is at most 0.00003052 pixels;
+the synchronous batch path saves 1.599 ms per sampled pose. This is not yet
+integrated and establishes neither GS pixel parity nor a full-frame gain.
+A subsequent direct GIF-output path needs an explicit
+material-order, bank-lifetime and submission contract; removing waits from the
+existing synchronous API is not a valid implementation of that path.
+
+The review uses the locally retained manuals from the supplied
+[PS2 documentation repository](https://github.com/DarrenRainey/PS2-Programming-Docs),
+with the following implementation constraints:
+
+| Reference | Consequence for this engine |
+| --- | --- |
+| EE User's Manual, section 6.3.8, pp. 99–101 | Use explicit VIF bank addresses and TOP/TOPS ownership to overlap upload and processing. Input and output must remain live until their respective consumers finish. |
+| EE User's Manual, pp. 111–113 | FLUSHE, FLUSH and FLUSHA wait for different consumers. A VU-only fence cannot retire a packet still being read by GIF. |
+| EE User's Manual, p. 155 | Concurrent PATH3 A+D traffic and PATH1 have a documented hang hazard. Retire the current Display state/upload path before a new XGKICK producer runs. |
+| VU User's Manual, section 3.6.1, p. 55 | EE access to VU data memory requires VU idle. Reading another bank through the existing callback does not establish supported asynchronous readback. |
+| VU User's Manual, XGKICK, p. 196 | Starting an output transfer does not make its source memory reusable. Model completion separately from command issue. |
+| PS2 Programming Optimisations, pp. 5, 18–20, 32–36 | Keep DMA payloads aligned, prepare immutable data outside the frame loop, and choose scratchpad/cache layouts for actual access patterns. VU0 and the EE multimedia instructions require useful batch work, not merely being enabled. |
+
+Sony's public [Procedural Rendering on PlayStation 2](https://lukasz.dk/files/rgreen_procedural_renderinggdc2001.pdf),
+pp. 18–22, compares serial, double-, triple- and quad-buffered schedules. Its
+examples overlap transfer, calculation and drawing while retaining ownership
+of every buffer. This supports the pipeline direction; its example throughput
+is not a measurement of this game. Similarly, Andy Gavin describes several
+specialized renderers, level-of-detail systems and streaming in
+[Jak & Daxter's development](https://blog.playstation.com/2012/08/24/behind-the-classics-jak-daxter/).
+Those are examples of organizing work for the machine, not evidence that this
+port already meets its budget or permission to reduce recovered scene fidelity.
+
+A first direct-output experiment should use a small resident-material batch,
+two explicitly budgeted VU banks, and a fence at the batch boundary. Preserve
+original triangle order when inserting an EE clipping fallback. Prevalidate
+inputs, retain referenced texture/CLUT storage, and draw into the backbuffer;
+already submitted drawing cannot be rolled back like a CPU frame assembly.
+Enable overlapping bank reuse only after packet retirement and failure tests.
+The ordinary Display uploader and GS readback require a documented ownership
+handoff before they can coexist with this producer.
+
+Validate each new continuation against actual scene geometry, screen/depth/Q
+results, clipping boundaries, primitive order and resource lifetimes. Measure
+complete native updates after integration. Keep exact recovered simulation
+arithmetic separate from presentation changes and retain the ordinary engine
+demo as a second consumer.
+
 ## Current limits and next architectural work
 
 - Materials currently support opaque and cutout drawing; general alpha blending

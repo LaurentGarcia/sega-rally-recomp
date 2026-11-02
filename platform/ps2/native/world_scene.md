@@ -110,8 +110,12 @@ the point uses its affine transform, and the point is made relative to
 when the normal/relative-point dot product is nonnegative, including signed
 zero. It uses the original separate binary32 multiply/add order in both
 geometry modes, without an inverse transpose or inferred winding. Inputs
-retain the ordinary bounded normal-or-zero domain; nonfinite or subnormal
-arithmetic intermediates reject the update atomically.
+retain the ordinary bounded normal-or-zero domain. Portable builds reject
+nonfinite or subnormal arithmetic intermediates atomically. On EE, the validated
+input magnitude limit of 2^16 keeps the dot below 2^72, excluding overflow;
+hardware underflow produces signed zero. The EE build therefore omits redundant
+intermediate classification while retaining every ordered multiply/add and all
+input checks. This does not change recovered game arithmetic or enable fast math.
 
 For recovered supplied-normal polygons, both fan triangles retain the same
 original anchor and normal. Two-sided polygons leave facing disabled. The
@@ -135,6 +139,28 @@ The preserved uncached-facing implementation and the cache produce identical
 same developer checkpoint, using its first controls then neutral controls.
 `build/ps2-facing-memo-review-001/result.json` binds that host comparison; it is
 not an original driving replay or an EE speed measurement.
+
+The source-preserved facing cost diagnostic measured 902,969 versus 155,657
+CP0 Count ticks per 1,761-plane first-pose pass, including the same digest loop
+in both paths. The difference is nominally 2.534 ms at 294.912 MHz; CP0 Count
+must not be converted using the separate 147.456 MHz timer API. This pass
+includes offscreen groups, so it is not complete-scene attribution. The bound
+report is `build/ps2-world-facing-cost-ee-002/runtime-validation.json`.
+The first attempt, retained separately, had invalid timing due to compiler
+motion; the corrected fixture uses compiler barriers and verified call brackets.
+
+Before promotion, an actual EE comparison passed all 601 native poses with
+independent camera histories and exact old/new equality over 885,445 ordered
+triangles, material/CLUT/texture contents and geometry counters. Its 864 boundary
+controls cover maximum magnitudes, cancellation, minimum normals, signed zero,
+underflow and invalid-input rollback. The source/ELF/log binding is
+`build/ps2-world-facing-ee-build-001/runtime-validation.json`: 35,272,503 checks,
+fingerprint `9fa7ee5e3989d0b7`. The scalar host and sanitizer comparison separately
+passed 885,448 triangle pairs; this is not host-versus-EE bit parity. The fixture
+does not exercise VU transport or GS pixels. EE underflow behavior follows the
+EE Core User Manual v6, Table 8-4 p162 and Table 8-6 p165; physical-console
+validation remains open. All eleven portable WorldScene tests pass after the
+change, with portable intermediate rejection preserved.
 
 Clipping input and its eight-triangle output scratch are initialized once per
 update and reused across faces. Every input corner and material pointer is
