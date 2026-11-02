@@ -11,8 +11,11 @@
 
 #include "runtime/geo.h"
 #include "runtime/model2_priority.h"
-#ifdef RALLY_OFFLINE_MESH_CAPTURE
+#if defined(RALLY_OFFLINE_MESH_CAPTURE) || defined(RALLY_OFFLINE_VISUAL_CAPTURE)
 #include "platform/ps2/tools/mesh_capture.h"
+#endif
+#ifdef RALLY_OFFLINE_VISUAL_CAPTURE
+#include "platform/ps2/tools/visual_asset_capture.h"
 #endif
 
 #include <algorithm>
@@ -395,6 +398,9 @@ void Geo::model2_3d_process_polygon(raster_state *raster, uint32_t attr)
 
 	/* set the luma value of this polygon */
 	object.luma = (raster->command_buffer[9] >> 15) & 0xff;
+#ifdef RALLY_OFFLINE_VISUAL_CAPTURE
+    ps2::offline::visual_asset_polygon(*raster,attr,object.v,object.texheader,object.luma,NumVerts);
+#endif
 
 #ifndef M2_FAST_GEO
 	/* set the texture LOD of this polygon */
@@ -1604,6 +1610,9 @@ GeoPtr Geo::geo_object_data(geo_state *geo, uint32_t opcode, GeoPtr input)
 #ifdef RALLY_OFFLINE_MESH_CAPTURE
     ps2::offline::capture_mesh_object(*geo, obp, opcode, tpa, tha, oba, obc);
 #endif
+#ifdef RALLY_OFFLINE_VISUAL_CAPTURE
+    ps2::offline::visual_asset_object(*geo,obp,opcode,tpa,tha,oba,obc);
+#endif
 
 	switch (geo->mode & 3)
 	{
@@ -1619,6 +1628,9 @@ GeoPtr Geo::geo_object_data(geo_state *geo, uint32_t opcode, GeoPtr input)
 		/* No Normals present, Specular */
 		case 3: geo_parse_nn_s(geo, obp, obc); break;
 	}
+#ifdef RALLY_OFFLINE_VISUAL_CAPTURE
+    ps2::offline::visual_asset_object_end();
+#endif
 
 	/* move by 4 parameters */
 	return input;
@@ -1627,7 +1639,7 @@ GeoPtr Geo::geo_object_data(geo_state *geo, uint32_t opcode, GeoPtr input)
 /* Command 02: Direct Data */
 GeoPtr Geo::geo_direct_data(geo_state *geo, uint32_t opcode, GeoPtr input)
 {
-#ifdef RALLY_OFFLINE_MESH_CAPTURE
+#if defined(RALLY_OFFLINE_MESH_CAPTURE) || defined(RALLY_OFFLINE_VISUAL_CAPTURE)
     ps2::offline::capture_direct_geometry();
 #endif
 	raster_state *raster = geo->raster;

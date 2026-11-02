@@ -8,5 +8,5 @@ enum class NativeVehicleRenderMode { native_vu, reference, guarded_vu };
 int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,
                             const char* checkpoint_path,const char* course_path,
                             const char* body_path,NativeVehicleRenderMode mode=NativeVehicleRenderMode::native_vu,
-                            bool detailed_profiling=false);
+                            bool detailed_profiling=false,bool textured_presentation=false);
 }

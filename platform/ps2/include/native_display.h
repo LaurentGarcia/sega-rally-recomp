@@ -12,9 +12,9 @@ inline constexpr unsigned framebuffer_storage_format = 0x00; // PSMCT32
 inline constexpr unsigned depth_storage_format = 0x3a;       // PSMZ16S
 inline constexpr unsigned depth_register_format = 0x0a;
 // Exact allocation footprint: two CT32 frames, one Z16S, 128x64 font,
-// fourteen256x256 PSMT4 slots and256 block-aligned CLUT slots.
+// ninety-six8192-byte PSMT4 pages and256 block-aligned CLUT slots.
 constexpr std::size_t display_vram_bytes(unsigned output_height) noexcept {
-    return std::size_t(640) * output_height * 10 + 128 * 64 * 4 + 14 * 32768 + 256 * 256;
+    return std::size_t(640) * output_height * 10 + 128 * 64 * 4 + 96 * 8192 + 256 * 256;
 }
 // Native assets use linear packed PSMT4 indices: left pixel in the low nibble.
 // The uploader performs no arcade texture addressing or color translation.
@@ -37,6 +37,10 @@ struct Material {
     std::array<std::uint32_t, 16> palette{};
     std::uint32_t color = 0xffffffffu;
     bool cutout = false;
+    // Screen-space one-pixel stipple at the logical496x384 resolution.
+    // Destination alpha preserves the mask across intervening primitives;
+    // rejected pixels must not write color or depth. Independent of cutout.
+    bool checker = false;
 };
 struct Triangle { std::array<Vertex, 3> vertices; const Material *material = nullptr; };
 struct Frame {
@@ -55,6 +59,8 @@ struct Stats {
     // completion fences final geometry, decoration precedes the vsync wait.
     std::uint64_t validation_ticks=0,build_ticks=0,completion_ticks=0;
     std::uint64_t decoration_ticks=0,vsync_ticks=0;
+    std::uint32_t checker_triangles=0;
+    std::uint32_t texture_evictions=0,texture_pages=0;
 };
 using DisplayClock=std::uint64_t (*)(void*) noexcept;
 enum class ReadbackStatus {

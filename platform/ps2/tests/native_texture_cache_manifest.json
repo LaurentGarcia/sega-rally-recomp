@@ -1,0 +1,11 @@
+{
+  "sources": [
+    "platform/ps2/tests/native_texture_cache_fixture.cpp",
+    "platform/ps2/src/native_display.cpp",
+    "platform/ps2/src/native_frame.cpp",
+    "platform/ps2/src/vu0_pack.cpp"
+  ],
+  "includes": ["platform/ps2/include", "platform/ps2/tests"],
+  "libraries": ["draw", "graph", "dma", "packet", "m"],
+  "embed_iop_modules": false
+}

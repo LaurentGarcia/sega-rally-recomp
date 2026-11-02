@@ -149,7 +149,60 @@ int main() {
             verify_at(name,"in_front",376,160,
                 transparent_red.cutout ? 0x00ff5020u : 0x002020ffu);
         }
-        std::printf("DEPTH FIXTURE PIXEL PASS frames=368 samples=%u hash=%016llx format=PSMCT32+PSMZ16S vram_bytes=%lu output_height=%u; scoped to sampled original regions\n",
+        // Stipple pixels rejected by DATE must also leave depth untouched.
+        // An intervening opaque green surface must preserve destination alpha,
+        // so a second checker cannot fill the holes in the first one.
+        Material green,checker_solid,checker_texture,checker_blue;
+        green.color=0xff20ff50u;
+        checker_solid.color=0xffff2020u;checker_solid.checker=true;
+        checker_texture.texture=&texture;checker_texture.checker=true;
+        checker_texture.palette.fill(checker_solid.color);
+        checker_blue.color=0xff2050ffu;checker_blue.checker=true;
+        display.set_caption(nullptr);
+        for(unsigned phase=0;phase<4;++phase){
+            const bool transparent=phase&1u,cutout=phase&2u;
+            checker_solid.color=transparent?0x00ff2020u:0xffff2020u;
+            checker_texture.palette.fill(checker_solid.color);
+            checker_solid.cutout=checker_texture.cutout=cutout;
+            const std::array<Triangle,6> coverage{
+                triangle(35,.8f,&checker_solid),triangle(291,.8f,&checker_texture),
+                triangle(35,.4f,&green),triangle(291,.4f,&green),
+                triangle(35,.7f,&checker_blue),triangle(291,.7f,&checker_blue)};
+            if(!display.present({coverage,0xff101923u,true}))throw std::runtime_error(display.error());
+            for(unsigned logical_x:{120u,376u}){
+                const unsigned x=logical_x*640/frame_width-4;
+                const unsigned y=160*display.output_height()/frame_height-4;
+                if(display.readback_rect(x,y,8,8,sample)!=ReadbackStatus::ok)
+                    throw std::runtime_error("STIPPLE READBACK UNAVAILABLE");
+                unsigned mismatch=0,on=0,off=0;
+                for(unsigned row=0;row<8;++row)for(unsigned col=0;col<8;++col){
+                    // The GS samples at integer raster coordinates; UV begins
+                    // at zero and scales with the full logical viewport.
+                    const unsigned u=(x+col)*frame_width/640;
+                    const unsigned v=(y+row)*frame_height/display.output_height();
+                    const bool enabled=(u^v)&1u;
+                    const std::uint32_t expected=enabled?(transparent&&cutout?0x00ff5020u:0x002020ffu):0x0050ff20u;
+                    const auto rgb=sample[row*8+col]&0x00ffffffu;
+                    mismatch+=rgb!=expected;on+=enabled;off+=!enabled;
+                    pixel_hash=(pixel_hash^rgb)*1099511628211ull;
+                }
+                std::printf("STIPPLE PIXELS %s phase=%u region=%u on=%u off=%u mismatch=%u first=%08lx\n",
+                    mismatch?"FAIL":"PASS",phase,logical_x,on,off,mismatch,(unsigned long)sample[0]);
+                if(mismatch){
+                    std::printf("STIPPLE SAMPLE origin=%u,%u height=%u\n",x,y,display.output_height());
+                    for(unsigned row=0;row<8;++row){
+                        for(unsigned col=0;col<8;++col)std::printf("%c",(sample[row*8+col]&0xffffffu)==0x0050ff20u?'0':'1');
+                        std::puts("");
+                    }
+                }
+                if(mismatch||!on||!off)throw std::runtime_error("GS STIPPLE COLOR OR DEPTH MISMATCH");
+                verified_pixels+=sample.size();
+            }
+        }
+        // Return to a frame without stipple, proving FRAME/TEST/depth reset.
+        if(!display.present({far_only,0xff101923u,true}))throw std::runtime_error(display.error());
+        verify("after_stipple",0x00ff5020u);
+        std::printf("DEPTH FIXTURE PIXEL PASS frames=373 samples=%u hash=%016llx format=PSMCT32+PSMZ16S vram_bytes=%lu output_height=%u; scoped to sampled original regions\n",
                     verified_pixels,static_cast<unsigned long long>(pixel_hash),
                     static_cast<unsigned long>(display_vram_bytes(display.output_height())),display.output_height());
         while (true) SleepThread();

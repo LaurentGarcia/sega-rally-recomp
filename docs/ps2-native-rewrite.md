@@ -76,10 +76,12 @@ RAM decoding must stay in offline conversion/reference tools.
 
 The native target now has a developer vehicle loop alongside the platform
 bootstrap and unchanged static study. It advances recovered game state from
-one validated initial checkpoint, reads the pad, and renders a body against a
-stationary collision course. This is not the complete arcade game: the model
-bridge, camera and flat materials remain diagnostic; race initialization,
-menus, AI, game audio and full-course validation remain open.
+one validated initial checkpoint and reads the pad. The textured mode now
+renders a bounded road neighborhood using recovered chase-camera, body,
+shadow and four-wheel transforms. Its textures and lighting are converted
+offline; camera history and car motion advance natively. The earlier flat
+body/collision-course diagnostic remains available. Race initialization,
+menus, AI, HUD, game audio and full-course validation remain open.
 
 ### Continuous vehicle milestone
 
@@ -96,18 +98,18 @@ The original processor/device runtime remains confined to offline observation.
 The application now calls this update and consumes the changing pose. Its
 bounded version-3 course package and 752-byte developer checkpoint carry no
 runtime addresses. The checkpoint is a development start state, not a recovered
-race initializer. Each subsequent input comes from the pad; no recorded motion,
-forces or contact results are supplied.
+race initializer. Each subsequent input comes from the pad or its neutral
+fallback; no recorded motion, forces or contact results are supplied.
 
 The integrated EE driver advances the car under neutral controls in Play.
 Native040 measures **59.99 native updates/sec across 1,680 complete frame
 periods**. Time outside the display wait/flip averages **15.04 ms**, with a
 **16.41 ms maximum** and no measured work interval over the nominal 16.67 ms
-budget. This is the current diagnostic car/course loop, not the complete game
+budget. This is the earlier flat diagnostic car/course loop, not the complete game
 or a physical-console result. Start-to-start periods include pad work and
 logging; the emulator window's displayed refresh rate is not this measurement.
 
-Equivalent initial states now take **2.75 ms for the native game update** and
+At that earlier checkpoint, equivalent initial states took **2.75 ms for the native game update** and
 **9.79 ms for geometry preparation**, versus 12.18 ms and 17.72 ms before this
 optimization pass. Earlier geometry milestones were 375.7 ms in native026 and
 27.6 ms in native030. Exact integer-limb operations replace bit-by-bit work in
@@ -148,11 +150,11 @@ depth/cutout combinations. The diagnostic body is visible without the previous
 false road occlusion. These sampled regions are not a complete-game image proof.
 
 Remaining integration work includes further measured geometry optimization,
-working interactive pad input, cadence under complete-game load and the
-model-local/world bridge before calling the view faithful. The measured runs had no connected pad;
-the car advanced from its moving checkpoint with neutral inputs. Complete races,
-AI, recovered cameras, textured presentation, game audio and physical-console
-validation remain later work.
+working interactive pad input and cadence under complete-game load. The measured
+runs had no connected pad; the car advanced from its moving checkpoint with
+neutral inputs. The later textured mode below adds the recovered chase camera
+and model-local/world bridge. Complete races, AI, remaining scene content,
+game audio and physical-console validation remain open.
 
 A private correction to Play's versioned IOP module dispatch restores pad
 receive-buffer publication in a paired headless test: the unmodified core
@@ -178,6 +180,37 @@ The application checks the checkpoint's course selector and asset CRC. An
 explicit loader command also accepts `--drive CHECKPOINT COURSE BODY`; each
 path must use `host:` or `mass:`. Without a developer checkpoint it retains
 the existing static-study/bootstrap selection.
+
+For textured motion, supply `native-visual/view.bin` and the `modelN.bin` files
+selected by its bounded manifest, alongside the matching checkpoint/course.
+The default loader selects this mode when `host:native-visual/view.bin` exists;
+the explicit command is `--drive-textured CHECKPOINT COURSE VISUAL_DIRECTORY`.
+The first update consumes the checkpoint's exact input and verifies all 22
+published pose words before presenting. Subsequent updates consume native pad
+input or its neutral fallback, and Start restores both the checkpoint and the camera history.
+The [visual adapter contract](../platform/ps2/native/rally_visual_scene.md) and
+[private asset conversion guide](../platform/ps2/native/textured_assets.md)
+describe the files and their limits. No per-frame reference matrices or pose
+recordings are consumed by this path.
+
+The native044 textured run measures 20.003 native updates/sec across 660
+complete periods in Play 0.72 HLE. Mean work outside wait/flip is 34.893 ms;
+this scene does not meet the 16.667 ms target. The earlier flat diagnostic's
+59.991 updates/sec does not apply to it. The debug page and log report the
+measured native rate after each 60-update window; the ordinary textured view
+has no timing banner. In native042 versus native043 at update 60, the last-
+palette shortcut reduces packet construction from 34.911 to 11.215 ms, while
+exact repeated-facing reuse reduces geometry from 23.747 to 20.866 ms.
+These are observed integration costs; the paired fixtures and their narrower
+claims are recorded in `HANDOFF.md`.
+
+The same-pose camera audit matches the original chase/body matrices exactly
+and visible projected corners within 0.0042 logical pixels. Play's default
+640×448 square-pixel presentation nevertheless stretches the logical 496×384
+image horizontally. Use the [isolated preview launcher](../platform/ps2/README.md#play-developer-preview)
+for an explicitly sized raw-image comparison. The recovered camera and FOV
+remain unchanged; absent scenery/HUD, texture sampling and shadow visibility
+are separate fidelity work. Raw-image parity is not physical CRT calibration.
 
 The driver requests native float/VU1 rendering by default. Use `--drive-ee` with
 the same three paths for the exact scalar comparison, or `--drive-guarded` for
@@ -391,7 +424,7 @@ checks its source boundary; it does not execute the ELF. The build report
 records source hashes, toolchain identity, static memory and symbol checks.
 
 Load the ELF through a PS2 homebrew loader or a PS2 development emulator.
-Without an explicit mesh path or `host:native-scene.bin`, it shows the original
+Without a developer checkpoint, explicit mesh path or `host:native-scene.bin`, it shows the original
 platform diagnostic. Select + Start toggles that page; the left stick moves
 the checkerboard test geometry and holding Cross submits a quiet original
 440 Hz tone. PCM refill follows the IOP queue independently of PAL/NTSC cadence.
@@ -404,7 +437,7 @@ GS geometry with depth testing. Left/Right step the orbit; L1/R1 change distance
 Both vector units are inactive for its solid triangles. Recovered game systems,
 original textures, collision, driving and game audio remain unconnected.
 
-The latest source-bound `native-020` build reproduces the executed `native-011`
+The earlier static-study `native-020` build reproduces the executed `native-011`
 ELF byte for byte (SHA-256
 `2338119372579ee7012ec95fcd43f5210d8382cb112d6f4dbce9d3fc8f050158`).
 The 10.212-second Play 0.72 HLE/Vulkan run visibly rendered the private six-object
@@ -416,8 +449,9 @@ allocation. Its shared 21-file engine source identity is unchanged. The current
 integration proof is `build/ps2-native-020/integration-validation.json`; it does
 not imply a new gameplay execution. Earlier native-008 runs also checked the
 no-asset bootstrap.
-The recovered game components have separate EE fixture evidence;
-they remain unused and are discarded from this diagnostic ELF by the linker.
+In that earlier static-study ELF the recovered game components were unused and
+discarded by the linker. The later developer loop connects the complete car
+update and recovered visual bridge as described above.
 
 A separate original depth fixture passed 206,609 quantization checks and read
 512 exact RGB samples from GS memory with zero mismatches, covering solid and

@@ -23,6 +23,7 @@ flowchart TD
     Sample[Original engine demo] --> Engine
     Engine --> SDK[Open PS2SDK and PS2 hardware]
     Recovery[Separate host recovery tools] -. private converted data .-> Study
+    Recovery -. private native assets .-> Rally
 ```
 
 The source-role inventory in `platform/ps2/build_ps2.py` enforces these project
@@ -32,8 +33,8 @@ might later discard. A folder name alone does not confer permission.
 
 | Role | Current files | Permitted project dependencies |
 | --- | --- | --- |
-| Engine | Native display, frame validation, clipping, VU0 packing, VU1 transforms, pad hardware, storage, PCM transport and IOP module | Explicit engine inventory only |
-| Rally game | Recovered progress, both pose publications, angle-fold, orientation, direction blend, contact search/result interpretation, rounded cross/affine transforms and cabinet steering/filter | Own game role and engine |
+| Engine | Native display, page-based texture cache, frame validation, world scene, owned textured models, clipping, VU0 packing, VU1 transforms, pad hardware, storage, PCM transport and IOP module | Explicit engine inventory only |
+| Rally game | Recovered main car update, contact/course rules, camera and model assembly, visual adapter and cabinet steering/filter | Own game role and engine |
 | Geometry study | `native_mesh`, `native_scene`, captured-view transforms and fitted camera | Own study role and engine |
 | Rally application | `platform/ps2/native/main.cpp` | Rally game, study and engine |
 | Original demo | `platform/ps2/samples/engine_demo/main.cpp` | Demo and engine |
@@ -48,6 +49,24 @@ Files initially stay in their existing locations to preserve working build and
 validation paths. Roles, dependency checks and a second consumer establish the
 boundary. Future moves must retain those checks and evidence; renaming folders
 alone does not establish independence.
+
+The textured motion path preserves this division. `TexturedModel` owns generic
+vertices, per-corner UVs, materials and PSMT4 indices; it contains no arcade
+addresses or captured camera matrices. `PreparedWorldModel` validates and owns
+immutable geometry/material storage, and published frames retain that storage
+through bounded leases. Rally's `RallyVisualScene` chooses course/car/wheel
+instances and supplies recovered transforms. The shared engine does not know
+which instance is a road, shadow or wheel.
+
+GS texture storage uses 96 complete 8 KiB pages with bounded LRU eviction and
+generation-aware identities. Images occupy one, two or four pages according
+to their dimensions; the existing completion fence protects every overwrite.
+The allocation is 3,751,936 bytes in the NTSC layout and 4,161,536 bytes in PAL,
+including both framebuffers, depth, font and CLUT storage. NTSC readback fixtures
+validate mixed sizes, residency, eviction, invalidation, cutouts and checker
+masks. PAL has a checked memory budget but no new execution result. These
+services remain synchronous; simultaneous EE, VU0, VU1 and GS work is not yet
+established by the current measurements.
 
 SDK and standard-library dependencies are external to this project-file gate.
 Application entry points still call SDK startup, clock and sleep functions

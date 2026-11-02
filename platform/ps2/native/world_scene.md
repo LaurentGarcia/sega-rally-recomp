@@ -2,7 +2,8 @@
 
 The reusable engine's `WorldScene` (`include/world_scene.h`,
 `src/world_scene.cpp`) is the presentation bridge for a persistent native vehicle update.
-It receives model-local points, indexed opaque flat faces, an explicit
+It receives model-local points, indexed faces with explicit materials and
+per-corner texel UVs, an explicit
 `object_to_world` matrix per instance, and a fixed `world_to_clip` matrix.
 The existing `StudyScene` and its captured reference-view transforms are not
 used or changed. There is no automatic fitting, recentering, inferred camera,
@@ -13,21 +14,24 @@ must be affine. The view may be projective and follows `native_geometry`'s
 y-up clip coordinates, positive-w guard, `0 <= z <= w` depth convention and
 496×384 logical viewport. The adapter uses the existing homogeneous clipping
 and projection operation, then sends an ordinary `Frame` with native reverse
-depth enabled. It does not reconstruct original lighting, textures, polygon
-priority or game camera behavior.
+depth enabled. It does not infer original lighting, texture identity, polygon
+priority or game camera behavior. The caller supplies those material assets.
 
 `configure(source_faces, output_triangles, error)` allocates two bounded banks
 of materials and triangles. Limits are 32,768 source faces, 16,384 output
 triangles, 1,024 instances and 65,536 declared vertices across all instances.
 `update()` allocates nothing. The inactive bank is prepared before committing;
 failure preserves the last complete frame. No clipping overflow is truncated.
-Caller model storage and transforms need only survive `update()`. The returned
-frame refers to owned storage and expires at the next successful update or
+Caller geometry, material tables and transforms need only survive `update()`.
+Ordinary texture descriptors and pixel storage remain borrowed through the
+returned frame's lifetime; their generation/invalidation rules are Display's.
+The returned frame refers to owned vertex/material storage and expires at the next successful update or
 reconfiguration, or owner destruction. Calls must be serialized with display
 submission. `stats().persistent_bytes` reports actual bank/object storage.
 
 For immutable geometry, `PreparedWorldModel::assign()` validates and owns a
-snapshot of the vertices, faces and optional group partition. It also records
+snapshot of the vertices, faces, optional group partition, referenced materials
+and texture bytes. It also records
 the exact six local extrema per group, using the same traversal and comparison
 order as ordinary rendering. Sources may be changed or destroyed after a
 successful assignment. Failed validation or allocation preserves the previous
@@ -38,18 +42,99 @@ limits, then uses the unchanged interval transforms, culling, batching and
 clipping. The ordinary mutable `update()` path still validates current model
 data on every call. Both paths allocate nothing during updates and publish
 frames transactionally. Model owners must survive an update, but finished
-frames contain no pointers into those owners.
+frames contain no pointers to those owners. Each preallocated frame bank holds
+snapshot leases for textured instances, so replacing or destroying a prepared
+owner cannot invalidate an already published frame's texture descriptors or
+pixels. Flat snapshots require no lease. An inactive bank may retain its older
+snapshots until that bank is reused; memory planning must include those leases.
 
 Snapshot storage is reported separately by
 `PreparedWorldModel::persistent_bytes()`: private storage plus actual vector
-capacities for 12-byte points, 16-byte faces, 8-byte groups and 24-byte group
-bounds. The public owner itself and allocator bookkeeping are excluded. The
-maximum accepted counts imply 2,359,296 bytes of element payload when every
-face is a separate group, plus private storage and any vector spare capacity.
+capacities for 12-byte points, 72-byte faces, 8-byte groups and 24-byte group
+bounds, plus owned materials, texture descriptors and packed indices. The public
+owner itself and allocator/shared-owner bookkeeping are excluded. Geometry at
+the maximum accepted counts implies 4,194,304 bytes of element payload when
+every face is a separate group, plus private storage and vector spare capacity.
+Each frame bank reserves 1,024 snapshot lease slots; no update allocates them.
 Replacement temporarily retains both old and new snapshots; caller input
 storage is also separate. `RallyBodyScene` releases its temporary decoded
 arrays after assignment, retaining only the owned body/course snapshots and
-their frame banks.
+their frame banks. These independent upper bounds do not promise that every
+maximum-size model, replacement and retained frame fits together in PS2 RAM.
+
+`WorldFace::material_index` selects a `WorldModel::materials` entry; the default
+sentinel preserves the existing opaque `argb` path and old aggregate initializers.
+Materials retain the native PSMT4 texture, sixteen-entry ARGB palette, cutout and
+logical checker flags. A model allows at most 4,096 materials. Texture dimensions
+are powers of two from 8 through 256, palette alpha is zero or 255, and UVs are
+normal-or-zero binary32 values with magnitude at most 65,536. The renderer keeps
+texel coordinates through homogeneous clipping and supplies reciprocal depth
+for GS STQ; filtering and texture addressing remain Display's explicit contract.
+
+Prepared assignment compacts referenced materials and deduplicates textures by
+source descriptor identity within that snapshot, with limits of 1,024 textures
+and 4 MiB of packed index bytes. It copies the exact required index extent and
+assigns monotonically unique texture generations after all fallible allocations.
+Prepared generations occupy the high half of the 64-bit space; decoded borrowed
+texture assets reserve the low half, preventing cross-owner address-reuse hits.
+Generation exhaustion rejects before publication. All prepared assignments and
+scene updates are serialized process-wide; this counter is not a concurrent
+asset registry. Generations never substitute for ownership. Texture sharing
+across separate prepared models is not implemented, so exporters should avoid
+splitting a shared large texture set unnecessarily.
+
+Transform and projection cache entries contain only geometric results. Each
+face restores its own corner UVs after cache lookup and any reference clipping
+restoration, preserving seams where multiple faces share a position index.
+The inside-projection helper then consumes the same validated XY/Q/depth with
+those face-specific UVs. Flat faces clear stale texture/cutout/checker state and
+skip the textured UV work.
+
+The retained material fixture passes 264 cached/uncached/prepared frame
+comparisons and 1,762 checks under ASan/UBSan. It covers independent clipped-UV
+expectations, shared-position seams, immutable pixel/palette copies, prepared
+owner replacement/destruction, allocation failures, invalid texture/UV domains,
+texture deduplication/caps, capacity rollback and allocation-free updates.
+Evidence is `build/ps2-world-material-002/validation.json`. The existing flat
+corpus still matches all 124,539,359 bytes across 1,803 complete frames, including
+replay of the sealed actual-VU results, in
+`build/ps2-world-material-flat-002/comparison.json`. This is host equivalence and
+lifetime evidence, not a new GS execution or a textured 60 Hz claim. The larger
+face records and material/lease work require fresh integrated timing.
+
+Authored facing is optional and independent of triangle winding. An enabled
+`WorldFace::facing` supplies a model-local normal and point; a view must also
+set `use_facing` explicitly. The normal uses the instance's linear transform,
+the point uses its affine transform, and the point is made relative to
+`facing_origin` in that same pre-projection space. The renderer retains a face
+when the normal/relative-point dot product is nonnegative, including signed
+zero. It uses the original separate binary32 multiply/add order in both
+geometry modes, without an inverse transpose or inferred winding. Inputs
+retain the ordinary bounded normal-or-zero domain; nonfinite or subnormal
+arithmetic intermediates reject the update atomically.
+
+For recovered supplied-normal polygons, both fan triangles retain the same
+original anchor and normal. Two-sided polygons leave facing disabled. The
+textured asset exporter currently rejects unsupported computed-normal
+single-sided modes rather than substituting a geometric normal. The generic
+engine has no Model 2 attribute or ROM dependency. `backface_rejected_faces`
+counts rejected input triangles, so a rejected quad fan contributes two.
+
+Within one instance, adjacent enabled faces with bit-identical six-word
+normal/point data reuse the last successful facing result. Disabled faces,
+skipped groups and new instances reset this cache; failed calculations are
+never cached. The current textured bundle has 1,463 such repetitions among
+3,224 enabled face tests. This removes repeated arithmetic without changing
+visibility, clipping or material order. Retained tests cover both geometry
+modes, every cache-key component, instance/view changes, opposite winding,
+shared quad anchors, signed zero, invalid-input rollback and prepared ownership.
+The final authored fixture passes 124 checks under ASan/UBSan, alongside all
+eleven WorldScene portable tests (`build/ps2-world-facing-cache-001/validation.json`).
+The preserved uncached-facing implementation and the cache produce identical
+134,963,168-byte triangle/material streams across 601 native updates from the
+same developer checkpoint, using its first controls then neutral controls.
+`build/ps2-facing-memo-review-001/result.json` binds that host comparison; it is
+not an original driving replay or an EE speed measurement.
 
 Clipping input and its eight-triangle output scratch are initialized once per
 update and reused across faces. Every input corner and material pointer is

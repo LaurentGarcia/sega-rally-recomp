@@ -13,7 +13,7 @@ have different purposes:
 
 | Target | Runtime | Purpose |
 | --- | --- | --- |
-| `native-port` | Native typed vehicle state and direct PS2 services; no arcade processor/device runtime | Developer car update and flat body/course view from one private checkpoint; also retains diagnostics/static study |
+| `native-port` | Native typed vehicle state and direct PS2 services; no arcade processor/device runtime | Developer car update, recovered camera and textured neighborhood from one private checkpoint; also retains flat diagnostics/static study |
 | `engine-demo` | Shared native PS2 engine and original sample content | Independent animated cube and service demonstration; no Rally sources or assets |
 | `core-probe` | Explicit manifest-selected sources | Separate translated reference probe, or standalone native contract fixtures with source-only manifests |
 | `bringup` / `audio-fixture` | ROM-free PS2 hardware diagnostics | Display, controller and PCM output checks |

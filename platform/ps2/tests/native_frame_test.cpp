@@ -9,7 +9,8 @@
 int main() {
     using namespace ps2::native;
     static_assert(framebuffer_storage_format == 0x00 && depth_storage_format == 0x3a && depth_register_format == 0x0a);
-    static_assert(display_vram_bytes(448) == 3424256 && display_vram_bytes(512) == 3833856);
+    static_assert(display_vram_bytes(448) == 3751936 && display_vram_bytes(512) == 4161536);
+    static_assert(display_vram_bytes(512) + 32768 == 4*1024*1024);
     static_assert(display_vram_bytes(512) < 4 * 1024 * 1024);
     assert(reverse_depth16(0) == 0 && reverse_depth16(1) == 65535);
     assert(reverse_depth16(.25f) == 16384 && reverse_depth16(.5f) == 32768 && reverse_depth16(.75f) == 49151);

@@ -5,6 +5,7 @@
 #include <bit>
 #include <cmath>
 #include <new>
+#include <limits>
 #include <stdexcept>
 #include <type_traits>
 #include <vector>
@@ -15,9 +16,17 @@ struct PreparedWorldModel::Storage {
     std::vector<WorldFace> faces;
     std::vector<WorldFaceGroup> groups;
     std::vector<std::array<float,6>> bounds;
+    std::vector<Material> materials;
+    std::vector<Texture> textures;
+    std::vector<std::uint8_t> indices;
 };
 struct WorldScene::Storage {
-    struct Bank {std::vector<Material> materials;std::vector<Triangle> triangles;};
+    struct Bank {
+        std::vector<Material> materials;std::vector<Triangle> triangles;
+        std::array<std::shared_ptr<const PreparedWorldModel::Storage>,1024> leases;
+        std::size_t lease_count=0;
+        void release_leases(){while(lease_count)leases[--lease_count].reset();}
+    };
     struct CachedVertex {ClipVertex clip;Vertex projected;std::uint32_t index=0,serial=0;};
     struct Batch {
         // Validated vertex indices fit16 bits. A fresh generation identifies
@@ -49,6 +58,11 @@ constexpr std::uint32_t cache_serial_mask=0x7fffffffu,approximate_vertex=0x80000
 // Vertex indices use only16 bits; projection validity is independent of the
 // cache serial and the provider provenance bit.
 constexpr std::uint32_t cache_index_mask=0xffffu,projected_vertex=0x80000000u;
+// Process-wide serialized asset preparation. Never reuse a generation even
+// when allocator addresses are recycled; reserve the final value as exhausted.
+// Prepared snapshots own the high half; decoded borrowed asset views reserve
+// the low half. Recycled addresses cannot collide across these owner classes.
+std::uint64_t next_prepared_generation=std::uint64_t{1}<<63;
 bool value(float x){const auto m=std::bit_cast<std::uint32_t>(x)&0x7fffffffu;return !m||(m>=0x00800000u&&m<=0x47800000u);}
 bool matrix(const WorldMatrix& m,bool affine){for(auto x:m)if(!value(x))return false;
     return !affine||(m[3]==0&&m[7]==0&&m[11]==0&&m[15]==1);}
@@ -70,9 +84,23 @@ bool valid_batch_result(const ps2::TransformVector4& v,bool outside=false){
     return w>=clip_min_w&&x>=-w&&x<=w&&y>=-w&&y<=w&&z>=0&&z<=w;
 }
 bool fail(WorldSceneError e,WorldSceneError& output){output=e;return false;}
+bool dimension(unsigned x){return x>=8&&x<=256&&(x&(x-1))==0;}
+bool valid_material(const Material& m){
+    if(!m.texture)return (m.color>>24)==255;
+    const auto& t=*m.texture;
+    if(!t.indices||!dimension(t.width)||!dimension(t.height)||t.bytes<std::size_t(t.width)*t.height/2)return false;
+    for(auto c:m.palette)if((c>>24)!=0&&(c>>24)!=255)return false;
+    return true;
+}
 bool valid_model(WorldModel model){
+        if(model.materials.size()>world_material_limit)return false;
+        for(const auto& material:model.materials)if(!valid_material(material))return false;
         for(auto p:model.vertices)if(!value(p.x)||!value(p.y)||!value(p.z))return false;
-        for(auto face:model.faces){if((face.argb>>24)!=255||face.indices[0]==face.indices[1]||face.indices[1]==face.indices[2]||face.indices[0]==face.indices[2])return false;
+        for(const auto& face:model.faces){if((face.material_index==world_flat_material&&(face.argb>>24)!=255)||face.indices[0]==face.indices[1]||face.indices[1]==face.indices[2]||face.indices[0]==face.indices[2])return false;
+            if(face.material_index!=world_flat_material&&face.material_index>=model.materials.size())return false;
+            for(const auto uv:face.uv)if(!value(uv.u)||!value(uv.v))return false;
+            if(face.facing.enabled)for(const auto p:{face.facing.normal,face.facing.point})
+                if(!value(p.x)||!value(p.y)||!value(p.z))return false;
             for(auto index:face.indices)if(index>=model.vertices.size())return false;}
         if(!model.groups.empty()){
             std::size_t end=0;
@@ -83,6 +111,35 @@ bool valid_model(WorldModel model){
             if(end!=model.faces.size())return false;
         }
     return true;
+}
+bool facing_value(float x){const auto bits=std::bit_cast<std::uint32_t>(x)&0x7fffffffu;
+    return !bits||(bits>=0x00800000u&&bits<0x7f800000u);}
+bool same_facing(const WorldFacing& a,const WorldFacing& b){
+    const auto same=[](float x,float y){return std::bit_cast<std::uint32_t>(x)==std::bit_cast<std::uint32_t>(y);};
+    return same(a.normal.x,b.normal.x)&&same(a.normal.y,b.normal.y)&&same(a.normal.z,b.normal.z)&&
+        same(a.point.x,b.point.x)&&same(a.point.y,b.point.y)&&same(a.point.z,b.point.z);
+}
+bool facing_visible(const WorldFacing& face,const WorldMatrix& matrix,WorldPoint origin,bool& visible){
+    const std::array<float,3> n{face.normal.x,face.normal.y,face.normal.z},
+        p{face.point.x,face.point.y,face.point.z},o{origin.x,origin.y,origin.z};
+    std::array<float,3> transformed_normal,relative_point;
+    for(unsigned row=0;row<3;++row){
+        // Match the supplied-vector operation order, then append translation
+        // to the point only. Do not infer a normal from a triangle's winding.
+        const float nx=n[0]*matrix[row],ny=n[1]*matrix[row+4],nz=n[2]*matrix[row+8];
+        const float px=p[0]*matrix[row],py=p[1]*matrix[row+4],pz=p[2]*matrix[row+8];
+        const float ns=nx+ny,ps=px+py;
+        transformed_normal[row]=ns+nz;
+        const float point=ps+pz,translated=point+matrix[row+12];
+        relative_point[row]=translated-o[row];
+        for(float x:{nx,ny,nz,px,py,pz,ns,ps,transformed_normal[row],point,translated,relative_point[row]})
+            if(!facing_value(x))return false;
+    }
+    const float x=transformed_normal[0]*relative_point[0],
+        y=transformed_normal[1]*relative_point[1],z=transformed_normal[2]*relative_point[2];
+    const float xy=x+y,dot=xy+z;
+    for(float v:{x,y,z,xy,dot})if(!facing_value(v))return false;
+    visible=dot>=0.f;return true;
 }
 std::array<float,6> local_bounds(WorldModel model,const WorldFaceGroup& group){
     std::array<float,6> bounds{};bool first=true;
@@ -242,20 +299,61 @@ bool PreparedWorldModel::valid()const noexcept{return bool(storage_);}
 std::size_t PreparedWorldModel::persistent_bytes()const noexcept{
     return storage_?sizeof(Storage)+storage_->vertices.capacity()*sizeof(WorldPoint)+
         storage_->faces.capacity()*sizeof(WorldFace)+storage_->groups.capacity()*sizeof(WorldFaceGroup)+
-        storage_->bounds.capacity()*sizeof(std::array<float,6>):0;
+        storage_->bounds.capacity()*sizeof(std::array<float,6>)+storage_->materials.capacity()*sizeof(Material)+
+        storage_->textures.capacity()*sizeof(Texture)+storage_->indices.capacity():0;
 }
 bool PreparedWorldModel::assign(WorldModel model,WorldSceneError& error)noexcept{
     if(model.vertices.size()<3||model.faces.empty())return fail(WorldSceneError::invalid_model,error);
     if(model.vertices.size()>65536||model.faces.size()>32768)return fail(WorldSceneError::input_limit,error);
     if(!valid_model(model))return fail(WorldSceneError::invalid_model,error);
     try{
-        auto replacement=std::make_unique<Storage>();
+        auto replacement=std::make_shared<Storage>();
         replacement->vertices.assign(model.vertices.begin(),model.vertices.end());
         replacement->faces.assign(model.faces.begin(),model.faces.end());
         replacement->groups.assign(model.groups.begin(),model.groups.end());
         replacement->bounds.reserve(model.groups.size());
         for(const auto& group:model.groups)replacement->bounds.push_back(local_bounds(model,group));
-        storage_.swap(replacement);error=WorldSceneError::none;return true;
+        if(!model.materials.empty()){
+            std::vector<std::uint32_t> remap(model.materials.size(),world_flat_material),texture_slots;
+            std::vector<const Texture*> sources;
+            std::size_t bytes=0;
+            for(auto& face:replacement->faces){
+                if(face.material_index==world_flat_material)continue;
+                auto& mapped=remap[face.material_index];
+                if(mapped==world_flat_material){
+                    const auto& material=model.materials[face.material_index];
+                    std::uint32_t slot=world_flat_material;
+                    if(material.texture){
+                        const auto found=std::find(sources.begin(),sources.end(),material.texture);
+                        slot=std::uint32_t(found-sources.begin());
+                        if(found==sources.end()){
+                            const auto n=std::size_t(material.texture->width)*material.texture->height/2;
+                            if(sources.size()==world_prepared_texture_limit||n>world_prepared_texture_bytes_limit-bytes)
+                                return fail(WorldSceneError::input_limit,error);
+                            sources.push_back(material.texture);bytes+=n;
+                        }
+                    }
+                    mapped=std::uint32_t(replacement->materials.size());
+                    replacement->materials.push_back(material);texture_slots.push_back(slot);
+                }
+                face.material_index=mapped;
+            }
+            replacement->textures.resize(sources.size());replacement->indices.resize(bytes);
+            std::size_t offset=0;
+            for(std::size_t i=0;i<sources.size();++i){const auto& original=*sources[i];
+                const auto n=std::size_t(original.width)*original.height/2;
+                std::copy_n(original.indices,n,replacement->indices.data()+offset);
+                replacement->textures[i]={replacement->indices.data()+offset,n,original.width,original.height,0};offset+=n;
+            }
+            for(std::size_t i=0;i<texture_slots.size();++i)
+                replacement->materials[i].texture=texture_slots[i]==world_flat_material?nullptr:&replacement->textures[texture_slots[i]];
+            if(sources.size()>std::numeric_limits<std::uint64_t>::max()-next_prepared_generation)
+                return fail(WorldSceneError::generation_exhausted,error);
+            for(std::size_t i=0;i<sources.size();++i)replacement->textures[i].generation=next_prepared_generation+i;
+            next_prepared_generation+=sources.size();
+        }
+        std::shared_ptr<const Storage> committed=std::move(replacement);
+        storage_.swap(committed);error=WorldSceneError::none;return true;
     }catch(const std::bad_alloc&){return fail(WorldSceneError::allocation_failed,error);}
     catch(const std::length_error&){return fail(WorldSceneError::allocation_failed,error);}
 }
@@ -265,6 +363,7 @@ const char* world_scene_error_message(WorldSceneError e)noexcept{switch(e){
     case WorldSceneError::invalid_capacity:return "INVALID WORLD FRAME CAPACITY";case WorldSceneError::invalid_model:return "INVALID WORLD MODEL";
     case WorldSceneError::invalid_transform:return "INVALID WORLD TRANSFORM";case WorldSceneError::input_limit:return "WORLD INPUT CAPACITY EXCEEDED";
     case WorldSceneError::output_limit:return "WORLD OUTPUT CAPACITY EXCEEDED";case WorldSceneError::clipping_failed:return "WORLD CLIPPING FAILED";
+    case WorldSceneError::generation_exhausted:return "WORLD TEXTURE GENERATION IDS EXHAUSTED";
     default:return "WORLD FRAME ALLOCATION FAILED";}}
 bool WorldScene::configure(std::size_t faces,std::size_t triangles,WorldSceneError& error,bool cache_vertices)noexcept{
     if(!faces||faces>32768||!triangles||triangles>16384)return fail(WorldSceneError::invalid_capacity,error);
@@ -294,7 +393,7 @@ bool WorldScene::update_impl(std::span<const Instance> instances,const WorldView
     const auto instance_view=[](const Instance& source)->decltype(auto){
         if constexpr(prepared){
             const auto& model=*source.model->storage_;
-            return WorldInstance{{model.vertices,model.faces,model.groups},source.object_to_world};
+            return WorldInstance{{model.vertices,model.faces,model.groups,model.materials},source.object_to_world};
         }else return (source);
     };
     const bool native=numeric_mode_==WorldNumericMode::native_float;
@@ -303,6 +402,8 @@ bool WorldScene::update_impl(std::span<const Instance> instances,const WorldView
     if(!storage_)return fail(WorldSceneError::not_configured,error);
     if(instances.size()>1024)return fail(WorldSceneError::input_limit,error);
     if(!matrix(view.world_to_clip,false)||(view.clear_color>>24)!=255)return fail(WorldSceneError::invalid_transform,error);
+    if(view.use_facing&&(!value(view.facing_origin.x)||!value(view.facing_origin.y)||!value(view.facing_origin.z)))
+        return fail(WorldSceneError::invalid_transform,error);
     std::size_t vertices=0,faces=0;
     for(const auto& source:instances){
         if constexpr(prepared)if(!source.model||!source.model->storage_)return fail(WorldSceneError::invalid_model,error);
@@ -314,8 +415,8 @@ bool WorldScene::update_impl(std::span<const Instance> instances,const WorldView
         if constexpr(!prepared)if(!valid_model(model))return fail(WorldSceneError::invalid_model,error);
     }
     const auto validation_ticks=now()-validation_start;
-    auto& bank=storage_->banks[storage_->active^1];std::size_t material_index=0,triangle_count=0;
-    std::uint32_t groups=0,culled_groups=0,transformed_vertices=0,cache_hits=0;
+    auto& bank=storage_->banks[storage_->active^1];bank.release_leases();std::size_t material_index=0,triangle_count=0;
+    std::uint32_t groups=0,culled_groups=0,transformed_vertices=0,cache_hits=0,backface_rejected_faces=0;
     std::uint32_t batch_calls=0,batch_vertices=0,accepted_batch_vertices=0,failed_batches=0,clipped_batch_fallbacks=0;
     std::uint32_t provider_triangle_corners=0;
     std::uint64_t bounds_ticks=0,transform_ticks=0,clipping_ticks=0;
@@ -326,7 +427,9 @@ bool WorldScene::update_impl(std::span<const Instance> instances,const WorldView
     ClipTriangle input;std::array<Vertex,3> projected;
     const bool cache_project=native&&!storage_->vertex_cache.empty();
     for(const auto& source:instances){const auto& instance=instance_view(source);std::size_t group_index=0;
+    if constexpr(prepared)if(!source.model->storage_->textures.empty())bank.leases[bank.lease_count++]=source.model->storage_;
     const bool identity_bounds=native&&identity_matrix(instance.object_to_world);
+    WorldFacing previous_facing;bool have_facing=false,previous_visible=false;
     batch.count=0;batch.end_face=0;
     if(++storage_->cache_serial==approximate_vertex){for(auto& entry:storage_->vertex_cache)entry.serial=0;storage_->cache_serial=1;}
     for(std::size_t face_index=0;face_index<instance.model.faces.size();++face_index){
@@ -336,11 +439,24 @@ bool WorldScene::update_impl(std::span<const Instance> instances,const WorldView
             if constexpr(prepared)saved_bounds=&source.model->storage_->bounds[group_index-1];
             const auto start=now();const bool outside=native?outside_group_float(instance,group,view.world_to_clip,saved_bounds,identity_bounds):outside_group(instance,group,view.world_to_clip,saved_bounds);bounds_ticks+=now()-start;
             if(outside){
-                ++culled_groups;material_index+=group.face_count;face_index+=group.face_count-1;continue;
+                have_facing=false;++culled_groups;material_index+=group.face_count;face_index+=group.face_count-1;continue;
             }
         }
         const auto& face=instance.model.faces[face_index];
-        auto& material=bank.materials[material_index++];material.color=face.argb;
+        if(view.use_facing&&face.facing.enabled){bool visible;
+            // Quad fans commonly repeat the identical authored plane. Only a
+            // successful result can be reused, within this unchanged instance.
+            if(have_facing&&same_facing(previous_facing,face.facing))visible=previous_visible;
+            else{
+                if(!facing_visible(face.facing,instance.object_to_world,view.facing_origin,visible))
+                    return fail(WorldSceneError::invalid_transform,error);
+                previous_facing=face.facing;previous_visible=visible;have_facing=true;
+            }
+            if(!visible){++backface_rejected_faces;++material_index;continue;}
+        }else have_facing=false;
+        auto& material=bank.materials[material_index++];
+        if(face.material_index==world_flat_material){material.texture=nullptr;material.cutout=false;material.checker=false;material.color=face.argb;}
+        else material=instance.model.materials[face.material_index];
         input.material=&material;
         std::array<bool,3> approximate{},projection_valid{};
         const auto transform_start=now();
@@ -409,6 +525,11 @@ bool WorldScene::update_impl(std::span<const Instance> instances,const WorldView
                 }
             }
         }
+        // The transform/projection cache is keyed by position, not a face's
+        // texel coordinates. Restore each corner's seam after cache hits and
+        // after any exact-reference corner restoration for clipping.
+        if(material.texture)for(unsigned i=0;i<3;++i){const auto uv=face.uv[i];input.vertices[i].u=uv.u;input.vertices[i].v=uv.v;
+            if(projection_valid[i]){projected[i].u=uv.u;projected[i].v=uv.v;}}
         transform_ticks+=now()-transform_start;
         const auto clip_start=now();
         const bool all_projected=projection_valid[0]&&projection_valid[1]&&projection_valid[2];
@@ -430,6 +551,7 @@ bool WorldScene::update_impl(std::span<const Instance> instances,const WorldView
     storage_->stats.provider_triangle_corners=provider_triangle_corners;
     storage_->stats.bounds_ticks=bounds_ticks;storage_->stats.transform_ticks=transform_ticks;storage_->stats.clipping_ticks=clipping_ticks;
     storage_->stats.numeric_mode=numeric_mode_;
+    storage_->stats.backface_rejected_faces=backface_rejected_faces;
     error=WorldSceneError::none;return true;
 }
 Frame WorldScene::frame()const noexcept{return storage_?Frame{{storage_->banks[storage_->active].triangles.data(),storage_->count},storage_->clear,true}:Frame{};}

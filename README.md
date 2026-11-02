@@ -66,15 +66,15 @@ or TestFlight release.
 **PlayStation 2 development:** the [native rewrite](docs/ps2-native-rewrite.md)
 now advances a complete recovered car update from its own persistent state.
 It matches 601 consecutive reference updates, including pose and sound
-requests. A developer application connects that update to pad input and a
-flat body/collision-course view through direct PS2 services, without an arcade
-CPU or device runtime. Rendering performance, the model/camera relationship,
+requests. A developer application now connects it to a textured road neighborhood,
+the recovered chase camera, body, shadow and four wheel transforms through direct
+PS2 services, without an arcade CPU or device runtime. Rendering performance,
 game audio and full race flow remain unfinished; this is not a playable release.
 The native renderer uses 32-bit geometry, VU1 transform batches and VU0 GS
-packing. The diagnostic car/course loop now measures **59.99 native updates/sec
-over 1,680 frames in Play**, with measured work below the 16.67 ms budget in
-every frame. This is an emulator development milestone; full-race and
-physical-console performance remain unverified.
+packing. The textured scene measures **20.00 native updates/sec over 660 frames
+in Play**, up from 8.89 in its first integrated run. The earlier flat diagnostic
+reached 59.99 updates/sec; the textured scene still needs substantial optimization
+for 60. Full-race and physical-console performance remain unverified.
 See the [PS2 build guide and limits](docs/ps2.md).
 The [shared engine](docs/ps2-engine-architecture.md) keeps hardware services
 independent of Rally rules and includes an original engine-only sample.

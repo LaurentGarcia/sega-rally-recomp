@@ -1,4 +1,5 @@
 #include "native_display.h"
+#include "native_texture_cache.h"
 #include "diagnostic_font.h"
 #include "vu0_pack.h"
 #include <dma.h>
@@ -15,6 +16,7 @@
 #include <packet.h>
 #include <vif_registers.h>
 #include <algorithm>
+#include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -24,7 +26,7 @@ namespace ps2::native {
 static_assert(framebuffer_storage_format == GS_PSM_32);
 static_assert(depth_storage_format == GS_PSMZ_16S && depth_register_format == GS_ZBUF_16S);
 namespace {
-constexpr unsigned upload_bytes = 65536, texture_slots = 14, palette_slots = 256;
+constexpr unsigned upload_bytes = 65536, texture_slots = detail::TexturePageCache::slot_count, palette_slots = 256;
 constexpr std::uint32_t dma_running = 1u << 8, vif_reverse = 1u << 23;
 // Display calls/lifetimes are caller-serialized. A failed transport poisons the
 // global GS lease even after its C++ object dies: the reverse bus may be held.
@@ -85,14 +87,17 @@ struct Display::Impl {
     Stats counters{};
     DisplayClock clock=nullptr;void* clock_context=nullptr;
     std::uint64_t now() const noexcept {return clock?clock(clock_context):std::uint64_t{0};}
-    struct TextureSlot { texbuffer_t buffer{}; Texture key{}; std::uint64_t age = 0; bool valid = false; } textures[texture_slots];
+    struct TextureSlot { texbuffer_t buffer{}; } textures[texture_slots];
+    detail::TexturePageCache texture_cache;
+    unsigned texture_base=0;
     struct PaletteSlot {
         clutbuffer_t buffer{};
         std::array<std::uint32_t, 16> colors{};
         std::uint64_t age = 0;
         bool valid = false;
     } palettes[palette_slots];
-    std::uint64_t texture_age = 0, palette_age = 0;
+    PaletteSlot *last_palette = nullptr;
+    std::uint64_t palette_age = 0;
 
     void free_buffers() {
         if (packet) packet_free(packet);
@@ -120,10 +125,10 @@ struct Display::Impl {
         dma_channel_send_chain(DMA_CHANNEL_GIF, packet->data, int(q - packet->data), 0, 0);
         dma_wait_fast();
     }
-    qword_t *test(qword_t *q, bool cutout, bool compare_depth = true) {
+    qword_t *test(qword_t *q, bool cutout, bool compare_depth = true, bool checker = false) {
         atest_t alpha{DRAW_ENABLE, static_cast<unsigned char>(cutout ? ATEST_METHOD_GREATER_EQUAL : ATEST_METHOD_ALLPASS),
                       0x80, ATEST_KEEP_ALL};
-        dtest_t destination{DRAW_DISABLE, DTEST_METHOD_PASS_ONE};
+        dtest_t destination{static_cast<unsigned char>(checker ? DRAW_ENABLE : DRAW_DISABLE), DTEST_METHOD_PASS_ONE};
         ztest_t z{DRAW_ENABLE, static_cast<unsigned char>(depth_active && compare_depth ?
                      ZTEST_METHOD_GREATER_EQUAL : ZTEST_METHOD_ALLPASS)};
         return draw_pixel_test(q, 0, &alpha, &destination, &z);
@@ -140,26 +145,36 @@ struct Display::Impl {
         return draw_clear(q, 0, 0, 0, 640, float(height), (color >> 16) & 255, (color >> 8) & 255, color & 255);
     }
     TextureSlot &texture(const Texture &key, qword_t *&q) {
-        for (auto &slot : textures)
-            if (slot.valid && slot.key.indices == key.indices && slot.key.generation == key.generation &&
-                slot.key.width == key.width && slot.key.height == key.height) {
-                slot.age = ++texture_age; ++counters.texture_hits; return slot;
-            }
-        auto *slot = &textures[0];
-        for (auto &candidate : textures)
-            if (!candidate.valid || (slot->valid && candidate.age < slot->age)) slot = &candidate;
+        // Every key was validated before frame mutation (or is the fixed
+        // original checker asset). Metadata changes cannot alter queued GIF
+        // words. The existing completion fence precedes all VRAM overwrite.
+        const auto selected=texture_cache.acquire(key);
+        assert(selected.slot<texture_slots);
+        auto* slot=&textures[selected.slot];
+        if(selected.hit){++counters.texture_hits;return *slot;}
         complete(q); // Earlier primitives must finish before VRAM is reused.
+        const auto& allocation=texture_cache.entry(selected.slot);
+        slot->buffer.address=texture_base+allocation.first_page*2048;
+        slot->buffer.width=detail::TexturePageCache::pitch_for(key.width);
+        slot->buffer.psm=GS_PSM_4;
         const size_t bytes = size_t(key.width) * key.height / 2;
         std::memcpy(staging, key.indices, bytes);
         upload(key.width, key.height, GS_PSM_4, slot->buffer.address, slot->buffer.width, bytes);
         slot->buffer.info = {draw_log2(key.width), draw_log2(key.height), TEXTURE_COMPONENTS_RGBA, TEXTURE_FUNCTION_DECAL};
-        slot->key = key; slot->age = ++texture_age; slot->valid = true;
+        counters.texture_evictions+=selected.evictions;
+        counters.texture_pages=texture_cache.used_pages();
         ++counters.texture_uploads; counters.texture_bytes += bytes;
         return *slot;
     }
     PaletteSlot &palette(const std::array<std::uint32_t, 16> &colors, qword_t *&q) {
+        // Adjacent primitives often share a CLUT. Retain full content equality:
+        // material pointers may be reused with changed colors between frames.
+        if (last_palette && last_palette->valid && last_palette->colors == colors) {
+            last_palette->age = ++palette_age; ++counters.palette_hits; return *last_palette;
+        }
         for (auto &slot : palettes)
             if (slot.valid && slot.colors == colors) {
+                last_palette = &slot;
                 slot.age = ++palette_age; ++counters.palette_hits; return slot;
             }
         auto *slot = &palettes[0];
@@ -169,8 +184,50 @@ struct Display::Impl {
         for (unsigned index = 0; index < 16; ++index) staging[index] = gs_color(colors[index]);
         upload(8, 2, GS_PSM_32, slot->buffer.address, 64, 64);
         slot->colors = colors; slot->age = ++palette_age; slot->valid = true;
+        last_palette = slot;
         ++counters.palette_uploads; counters.palette_bytes += 64;
         return *slot;
+    }
+    void checker_mask(qword_t *&q) {
+        // Only alpha is written by this repeated8x8 texture. It represents
+        // ((logical_x ^ logical_y) &1), so the checker scales with the same
+        // logical viewport as the triangles. Texture and palette use the
+        // ordinary fenced cache; no extra VRAM or per-frame allocation.
+        static constexpr auto indices=[] {
+            std::array<std::uint8_t,32> result{};
+            for(unsigned y=0;y<8;++y)
+                for(unsigned x=0;x<8;x+=2)
+                    result[y*4+x/2]=(y&1u)?0x01:0x10;
+            return result;
+        }();
+        static const Texture key{indices.data(),indices.size(),8,8,1};
+        static constexpr auto colors=[] {
+            std::array<std::uint32_t,16> result{};
+            result[1]=0xff000000u;return result;
+        }();
+        auto& image=texture(key,q);
+        auto& clut=palette(colors,q);
+        framebuffer_t masked=frames[target];masked.mask=0x00ffffffu;
+        q=draw_framebuffer(q,0,&masked);
+        const auto saved_mask=depth.mask;depth.mask=1;
+        q=draw_zbuffer(q,0,&depth);
+        q=test(q,false,false);
+        q=draw_texturebuffer(q,0,&image.buffer,&clut.buffer);
+        texwrap_t wrap{};wrap.horizontal=wrap.vertical=WRAP_REPEAT;
+        q=draw_texture_wrapping(q,0,&wrap);
+        texrect_t rect{};
+        // The pinned SDK's sprite helper expands v0 by-7/16 and v1 by+9/16.
+        // Cancel that expansion so texels track our triangle viewport exactly,
+        // instead of stretching the mask over641 by(height+1) physical pixels.
+        rect.v0={.4375f,.4375f,0};rect.v1={640.f-.5625f,float(height)-.5625f,0};
+        rect.t0.u=rect.t0.v=0;rect.t1.u=frame_width;rect.t1.v=frame_height;
+        rect.color.r=rect.color.g=rect.color.b=rect.color.a=0x80;rect.color.q=1;
+        q=draw_rect_textured(q,0,&rect);
+        complete(q);
+        // Keep stipple alpha intact even when an ordinary opaque or cutout
+        // primitive intervenes. Restore native depth writes for scene work.
+        masked.mask=0xff000000u;q=draw_framebuffer(q,0,&masked);
+        depth.mask=saved_mask;q=draw_zbuffer(q,0,&depth);
     }
     void page(const char *text, bool fullscreen = true) {
         if (!text || !*text) return;
@@ -249,12 +306,7 @@ void Display::set_profile_clock(DisplayClock clock,void* context) noexcept {
 }
 void Display::invalidate_textures() noexcept {
     if (!impl_) return;
-    for (auto &slot : impl_->textures) {
-        slot.valid = false;
-        slot.key = {};
-        slot.age = 0;
-    }
-    impl_->texture_age = 0;
+    impl_->texture_cache.clear();
 }
 
 bool Display::initialize() {
@@ -297,11 +349,12 @@ bool Display::initialize() {
     if (font < 0) return failed("NATIVE FONT VRAM EXHAUSTED");
     d.font.address = font; d.font.width = 128; d.font.psm = GS_PSM_32;
     d.font.info = {7, 6, TEXTURE_COMPONENTS_RGBA, TEXTURE_FUNCTION_DECAL};
-    for (auto &slot : d.textures) {
-        const int address = graph_vram_allocate(256, 256, GS_PSM_4, GRAPH_ALIGN_BLOCK);
-        if (address < 0) return failed("NATIVE TEXTURE VRAM EXHAUSTED");
-        slot.buffer.address = address; slot.buffer.width = 256; slot.buffer.psm = GS_PSM_4;
-    }
+    // This is an arena allocation, not a1024x1536 sampled texture. It reserves
+    // exactly96 complete GS pages; each actual image uses its own1/2/4-page
+    // range and TBW128 or256. The pool leaves32KiB free in the PAL layout.
+    const int texture_base=graph_vram_allocate(1024,1536,GS_PSM_4,GRAPH_ALIGN_PAGE);
+    if(texture_base<0)return failed("NATIVE TEXTURE VRAM EXHAUSTED");
+    d.texture_base=texture_base;d.texture_cache.clear();
     for (auto &slot : d.palettes) {
         const int address = graph_vram_allocate(8, 8, GS_PSM_32, GRAPH_ALIGN_BLOCK);
         if (address < 0) return failed("NATIVE CLUT VRAM EXHAUSTED");
@@ -338,21 +391,28 @@ bool Display::present(const Frame &frame) {
     const auto validation_start=d.now();
     if (!valid_frame(frame, d.failure)) return false;
     d.counters = {};
+    d.counters.texture_pages=d.texture_cache.used_pages();
     const auto build_start=d.now();
     d.counters.validation_ticks=build_start-validation_start;
     qword_t *q = d.clear(frame.clear_color, frame.depth_test);
+    const bool checker=std::any_of(frame.triangles.begin(),frame.triangles.end(),
+        [](const Triangle& triangle){return triangle.material->checker;});
+    if(checker)d.checker_mask(q);
     // Depth comparison stays fixed for this frame. Preserve the same TEST
     // writes while constructing each cutout variant only once with the SDK.
-    alignas(16) qword_t pixel_tests[2][2];
-    d.test(pixel_tests[0],false);
-    d.test(pixel_tests[1],true);
+    alignas(16) qword_t pixel_tests[2][2][2];
+    for(unsigned cutout=0;cutout<2;++cutout){
+        d.test(pixel_tests[cutout][0],cutout!=0);
+        if(checker)d.test(pixel_tests[cutout][1],cutout!=0,true,true);
+    }
     const float sx = 640.f / frame_width, sy = float(d.height) / frame_height;
     for (const auto &triangle : frame.triangles) {
         if (q - d.packet->data > 200) { d.submit(q); q = d.packet->data; }
         const auto &material = *triangle.material;
         ++d.counters.triangles;
+        d.counters.checker_triangles+=material.checker;
         if (d.use_vu0) d.counters.vu0_vertices += 3;
-        std::memcpy(q,pixel_tests[material.cutout?1:0],32); q+=2;
+        std::memcpy(q,pixel_tests[material.cutout?1:0][material.checker?1:0],32); q+=2;
         if (!material.texture) {
             // The SDK's 2D filled-triangle helper repeats v0.z for all three
             // corners. Native 3D surfaces require independently interpolated Z.

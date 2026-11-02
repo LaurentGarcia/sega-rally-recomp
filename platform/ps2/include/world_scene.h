@@ -6,17 +6,38 @@
 namespace ps2::native {
 using WorldMatrix=std::array<float,16>; // column-major, column vectors
 struct WorldPoint { float x=0,y=0,z=0; };
-struct WorldFace { std::array<std::uint32_t,3> indices{};std::uint32_t argb=0xffffffffu; };
+struct WorldUV { float u=0,v=0; }; // Texel coordinates, per face corner.
+// Optional authored facing data, independent of triangle winding. Both fan
+// triangles of a source quad retain the same original point/vector. The
+// vector uses the instance's linear transform (no inverse transpose).
+struct WorldFacing { WorldPoint normal{},point{};bool enabled=false; };
+inline constexpr std::uint32_t world_flat_material=0xffffffffu;
+inline constexpr std::size_t world_material_limit=4096;
+inline constexpr std::size_t world_prepared_texture_limit=1024;
+inline constexpr std::size_t world_prepared_texture_bytes_limit=4*1024*1024;
+struct WorldFace {
+    std::array<std::uint32_t,3> indices{};std::uint32_t argb=0xffffffffu;
+    std::array<WorldUV,3> uv{};
+    // The sentinel retains the opaque argb path. Otherwise this selects the
+    // complete material, including its palette, cutout and texture identity.
+    std::uint32_t material_index=world_flat_material;
+    WorldFacing facing{};
+};
 struct WorldFaceGroup { std::uint32_t first_face=0,face_count=0; };
 struct WorldModel { std::span<const WorldPoint> vertices;std::span<const WorldFace> faces;
     // Optional nonempty, contiguous partition of all faces. Bounds are derived
     // from validated vertices each call; no caller-supplied bound is trusted.
-    std::span<const WorldFaceGroup> groups{}; };
+    std::span<const WorldFaceGroup> groups{};
+    std::span<const Material> materials{}; };
 struct WorldInstance { WorldModel model;WorldMatrix object_to_world{}; };
-struct WorldView { WorldMatrix world_to_clip{};std::uint32_t clear_color=0xff101923u; };
+struct WorldView { WorldMatrix world_to_clip{};std::uint32_t clear_color=0xff101923u;
+    // Explicit pre-projection-space origin. Facing uses original-ordered
+    // binary32 arithmetic in both geometry modes, retaining dot==0. All read
+    // inputs and arithmetic intermediates must be finite normal-or-zero.
+    bool use_facing=false;WorldPoint facing_origin{}; };
 enum class WorldNumericMode { reference, native_float };
 enum class WorldSceneError { none,not_configured,invalid_capacity,invalid_model,invalid_transform,
-    input_limit,output_limit,clipping_failed,allocation_failed };
+    input_limit,output_limit,clipping_failed,allocation_failed,generation_exhausted };
 struct WorldSceneStats { std::uint32_t instances=0,vertices=0,source_faces=0,output_triangles=0;
     std::size_t persistent_bytes=0;
     std::uint32_t groups=0,culled_groups=0,transformed_vertices=0,vertex_cache_hits=0;
@@ -27,7 +48,8 @@ struct WorldSceneStats { std::uint32_t instances=0,vertices=0,source_faces=0,out
     // Optional caller-clock units, reset per successful frame. Clock overhead
     // is included; these diagnostics are not an uninstrumented timing claim.
     std::uint64_t validation_ticks=0,bounds_ticks=0,transform_ticks=0,clipping_ticks=0;
-    WorldNumericMode numeric_mode=WorldNumericMode::reference; };
+    WorldNumericMode numeric_mode=WorldNumericMode::reference;
+    std::uint32_t backface_rejected_faces=0; };
 using WorldSceneClock=std::uint64_t (*)(void* context) noexcept;
 // Optional rendering-only provider, never a game-state transform. Every call
 // has1..96 distinct input vertices and equally sized output/accepted spans.
@@ -49,9 +71,11 @@ using WorldSceneTransformBatch=bool (*)(void*,const WorldMatrix&,const WorldMatr
 const char* world_scene_error_message(WorldSceneError error) noexcept;
 
 // Immutable, owned model snapshot. Assignment validates and copies all source
-// vertices/faces/groups and derives exact local group extrema once. Sources may
-// then change or die. Failed assignment retains the previous snapshot. Calls
-// are serialized with update_prepared(); no borrowed mutable model is trusted.
+// vertices/faces/groups, referenced materials and texture bytes, and derives
+// exact local group extrema once. Sources may then change or die. Failed
+// assignment retains the previous snapshot. Assignment and prepared updates
+// are serialized process-wide: copied textures receive monotonically unique
+// lifetime generations, with exhaustion rejected before publication.
 class PreparedWorldModel {
 public:
     PreparedWorldModel() noexcept;~PreparedWorldModel();
@@ -60,12 +84,16 @@ public:
     PreparedWorldModel(PreparedWorldModel&&)=delete;
     PreparedWorldModel& operator=(PreparedWorldModel&&)=delete;
     // Same model domain as update(), at most65536 vertices and32768 faces.
+    // Copies only referenced materials and unique Texture descriptor pointers:
+    // at most1024 textures/4MiB of indices. Supplied generations are replaced by
+    // private lifetime IDs; prepared pixels are immutable. A published frame
+    // retains its snapshot even after this owner is replaced or destroyed.
     bool assign(WorldModel,WorldSceneError&) noexcept;
     bool valid() const noexcept;
     // Owned storage and vector capacities, excluding allocator bookkeeping.
     std::size_t persistent_bytes() const noexcept;
 private:
-    struct Storage;std::unique_ptr<Storage> storage_;
+    struct Storage;std::shared_ptr<const Storage> storage_;
     friend class WorldScene;
 };
 struct PreparedWorldInstance {
@@ -76,7 +104,7 @@ struct PreparedWorldInstance {
 // Explicit fixed-world presentation adapter. It does not fit/recenter bounds,
 // advance game state, recover a game camera, or read reference-view transforms.
 // Caller supplies the proven model-local assembly and world/view transforms.
-// Color is opaque flat material; original lighting/textures are not inferred.
+// Materials and UVs are explicit assets; lighting/texture identity is not inferred.
 class WorldScene {
 public:
     WorldScene() noexcept;~WorldScene();
@@ -108,14 +136,20 @@ public:
     // values must be normal-or-zero finite with abs<=65536. Object transforms
     // are affine; the explicit world_to_clip may be projective. Positive-w and
     // clip/depth conventions are native_geometry's; depth testing is enabled.
-    // Failure retains the previous frame. Models/views need only survive this
-    // call; the prepared frame owns its materials/vertices. Returned frame views
+    // UVs are normal-or-zero with abs<=65536. At most4096 materials, with
+    // PSMT4 Texture dimensions8..256 and opaque/transparent palette entries.
+    // Failure retains the previous frame. Geometry/views/material tables need
+    // only survive this call; the frame copies materials/vertices. Ordinary
+    // Texture descriptors/pixels remain borrowed through the frame's lifetime;
+    // Display's generation/invalidation contract still applies to those assets.
+    // Returned frame views
     // expire at the next successful update/configure or owner destruction.
     bool update(std::span<const WorldInstance>,const WorldView&,WorldSceneError&) noexcept;
     // Identical presentation and transactional limits, using owned snapshots.
     // Owners must be valid and survive this call; instance/view transforms are
     // checked every time. No allocations occur, and the resulting frame does
-    // not retain pointers to a model owner. Snapshot storage is separate from
+    // not retain pointers to a model owner. Its preallocated bank leases retain
+    // textured snapshots; flat snapshots require no lease. Snapshot storage is separate from
     // WorldSceneStats::persistent_bytes and is reported by each model owner.
     bool update_prepared(std::span<const PreparedWorldInstance>,const WorldView&,WorldSceneError&) noexcept;
     Frame frame() const noexcept;

@@ -1,6 +1,7 @@
 #include "native_vehicle_demo.h"
 #include "main_vehicle_checkpoint.h"
 #include "rally_body_scene.h"
+#include "rally_visual_scene.h"
 #include "debug_controls.h"
 #include "vu1_transform.h"
 #include <timer.h>
@@ -81,8 +82,11 @@ WorldView view(const std::array<float,3>& target,float yaw) {
 }
 }
 int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* checkpoint_path,
-                            const char* course_path,const char* body_path,NativeVehicleRenderMode mode,bool detailed_profiling) {
-    display.present_status("NATIVE VEHICLE DEVELOPMENT TEST\nLOADING ONE INITIAL CHECKPOINT\nLIVE PAD / NATIVE GAME UPDATE\nDIAGNOSTIC BODY AND COURSE VIEW");
+                            const char* course_path,const char* body_path,NativeVehicleRenderMode mode,bool detailed_profiling,
+                            bool textured_presentation) {
+    display.present_status(textured_presentation?
+        "NATIVE TEXTURED DRIVING TEST\nLOADING ONE INITIAL CHECKPOINT\nRECOVERED CAR AND CHASE VIEW\nFIXED VISUAL COURSE NEIGHBORHOOD":
+        "NATIVE VEHICLE DEVELOPMENT TEST\nLOADING ONE INITIAL CHECKPOINT\nLIVE PAD / NATIVE GAME UPDATE\nDIAGNOSTIC BODY AND COURSE VIEW");
     DrivingAssets assets;DrivingAssetError asset_error;
     if(!load_driving_assets_file(course_path,assets,asset_error))throw std::runtime_error(driving_asset_error_message(asset_error));
     MainVehicleCheckpoint initial;MainVehicleCheckpointError checkpoint_error;
@@ -91,10 +95,17 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
         throw std::runtime_error("CHECKPOINT AND COURSE ASSETS DIFFER");
     if(initial.input.operating_mode!=1)throw std::runtime_error("DRIVING TEST REQUIRES ACTIVE RACE CHECKPOINT");
     RallyBodyScene body;RallyBodyError body_error;
-    if(!body.load(body_path,identity,body_error)||!body.attach_course(assets.course(),body_error))
+    RallyVisualScene visual;RallyVisualError visual_error;
+    if(textured_presentation){
+        if(!visual.load(body_path,initial.input.frame,visual_error))
+            throw std::runtime_error(rally_visual_error_message(visual_error));
+    }else if(!body.load(body_path,identity,body_error)||!body.attach_course(assets.course(),body_error))
         throw std::runtime_error(rally_body_error_message(body_error));
+    const auto scene_stats=[&](){return textured_presentation?visual.stats():body.stats();};
+    const auto scene_frame=[&](){return textured_presentation?visual.frame():body.frame();};
     const WorldSceneClock detail_clock=[](void*) noexcept -> std::uint64_t {return GetTimerSystemTime();};
     body.set_profile_clock(detailed_profiling?detail_clock:nullptr);
+    visual.set_profile_clock(detailed_profiling?detail_clock:nullptr);
     display.set_profile_clock([](void*) noexcept -> std::uint64_t {return GetTimerSystemTime();});
     VuPresentation vu;
     bool use_vu1=false;
@@ -103,8 +114,10 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
     const auto apply_mode=[&](){
         vu.native_float=mode==NativeVehicleRenderMode::native_vu;
         body.set_numeric_mode(vu.native_float?WorldNumericMode::native_float:WorldNumericMode::reference);
+        visual.set_numeric_mode(vu.native_float?WorldNumericMode::native_float:WorldNumericMode::reference);
         use_vu1=mode!=NativeVehicleRenderMode::reference&&vu.unit.initialize();
         body.set_transform_provider(use_vu1?VuPresentation::batch:nullptr,&vu);
+        visual.set_transform_provider(use_vu1?VuPresentation::batch:nullptr,&vu);
         std::printf("NATIVE_VEHICLE_VU mode=%s status=\"%s\" synchronous=1\n",mode_name(),vu.unit.error());
     };
     apply_mode();
@@ -114,15 +127,18 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
     MainVehicleProfile update_profile;
     update_profile.clock=[](void*) noexcept -> std::uint64_t {return GetTimerSystemTime();};
     bool diagnostics=false;std::uint16_t previous_buttons=0;
+    bool visual_initial_update_pending=textured_presentation;
     ps2::PadSnapshot previous_pad;const char* previous_pad_status="";
     int previous_sdk_state=-1,previous_sdk_request=-1;
-    char page[1500]{};std::uint64_t total_update_ticks=0,total_draw_ticks=0;
+    char page[1500]{},caption[128]{};std::uint64_t total_update_ticks=0,total_draw_ticks=0;
     std::uint64_t previous_start=0,previous_vsync=0,period_sum=0,period_min=~std::uint64_t{0},period_max=0;
-    std::uint64_t work_sum=0,work_max=0;unsigned measured_frames=0,over_budget=0;
+    std::uint64_t work_sum=0,work_max=0;unsigned measured_frames=0,over_budget=0,rate_tenths=0;
     constexpr std::uint64_t frame_budget=kBUSCLK/60;
-    display.set_caption("NATIVE VEHICLE TEST\nDIAGNOSTIC BODY / COURSE");
-    std::printf("NATIVE_VEHICLE_BEGIN course=%lu asset_crc=%08lx checkpoint_frame=%lu body_bytes=%lu\n",
-        (unsigned long)assets.selector(),(unsigned long)assets.payload_crc32(),(unsigned long)controls.frame,(unsigned long)body.persistent_bytes());
+    display.set_caption(textured_presentation?nullptr:
+        "NATIVE VEHICLE TEST\nDIAGNOSTIC BODY / COURSE");
+    std::printf("NATIVE_VEHICLE_BEGIN course=%lu asset_crc=%08lx checkpoint_frame=%lu body_bytes=%lu textured=%u\n",
+        (unsigned long)assets.selector(),(unsigned long)assets.payload_crc32(),(unsigned long)controls.frame,
+        (unsigned long)(textured_presentation?visual.persistent_bytes():body.persistent_bytes()),unsigned(textured_presentation));
     for(unsigned frame=1;;++frame){
         const auto frame_start=GetTimerSystemTime();
         if(frame>1){
@@ -138,6 +154,14 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
                     frame-1,measured_frames,(unsigned long long)frame_budget,(unsigned long long)period_sum,
                     (unsigned long long)period_min,(unsigned long long)period_max,(unsigned long long)work_sum,
                     (unsigned long long)work_max,over_budget,unsigned(kBUSCLK));
+                if(period_sum){
+                    rate_tenths=unsigned(std::uint64_t(measured_frames)*10*kBUSCLK/period_sum);
+                    if(!textured_presentation){
+                        std::snprintf(caption,sizeof(caption),"NATIVE VEHICLE TEST\nGAME UPDATES/S %lu.%lu / TARGET 60",
+                            (unsigned long)(rate_tenths/10),(unsigned long)(rate_tenths%10));
+                        display.set_caption(caption);
+                    }
+                }
                 period_sum=0;period_min=~std::uint64_t{0};period_max=0;
                 work_sum=0;work_max=0;measured_frames=0;over_budget=0;
             }
@@ -157,14 +181,20 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
         if(debug_toggle.update(pad_state)){
             diagnostics=!diagnostics;
             body.set_profile_clock(detailed_profiling||diagnostics?detail_clock:nullptr);
+            visual.set_profile_clock(detailed_profiling||diagnostics?detail_clock:nullptr);
         }
         const auto pressed=pad_state.buttons&~previous_buttons;previous_buttons=pad_state.buttons;
         if(pressed&ps2::Triangle){
             mode=static_cast<NativeVehicleRenderMode>((unsigned(mode)+1)%3);apply_mode();
         }
-        if((pressed&ps2::Start)&&!(pad_state.buttons&ps2::Select)){state=initial.state;controls=initial.input;}
-        controls.steering_sample=128;controls.accelerator_sample=48;controls.brake_sample=48;
-        if(pad_state.connected){
+        if((pressed&ps2::Start)&&!(pad_state.buttons&ps2::Select)){
+            state=initial.state;controls=initial.input;if(textured_presentation){visual.reset();visual_initial_update_pending=true;}
+        }
+        // One seed control establishes the asset-bound initial publication.
+        // Every later update consumes live pad/neutral controls, never poses.
+        if(!visual_initial_update_pending){
+          controls.steering_sample=128;controls.accelerator_sample=48;controls.brake_sample=48;
+          if(pad_state.connected){
             if(pad_state.analog)controls.steering_sample=std::uint8_t(128+(int(pad_state.left_x)-128)*80/128);
             if(pad_state.buttons&ps2::Left)controls.steering_sample=48;
             if(pad_state.buttons&ps2::Right)controls.steering_sample=208;
@@ -174,6 +204,7 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
                 if((pressed&ps2::R1)&&controls.requested_gear<4)++controls.requested_gear;
                 if((pressed&ps2::L1)&&controls.requested_gear>1)--controls.requested_gear;
             }
+          }
         }
         const auto update_start=GetTimerSystemTime();
         if(!update_main_vehicle(assets,initial.setup,controls,state,result,&update_profile)){
@@ -186,9 +217,14 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
         RallyBodyPose pose{{car.position[0],car.position[1],car.position[2]},
                            {car.orientation[0],car.orientation[1],car.orientation[2]}};
         vu.counts={};
-        if(!body.update(pose,view(car.position,camera_yaw),body_error))throw std::runtime_error(rally_body_error_message(body_error));
+        if(textured_presentation){
+            if(!visual.update(result.pose,visual_error))throw std::runtime_error(rally_visual_error_message(visual_error));
+            visual_initial_update_pending=false;
+        }else if(!body.update(pose,view(car.position,camera_yaw),body_error))
+            throw std::runtime_error(rally_body_error_message(body_error));
         if(use_vu1&&!vu.unit.available()){
             use_vu1=false;body.set_transform_provider(nullptr);
+            visual.set_transform_provider(nullptr);
             std::printf("NATIVE_VEHICLE_VU_RETIRED update=%u status=\"%s\" switching_to=%s\n",frame,vu.unit.error(),mode_name());
         }
         const auto geometry_ticks=GetTimerSystemTime()-draw_start;
@@ -196,10 +232,11 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
             "NATIVE VEHICLE DEVELOPMENT TEST\n"
             "ONE INITIAL STATE / LIVE PAD\n"
             "RECOVERED CONTACTS AND MOTION\n"
-            "DIAGNOSTIC BODY / COLLISION COURSE\n"
-            "CAMERA AND BODY AXIS BRIDGE DIAGNOSTIC\n"
+            "%s\n"
+            "%s\n"
             "GAME AUDIO AND GAME FLOW NOT CONNECTED\n\n"
             "PAD %s / UPDATE %u\n"
+            "GAME UPDATES/S %lu.%lu / TARGET 60\n"
             "PAD STATUS %s\n"
             "SDK STATE %d / REQUEST %d\n"
             "GEAR %lu / SEGMENT %d\n"
@@ -214,32 +251,39 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
             "TRIANGLE CYCLE RENDERER\n"
             "SELECT+START TOGGLE THIS PAGE\n"
             "TIMING IS EMULATOR OBSERVATION",
-            pad_state.connected?"CONNECTED":"DISCONNECTED",frame,pad_status,pad.sdk_state(),pad.sdk_request_state(),(unsigned long)state.gear,int(state.segment),
+            textured_presentation?"TEXTURED CAR / FIXED VISUAL COURSE":"DIAGNOSTIC BODY / COLLISION COURSE",
+            textured_presentation?"RECOVERED CHASE VIEW / FIXED LIGHTING":"CAMERA AND BODY AXIS BRIDGE DIAGNOSTIC",
+            pad_state.connected?"CONNECTED":"DISCONNECTED",frame,
+            (unsigned long)(rate_tenths/10),(unsigned long)(rate_tenths%10),
+            pad_status,pad.sdk_state(),pad.sdk_request_state(),(unsigned long)state.gear,int(state.segment),
             double(car.position[0]),double(car.position[1]),double(car.position[2]),double(car.motion[0]),double(car.motion[1]),double(car.motion[2]),
             (unsigned long long)(update_ticks*1000000/kBUSCLK),(unsigned long long)(geometry_ticks*1000000/kBUSCLK),
-            (unsigned long)body.stats().output_triangles,mode_name(),
-            (unsigned long)body.stats().accepted_batch_vertices);
+            (unsigned long)scene_stats().output_triangles,mode_name(),
+            (unsigned long)scene_stats().accepted_batch_vertices);
         display.set_debug_page(diagnostics?page:nullptr);
-        if(!display.present(body.frame()))throw std::runtime_error(display.error());
+        if(!display.present(scene_frame()))throw std::runtime_error(display.error());
         previous_vsync=display.stats().vsync_ticks;
         const auto draw_ticks=GetTimerSystemTime()-draw_start;total_draw_ticks+=draw_ticks;
         if(frame<=3||frame%60==0){
-            const auto stats=body.stats();
+            const auto stats=scene_stats();
             std::printf("NATIVE_VEHICLE_UPDATE_PROFILE update=%u entry_ticks=%llu contact_ticks=%llu front_ticks=%llu balance_ticks=%llu motion_ticks=%llu total_ticks=%llu\n",
                 frame,(unsigned long long)update_profile.entry_ticks,(unsigned long long)update_profile.contact_ticks,
                 (unsigned long long)update_profile.front_ticks,(unsigned long long)update_profile.balance_ticks,
                 (unsigned long long)update_profile.motion_ticks,(unsigned long long)update_profile.total_ticks);
-            const auto body_timing=body.timings();const auto display_stats=display.stats();
+            const auto body_timing=body.timings();const auto visual_timing=visual.timings();const auto display_stats=display.stats();
             std::printf("NATIVE_VEHICLE_PIPELINE update=%u detailed=%u pose_ticks=%llu scene_ticks=%llu display_validation_ticks=%llu packet_ticks=%llu completion_ticks=%llu decoration_ticks=%llu vsync_ticks=%llu\n",
-                frame,unsigned(detailed_profiling||diagnostics),(unsigned long long)body_timing.pose_ticks,(unsigned long long)body_timing.scene_ticks,
+                frame,unsigned(detailed_profiling||diagnostics),
+                (unsigned long long)(textured_presentation?visual_timing.pose_ticks:body_timing.pose_ticks),
+                (unsigned long long)(textured_presentation?visual_timing.scene_ticks:body_timing.scene_ticks),
                 (unsigned long long)display_stats.validation_ticks,(unsigned long long)display_stats.build_ticks,
                 (unsigned long long)display_stats.completion_ticks,(unsigned long long)display_stats.decoration_ticks,
                 (unsigned long long)display_stats.vsync_ticks);
-            std::printf("NATIVE_VEHICLE_GEOMETRY update=%u validation_ticks=%llu bounds_ticks=%llu transform_ticks=%llu clipping_ticks=%llu transformed_vertices=%lu cache_hits=%lu groups=%lu culled_groups=%lu\n",
+            std::printf("NATIVE_VEHICLE_GEOMETRY update=%u validation_ticks=%llu bounds_ticks=%llu transform_ticks=%llu clipping_ticks=%llu transformed_vertices=%lu cache_hits=%lu groups=%lu culled_groups=%lu backface_rejected=%lu\n",
                 frame,(unsigned long long)stats.validation_ticks,(unsigned long long)stats.bounds_ticks,
                 (unsigned long long)stats.transform_ticks,(unsigned long long)stats.clipping_ticks,
                 (unsigned long)stats.transformed_vertices,(unsigned long)stats.vertex_cache_hits,
-                (unsigned long)stats.groups,(unsigned long)stats.culled_groups);
+                (unsigned long)stats.groups,(unsigned long)stats.culled_groups,
+                (unsigned long)stats.backface_rejected_faces);
             std::printf("NATIVE_VEHICLE_VU_FRAME update=%u batches=%lu vertices=%lu accepted=%lu used_corners=%lu clipped_fallbacks=%lu failed_batches=%lu near_plane=%u budget=%u invalid=%u unsupported=%u transform_ticks=%llu guard_ticks=%llu max_bound_pixels=%.7g max_bound_depth=%.7g vu0_vertices=%lu status=\"%s\"\n",
                 frame,(unsigned long)stats.batch_calls,(unsigned long)stats.batch_vertices,
                 (unsigned long)stats.accepted_batch_vertices,(unsigned long)stats.provider_triangle_corners,
@@ -247,6 +291,12 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
                 vu.counts.near_plane,vu.counts.budget,vu.counts.invalid,vu.counts.unsupported,
                 (unsigned long long)vu.counts.transform_ticks,(unsigned long long)vu.counts.guard_ticks,
                 vu.counts.max_pixels,vu.counts.max_depth,(unsigned long)display.stats().vu0_vertices,vu.unit.error());
+            if(textured_presentation)std::printf(
+                "NATIVE_VEHICLE_TEXTURES update=%u uploads=%lu hits=%lu bytes=%llu palettes=%lu palette_bytes=%llu checker=%lu evictions=%lu pages=%lu\n",
+                frame,(unsigned long)display_stats.texture_uploads,(unsigned long)display_stats.texture_hits,
+                (unsigned long long)display_stats.texture_bytes,(unsigned long)display_stats.palette_uploads,
+                (unsigned long long)display_stats.palette_bytes,(unsigned long)display_stats.checker_triangles,
+                (unsigned long)display_stats.texture_evictions,(unsigned long)display_stats.texture_pages);
         }
         if(frame<=3||frame%60==0)std::printf(
             "NATIVE_VEHICLE_FRAME update=%u game_frame=%lu pad=%u controls=%u,%u,%u position=%.7g,%.7g,%.7g motion=%.7g,%.7g,%.7g update_ticks=%llu geometry_ticks=%llu display_ticks=%llu total_update_ticks=%llu total_draw_ticks=%llu frequency=%u triangles=%lu sound_requests=%u\n",
@@ -254,7 +304,7 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
             double(car.position[0]),double(car.position[1]),double(car.position[2]),double(car.motion[0]),double(car.motion[1]),double(car.motion[2]),
             (unsigned long long)update_ticks,(unsigned long long)geometry_ticks,(unsigned long long)draw_ticks,
             (unsigned long long)total_update_ticks,(unsigned long long)total_draw_ticks,unsigned(kBUSCLK),
-            (unsigned long)body.stats().output_triangles,result.command_count);
+            (unsigned long)scene_stats().output_triangles,result.command_count);
         ++controls.frame;
     }
 }

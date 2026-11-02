@@ -138,9 +138,9 @@ int main() {
                 {Fault::vram,3,"NATIVE DEPTH VRAM EXHAUSTED"},
                 {Fault::vram,4,"NATIVE FONT VRAM EXHAUSTED"},
                 {Fault::vram,5,"NATIVE TEXTURE VRAM EXHAUSTED"},
-                {Fault::vram,18,"NATIVE TEXTURE VRAM EXHAUSTED"},
-                {Fault::vram,19,"NATIVE CLUT VRAM EXHAUSTED"},
-                {Fault::vram,274,"NATIVE CLUT VRAM EXHAUSTED"},
+                {Fault::vram,6,"NATIVE CLUT VRAM EXHAUSTED"},
+                {Fault::vram,128,"NATIVE CLUT VRAM EXHAUSTED"},
+                {Fault::vram,261,"NATIVE CLUT VRAM EXHAUSTED"},
                 {Fault::video,0,"NATIVE VIDEO MODE FAILED"},
             };
             // Every failure retries the same object twice. Failure must release

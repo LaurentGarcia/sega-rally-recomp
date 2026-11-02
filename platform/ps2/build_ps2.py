@@ -51,6 +51,7 @@ ENGINE_SOURCES = (
     "platform/ps2/src/pad_input.cpp", "platform/ps2/src/storage.cpp",
     "platform/ps2/src/audio_output.cpp", "platform/ps2/src/vu0_pack.cpp",
     "platform/ps2/src/world_scene.cpp",
+    "platform/ps2/src/native_textured_model.cpp",
     "platform/ps2/src/vu1_transform.cpp", "platform/ps2/src/vu1_transform_math.cpp",
     "platform/ps2/src/vu1_transform.vsm",
 )
@@ -92,6 +93,9 @@ GAME_SOURCES = ("platform/ps2/native/race_progress.cpp", "platform/ps2/native/ca
                 "platform/ps2/native/main_vehicle_update.cpp",
                 "platform/ps2/native/main_vehicle_checkpoint.cpp",
                 "platform/ps2/native/rally_body_scene.cpp",
+                "platform/ps2/native/car_render_bridge.cpp",
+                "platform/ps2/native/driving_render_view.cpp",
+                "platform/ps2/native/rally_visual_scene.cpp",
                 "platform/ps2/native/native_vehicle_demo.cpp")
 # Preserve the existing native-port object order while the demo omits study code.
 NATIVE_TOOLKIT_SOURCES = (*ENGINE_SOURCES[:3], *STUDY_SOURCES, *ENGINE_SOURCES[3:])
@@ -100,7 +104,8 @@ ENGINE_DEMO_SOURCES = ["platform/ps2/samples/engine_demo/main.cpp", *ENGINE_SOUR
 ENGINE_HEADERS = {
     "audio_output.h", "pcm_protocol.h", "pcm_resampler.h", "pcm_ring.h",
     "native_display.h", "native_geometry.h", "native_geometry_float.h",
-    "native_geometry_float_internal.h", "world_scene.h",
+    "native_geometry_float_internal.h", "world_scene.h", "native_textured_model.h",
+    "native_texture_cache.h",
     "pad_input.h", "pad_state.h", "debug_controls.h", "storage.h", "vu0_pack.h", "vu1_transform.h", "diagnostic_font.h",
 }
 STUDY_HEADERS = {"native_mesh.h", "native_scene.h"}

@@ -1,5 +1,242 @@
 # Handoff
 
+## Native textured motion and recovered visual assembly (2026-11-01)
+
+Continued from 12ef097e. The native application now renders the Martini Lancia
+Delta moving through a bounded textured road/building neighborhood. One initial
+checkpoint seeds the recovered main update; subsequent car, shadow, four-wheel
+and chase-camera transforms come from native state. No captured per-frame pose,
+matrix stream, arcade processor, device or bus is linked into this executable.
+This is a development scene with fixed lighting and a fixed visual neighborhood,
+not a full race. HUD, opponents, race initialization/progression, dynamic scenery,
+game audio, physical input and physical-console performance remain open.
+
+The first integrated native041 scene measures 8.893 native updates/sec across
+240 complete periods in Play 0.72 HLE. Native042, with supplied-normal facing
+and GS page residency, measures 14.971 across 480 complete periods. Native043
+adds exact facing-result reuse and the last-palette lookup fast path and measures
+20.003 across 660 complete periods. Its mean complete period is 49.993 ms and mean
+work outside wait/flip is 34.927 ms; all 660 work periods exceed 16.667 ms. These
+sample lengths differ; the figures do not isolate individual changes. Earlier native040's
+59.991 result below belongs to the flat diagnostic, not textured gameplay.
+Source/ELF/log/input bindings are in
+build/ps2-native-motion-001/native041-validation.json and
+build/ps2-native-motion-001/native042-validation.json. The final run is bound in
+build/ps2-native-motion-001/native043-validation.json; native043 ELF SHA256 is
+2188b39b72d36ef1e19fab55311b4b8d9bc7d01b384bbdbf0737c75677b7ff67.
+Native043's caption reported the actual start-to-start native update rate
+rather than relying on Play's counter. The later native044 presentation change
+moves this rate to the existing debug page and log, leaving the textured view
+unobscured; the flat diagnostic retains its caption.
+Native044's corrected-aspect moving run also measures 20.003 updates/sec across
+660 complete periods, with 34.893 ms mean work outside wait/flip. All 660 work
+periods remain over budget. Its ELF SHA256 is
+a198fe39b21f5faa8156feca97129cde5dc46ddb0ea9729e7dfbfb1c845a83c7;
+the current-source runtime proof is
+build/ps2-native-motion-002/native044-validation.json.
+
+The recovered chase view matches 1,027 original-program cases: 12,324 matrix
+words and 9,243 state words, including three live publications, fingerprint
+7b95f4f8895068b8. Car assembly matches 2,050 cases, 12,300 matrices and 147,600
+words, including two complete live assemblies, fingerprint 30473be6c283b9bb.
+Evidence: build/ps2-native-render-bridge-final-001/result.json. The wheel phase
+in real data reaches approximately 59–61 radians; the initially proposed small
+angle domain was insufficient. The new render bridge has its own proven phase
+reduction, with sampled phases through +/-2^20. Existing game math is unchanged.
+The portable render-bridge sanitizer checks also pass.
+
+Offline capture records full mesh links before culling, including hidden,
+off-screen and back-facing topology, raw normals, corner UVs and material
+attributes. The final capture matches all 2,850 enabled/disabled reference
+checkpoints and all 17 observed camera/draw publications. It contains frames
+2399–2403; observation frame 2401 publishes game counter 2318, and geometry frame
+2402 consumes that publication one frame later. Confusing those counters caused
+the first visual bundle's pose guard to fail. Bundle003 uses the correct seed
+and first input; all 22 first-pose words match and it produces 1,711 triangles.
+Its current-source proof is
+build/ps2-native-visual-bundle-003/first-pose-final.json. The initial checkpoint
+export is bound to the unchanged 601-update main-car proof, fingerprint
+57e2c98c5de78376. Reset restores the checkpoint, first-input guard and camera
+history together. Later updates consume native pad/neutral inputs only.
+
+TexturedModel is a bounded generic engine loader with owned geometry, per-corner
+UVs, materials and PSMT4 indices. Wire version 2 adds authored normal/anchor facing
+data; version 1 remains readable without that data. No captured transforms or
+arcade addresses appear in the runtime format. PreparedWorldModel owns immutable
+copies, and bounded frame-bank leases retain texture storage after an owner is
+replaced or destroyed. The ordinary mutable path keeps full validation and its
+borrowed-texture contract. UVs are restored per corner after position-cache hits,
+including clipped paths, so shared vertices retain texture seams. Material work
+preserved all 1,803 earlier flat frames/124,539,359 bytes exactly. Dedicated
+ownership, malformed-file, allocation-failure and sanitizer checks pass.
+
+The reversed rear-wing lettering was not a UV-order defect. Original body links
+514 and 624 occupy the same quad with opposite supplied normals and opposite UVs.
+Their original front dots are approximately +2.7979555 and -2.7979555. Drawing
+both sides let the later back face cover the correct text. The engine now has
+an explicit facing opt-in and uses the original ordered binary32 vector, point
+and dot operations against the chosen preprojection origin. It preserves the
+authored normal and shared quad anchor, excludes translation from normals and
+keeps a zero dot product. All 3,380 exported face UV/material/texture records are unchanged;
+the source audit is build/ps2-native-visual-bundle-003/facing-audit.json. The
+native042 window visibly restores MARTINI RACING and the rear badges. Native
+depth, nearest sampling and clipping still do not establish arcade pixel parity.
+
+Adjacent quad triangles repeat the same facing calculation. A six-raw-word key
+now reuses only a successful result within one instance/update, resetting across
+disabled faces and skipped groups. In the initial scene 1,463 of 3,224 enabled
+facing calls repeat immediately. All 11 WorldScene tests and 124 focused sanitizer
+checks pass. The old/new actual textured frame streams match across 601 native
+updates and 134,963,168 bytes, SHA256
+f3221b3eb0f5b15d870d325cdc39c9d56ef1ce6257562d9a91620a0047cc50ae.
+The comparison is streamed without retaining duplicate frame dumps:
+build/ps2-facing-memo-review-001/result.json. This is optimization equivalence
+on native updates, not a new full-race original-program comparison.
+
+Display replaces fourteen maximum-size texture slots with a bounded 96-page
+arena. Each PSMT4 image occupies one, two or four complete 8 KiB GS pages, with
+dimension-correct pitch, aligned first-fit allocation and LRU eviction. The
+existing GS completion fence still precedes every overwrite. Total VRAM is
+3,751,936 bytes for NTSC and 4,161,536 for PAL, leaving 32 KiB in PAL. Native042
+uploads 53 textures/361,504 bytes initially and has zero logged steady uploads
+or evictions. A 601-update bundle003 allocator trace sees one additional visible
+512-byte texture at update 118 and reaches 73 pages without eviction.
+
+Actual NTSC GS readback covers all 36 supported dimension pairs, 77 resident
+images including checker, warm frames, forced eviction, generation changes and
+explicit invalidation: 35,648 pixels across eight frames, hash 53a520d4e28c7147.
+Resource retry/lifetime checks pass 464 cases with 24 injected failures and 320
+pixel samples, hash a6f9c6418b875dc3. The complete depth/cutout/checker fixture
+passes 373 frames/2,688 samples, hash c76f6a70b0160483, unchanged by page allocation.
+The three source-bound reports are under build/ps2-texture-pages-ee-001,
+build/ps2-texture-pages-resources-ee-001 and build/ps2-texture-pages-depth-ee-001.
+PAL is memory-budget checked only; these are emulator results, not physical PS2
+certification. The generic allocator sanitizer also passes 1,255,229 ownership
+checks across 4,802 requests without allocation.
+
+Checker shadows use a project-authored repeated 8x8 PSMT4 mask in destination
+alpha. Opaque drawing preserves that alpha; checker holes do not write depth.
+The pinned SDK rectangle helper expands the supplied bounds by -7/16 and +9/16.
+The first two attempts stretched the mask over 641 pixels and failed 8/64 samples;
+canceling that expansion aligns it with the triangle viewport. The failed runs
+remain under build/ps2-native-stipple-ee-001 and 002; 003 passed, and the later
+page-cache fixture retains the same pixel hash. Do not reinstate the uncorrected
+sprite bounds or infer checker correctness from a screenshot alone.
+
+Further rejected shortcuts: most nearby tree objects are camera-facing, and
+eight source addresses change across the observed frames. Freezing all objects
+would not recover that behavior. Course chunks 175–183 have exact camera-only
+matrices and world-space positions; object 170 is another proven expansion, not
+yet required by this bundle. Objects 39–42 have almost constant world transforms,
+but a one-time float bake differed by up to 1.42 pixels on a near-clip/offscreen
+vertex; defer them until a clipped-image comparison. The background layer is a
+uniform color in these captures. A clipper scratch rewrite was also rejected:
+only 80 initial faces need polygon clipping, versus 2,860 inside and 548 common-
+outside faces before authored facing. The measurements favored residency,
+correct visibility and repeated facing/palette work instead.
+
+The last-palette fast path retains full 16-word color equality, stable slot
+ownership, age updates and the original fallback scan. An independent exact-
+method host differential passes 53,504 requests under optimized and sanitizer
+builds, comparing every slot, returned address, counter, fence/upload request
+and converted CLUT payload after each call. It includes same-pointer mutation,
+eviction, age wrap and new owners. The bound result is
+build/ps2-palette-host-differential-001/result.json.
+
+The first same-executable GS comparison did not pass. It matched drawing
+packets and palette state, then read the first owner's last image when the
+second owner began. Extending the observation did not establish success.
+Explicit failure logging localized the mismatch to pixel check 261; a control
+with the optimization disabled for both owners reproduced it. Its report is
+build/ps2-palette-baseline-control-ee-001/runtime-validation.json. Play's pinned
+Vulkan readback code skips flush/queue-idle waiting for recurring BITBLTBUF
+keys before copying mapped transfer memory, and that history survives guest
+Display replacement. GS FINISH does not fence this host-side copy. Do not
+interpret a successful transfer status or repeated old hash as fresh pixels.
+
+A private diagnostic varies only the destination-base field ignored by
+local-to-host transfers, giving each of 336 reads a new bounded key. The GS
+manual and independent source review confirm that source pixels, transfer
+geometry and DMA are unchanged; each key forces Play's synchronous copy path.
+Production readback and emulator code are unchanged. The resulting comparison
+passes 480 checks across six phases in both modes and 1,720,320 compared pixels.
+Drawing-packet, palette-state and framebuffer FNV fingerprints match; this is
+fingerprint equality rather than retained literal-byte image comparison. The
+source/ELF/log report is
+build/ps2-palette-mru-sync-ee-001/runtime-validation.json, SHA256
+6a47680306ba8330ba010066ad249b65fcf912acd8abdf7ca10d832afb6464f4.
+Sixteen warm samples alternate both mode orders with hashing disabled and zero
+uploads. Mean packet time falls from 21.939 to 8.837 ms, a 59.72% reduction in
+this original 1,630-triangle fixture. Both modes retain last-slot bookkeeping;
+the result isolates the lookup, not a complete game frame or console timing.
+The failed controls remain evidence, and ordinary repeated emulator readbacks
+must retain the stale-data limitation when interpreting earlier fixture passes.
+
+Builds and tests remain separate from release readiness. The shared engine keeps
+Rally semantics and offline recovery out of its dependency inventory; independent
+engine-demo019 and native043 have identical 33-input engine manifests:
+5a42ce7fc927f00b43351872e684e8a2988db7f7b34f78126b50e8c2557a417d.
+The native043 and sample compiled input hashes were checked together before the
+caption change. All 304 portable PS2 tests passed in 105.527 seconds in
+build/ps2-native-motion-001/portable-tests-final.json. After the native044 caption
+change, all 304 pass again in 102.353 seconds with no drift across 488 bound
+source/test files, in build/ps2-native-motion-002/portable-tests-final.json.
+The final native044 and demo019 builds retain the same 33-input engine manifest;
+all 129 native and 34 sample compiled inputs are current, as bound in
+build/ps2-native-motion-002/shared-engine-final.json. Private
+assets, captured images, reference generated source, manuals and ELFs remain
+under ignored build/. The textured loader, visual adapter and recovered camera
+contracts are documented beside their sources; the README/build guides now
+describe actual native motion rather than the obsolete static-only status.
+
+The reported camera/FOV mismatch prompted a separate same-pose audit before
+publication. Current native checkpoint update 2318 exactly reproduces 84
+original camera/body/shadow/wheel matrix words, 22 pose words, focus and yaw
+history from camera publication 2401/geometry frame 2402. All 9,300 selected
+source corners reproduce the 27,900 captured geometry transport words. At
+the logical 496-by-384 output, the body differs by at most 0.001862 pixels,
+wheels by 0.002350, shadow by 0.002899 and visible course corners by 0.004120.
+These are numerical projection comparisons, not whole-image pixel equality.
+Focus remains 300 in both axes; the logical geometric FOV is approximately
+79.159 degrees horizontal and 65.238 vertical. The current native 600-update
+neutral-coast comparison also keeps camera distance and car bounds essentially
+constant, rejecting a speed-dependent zoom explanation for the visible change.
+Evidence is in build/ps2-camera-match-001 and
+build/ps2-native-projection-audit-001; no recovered camera/FOV code was changed.
+
+The confirmed mismatch was presentation: Play's FIT mode displayed the
+640-by-448 GS framebuffer with square pixels, stretching the logical image
+10.599% horizontally relative to the raw reference and existing Mac viewport.
+The isolated preview launcher uses FILL with a measured window canvas instead.
+Raw 496:384 comparison and a separate 4:3 presentation option are explicit;
+neither calibrates physical PS2/arcade CRT pixels. The first requested window
+used 26 status-bar points but measured a 27-point bar including its divider,
+leaving the image two device pixels short at 2x scale. That near-correct run
+is retained under build/ps2-aspect-preview-001/raw-001 rather than called exact.
+The corrected raw-002 run measures a 1488-by-1152 game rectangle, exactly 3x
+the reference image, with identical held-frame captures and empty stderr.
+Actual EE/VU1/VU0 rendering passes with 1,711 triangles, 108 VU1 batches,
+4,103 VU1 vertices, 5,133 VU0 vertices and zero failed batches. The source-bound
+report is build/ps2-view-comparison-ee-001/runtime-validation.json, SHA256
+8fe54612347f21c4f381072a364afb7ed1c8a3f1fc714a3a49ffaff02b8252ac.
+The paired image is build/ps2-view-comparison-001/reference-vs-actual-ee.png;
+the original is enlarged with nearest sampling and the actual game crop is
+unresampled. Its screenshot ICC profile is converted to sRGB for comparison;
+omitting that conversion falsely suggests a clear-color mismatch.
+The native first-pose host comparison and actual VU1/VU0 held-frame fixture are
+kept separately from moving-game evidence. Missing sky, spectators, signs,
+HUD, visible shadow and parts of the scene remain differences, as does texture
+sampling. These are separate fidelity tasks, not an FOV correction.
+
+The exact staged tree and matching source tar are checked together under
+build/ps2-textured-motion-source-release-001 before this commit. No private
+capture, converted model, checkpoint, manual, generated source or executable
+is included. Next priorities are the remaining EE geometry/packet cost toward
+the complete-frame 60 Hz budget, working interactive pad publication, then
+recovered dynamic scenery and race progression. The current unmodified Play
+preview advances the initial moving state under neutral fallback; it does not
+establish controller play, a full race or simultaneous EE/VU overlap.
+
 ## Native diagnostic loop reaches the 60 Hz budget (2026-10-28)
 
 Continued from 6d1fed8. Native040 measures 59.991 native updates/sec across

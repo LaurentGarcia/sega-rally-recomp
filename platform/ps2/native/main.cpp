@@ -39,9 +39,10 @@ int main(int argc, char **argv) {
         const bool exact_drive = argc > 1 && std::strcmp(argv[1],"--drive-ee")==0;
         const bool guarded_drive = argc > 1 && std::strcmp(argv[1],"--drive-guarded")==0;
         const bool profile_drive = argc > 1 && std::strcmp(argv[1],"--drive-profile")==0;
-        const bool explicit_drive = exact_drive || guarded_drive || profile_drive || (argc > 1 && std::strcmp(argv[1],"--drive")==0);
+        bool textured_drive = argc > 1 && std::strcmp(argv[1],"--drive-textured")==0;
+        const bool explicit_drive = exact_drive || guarded_drive || profile_drive || textured_drive || (argc > 1 && std::strcmp(argv[1],"--drive")==0);
         if (explicit_drive && argc != 5)
-            throw std::runtime_error("USE --drive, --drive-ee, --drive-guarded OR --drive-profile CHECKPOINT COURSE BODY");
+            throw std::runtime_error("USE --drive CHECKPOINT COURSE BODY OR --drive-textured CHECKPOINT COURSE VISUAL_DIRECTORY");
         const char *checkpoint_path = explicit_drive ? argv[2] : nullptr;
         const char *course_path = explicit_drive ? argv[3] : "host:native-course.bin";
         const char *body_path = explicit_drive ? argv[4] : "host:native-body.bin";
@@ -49,6 +50,9 @@ int main(int argc, char **argv) {
         if (argc <= 1) {
             if (FILE *probe = std::fopen("host:native-driving.bin", "rb")) {
                 std::fclose(probe); checkpoint_path = "host:native-driving.bin";
+                if(FILE* visual=std::fopen("host:native-visual/view.bin","rb")){
+                    std::fclose(visual);textured_drive=true;body_path="host:native-visual";
+                }
             }
         }
         if (!scene_path && !checkpoint_path) {
@@ -69,11 +73,12 @@ int main(int argc, char **argv) {
         if (!pad.initialize(!retain_host)) std::printf("PAD: %s\n", pad.status());
         if (use_storage && !ps2::initialize_storage()) throw std::runtime_error(ps2::storage_error());
         if (checkpoint_path) {
-            if (!ps2::wait_for_file(checkpoint_path)||!ps2::wait_for_file(course_path)||!ps2::wait_for_file(body_path))
+            if (!ps2::wait_for_file(checkpoint_path)||!ps2::wait_for_file(course_path)||
+                (!textured_drive&&!ps2::wait_for_file(body_path)))
                 throw std::runtime_error(ps2::storage_error());
             return ps2::native::run_native_vehicle_demo(display,pad,checkpoint_path,course_path,body_path,
                 exact_drive?ps2::native::NativeVehicleRenderMode::reference:guarded_drive?
-                ps2::native::NativeVehicleRenderMode::guarded_vu:ps2::native::NativeVehicleRenderMode::native_vu,profile_drive);
+                ps2::native::NativeVehicleRenderMode::guarded_vu:ps2::native::NativeVehicleRenderMode::native_vu,profile_drive,textured_drive);
         }
         ps2::native::Mesh mesh;
         ps2::native::StudyScene study;

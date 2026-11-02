@@ -1,6 +1,9 @@
 #include "runtime/model2a_machine.h"
 #include "runtime/model2a_clock.h"
 #include "runtime/gen_support.h"
+#ifdef RALLY_OFFLINE_VISUAL_CAPTURE
+#include "platform/ps2/tools/visual_camera_capture.h"
+#endif
 #ifdef RALLY_OFFLINE_DRIVING_CAPTURE
 #if defined(_EE) || defined(RALLY_PS2_EE)
 #error "Driving capture belongs only in the offline host reference"
@@ -327,6 +330,11 @@ struct Model2AMachine::Impl {
         if (action == BoundaryAction::Continue)
             ::ps2::offline::observe_driving_instruction(self.cpu,self.schedule.count,
                                                        self.frames_rendered,self.clock.now_ns());
+#endif
+#ifdef RALLY_OFFLINE_VISUAL_CAPTURE
+        if (action == BoundaryAction::Continue)
+            ::ps2::offline::observe_visual_camera(self.cpu,self.schedule.count,
+                                                  self.frames_rendered,self.clock.now_ns());
 #endif
         return action;
     }
