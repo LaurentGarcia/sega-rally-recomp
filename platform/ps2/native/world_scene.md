@@ -233,6 +233,31 @@ uses the scalar path. The application owns transport error reporting and may
 disable a retired backend. The callback must not retain spans or reenter the
 scene. No callback is installed by default.
 
+`set_transform_project_provider()` is an optional native-float continuation.
+Either provider setter clears the other callback. Reference mode does not call
+the projection provider. The callback returns the same clip vectors and
+acceptance flags, plus logical screen x/y, reverse depth and reciprocal w.
+WorldScene resets q before each call, so an omitted result cannot reuse an old
+projection. q=0, an invalid projected value, or an outside clip vector retains
+the ordinary EE projection/clipping path. A transport failure discards both
+output sets. Accepted projections are cached by position; UV seams are restored
+per face as before. `provider_projected_vertices` counts consumed projections
+on cache misses, excluding unused prefetch and cache hits.
+
+The projection contract allows 1/32 logical pixel, 2^-20 absolute depth and
+2^-20 relative q error against scalar projection of the same clip vector.
+Those continuous-coordinate bounds do not imply identical quantized GS pixels.
+The actual VU continuation passed 601 paired scene updates with 885,445 ordered
+triangle pairs and identical materials/UVs. Seventeen full GS color-frame pairs
+differed at 348 of 4,874,240 pixels; depth-buffer readback was not compared.
+The paired scene work increased from 17.740 to 19.222 ms, and the integrated
+native047 candidate increased complete-frame work from 30.992 to 32.565 ms.
+The application therefore retains the faster transform-only provider. The
+continuation is opt-in for further renderer experiments; it is not a default
+speedup. Evidence is in
+`build/ps2-world-projection-ee-build-002/runtime-validation.json` and
+`build/ps2-native-motion-004/native047-validation.json`.
+
 Provider results are explicitly rendering approximations unless the provider
 proves otherwise. Cache provenance distinguishes them from exact scalar values.
 In reference mode, if any corner requires clipping, all approximate corners of that

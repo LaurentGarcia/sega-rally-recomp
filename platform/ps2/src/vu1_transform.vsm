@@ -48,3 +48,90 @@ native_vu1_transform_done:
     nop nop
 native_vu1_transform_end:
 .align 4
+
+.global native_vu1_project_begin
+.global native_vu1_project_end
+# Optional entry uploaded separately at micro-instruction256. Header q9 adds
+# projection constants; projected output q202..297 does not alias clip data.
+# All control paths retain the original clip vector for ordered EE fallback.
+native_vu1_project_begin:
+    nop lq vf01,0(vi00)
+    nop lq vf02,1(vi00)
+    nop lq vf03,2(vi00)
+    nop lq vf04,3(vi00)
+    nop lq vf05,4(vi00)
+    nop lq vf06,5(vi00)
+    nop lq vf07,6(vi00)
+    nop lq vf08,7(vi00)
+    nop lq vf09,9(vi00)
+    nop iaddiu vi05,vi00,202
+    nop iaddiu vi06,vi00,0x30
+    nop ilw.x vi08,8(vi00)
+    nop iaddiu vi02,vi00,10
+    nop iaddiu vi03,vi00,106
+    nop ibeq vi08,vi00,native_vu1_project_done
+    nop nop
+native_vu1_project_vertex:
+    nop lqi vf10,(vi02++)
+    nop nop
+    nop nop
+    nop nop
+    mulax.xyzw ACC,vf01,vf10x nop
+    madday.xyzw ACC,vf02,vf10y nop
+    maddaz.xyzw ACC,vf03,vf10z nop
+    maddw.xyzw vf11,vf04,vf10w nop
+    nop nop
+    nop nop
+    nop nop
+    mulax.xyzw ACC,vf05,vf11x nop
+    madday.xyzw ACC,vf06,vf11y nop
+    maddaz.xyzw ACC,vf07,vf11z nop
+    maddw.xyzw vf12,vf08,vf11w iaddi vi08,vi08,-1
+    nop nop
+    nop nop
+    nop nop
+    nop sqi vf12,(vi03++)
+    # Preserve the original clip vector. Projection uses one VU reciprocal.
+    # q9={248,192,0,minimum_w}; rejected vertices write an all-zero result.
+    sub.xyzw vf14,vf00,vf00 nop
+    clipw.xyz vf12,vf12w nop
+    sub.zw vf20,vf12,vf09 nop
+    nop nop
+    nop nop
+    nop nop
+    nop fcand vi01,0x3f
+    nop fmand vi07,vi06
+    nop ior vi04,vi01,vi07
+    # VU manual3.4.8 p50: integer-setting op needs a slot before branch.
+    nop nop
+    nop ibne vi04,vi00,native_vu1_projection_store
+    nop nop
+    nop div Q,vf00w,vf12w
+    nop waitq
+    mulq.xyzw vf14,vf12,Q nop
+    nop nop
+    nop nop
+    nop nop
+    mulq.w vf14,vf00,Q nop
+    addw.xyz vf15,vf00,vf00w nop
+    nop nop
+    nop nop
+    nop nop
+    addw.x vf14,vf14,vf00w nop
+    sub.yz vf14,vf15,vf14 nop
+    nop nop
+    nop nop
+    nop nop
+    mul.xy vf14,vf14,vf09 nop
+    nop nop
+    nop nop
+    nop nop
+native_vu1_projection_store:
+    nop sqi vf14,(vi05++)
+    nop ibne vi08,vi00,native_vu1_project_vertex
+    nop nop
+native_vu1_project_done:
+    nop[e] nop
+    nop nop
+native_vu1_project_end:
+.align 4

@@ -140,6 +140,11 @@ interfaces do not promise thread-safe concurrent initialization or submission.
 The [VU1 transform backend](../platform/ps2/vu1_transform.md) accepts generic
 matrices and vertices, with no Rally state or asset dependencies. WorldScene's
 optional batch provider preserves the exact scalar path and owns no hardware.
+An optional transform-and-projection provider also returns logical screen X/Y,
+depth and reciprocal W while retaining clip coordinates for EE fallback. It is
+used only in native-float presentation; reference mode ignores that provider.
+The vehicle application's default remains the transform-only provider because
+the measured integrated projection continuation is slower.
 The vehicle application selects native binary32 presentation by default, with
 exact and guarded modes available for comparison. Its game update retains
 separate exact arithmetic. VU1 and VU0 currently execute
@@ -201,7 +206,7 @@ experiment separates approximately 2.030 ms of camera/body pose work from
 instrumentation itself adds 2.073 ms, so its per-stage totals cannot be treated
 as free measurements. These are emulator observations, not console timings.
 
-The current data flow remains sequential:
+The default data flow remains sequential:
 
 ```mermaid
 flowchart LR
@@ -213,20 +218,30 @@ flowchart LR
 ```
 
 Using both VUs does not establish concurrent execution. The transform provider
-returns clip coordinates and acceptance flags; it has no projected-vertex or
-GS-packet continuation. Display later consumes a complete Frame. Each transform
-batch fences execution and returns through the EE before the next stage.
+returns clip coordinates and acceptance flags. The optional projection
+continuation additionally returns validated inside projections, with a zero-Q
+fallback marker; EE still clips and assembles triangles, and Display consumes a
+complete Frame. Neither provider submits GS packets. Each transform batch fences
+execution and returns through the EE before the next stage.
+
+The optional continuation passes its authored target tests, but the complete
+601-pose scene comparison regresses from 17.740 to 19.222 ms per scene update.
+All 885,445 triangles retain their order and exact materials/UVs; projected
+values stay within the stated coordinate/depth/Q budgets. Seventeen GS
+framebuffer pairs differ at 348 of
+4,874,240 color pixels, with a maximum channel difference of 228; this is not
+pixel identity or a depth-buffer comparison. The integrated native047 run also
+regresses to 27.448 updates/sec and 32.565 ms of work, versus native046's 29.383
+updates/sec and 30.992 ms. The earlier isolated 1.599 ms projection saving does
+not describe this integrated workload, which also projects prefetched vertices
+that the scene never consumes. Transform-only rendering remains the default.
+The rebuilt native048 default measures 29.361 updates/sec and 31.085 ms mean
+work over 660 periods, with every work interval still over the 16.667 ms budget.
 
 The manuals describe a different scheduling opportunity: upload one bank while
-VU1 processes another and the previous output travels to the GS. A private
-bounded VU1 projection experiment now passes 101 authored cases and 69,513
-vertices, retaining exact clip coordinates and admission decisions for the EE
-fallback. Its isolated projection difference is at most 0.00003052 pixels;
-the synchronous batch path saves 1.599 ms per sampled pose. This is not yet
-integrated and establishes neither GS pixel parity nor a full-frame gain.
-A subsequent direct GIF-output path needs an explicit
-material-order, bank-lifetime and submission contract; removing waits from the
-existing synchronous API is not a valid implementation of that path.
+VU1 processes another and the previous output travels to the GS. Direct GIF
+output needs an explicit material-order, bank-lifetime and submission contract;
+removing waits from the existing synchronous API does not establish that path.
 
 The review uses the locally retained manuals from the supplied
 [PS2 documentation repository](https://github.com/DarrenRainey/PS2-Programming-Docs),
@@ -251,14 +266,25 @@ specialized renderers, level-of-detail systems and streaming in
 Those are examples of organizing work for the machine, not evidence that this
 port already meets its budget or permission to reduce recovered scene fidelity.
 
-A first direct-output experiment should use a small resident-material batch,
-two explicitly budgeted VU banks, and a fence at the batch boundary. Preserve
-original triangle order when inserting an EE clipping fallback. Prevalidate
-inputs, retain referenced texture/CLUT storage, and draw into the backbuffer;
-already submitted drawing cannot be rolled back like a CPU frame assembly.
-Enable overlapping bank reuse only after packet retirement and failure tests.
-The ordinary Display uploader and GS readback require a documented ownership
-handoff before they can coexist with this producer.
+A private direct-output fixture now passes four authored cases over eight
+frames and four VU1 XGKICK batches. Its packet words and 1,433,600 framebuffer
+word comparisons are exact, with six rejected submissions leaving the displayed
+buffer unchanged. It explicitly retires owned PATH3 work and waits for GIF idle
+before handing off to PATH1. This validates a small direct-output boundary, not
+overlap, general projection/clipping or game throughput. A separate prepared
+gather-mask experiment preserves the tested provider order and geometry across
+601 poses, but its EE scene-update cost increases by about 0.413 ms per measured
+pose. It remains private; fewer host lookups did not establish a target speedup.
+
+The next reusable seam is a renderer-owned prepared batch contract, building on
+the current immutable model/material storage. It must retain geometry, texture
+and CLUT resources, preserve primitive order across VU output and EE clipping
+fallback, and define packet/bank retirement before reuse. Applications should
+supply instances without taking over GS resource ownership. Start with bounded
+resident-material world batches and draw into the backbuffer: already submitted
+drawing cannot be rolled back like CPU frame assembly. Add overlap only after
+the ownership and failure cases pass. Display uploads and GS readback need an
+explicit handoff to this producer.
 
 Validate each new continuation against actual scene geometry, screen/depth/Q
 results, clipping boundaries, primitive order and resource lifetimes. Measure

@@ -50,6 +50,7 @@ public:
     void reset() noexcept;
     void set_profile_clock(WorldSceneClock,void* context=nullptr) noexcept;
     void set_transform_provider(WorldSceneTransformBatch,void* context=nullptr) noexcept;
+    void set_transform_project_provider(WorldSceneTransformProjectBatch,void* context=nullptr) noexcept;
     void set_numeric_mode(WorldNumericMode) noexcept;
     Frame frame() const noexcept;
     WorldSceneStats stats() const noexcept;
@@ -59,6 +60,7 @@ private:
     struct Storage;std::unique_ptr<Storage> storage_;
     WorldSceneClock clock_=nullptr;void* clock_context_=nullptr;
     WorldSceneTransformBatch provider_=nullptr;void* provider_context_=nullptr;
+    WorldSceneTransformProjectBatch project_provider_=nullptr;
     WorldNumericMode mode_=WorldNumericMode::native_float;
     RallyVisualTimings timings_{};
 };

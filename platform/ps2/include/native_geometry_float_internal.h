@@ -9,8 +9,9 @@ namespace ps2::native::detail {
 // the caller retains the original clip vertex for the complete triangle path.
 bool project_inside_float(const ClipVertex&, Vertex& result) noexcept;
 
-// Each vertex's position/q/depth must be an unmodified successful
-// project_inside_float result. UV may be replaced with a face corner's already
+// Each vertex's position/q/depth must be a successful project_inside_float
+// result or a WorldScene-validated native projection-provider result within
+// that callback's numerical allowance. UV may be replaced with a face corner's already
 // validated normal-or-zero texel coordinates (abs<=65536): projection copies
 // those two values unchanged. This permits seams at a shared position index.
 // Only WorldScene's private, per-instance cache and corner scratch retain this

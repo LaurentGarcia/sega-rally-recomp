@@ -11,14 +11,17 @@
 #include <kernel.h>
 #include <vif_registers.h>
 extern "C" const unsigned char native_vu1_transform_begin[],native_vu1_transform_end[];
+extern "C" const unsigned char native_vu1_project_begin[],native_vu1_project_end[];
 #endif
 
 namespace ps2 {
 namespace {
+static_assert(sizeof(TransformVector4)==16&&sizeof(TransformProjectedVertex)==16);
 const void* owner=nullptr;
 bool quarantined=false;
 #ifdef _EE
 constexpr std::uint32_t running=0x100,limit=300000000;
+constexpr unsigned projection_entry=256; // Micro-instruction units, not bytes.
 std::uint32_t ticks(){std::uint32_t t;asm volatile("mfc0 %0,$9":"=r"(t));return t;}
 bool idle(){
     // DBF/MRK are harmless; command/FIFO/error/reverse state is not.
@@ -41,6 +44,20 @@ constexpr std::uint32_t command(unsigned op,unsigned count=0,unsigned immediate=
     return (std::uint32_t(op)<<24)|(std::uint32_t(count&255)<<16)|(immediate&65535u);
 }
 #endif
+bool overlapping(const void*a,const void*b,std::size_t bytes){
+    const auto x=reinterpret_cast<std::uintptr_t>(a),y=reinterpret_cast<std::uintptr_t>(b);
+    return x<=y?y-x<bytes:x-y<bytes;
+}
+bool aligned(const void*p){return (reinterpret_cast<std::uintptr_t>(p)&15u)==0;}
+#ifdef _EE
+bool usable_projection(const TransformVector4&c,const TransformProjectedVertex&p){
+    const auto normal=[](float f){const auto m=std::bit_cast<std::uint32_t>(f)&0x7fffffffu;
+        return !m||(m>=0x00800000u&&m<0x7f800000u);};
+    return c.w>=0x1p-10f&&c.x>=-c.w&&c.x<=c.w&&c.y>=-c.w&&c.y<=c.w&&c.z>=0&&c.z<=c.w&&
+        normal(p.x)&&normal(p.y)&&normal(p.depth)&&normal(p.q)&&
+        p.x>=0&&p.x<=496&&p.y>=0&&p.y<=384&&p.depth>=0&&p.depth<=1&&p.q>=0x1p-16f&&p.q<=1024;
+}
+#endif
 }
 bool valid_native_vu1_transform_input(const TransformMatrix&a,const TransformMatrix&b,
                                      std::span<const TransformVector4>input) noexcept {
@@ -59,8 +76,9 @@ bool valid_native_vu1_transform_input(const TransformMatrix&a,const TransformMat
 struct Vu1Transform::Storage {
     alignas(64) std::array<std::uint32_t,1024> packet{};
     alignas(16) std::array<TransformVector4,vu1_transform_capacity> result{};
+    alignas(16) std::array<TransformProjectedVertex,vu1_transform_capacity> projected{};
     unsigned used=0;std::uint16_t sequence=0;
-    bool ready=false,retain=false;
+    bool ready=false,retain=false,projection_ready=false;
     const char* failure="VU1 NOT INITIALIZED";
     Vu1TransformStats counters{};
 #ifdef _EE
@@ -148,8 +166,24 @@ bool Vu1Transform::transform_native(const TransformMatrix&a,const TransformMatri
         storage_->failure="VU1 NATIVE INPUT UNSUPPORTED";return false;}
     return transform_validated(a,b,input,output);
 }
+bool Vu1Transform::transform_project_native(const TransformMatrix&a,const TransformMatrix&b,
+                                           std::span<const TransformVector4>input,std::span<TransformVector4>output,
+                                           std::span<TransformProjectedVertex>projected) noexcept {
+    if(!storage_||!storage_->ready)return false;
+    const auto count=input.size();
+    if(count>vu1_transform_capacity||output.size()<count||projected.size()<count||
+       (count&&(!input.data()||!output.data()||!projected.data()||
+          !aligned(input.data())||!aligned(output.data())||!aligned(projected.data())||
+          overlapping(input.data(),projected.data(),count*sizeof(TransformVector4))||
+          overlapping(output.data(),projected.data(),count*sizeof(TransformVector4))))||
+       !valid_native_vu1_transform_input(a,b,input)){
+        storage_->failure="VU1 PROJECTED INPUT UNSUPPORTED";return false;
+    }
+    return transform_validated(a,b,input,output,projected.first(count));
+}
 bool Vu1Transform::transform_validated(const TransformMatrix&a,const TransformMatrix&b,
-                                      std::span<const TransformVector4>input,std::span<TransformVector4>output) noexcept {
+                                      std::span<const TransformVector4>input,std::span<TransformVector4>output,
+                                      std::span<TransformProjectedVertex>projected) noexcept {
     auto&s=*storage_;
     if(input.empty()){s.failure="NONE";return true;}
 #ifdef _EE
@@ -157,11 +191,30 @@ bool Vu1Transform::transform_validated(const TransformMatrix&a,const TransformMa
         // Nothing was submitted by this call: never stop another owner's DMA.
         s.ready=false;quarantined=true;s.failure="VU1 OWNERSHIP OR CONFIGURATION LOST";return false;
     }
+    const bool project=!projected.empty();
+    if(project&&!s.projection_ready){
+        const auto bytes=std::size_t(reinterpret_cast<std::uintptr_t>(native_vu1_project_end)-
+                                    reinterpret_cast<std::uintptr_t>(native_vu1_project_begin));
+        // MPG's zero count means256 instructions. Keep a single bounded MPG
+        // and leave the original entry0 program untouched.
+        if(!bytes||bytes%8||bytes>2048||projection_entry+bytes/8>2048){
+            s.failure="VU1 PROJECTION PROGRAM SIZE INVALID";return false;
+        }
+        s.used=0;s.word(command(0x10));
+        s.word(command(0x4a,unsigned(bytes/8),projection_entry));
+        s.words(native_vu1_project_begin,bytes);
+        if(!s.transfer())return false;
+        s.projection_ready=true;
+    }
     s.used=0;
     s.word(command(0x6c,8,0));s.words(a.data(),sizeof(a));s.words(b.data(),sizeof(b));
     s.word(command(0x6c,1,8));s.word(std::uint32_t(input.size()));s.word(0);s.word(0);s.word(0);
+    if(project){
+        s.word(command(0x6c,1,9)); // x/y scale, zero and minimum positive w.
+        s.word(0x43780000u);s.word(0x43400000u);s.word(0);s.word(0x3a800000u);
+    }
     s.word(command(0x6c,unsigned(input.size()),10));s.words(input.data(),input.size_bytes());
-    s.word(command(0x14)); // MSCAL address0; kernel uses absolute data addresses.
+    s.word(command(0x14,0,project?projection_entry:0));
     if(!s.transfer())return false;
     const volatile std::uint32_t*memory=reinterpret_cast<const volatile std::uint32_t*>(0x1100c000u+106*16);
     for(std::size_t i=0;i<input.size();++i){
@@ -171,10 +224,23 @@ bool Vu1Transform::transform_validated(const TransformMatrix&a,const TransformMa
                 s.failure="VU1 OUTPUT OUTSIDE BOUNDED DOMAIN";return false;}}
         s.result[i]=std::bit_cast<TransformVector4>(bits);
     }
+    if(project){
+        memory=reinterpret_cast<const volatile std::uint32_t*>(0x1100c000u+202*16);
+        for(std::size_t i=0;i<input.size();++i){
+            std::array<std::uint32_t,4>bits;
+            for(unsigned c=0;c<4;++c)bits[c]=memory[4*i+c];
+            const auto p=std::bit_cast<TransformProjectedVertex>(bits);
+            // An inadmissible projection falls back without losing its valid
+            // clip vector. No projection value is published before all clip
+            // outputs have passed the existing bounded-domain checks.
+            s.projected[i]=usable_projection(s.result[i],p)?p:TransformProjectedVertex{};
+        }
+    }
     std::copy_n(s.result.begin(),input.size(),output.begin());
+    if(project)std::copy_n(s.projected.begin(),input.size(),projected.begin());
     ++s.counters.batches;s.counters.vertices+=input.size();s.failure="NONE";return true;
 #else
-    (void)a;(void)b;(void)output;return false;
+    (void)a;(void)b;(void)output;(void)projected;return false;
 #endif
 }
 bool Vu1Transform::available()const noexcept{return storage_&&storage_->ready;}

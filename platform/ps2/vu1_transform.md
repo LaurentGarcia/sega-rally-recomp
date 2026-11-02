@@ -6,9 +6,10 @@ game update never calls it; its arithmetic and persistent state are unchanged.
 VU0 remains responsible for final GS 12.4 XY conversion. Both units perform
 actual work, with a synchronous boundary between their operations.
 
-The native renderer calls `transform_native`: normal binary32 arithmetic on
-VU1, followed by binary32 clipping/projection on the EE and VU0 GS-coordinate
-packing. The separate `transform` and projection-guard APIs retain the
+The transform-only entry `transform_native` performs normal binary32 arithmetic
+on VU1, followed by binary32 clipping/projection on the EE and VU0 GS-coordinate
+packing. The optional `transform_project_native` continues inside vertices
+through VU1 projection while retaining the same clip coordinates for fallback. The separate `transform` and projection-guard APIs retain the
 binary64 diagnostic comparison path. The native call does not calculate those
 error bounds or invoke software-double helpers.
 
@@ -24,8 +25,8 @@ established.
 
 The independently written kernel loads eight matrix columns, then performs two
 four-component multiply/add chains for each vertex. It writes clip coordinates
-back to VU data memory. It performs no game arithmetic, perspective division,
-XGKICK, texture upload or GS submission. Four-cycle register hazards have explicit
+back to VU data memory. This original entry performs no perspective division.
+Neither entry performs game arithmetic, XGKICK, texture upload or GS submission. Four-cycle register hazards have explicit
 spacing; accumulator chains use their documented forwarding path.
 
 VIF1 uploads matrices, count and input vertices into fixed owned data addresses.
@@ -45,6 +46,93 @@ unchanged; this removes redundant publication work without adding overlap.
 The generic build driver assembles this `.vsm` with the pinned DVP assembler and
 records its version, source hash, object hash and instruction listing. It does
 not copy a proprietary SDK implementation.
+
+## Optional projected output
+
+`transform_project_native(a, b, input, clip, projected)` keeps both matrix
+products and publishes two output prefixes together. `TransformProjectedVertex`
+contains logical screen `x`, `y`, reverse `depth`, and reciprocal `q`. Its
+nonzero result uses `(1+x/w)*248`, `(1-y/w)*192`, `1-z/w`, and `1/w`.
+A zero result means ordinary EE projection/clipping is required; it is not an
+extra vertex at the origin. Primitive order, attributes and clipped edges remain
+the caller's responsibility.
+
+Admission uses all seven inclusive native planes: `w >= 1/1024`,
+`-w <= x,y <= w`, and `0 <= z <= w`. The driver also checks the returned
+screen/depth/Q domain. Rejected or unusable projections become all-zero while
+the valid clip vector is retained. The presentation comparison allowances are
+1/32 logical pixel, `2^-20` absolute depth, and `2^-20` relative Q against
+projection of the **same clip vector**. These are target validation budgets,
+not a universal raster-equivalence or physical-hardware guarantee.
+
+The original entry-zero microprogram and transform-only packets are unchanged.
+The second program uploads only on the first nonempty projection call, at
+micro-instruction 256, with a separate bounded MPG upload and completion fence.
+Both programs fit within individual 256-instruction MPG transfers. Matrices use
+VU data q0–7, count q8, projection constants q9, input q10–105, clip output
+q106–201, and projected output q202–297. The exclusive lease owns these ranges;
+no transfer/compute overlap or GS output is introduced.
+
+Nonempty input and output buffers require 16-byte alignment. Input may overlap
+clip output, since publication follows complete staging. Projected output may
+overlap neither input nor clip output. Unsupported input, overlap, insufficient
+capacity, or a late invalid clip output leaves **both** caller outputs unchanged.
+An invalid projected value alone requests fallback. Numeric failures preserve
+the usable lease; transport failures retain the existing quarantine policy.
+Projected staging adds 1,536 bytes per owner and no allocation per batch.
+
+The original private prototype's first run exposed an integer branch hazard:
+`IOR` immediately followed by `IBNE` admitted a zero-W vector. The retained
+failure was corrected with the intervening instruction required by VU User's
+Manual section 3.4.8, page 50. The production fixture includes zero/negative W,
+each plane and adjacent encodings, reciprocal extremes, both output sentinels,
+capacity/alias rejection, and reuse of entry zero after the lazy upload.
+
+The corrected private prototype passed 101 authored cases and 69,513 vertices
+from 1,836 batches across 17 actual textured-scene poses. All 51,381 inside
+vertices were admitted; 18,132 outside vertices retained fallback. Maximum
+projection differences were `3.05175781e-5` logical pixel, `1.1920929e-7` depth,
+and zero relative Q. Paired synchronous transform/projection work averaged
+5.9455 ms versus 4.3462 ms per sampled pose. Those timings include extra projected
+readback and validation, but exclude GS submission and full-frame work. They
+are prototype measurements, not a production frame-rate claim. The source-bound
+private record is `build/ps2-vu-projection-002/runtime-validation.json`; the
+failed first run is preserved under `build/ps2-vu-projection-001`.
+
+The production driver then passed its own target fixture: 101 candidates
+comprised 68 inside vertices, 28 outside vertices and five matrix-domain
+rejections before DMA. The complete fixture passed 147,597 checks and 520
+hardware submissions. Projection differences were at most `3.05175781e-5`
+pixel, `5.96046448e-8` depth and `9.31322574e-8` relative Q. Owner storage is
+7,232 bytes. Its original 36-instruction kernel is byte-identical to the
+preceding kernel, and the separate 72-instruction continuation is byte-identical
+to the executed private prototype. The production report is
+`build/ps2-vu1-projected-engine-ee-001/runtime-validation.json`. It also binds the
+warning-free `ee-002` rebuild through an identical executable hash; the original
+fixture source is preserved separately.
+
+The subsequent complete-scene experiment passed the numerical and ordering
+checks but **regressed performance**, so the transform-only path remains the
+default. Two visual histories advanced through the same 601 native poses,
+preserving 885,445 ordered triangles and their materials/UVs. The continuation
+supplied 1,198,630 consumed projections; maximum differences were
+`3.05175781e-5` pixel, `1.1920929e-7` depth and zero relative Q. Seventeen actual
+GS color framebuffer comparisons changed 348 of 4,874,240 pixels, with a maximum
+channel difference of 228. This is not pixel identity or a depth-readback proof.
+
+Alternating same-executable scene updates averaged 17.7399 ms for transform-only
+and 19.2221 ms for the continuation: **1.4822 ms slower**. Timing includes
+validation, gathering, transform, projection, clipping and frame assembly;
+it excludes native game updates, lazy upload warmup and GS drawing/readback.
+Unlike the isolated prototype, the renderer already caches EE projections and
+does not consume every prefetched vertex. The new path adds projected readback
+and validation for those submissions. Their individual costs have not been
+isolated, so neither unused work nor repeated guards alone is established as
+the cause. A future direct GS-packet continuation must be measured end to end.
+The result is bound by
+`build/ps2-world-projection-ee-build-002/runtime-validation.json`, with its new
+source archive under `build/ps2-scene-projection-continuation-001`. It is a
+Play observation, not physical-console or 60 Hz validation.
 
 ## Presentation arithmetic contract
 

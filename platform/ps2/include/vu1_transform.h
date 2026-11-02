@@ -7,6 +7,10 @@
 
 namespace ps2 {
 struct alignas(16) TransformVector4 { float x=0,y=0,z=0,w=1; };
+// Native logical496x384 screen coordinates, reverse depth and reciprocal w.
+// An all-zero value (q==0) asks the caller to project/clip the retained clip
+// vector normally. It is not a vertex at the screen origin.
+struct alignas(16) TransformProjectedVertex { float x=0,y=0,depth=0,q=0; };
 using TransformMatrix = std::array<float,16>; // column-major, column vectors
 inline constexpr std::size_t vu1_transform_capacity=96;
 struct TransformErrorBound { std::array<double,4> absolute{}; };
@@ -86,12 +90,31 @@ public:
     // Numerical output rejection preserves both output and the usable lease.
     bool transform_native(const TransformMatrix&,const TransformMatrix&,
                           std::span<const TransformVector4>,std::span<TransformVector4>) noexcept;
+    // Optional native presentation continuation. Preserves the exact existing
+    // clip outputs; a separate, lazily loaded kernel projects interior vertices
+    // with one VU reciprocal. All seven planes use inclusive boundaries:
+    // w>=1/1024, -w<=x,y<=w, 0<=z<=w. Outside or unusable projected results are
+    // all-zero; clip coordinates remain available for ordinary ordered fallback.
+    // Nonzero-q results are normal-or-zero, x[0,496], y[0,384], depth[0,1],
+    // q[2^-16,1024]. Presentation allowances relative to scalar projection of
+    // the same clip vector are1/32pixel,2^-20 absolute depth and2^-20 relative q;
+    // authored/scene-corpus validation is separate from hardware fidelity and
+    // full-frame raster equivalence. No recovered game arithmetic is changed.
+    // Both output prefixes publish atomically after completion. Each span must
+    // hold input.size() elements. Input may overlap clip output; projected
+    // output may overlap neither. Nonempty buffers must be16-byte aligned.
+    // Invalid input/overlap rejects before DMA. Empty succeeds on a ready
+    // owner without uploading the projection kernel. No allocation per call.
+    bool transform_project_native(const TransformMatrix&,const TransformMatrix&,
+                                  std::span<const TransformVector4>,std::span<TransformVector4>,
+                                  std::span<TransformProjectedVertex>) noexcept;
     bool available() const noexcept;
     const char* error() const noexcept;
     Vu1TransformStats stats() const noexcept;
 private:
     bool transform_validated(const TransformMatrix&,const TransformMatrix&,
-                             std::span<const TransformVector4>,std::span<TransformVector4>) noexcept;
+                             std::span<const TransformVector4>,std::span<TransformVector4>,
+                             std::span<TransformProjectedVertex> = {}) noexcept;
     struct Storage;std::unique_ptr<Storage> storage_;
 };
 } // namespace ps2

@@ -64,8 +64,16 @@ bool provider(void* count,const WorldMatrix&a,const WorldMatrix&b,std::span<cons
   for(unsigned r=0;r<4;++r)for(unsigned k=0;k<4;++k)q[r]+=b[r+4*k]*w[k];
   output[i]={q[0],q[1],q[2],q[3]};accepted[i]=1;}return true;
 }
+bool project_provider(void* count,const WorldMatrix&a,const WorldMatrix&b,std::span<const ps2::TransformVector4> input,
+              std::span<ps2::TransformVector4> output,std::span<std::uint8_t> accepted,
+              std::span<ps2::TransformProjectedVertex> projected)noexcept {
+ // Exercise forwarding and replacement independently of the hardware kernel;
+ // q=0 deliberately retains the ordinary projection arithmetic in this test.
+ for(auto& p:projected)p={};
+ return provider(count,a,b,input,output,accepted);
+}
 void movement(){Source source;const auto model=source.model();const auto c=config();RallyVisualError e;
- RallyVisualScene scene,control;unsigned provider_calls=0;scene.set_transform_provider(provider,&provider_calls);
+ RallyVisualScene scene,control;unsigned provider_calls=0;scene.set_transform_project_provider(project_provider,&provider_calls);
  REQUIRE(scene.configure(c,{&model,1},e));REQUIRE(control.configure(c,{&model,1},e));
  auto wrong=c.initial_pose;wrong.progress=1;REQUIRE(!scene.update(wrong,e)&&e==RallyVisualError::initial_pose);REQUIRE(scene.frame().triangles.empty());
  const auto before=allocations;REQUIRE(scene.update(c.initial_pose,e));REQUIRE(control.update(c.initial_pose,e));REQUIRE(allocations==before);
@@ -99,6 +107,8 @@ void movement(){Source source;const auto model=source.model();const auto c=confi
  // Prepared ownership protects every published material from source changes.
  source.points.fill({100,100,100});source.pixels.fill(0xff);source.materials[0].palette.fill(0);
  scene.reset();REQUIRE(scene.update(c.initial_pose,e));REQUIRE(hash(scene.frame())==original);
+ const auto calls=provider_calls;scene.set_transform_provider(nullptr);scene.reset();
+ REQUIRE(scene.update(c.initial_pose,e));REQUIRE(provider_calls==calls);REQUIRE(hash(scene.frame())==original);
  REQUIRE(scene.persistent_bytes()>0);
 }
 std::vector<std::uint8_t> model_bytes(){std::vector<std::uint8_t>b(264);std::memcpy(b.data(),"RLYTEXM1",8);
@@ -112,7 +122,9 @@ void write_file(const std::string&path,std::span<const std::uint8_t>b){FILE*f=st
 void files(const char* directory){auto c=config();auto asset=model_bytes();c.assets[0]={std::uint32_t(asset.size()),crc(asset)};
  const std::string root=directory;const auto asset_path=root+"/model0.bin",config_path=root+"/view.bin";
  write_file(asset_path,asset);write_file(config_path,encode(c));RallyVisualScene scene;RallyVisualError e;
+ unsigned calls=0;scene.set_transform_project_provider(project_provider,&calls);
  REQUIRE(scene.load(directory,17,e));REQUIRE(scene.update(c.initial_pose,e));const auto previous=hash(scene.frame());
+ REQUIRE(calls>0);
  REQUIRE(!scene.load(directory,18,e)&&e==RallyVisualError::frame_mismatch);REQUIRE(hash(scene.frame())==previous);
  asset.back()^=1;write_file(asset_path,asset);REQUIRE(!scene.load(directory,17,e)&&e==RallyVisualError::asset_identity);REQUIRE(hash(scene.frame())==previous);
  asset.back()^=1;asset.push_back(0);write_file(asset_path,asset);REQUIRE(!scene.load(directory,17,e)&&e==RallyVisualError::asset_identity);

@@ -44,6 +44,7 @@ struct WorldScene::Storage {
         }
 
         std::array<ps2::TransformVector4,ps2::vu1_transform_capacity> input,output;
+        std::array<ps2::TransformProjectedVertex,ps2::vu1_transform_capacity> projected;
         std::array<std::uint32_t,ps2::vu1_transform_capacity> indices{};
         std::array<std::uint8_t,ps2::vu1_transform_capacity> accepted{};
         std::size_t count=0,end_face=0;
@@ -82,6 +83,11 @@ bool valid_batch_result(const ps2::TransformVector4& v,bool outside=false){
     if(outside)return true;
     const float x=v.x,y=v.y,z=v.z,w=v.w;
     return w>=clip_min_w&&x>=-w&&x<=w&&y>=-w&&y<=w&&z>=0&&z<=w;
+}
+bool valid_projected_result(const ps2::TransformProjectedVertex& p,const ps2::TransformVector4& clip){
+    return value(p.x)&&value(p.y)&&value(p.depth)&&value(p.q)&&
+        p.x>=0&&p.x<=float(frame_width)&&p.y>=0&&p.y<=float(frame_height)&&
+        p.depth>=0&&p.depth<=1&&p.q>=0x1p-16f&&p.q<=0x1p10f&&valid_batch_result(clip);
 }
 bool fail(WorldSceneError e,WorldSceneError& output){output=e;return false;}
 bool dimension(unsigned x){return x>=8&&x<=256&&(x&(x-1))==0;}
@@ -389,7 +395,12 @@ bool WorldScene::configure(std::size_t faces,std::size_t triangles,WorldSceneErr
     catch(const std::length_error&){return fail(WorldSceneError::allocation_failed,error);}
 }
 void WorldScene::set_profile_clock(WorldSceneClock clock,void* context)noexcept{clock_=clock;clock_context_=context;}
-void WorldScene::set_transform_provider(WorldSceneTransformBatch provider,void* context)noexcept{transform_batch_=provider;transform_context_=context;}
+void WorldScene::set_transform_provider(WorldSceneTransformBatch provider,void* context)noexcept{
+    transform_batch_=provider;transform_project_batch_=nullptr;transform_context_=context;
+}
+void WorldScene::set_transform_project_provider(WorldSceneTransformProjectBatch provider,void* context)noexcept{
+    transform_project_batch_=provider;transform_batch_=nullptr;transform_context_=context;
+}
 void WorldScene::set_numeric_mode(WorldNumericMode mode)noexcept{numeric_mode_=mode;}
 bool WorldScene::update(std::span<const WorldInstance> instances,const WorldView& view,WorldSceneError& error)noexcept{
     return update_impl(instances,view,error);
@@ -407,6 +418,8 @@ bool WorldScene::update_impl(std::span<const Instance> instances,const WorldView
         }else return (source);
     };
     const bool native=numeric_mode_==WorldNumericMode::native_float;
+    const bool project_provider=native&&transform_project_batch_;
+    const bool transform_provider=transform_batch_||project_provider;
     const auto now=[&]()noexcept{return clock_?clock_(clock_context_):std::uint64_t{0};};
     const auto validation_start=now();
     if(!storage_)return fail(WorldSceneError::not_configured,error);
@@ -428,7 +441,7 @@ bool WorldScene::update_impl(std::span<const Instance> instances,const WorldView
     auto& bank=storage_->banks[storage_->active^1];bank.release_leases();std::size_t material_index=0,triangle_count=0;
     std::uint32_t groups=0,culled_groups=0,transformed_vertices=0,cache_hits=0,backface_rejected_faces=0;
     std::uint32_t batch_calls=0,batch_vertices=0,accepted_batch_vertices=0,failed_batches=0,clipped_batch_fallbacks=0;
-    std::uint32_t provider_triangle_corners=0;
+    std::uint32_t provider_triangle_corners=0,provider_projected_vertices=0;
     std::uint64_t bounds_ticks=0,transform_ticks=0,clipping_ticks=0;
     auto& batch=storage_->batch;
     // Every face overwrites all input corners. Clippers commit only their
@@ -470,7 +483,7 @@ bool WorldScene::update_impl(std::span<const Instance> instances,const WorldView
         input.material=&material;
         std::array<bool,3> approximate{},projection_valid{};
         const auto transform_start=now();
-        if(transform_batch_&&face_index>=batch.end_face){
+        if(transform_provider&&face_index>=batch.end_face){
             batch.count=0;batch.begin_lookup();batch.end_face=std::min(instance.model.faces.size(),face_index+ps2::vu1_transform_capacity/3);
             // Never prefetch through an unclassified group. The next block
             // first runs the same conservative culling decision as scalar mode.
@@ -482,12 +495,18 @@ bool WorldScene::update_impl(std::span<const Instance> instances,const WorldView
                 if(entry.key==key)continue;
                 entry={key,std::uint32_t(batch.count)};
                 const auto p=instance.model.vertices[index];
-                batch.indices[batch.count]=index;batch.input[batch.count]={p.x,p.y,p.z,1};batch.accepted[batch.count]=0;++batch.count;
+                batch.indices[batch.count]=index;batch.input[batch.count]={p.x,p.y,p.z,1};batch.accepted[batch.count]=0;
+                if(project_provider)batch.projected[batch.count].q=0;
+                ++batch.count;
             }
             if(batch.count){
                 ++batch_calls;batch_vertices+=std::uint32_t(batch.count);
-                const bool completed=transform_batch_(transform_context_,instance.object_to_world,view.world_to_clip,
-                    std::span(batch.input).first(batch.count),std::span(batch.output).first(batch.count),std::span(batch.accepted).first(batch.count));
+                const bool completed=project_provider?
+                    transform_project_batch_(transform_context_,instance.object_to_world,view.world_to_clip,
+                        std::span(batch.input).first(batch.count),std::span(batch.output).first(batch.count),
+                        std::span(batch.accepted).first(batch.count),std::span(batch.projected).first(batch.count)):
+                    transform_batch_(transform_context_,instance.object_to_world,view.world_to_clip,
+                        std::span(batch.input).first(batch.count),std::span(batch.output).first(batch.count),std::span(batch.accepted).first(batch.count));
                 if(!completed)++failed_batches;
                 for(std::size_t k=0;k<batch.count;++k){
                     if(completed&&batch.accepted[k]==1&&valid_batch_result(batch.output[k],native))++accepted_batch_vertices;
@@ -505,15 +524,21 @@ bool WorldScene::update_impl(std::span<const Instance> instances,const WorldView
                     continue;}
             }
             bool accepted=false;
-            if(transform_batch_){const auto& entry=batch.lookup_entry(index);
+            if(transform_provider){const auto& entry=batch.lookup_entry(index);
                 if(entry.key==((batch.lookup_serial<<16)|index)&&batch.accepted[entry.slot]){
-                    const auto v=batch.output[entry.slot];input.vertices[i]={v.x,v.y,v.z,v.w,0,0};accepted=true;approximate[i]=true;}
+                    const auto v=batch.output[entry.slot];input.vertices[i]={v.x,v.y,v.z,v.w,0,0};accepted=true;approximate[i]=true;
+                    if(project_provider){const auto p=batch.projected[entry.slot];
+                        if(valid_projected_result(p,v)){
+                            projected[i]={p.x,p.y,0,0,p.q,p.depth};projection_valid[i]=true;++provider_projected_vertices;
+                        }
+                    }
+                }
             }
             if(!accepted){
             ++transformed_vertices;
             if(!scalar_vertex(instance,view.world_to_clip,index,native,input.vertices[i]))return fail(WorldSceneError::invalid_transform,error);
             }
-            if(cache_project){projection_valid[i]=detail::project_inside_float(input.vertices[i],projected[i]);}
+            if(cache_project&&!projection_valid[i]){projection_valid[i]=detail::project_inside_float(input.vertices[i],projected[i]);}
             if(cached){cached->clip=input.vertices[i];cached->index=index|(projection_valid[i]?projected_vertex:0u);cached->serial=storage_->cache_serial|(approximate[i]?approximate_vertex:0);
                 if(projection_valid[i])cached->projected=projected[i];}
         }
@@ -559,6 +584,7 @@ bool WorldScene::update_impl(std::span<const Instance> instances,const WorldView
     storage_->stats.accepted_batch_vertices=accepted_batch_vertices;storage_->stats.failed_batches=failed_batches;
     storage_->stats.clipped_batch_fallbacks=clipped_batch_fallbacks;
     storage_->stats.provider_triangle_corners=provider_triangle_corners;
+    storage_->stats.provider_projected_vertices=provider_projected_vertices;
     storage_->stats.bounds_ticks=bounds_ticks;storage_->stats.transform_ticks=transform_ticks;storage_->stats.clipping_ticks=clipping_ticks;
     storage_->stats.numeric_mode=numeric_mode_;
     storage_->stats.backface_rejected_faces=backface_rejected_faces;

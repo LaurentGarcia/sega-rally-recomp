@@ -122,7 +122,10 @@ bool RallyVisualScene::configure(const RallyVisualConfig& config,std::span<const
             next->vertices[i]=models[i].vertices.size();next->faces[i]=models[i].faces.size();
         }
         if(!next->initialize_scene(engine_error))return fail(error,engine_error==WorldSceneError::allocation_failed?RallyVisualError::allocation:RallyVisualError::capacity);
-        next->scene.set_profile_clock(clock_,clock_context_);next->scene.set_transform_provider(provider_,provider_context_);next->scene.set_numeric_mode(mode_);
+        next->scene.set_profile_clock(clock_,clock_context_);
+        if(project_provider_)next->scene.set_transform_project_provider(project_provider_,provider_context_);
+        else next->scene.set_transform_provider(provider_,provider_context_);
+        next->scene.set_numeric_mode(mode_);
         storage_.swap(next);timings_={};error=RallyVisualError::none;return true;
     }catch(const std::bad_alloc&){return fail(error,RallyVisualError::allocation);}
      catch(const std::length_error&){return fail(error,RallyVisualError::capacity);}
@@ -148,7 +151,10 @@ bool RallyVisualScene::load(const char* directory,std::uint32_t expected,RallyVi
             if(!prepare_model(view,next->models[i],engine_error))return fail(error,engine_error==WorldSceneError::allocation_failed?RallyVisualError::allocation:RallyVisualError::asset);
         }
         if(!next->initialize_scene(engine_error))return fail(error,engine_error==WorldSceneError::allocation_failed?RallyVisualError::allocation:RallyVisualError::capacity);
-        next->scene.set_profile_clock(clock_,clock_context_);next->scene.set_transform_provider(provider_,provider_context_);next->scene.set_numeric_mode(mode_);
+        next->scene.set_profile_clock(clock_,clock_context_);
+        if(project_provider_)next->scene.set_transform_project_provider(project_provider_,provider_context_);
+        else next->scene.set_transform_provider(provider_,provider_context_);
+        next->scene.set_numeric_mode(mode_);
         storage_.swap(next);timings_={};error=RallyVisualError::none;return true;
     }catch(const std::bad_alloc&){return fail(error,RallyVisualError::allocation);}
      catch(const std::length_error&){return fail(error,RallyVisualError::capacity);}
@@ -183,7 +189,12 @@ void RallyVisualScene::set_profile_clock(WorldSceneClock clock,void* context) no
     clock_=clock;clock_context_=context;if(storage_)storage_->scene.set_profile_clock(clock,context);
 }
 void RallyVisualScene::set_transform_provider(WorldSceneTransformBatch provider,void* context) noexcept {
-    provider_=provider;provider_context_=context;if(storage_)storage_->scene.set_transform_provider(provider,context);
+    provider_=provider;project_provider_=nullptr;provider_context_=context;
+    if(storage_)storage_->scene.set_transform_provider(provider,context);
+}
+void RallyVisualScene::set_transform_project_provider(WorldSceneTransformProjectBatch provider,void* context) noexcept {
+    project_provider_=provider;provider_=nullptr;provider_context_=context;
+    if(storage_)storage_->scene.set_transform_project_provider(provider,context);
 }
 void RallyVisualScene::set_numeric_mode(WorldNumericMode mode) noexcept {
     mode_=mode;if(storage_)storage_->scene.set_numeric_mode(mode);

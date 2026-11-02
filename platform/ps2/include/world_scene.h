@@ -49,7 +49,10 @@ struct WorldSceneStats { std::uint32_t instances=0,vertices=0,source_faces=0,out
     // is included; these diagnostics are not an uninstrumented timing claim.
     std::uint64_t validation_ticks=0,bounds_ticks=0,transform_ticks=0,clipping_ticks=0;
     WorldNumericMode numeric_mode=WorldNumericMode::reference;
-    std::uint32_t backface_rejected_faces=0; };
+    std::uint32_t backface_rejected_faces=0;
+    // Projection values consumed from the optional provider on cache misses;
+    // cache hits and prefetched but unused vertices are excluded.
+    std::uint32_t provider_projected_vertices=0; };
 using WorldSceneClock=std::uint64_t (*)(void* context) noexcept;
 // Optional rendering-only provider, never a game-state transform. Every call
 // has1..96 distinct input vertices and equally sized output/accepted spans.
@@ -68,6 +71,16 @@ using WorldSceneClock=std::uint64_t (*)(void* context) noexcept;
 using WorldSceneTransformBatch=bool (*)(void*,const WorldMatrix&,const WorldMatrix&,
     std::span<const ps2::TransformVector4>,std::span<ps2::TransformVector4>,
     std::span<std::uint8_t>) noexcept;
+// Native-float continuation of the same transform contract. Clip acceptance
+// remains independent of projection: q=0 requests ordinary EE projection.
+// Supplied x/y/depth/q must describe the same clip vector within 1/32 logical
+// pixel, 2^-20 depth and 2^-20 relative q. Only wholly inside, bounded outputs
+// are used. UVs remain per-corner. Invalid/missing projected outputs fall back
+// to EE projection without discarding a valid transform. Reference mode never
+// calls this provider. All spans are separate and live only during the call.
+using WorldSceneTransformProjectBatch=bool (*)(void*,const WorldMatrix&,const WorldMatrix&,
+    std::span<const ps2::TransformVector4>,std::span<ps2::TransformVector4>,
+    std::span<std::uint8_t>,std::span<ps2::TransformProjectedVertex>) noexcept;
 const char* world_scene_error_message(WorldSceneError error) noexcept;
 
 // Immutable, owned model snapshot. Assignment validates and copies all source
@@ -126,6 +139,10 @@ public:
     // Changes are serialized outside update(); subsequent instances/frames
     // always start fresh cache serials, including after provider changes.
     void set_transform_provider(WorldSceneTransformBatch,void* context=nullptr) noexcept;
+    // Replaces the ordinary provider; either setter clears the other one.
+    // A null callback restores scalar work. No projection-provider work runs
+    // in reference mode; changing back to native-float enables it again.
+    void set_transform_project_provider(WorldSceneTransformProjectBatch,void* context=nullptr) noexcept;
     // Serialized between updates, retained across configure(). Reference is
     // the default and keeps binary64 preparation/clipping. Native-float uses
     // binary32 transforms, conservative bounds and clipping without a hidden
@@ -160,6 +177,7 @@ private:
     struct Storage;std::unique_ptr<Storage> storage_;
     WorldSceneClock clock_=nullptr;void* clock_context_=nullptr;
     WorldSceneTransformBatch transform_batch_=nullptr;void* transform_context_=nullptr;
+    WorldSceneTransformProjectBatch transform_project_batch_=nullptr;
     WorldNumericMode numeric_mode_=WorldNumericMode::reference;
 };
 } // namespace ps2::native

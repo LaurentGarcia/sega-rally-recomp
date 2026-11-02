@@ -31,6 +31,110 @@ void host_float(const TransformMatrix&a,const TransformMatrix&b,std::span<const 
         out[i]=std::bit_cast<TransformVector4>(c);}
 }
 #endif
+#ifdef _EE
+bool projection_contract(Vu1Transform&backend){
+    static_assert(sizeof(TransformVector4)==16 && sizeof(TransformProjectedVertex)==16);
+    const auto id=identity();
+    std::array<TransformVector4,97> input{},clip{},plain{};
+    std::array<TransformProjectedVertex,97> projected{};
+    const TransformVector4 cs{17,18,19,20};
+    const TransformProjectedVertex ps{21,22,23,24};
+    const auto reset=[&](){clip.fill(cs);projected.fill(ps);};
+    const auto unchanged=[&](){for(unsigned i=0;i<97;++i){
+        if(std::memcmp(&clip[i],&cs,16)||std::memcmp(&projected[i],&ps,16))return false;}
+        return true;};
+    auto before=backend.stats().dma_qwords;reset();
+    if(!check(backend.transform_project_native(id,id,{},{},{})&&backend.stats().dma_qwords==before,
+              "empty projected batch performs no transfer")||!check(unchanged(),"empty projected unchanged"))return false;
+    unsigned inside_count=0,outside_count=0;
+    double max_pixel=0,max_depth=0,max_q=0;
+    // Each matrix emits an authored clip vector independently of the input.
+    // Both sides of every plane, exact corners and reciprocal extremes are
+    // covered. In particular zero w must never admit the saturated VU DIV.
+    std::array<TransformVector4,101> cases{};unsigned n=0;
+    cases[n++]={0,0,0,0};cases[n++]={0,0,0,-1};
+    for(float w:std::array<float,5>{0x1p-10f,.5f,1,7,65536}){
+        cases[n++]={0,0,w*.5f,w};
+        for(unsigned axis=0;axis<3;++axis)for(unsigned side=0;side<2;++side){
+            TransformVector4 v{0,0,w*.5f,w};
+            auto values=lanes(v);values[axis]=axis==2?(side?w:0):(side?w:-w);
+            cases[n++]=std::bit_cast<TransformVector4>(values);
+            const auto edge=std::bit_cast<std::uint32_t>(values[axis]);
+            values[axis]=std::bit_cast<float>(edge+1u);
+            if(axis==2&&!side)values[axis]=-0x1p-20f;
+            cases[n++]=std::bit_cast<TransformVector4>(values);
+        }
+        cases[n++]={-w,-w,0,w};cases[n++]={w,w,w,w};
+    }
+    cases[n++]={0,0,0,std::bit_cast<float>(std::uint32_t(0x3a7fffff))};
+    cases[n++]={0,0,0,std::bit_cast<float>(std::uint32_t(0x3a800001))};
+    while(n<cases.size()){const float w=float(n-70);cases[n++]={w*.25f,-w*.375f,w*.625f,w};}
+    for(const auto c:cases){
+        auto b=TransformMatrix{};b[12]=c.x;b[13]=c.y;b[14]=c.z;b[15]=c.w;
+        input[0]={0,0,0,1};reset();
+        // 65536 outward-neighbor tests exceed the API input bound and must
+        // reject both output spans before submitting anything.
+        if(!valid_native_vu1_transform_input(id,b,{input.data(),1})){
+            before=backend.stats().dma_qwords;
+            if(!check(!backend.transform_project_native(id,b,{input.data(),1},clip,projected)&&
+                      unchanged()&&backend.stats().dma_qwords==before,"projected bounded matrix rejection"))return false;
+            continue;
+        }
+        if(!check(backend.transform_native(id,b,{input.data(),1},plain),"projection baseline")||
+           !check(backend.transform_project_native(id,b,{input.data(),1},clip,projected),backend.error())||
+           !check(std::memcmp(plain.data(),clip.data(),16)==0,"projected clip preserves original kernel"))return false;
+        const auto v=clip[0];const auto p=projected[0];
+        const bool inside=v.w>=0x1p-10f&&v.x>=-v.w&&v.x<=v.w&&v.y>=-v.w&&v.y<=v.w&&v.z>=0&&v.z<=v.w;
+        if(!inside){++outside_count;const TransformProjectedVertex zero{};
+            if(!check(std::memcmp(&p,&zero,16)==0,"outside all-zero projection including zero w"))return false;
+        }else{++inside_count;
+            const double q=1.0/double(v.w);
+            const double pixel=std::max(std::abs(double(p.x)-(1+double(v.x)*q)*248),
+                                        std::abs(double(p.y)-(1-double(v.y)*q)*192));
+            const double depth=std::abs(double(p.depth)-(1-double(v.z)*q));
+            const double qe=std::abs(double(p.q)-q)/q;
+            max_pixel=std::max(max_pixel,pixel);max_depth=std::max(max_depth,depth);max_q=std::max(max_q,qe);
+            if(!check(p.q>0&&p.x>=0&&p.x<=496&&p.y>=0&&p.y<=384&&p.depth>=0&&p.depth<=1&&
+                      pixel<=1.0/32&&depth<=0x1p-20&&qe<=0x1p-20,"projection boundary numerical budget"))return false;
+        }
+        if(!check(std::memcmp(&clip[1],&cs,16)==0&&std::memcmp(&projected[1],&ps,16)==0,"projected output prefix only"))return false;
+    }
+    for(unsigned count:std::array<unsigned,4>{0,1,95,96}){
+        for(unsigned i=0;i<count;++i)input[i]={float(i%9)/8-.5f,float(i%7)/8-.25f,.5f,1};
+        reset();
+        if(!check(backend.transform_project_native(id,id,{input.data(),count},clip,projected),"projected count boundary")||
+           !check(std::memcmp(&clip[count],&cs,16)==0&&std::memcmp(&projected[count],&ps,16)==0,"projected count preserves tail"))return false;
+        for(unsigned i=0;i<count;++i)if(!check(std::memcmp(&clip[i],&input[i],16)==0&&projected[i].q==1,"projected count output"))return false;
+    }
+    reset();input[0]={.25f,-.5f,.75f,1};before=backend.stats().dma_qwords;
+    alignas(16) std::array<unsigned char,32> misaligned{};
+    if(!check(!backend.transform_project_native(id,id,{input.data(),1},{clip.data(),0},projected)&&unchanged(),"short clip rejection")||
+       !check(!backend.transform_project_native(id,id,{input.data(),1},clip,{projected.data(),0})&&unchanged(),"short projected rejection")||
+       !check(!backend.transform_project_native(id,id,input,clip,projected)&&unchanged(),"oversized projected rejection")||
+       !check(!backend.transform_project_native(id,id,{input.data(),1},clip,
+             {reinterpret_cast<TransformProjectedVertex*>(input.data()),1})&&input[0].x==.25f&&unchanged(),"input projected overlap rejection")||
+       !check(!backend.transform_project_native(id,id,{input.data(),1},clip,
+             {reinterpret_cast<TransformProjectedVertex*>(clip.data()),1})&&unchanged(),"clip projected overlap rejection")||
+       !check(!backend.transform_project_native(id,id,{input.data(),1},clip,
+             {reinterpret_cast<TransformProjectedVertex*>(misaligned.data()+4),1})&&unchanged(),"projected alignment rejection")||
+       !check(backend.stats().dma_qwords==before,"invalid projected requests perform no DMA"))return false;
+    for(std::uint32_t bits:std::array<std::uint32_t,5>{1,0x7f800000,0x7fc00000,0x47800001,0xff800000}){
+        input[0].x=std::bit_cast<float>(bits);
+        if(!check(!backend.transform_project_native(id,id,{input.data(),1},clip,projected)&&unchanged()&&
+                  backend.stats().dma_qwords==before,"invalid projected encoding atomic before DMA"))return false;
+    }
+    input[0]={0,0,.5f,1};input[1]={2,0,.5f,1};auto large=id;large[0]=65536;
+    if(!check(!backend.transform_project_native(large,id,{input.data(),2},clip,projected)&&unchanged()&&backend.available(),
+              "late clip failure preserves both outputs and lease"))return false;
+    input[0]={.25f,-.5f,.75f,1};
+    if(!check(backend.transform_project_native(id,id,{input.data(),1},{input.data(),1},projected)&&input[0].z==.75f&&
+              projected[0].x==310&&projected[0].y==288&&projected[0].depth==.25f,"projected in-place clip after rejection")||
+       !check(backend.transform_native(id,id,{input.data(),1},clip)&&clip[0].z==.75f,"entry zero survives lazy projection upload"))return false;
+    std::printf("VU1 PROJECTED PASS cases=%u inside=%u outside=%u max_pixels=%.9g max_depth=%.9g max_q_relative=%.9g persistent=%u\n",
+        n,inside_count,outside_count,max_pixel,max_depth,max_q,unsigned(backend.stats().persistent_bytes));
+    return true;
+}
+#endif
 bool run(){
     Vu1Transform backend;
 #ifdef _EE
@@ -170,6 +274,14 @@ bool run(){
     if(!check(backend.transform(a,b,{input.data(),1},{input.data(),1},bound)&&input[0].z==.75f,"hardware alias"))return false;
     if(!check(backend.transform_native(a,b,{input.data(),1},{input.data(),1})&&input[0].z==.75f,"native hardware alias"))return false;
 #endif
+    #ifdef _EE
+    if(!projection_contract(backend))return false;
+    #else
+    std::array<TransformProjectedVertex,1> unavailable{{{21,22,23,24}}};
+    output[0]=unchanged;
+    if(!check(!backend.transform_project_native(a,b,{input.data(),1},{output.data(),1},unavailable)&&
+        std::memcmp(&output[0],&unchanged,16)==0&&unavailable[0].q==24,"host projected API unavailable preserves outputs"))return false;
+    #endif
     std::printf("VU1 ENGINE PASS checks=%u vertices=%u accepted=%u fallback=%u max_clip=%.9g max_pixels=%.9g max_depth=%.9g batches=%llu\n",
         checks,vertices,accepted,fallbacks,maximum_error,maximum_pixels,maximum_depth,
         static_cast<unsigned long long>(backend.stats().batches));return true;

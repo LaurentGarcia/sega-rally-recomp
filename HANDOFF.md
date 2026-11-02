@@ -1,5 +1,118 @@
 # Handoff
 
+## Native PS2 projection and direct-GS investigation (2026-11-01)
+
+Continued from b1dc5621. The reusable VU1 driver now offers an optional native
+transform/project operation and WorldScene can consume its bounded projection
+results. The original transform kernel remains byte-identical; the separate
+projection kernel uploads lazily at micro-instruction 256. Both output prefixes
+publish only after every clip vector passes validation. Missing or invalid
+projection values fall back to the existing EE projector without losing a
+valid transform. Reference mode bypasses this continuation, UVs remain per
+corner, and provider changes clear the alternate callback. RallyVisualScene
+preserves the selected provider across configure/load/reset.
+
+The authored driver proof passes 147,597 checks, 15,168 vertices and 520 batches.
+Its 101 numerical candidates include 68 inside, 28 outside and five rejected
+matrix cases. Maximum authored projection error is 0.00003052 logical pixels.
+The clean driver-fixture rebuild is byte-identical to the executed ELF; the
+original 36-instruction kernel is unchanged and the 72-instruction continuation
+matches its earlier isolated proof. Native-path disassembly contains no software
+double helpers. Evidence: build/ps2-vu1-projected-engine-ee-001/runtime-validation.json
+and build/ps2-vu1-projected-engine-ee-002/native-path-audit.json.
+
+The actual-scene test passes 601 independent native updates, 27,306,017 checks,
+885,445 ordered triangle pairs and 53 textures. It consumes 1,198,630 supplied
+projections; triangle order, materials and UVs agree. Maximum x/y difference is
+0.00003052 logical pixels and depth difference is 0.00000011921. Seventeen
+literal GS color-frame comparisons find 348 changed pixels out of 4,874,240,
+with maximum channel change 228. Depth buffers were not read. This is measured
+presentation variation, not exact raster parity. Alternating AB/BA scene-update
+timings regress from 17.740 to 19.222 ms, including transform transport and
+validation but excluding game update and GS submission. Evidence:
+build/ps2-world-projection-ee-build-002/runtime-validation.json.
+
+The integrated native047 experiment also regresses: matching 660 complete
+periods measure 27.448 updates/sec and 32.565 ms mean work, compared with
+native046's 29.383 and 30.992 ms. All 700 non-timing fields across 98 common
+records agree. The extra readback and admission work outweigh the isolated
+division saving. The application therefore retains its transform-only provider;
+the optional API is a validated building block, not an enabled speedup. Rejected
+ELF SHA256: e10666fb8041d548fe482973079430127e388cd04c6cc878e2b30cf89db9fc7a.
+Evidence: build/ps2-native-motion-004/native047-validation.json.
+
+The restored transform-only application is rebuilt as native048. Its first 660
+complete periods measure 29.361 updates/sec, 34.059 ms mean period and 31.085 ms
+mean work (maximum 37.314 ms). Every work interval still exceeds 16.667 ms.
+Mean work differs by +0.093 ms from native046; no speedup is claimed. The same
+98 sampled log records retain all 588 compared non-timing payload fields
+(update/frequency metadata excluded). Inputs match and emulator preferences
+match after normalizing each private output directory. ELF SHA256:
+85121d13320c418156e69a4cf141bfba61e24e45e8275c258ccaf8e43c1c76c9.
+The source-bound run is build/ps2-projection-final-001/native048-validation.json;
+its compiled closure is retained separately. Native048 and the rebuilt original
+engine-demo048 share all 33 engine input hashes, manifest
+c10dd4041b96ecf47c8086b57024ad130e23b8d105f662a63c588ca6930f189a.
+The independent demo was cross-built, not re-executed in this cycle.
+
+All 306 portable PS2 tests pass in 98.114 seconds, without source drift; the
+bound report is build/ps2-projection-final-001/portable-tests.json. Consumer
+tests include 300 continuation failure/cache/seam/reference cases and the
+existing 1,000 cached-projection frames, also checked with ASan/UBSan. The new
+prepared-versus-mutable gather regression covers 2,112 frames, provider order,
+all dynamic window starts, cache collisions, rejected transforms, allocation
+failures and frame publication. Callback numerical allowances remain a trusted
+provider obligation; runtime admission checks domain/inside bounds without
+recomputing scalar error. Physical hardware and fatal lazy-upload transport
+fault injection remain untested.
+
+A private topology-only gather mask reduces host candidate visits and preserves
+601 EE poses, 885,445 triangles and 14,586,293 provider trace words, fingerprint
+9fa7ee5e3989d0b7. It adds 60,840 bytes across the four actual models. However,
+the same-executable AB/BA EE test regresses over 600 measured poses: gather
+285,766,925 -> 358,254,797 CP0 Count ticks, complete geometry
+3,260,069,454 -> 3,333,222,158 ticks. At 294.912 MHz these add about 0.410 and
+0.413 ms per pose respectively. The mask is not promoted into production.
+Bit-scan lowering remains unverified; no second candidate has been built or
+measured. The retained correctness test is independent of the rejected layout.
+Evidence: build/ps2-world-gather-ee-002/runtime-validation.json and the private
+host/sanitizer proof build/ps2-world-gather-001/validation.json.
+
+A separate private VU1 packet producer now emits authored ST/RGBAQ/XYZ2 packets
+through XGKICK. Run004 passes four cases/eight frames, 422 checks, 20,480 VU-memory
+words, six preflight rejection/no-flip controls and 1,433,600 literal framebuffer
+word comparisons against PATH3. Its inputs are already projected, with dyadic
+depth/UV and one resident texture/CLUT; it does not establish general projection,
+depth packing, game integration, overlap or improved cadence. Failed runs001–003
+remain recorded: Play retains synthetic PATH3 activity ticks after a transfer
+finishes. Run004 waits boundedly for the same strict GIF-idle condition after
+its owned PATH3 FINISH; no emulator patch or relaxed ownership check is used.
+Evidence: build/ps2-vu1-gs-ee-004/runtime-validation.json. The next useful renderer
+boundary accepts model/world vertices, matrices and per-corner UVs, transforms
+and builds ordered GS packets on VU1, and falls back before emitting any part of
+a batch that needs EE clipping. Texture/CLUT leases, bank retirement, general
+depth quantization and complete-frame timing must precede overlapping transfers.
+
+A private exact-depth decomposition is ready for that next kernel. Its host
+comparison matches reverse_depth16 over all 1,056,964,609 positive normal
+binary32 encodings in [0,1], plus signed-zero controls. Scaling by 2^16,
+separating the integer/fractional parts, and comparing exact half-offsets avoids
+the naive multiply/add conversion's 32,768 mismatches in the same host domain.
+The proposed VU mapping still needs assembly/hazard review and target execution;
+this is not a validated GS kernel or a performance result. Sources and exhaustive
+log are in build/ps2-vu-depth16-001.
+
+The private evidence directory build/ps2-world-projection-ee-001 was mistakenly
+reused during preparation: its historical main.cpp and manifest.json were
+overwritten. The old ELF, logs and report remain intact, but a bounded search
+did not recover the exact old source. Do not claim that older experiment is
+source-rebuildable from the current directory. The new paired-scene and native047
+compiled closure is separately preserved in
+build/ps2-scene-projection-continuation-001/sources.tar (131 files), SHA256
+da2be3df724e5d965944294759a0e9fb8f4179edec1270c31048be0cce049ca9.
+Its source-binding.json and historical-source-recovery.json explicitly record
+the collision and limitation. New evidence directories must be fresh.
+
 ## Native PS2 frame-budget investigation (2026-11-01)
 
 Continued from b68004ff. Native045 adds a last-texture-slot shortcut to the

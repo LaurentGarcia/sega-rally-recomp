@@ -135,6 +135,13 @@ preparing those guards helped, but removing reference arithmetic from normal
 rendering produced the larger gain. The recovered game calculations are
 unchanged. Transfers and vector-unit work are still serialized.
 
+An optional VU1 transform-and-projection continuation now supplies logical
+screen X/Y, depth and reciprocal W for inside vertices, retaining clip
+coordinates for EE fallback. Reference presentation ignores this provider.
+The normal vehicle path remains transform-only, with EE projection: the
+complete-scene and application measurements below show a regression when the
+continuation is enabled.
+
 Complete-frame replay of actual VU output covers all 601 recorded poses and
 1,364,846 transformed vertices. Against the binary64 reference, the independent
 host raster differs at 305 of 114,468,864 color pixels, at most four per frame,
@@ -204,6 +211,25 @@ native046 removes redundant EE facing-intermediate checks under the validated
 input bounds and hardware signed-zero-underflow contract. Portable checks and
 recovered game arithmetic remain unchanged. The next structural work is the
 [VU1 rendering pipeline](ps2-engine-architecture.md#rendering-throughput-and-the-hardware-pipeline).
+
+The experimental native047 projection continuation measures 27.448 native
+updates/sec and 32.565 ms of work, slower than native046's 29.383 updates/sec
+and 30.992 ms. In a separate paired 601-pose target comparison, scene update
+time rises from 17.740 to 19.222 ms. All 885,445 ordered triangles and their
+materials/UVs retain the comparison contract, while coordinates, depth and Q
+stay within the documented numerical budgets. Seventeen GS framebuffer pairs
+differ at 348 of 4,874,240 color pixels (maximum channel difference 228); these
+are color comparisons, not depth readback or pixel identity. The earlier
+isolated 1.599 ms projection saving is not an integrated gain. The optional
+API remains available for further work, but transform-only is the default.
+The rebuilt native048 default measures 29.361 updates/sec and 31.085 ms mean
+work over the matching 660 periods. All 660 work intervals still exceed the
+16.667 ms budget; this restores the preceding path without a speedup claim.
+The next direction is renderer-owned prepared world/clip batches with explicit
+texture, packet and VU-bank lifetimes. A private authored XGKICK fixture has
+passed exact packet/framebuffer checks; it does not yet establish general
+scene integration, overlapping work or a game-rate improvement.
+
 In native042 versus native043 at update 60, the last-
 palette shortcut reduces packet construction from 34.911 to 11.215 ms, while
 exact repeated-facing reuse reduces geometry from 23.747 to 20.866 ms.
