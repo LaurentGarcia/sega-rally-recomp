@@ -569,12 +569,15 @@ bool Display::present(const Frame &frame) {
     d.flip(); d.failure = "NONE";
     return true;
 }
-bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit,WorldSubmissionMode mode) {
+bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit,WorldSubmissionMode mode,WorldMaterialMode material_mode) {
     if(!impl_||!impl_->ready)return false;
     auto& d=*impl_;const auto validation_start=d.now();
     const auto reject=[&d](const char* reason){d.failure=reason;return false;};
     if(mode!=WorldSubmissionMode::fused&&mode!=WorldSubmissionMode::classify_first&&mode!=WorldSubmissionMode::classify_async)
         return reject("INVALID WORLD SUBMISSION MODE");
+    if(material_mode!=WorldMaterialMode::resolve_each&&material_mode!=WorldMaterialMode::memoized)
+        return reject("INVALID WORLD MATERIAL MODE");
+    const bool memoized=material_mode==WorldMaterialMode::memoized;
     if(!plan.output_triangle_capacity()||plan.output_triangle_capacity()>16384||plan.instances().size()>1024)
         return reject("INVALID WORLD DRAW PLAN");
     if(!unit.available())return reject("WORLD VU1 OWNER UNAVAILABLE");
@@ -650,6 +653,28 @@ bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit,Wo
     std::array<ps2::Vu1WorldState,ps2::vu1_world_triangle_capacity> states;
     std::array<unsigned,ps2::vu1_world_triangle_capacity> texture_slots_used{};
     std::array<Impl::PaletteSlot*,ps2::vu1_world_triangle_capacity> palette_slots_used{};
+    std::array<std::uint32_t,ps2::vu1_world_triangle_capacity> texture_epochs,palette_epochs;
+    struct MaterialMemo {
+        const Material* material;
+        unsigned texture_slot,palette_slot;
+        std::uint32_t texture_epoch,palette_epoch;
+        bool state_valid;
+        alignas(ps2::Vu1WorldState) std::array<std::byte,sizeof(ps2::Vu1WorldState)> state;
+    };
+    static_assert(sizeof(MaterialMemo)<=80);
+    std::array<MaterialMemo,64> material_memo;
+    // No cache setup on the resolve_each control. A fresh call/retry clears
+    // tags before reading any remaining member, including after rejection.
+    if(memoized)for(auto& memo:material_memo)memo.material=nullptr;
+    const auto memo_for=[&](const Material* material)->MaterialMemo&{
+        const auto p=reinterpret_cast<std::uintptr_t>(material);
+        return material_memo[((p>>4)^(p>>10))&(material_memo.size()-1)];
+    };
+    // A presentation admits <=32768 source faces and <=16384 emitted fans.
+    // Each can request at most one texture/CLUT upload, plus the checker;
+    // successful-upload counters therefore cannot wrap within this call.
+    // Fallback uses the unchanged writer and invalidates these proofs through
+    // the same counters. Immutable plan leases prevent material mutation here.
     std::array<Triangle,clip_triangle_capacity> clipped;
     const float sx=640.f/frame_width,sy=float(d.height)/frame_height;
     std::size_t next_instance=0,next_face=0;
@@ -696,9 +721,36 @@ bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit,Wo
             const auto preload_materials=[&](){
                 for(std::size_t i=0;i<count;++i){const auto& material=*materials[i];
                     if(material.texture){
+                        auto* memo=memoized?&memo_for(&material):nullptr;
+                        // Validate everything that could reject BEFORE the
+                        // texture touch. After it succeeds, the palette touch
+                        // is infallible: no retry may double-touch either LRU.
+                        if(memo&&memo->material==&material&&
+                           memo->texture_epoch==d.counters.texture_uploads&&memo->palette_epoch==d.counters.palette_uploads&&
+                           memo->palette_slot<palette_slots&&d.palettes[memo->palette_slot].valid&&
+                           d.texture_cache.try_touch_resident(memo->texture_slot,*material.texture)){
+                            auto& palette=d.palettes[memo->palette_slot];
+                            palette.age=++d.palette_age;d.last_palette=&palette;
+                            ++d.counters.texture_hits;++d.counters.palette_hits;++d.counters.world_material_memo_hits;
+                            texture_slots_used[i]=memo->texture_slot;palette_slots_used[i]=&palette;
+                            texture_epochs[i]=memo->texture_epoch;palette_epochs[i]=memo->palette_epoch;
+                            continue;
+                        }
+                        if(memo){
+                            ++d.counters.world_material_memo_misses;
+                            d.counters.world_material_memo_invalidations+=memo->material==&material&&
+                                (memo->texture_epoch!=d.counters.texture_uploads||memo->palette_epoch!=d.counters.palette_uploads);
+                        }
                         auto& image=d.texture(*material.texture,q);if(!d.ready)return false;
                         texture_slots_used[i]=unsigned(&image-d.textures);
                         palette_slots_used[i]=&d.palette(material.palette,q);if(!d.ready)return false;
+                        if(memo){
+                            memo->material=&material;memo->texture_slot=texture_slots_used[i];
+                            memo->palette_slot=unsigned(palette_slots_used[i]-d.palettes);
+                            memo->texture_epoch=texture_epochs[i]=d.counters.texture_uploads;
+                            memo->palette_epoch=palette_epochs[i]=d.counters.palette_uploads;
+                            memo->state_valid=false;
+                        }
                     }else palette_slots_used[i]=nullptr;
                 }
                 return true;
@@ -709,6 +761,9 @@ bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit,Wo
                 bool resident=true;
                 for(std::size_t i=0;i<count;++i){const auto& material=*materials[i];
                     if(!material.texture)continue;
+                    if(memoized&&texture_epochs[i]==d.counters.texture_uploads&&palette_epochs[i]==d.counters.palette_uploads){
+                        ++d.counters.world_material_residency_fast;continue;
+                    }
                     const auto& entry=d.texture_cache.entry(texture_slots_used[i]);const auto& key=*material.texture;
                     resident=resident&&entry.valid&&entry.key.indices==key.indices&&entry.key.generation==key.generation&&
                         entry.key.width==key.width&&entry.key.height==key.height&&palette_slots_used[i]->valid&&
@@ -718,6 +773,16 @@ bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit,Wo
             };
             const auto resolve_states=[&](){
                 for(std::size_t i=0;i<count;++i){const auto& material=*materials[i];auto& state=states[i];
+                    auto* memo=memoized&&material.texture?&memo_for(&material):nullptr;
+                    // A later material may have collided with this bucket
+                    // during preload. Re-find and verify the complete binding;
+                    // never retain a pointer into the memo across that pass.
+                    if(memo&&memo->material==&material&&memo->state_valid&&
+                       memo->texture_epoch==d.counters.texture_uploads&&memo->palette_epoch==d.counters.palette_uploads&&
+                       memo->texture_slot==texture_slots_used[i]&&memo->palette_slot==unsigned(palette_slots_used[i]-d.palettes)){
+                        std::memcpy(&state,memo->state.data(),sizeof state);
+                        ++d.counters.world_material_state_hits;continue;
+                    }
                     std::memcpy(&state.test,pixel_tests[material.cutout?1:0][material.checker?1:0]+1,8);
                     state.tex0=0;state.clamp=0;
                     if(material.texture){
@@ -728,6 +793,12 @@ bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit,Wo
                     }
                     state.prim=GS_SET_PRIM(PRIM_TRIANGLE,0,material.texture?1:0,0,0,0,0,0,0);
                     state.rgba=material.texture?0x80808080u:gs_color(material.color);
+                    if(memo){
+                        memo->material=&material;memo->texture_slot=texture_slots_used[i];
+                        memo->palette_slot=unsigned(palette_slots_used[i]-d.palettes);
+                        memo->texture_epoch=d.counters.texture_uploads;memo->palette_epoch=d.counters.palette_uploads;
+                        std::memcpy(memo->state.data(),&state,sizeof state);memo->state_valid=true;
+                    }
                 }
                 return true;
             };

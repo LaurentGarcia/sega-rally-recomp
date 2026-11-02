@@ -17,6 +17,8 @@ class TextureCache(unittest.TestCase):
             result=subprocess.run([str(executable)],capture_output=True,text=True,check=True)
             self.assertIn("TEXTURE_CACHE PASS",result.stdout)
             self.assertIn("page_ownership=1 eviction=1 generation=1 atomic_rejection=1 no_allocations=1",result.stdout)
+            self.assertIn("TEXTURE_CACHE TOUCH PASS",result.stdout)
+            self.assertIn("stale_identity=1 atomic_miss=1 exact_lru=1 no_allocations=1",result.stdout)
     def test_age_wrap_preserves_last_hit_and_lru(self):
         compiler=shutil.which("clang++") or shutil.which("g++")
         if not compiler:self.skipTest("C++20 compiler unavailable")
@@ -34,4 +36,5 @@ class TextureCache(unittest.TestCase):
                 capture_output=True,text=True,check=True)
             result=subprocess.run([str(executable)],capture_output=True,text=True,check=True)
             self.assertIn("TEXTURE_CACHE AGE_WRAP PASS",result.stdout)
+            self.assertIn("TEXTURE_CACHE TOUCH_PRIVATE PASS owners=1 age=1 last=1 wrap=1",result.stdout)
 if __name__=="__main__":unittest.main()

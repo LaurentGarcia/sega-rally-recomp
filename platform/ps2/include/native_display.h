@@ -85,9 +85,15 @@ struct Stats {
     // was still executing throughout that interval.
     std::uint32_t world_async_prepare_submissions=0,world_async_emit_submissions=0;
     std::uint32_t world_async_gathered_triangles=0;
+    // Optional per-presentation immutable-material memo. Resource hits still
+    // perform every original LRU touch and increment the existing counters.
+    std::uint32_t world_material_memo_hits=0,world_material_state_hits=0;
+    std::uint32_t world_material_residency_fast=0;
+    std::uint32_t world_material_memo_misses=0,world_material_memo_invalidations=0;
 };
 using DisplayClock=std::uint64_t (*)(void*) noexcept;
 enum class WorldSubmissionMode : std::uint8_t { fused, classify_first, classify_async };
+enum class WorldMaterialMode : std::uint8_t { resolve_each, memoized };
 enum class ReadbackStatus {
     ok, not_ready, invalid_rectangle, busy, unsupported_configuration,
     gif_timeout, finish_timeout, receive_timeout, fifo_timeout, cleanup_failed
@@ -135,8 +141,13 @@ public:
     // triangle writer before any primitive from that batch has been emitted.
     // No allocation per call. Rejection never flips a partial backbuffer;
     // transport faults quarantine the Display and require process restart.
+    // memoized reuses immutable material bindings/state only within this call;
+    // uploads invalidate its fast residency proof. Source-order resource
+    // touches/counters and overwrite fences remain unchanged. resolve_each
+    // retains the original resolver as the default comparison path.
     bool present_world(const WorldDrawPlan&, ps2::Vu1Transform&,
-                       WorldSubmissionMode = WorldSubmissionMode::fused);
+                       WorldSubmissionMode = WorldSubmissionMode::fused,
+                       WorldMaterialMode = WorldMaterialMode::resolve_each);
     bool present_status(const char *message);
     // Between calls, forget all cached texture identities. The next use uploads
     // its index bytes; copied-content CLUT entries remain valid. No allocation,

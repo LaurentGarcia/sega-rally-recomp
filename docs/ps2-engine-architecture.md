@@ -111,6 +111,18 @@ If a ready batch cannot be submitted, cancellation retrieves its retained clip
 coordinates for the same ordered fallback. The resource-first `fused` mode
 remains available as the comparison path.
 
+`WorldMaterialMode::memoized` adds a 64-entry immutable-material cache scoped
+to one presentation. Its EE entries occupy 4 KiB of fixed stack storage. Each
+entry retains texture/CLUT slots and GS state. Successful uploads advance
+conservative texture/palette epochs, including uploads from ordered fallback;
+a changed epoch requires the original resolver or full residency check.
+The texture-slot shortcut validates identity and reproduces the original LRU
+touch. Palette hits likewise preserve age, last-slot selection and counters.
+State reuse rechecks the binding after all batch preloads, so pointer-hash
+collisions cannot supply another material's state. Calls and retries start with
+empty tags. Geometry, arithmetic, primitive order and overwrite fences are
+unchanged. `resolve_each` remains the engine API default and comparison path.
+
 Tokens belong to one exclusive VU owner and one preparation. Copies cannot
 extend their lifetime. With no pending submission, another synchronous
 transform, draw or prepare attempt invalidates them. Texture transfers between
@@ -342,14 +354,23 @@ send implementation returns after starting the channel, but Play can execute
 the work while servicing that write. These results validate scheduling and
 output without demonstrating hardware overlap.
 
-A separate instrumented three-pose baseline places corner gathering at 0.666 ms,
-material preload at 4.371 ms, residency recheck at 0.904 ms and state assembly at
-0.502 ms. Instrumentation adds 0.382 ms to draw work; the sampled warmed poses
-perform no texture or CLUT uploads. The material cost therefore includes repeated
-lookup and bookkeeping, not just transfers. Gathering alone cannot remove the
-remaining whole-frame budget gap. Material reuse needs a bounded experiment
-that preserves resource generations, eviction behavior and source order before
-its potential saving can be claimed.
+A further instrumented three-pose baseline separates direct material preloads:
+texture lookup takes 0.329 ms and palette lookup 4.087 ms. Texture/palette
+residency checks take 0.167/0.750 ms; SDK TEX0 construction and copying take
+0.362 ms. The warmed samples perform no uploads. Instrumentation adds 0.964 ms,
+so those component measurements are not independently recoverable savings.
+Fallback palette lookup (1.155 ms) is already included in fallback emission.
+
+The resulting 64-entry material-cache experiment advances 601 native updates
+and preserves all 4,874,240 sampled color words and prior plan/pixel hashes.
+Across 593 stable warmed pairs, all 29 preexisting resource/path counters agree
+and draw work falls from 18.460 to 15.507 ms (16.0%). Eight cold/transition pairs
+are reported separately because the alternating paths share one resource cache.
+Their different upload counts do not establish avoided uploads. This is a draw
+comparison excluding shared game/plan work, vsync and readback; complete-loop
+results are recorded in the [native guide](ps2-native-rewrite.md). The original
+Frame path and VU program are unchanged. These results demonstrate reduced EE
+material work, not simultaneous execution or physical-console throughput.
 
 The manuals describe a different scheduling opportunity: upload one bank while
 VU1 processes another and the previous output travels to the GS. Direct GIF

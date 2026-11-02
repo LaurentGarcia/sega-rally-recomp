@@ -9,9 +9,11 @@ enum class NativeVehicleRenderMode { native_vu, reference, guarded_vu };
 // it is an explicit opt-in to untransformed plans and direct VU1 world batches.
 // classify_async schedules EE gathering between submit and finish calls; it
 // does not imply measured hardware overlap. Presentation still completes here.
+// Material memoization is scoped to one immutable draw plan presentation.
 int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,
                             const char* checkpoint_path,const char* course_path,
                             const char* body_path,NativeVehicleRenderMode mode=NativeVehicleRenderMode::native_vu,
                             bool detailed_profiling=false,bool textured_presentation=false,bool world_presentation=false,
-                            WorldSubmissionMode world_submission=WorldSubmissionMode::classify_first);
+                            WorldSubmissionMode world_submission=WorldSubmissionMode::classify_first,
+                            WorldMaterialMode world_materials=WorldMaterialMode::resolve_each);
 }

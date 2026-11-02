@@ -241,37 +241,56 @@ The EE gathers the next batch between submission and completion; all resource
 lookups, PATH3 work and mapped VU reads follow completion. One hardware operation
 may be pending, with two independently owned ready banks. The synchronous
 `--drive-world-vu` option remains available for comparisons. In a 601-update
-same-plan draw comparison, async takes 18.428 ms versus 18.411 ms for synchronous,
+same-plan comparison before material memoization, async draw work measured
+18.428 ms versus 18.411 ms for synchronous,
 with all 4,874,240 sampled color words and the preceding plan/pixel hashes equal.
 These are warm-cache draw intervals, not complete-game or console timings.
+
+Both world options now reuse immutable material bindings and GS state through
+a 64-entry cache, cleared at each presentation. Resource uploads invalidate its
+fast residency proofs; original texture/CLUT LRU touches and fences are retained.
+`--drive-world-no-memo CHECKPOINT COURSE VISUAL_DIRECTORY` selects synchronous
+submission with the original resolver. The automatic Frame renderer is unchanged.
+The same-plan comparison preserves all 4,874,240 sampled color words; 593 stable
+warmed pairs preserve all 29 original resource/path counters and reduce draw
+work from 18.460 to 15.507 ms. Eight cold/transition pairs are recorded separately
+because the paths share one resource cache. Authored tests add 20,930,560 exact
+pixel comparisons across collisions, eviction, replacement immutable snapshots,
+all three submission modes and 25 no-flip rejection cases. These compare renderer
+paths; they do not certify complete arcade fidelity.
 
 The opt-in fixes native binary32 presentation for that run, so Triangle does
 not cycle renderers. Start still restores the initial checkpoint, and the
 diagnostic page reports the previous submitted GS triangle count. Game
 arithmetic, camera history and input behavior are shared with the normal path.
 
-The final native054 builds were measured over matching 660 complete periods in
+The final native055 builds were measured over matching 660 complete periods in
 Play 0.72, with identical inputs and rendering preferences:
 
 | Renderer | Native updates/sec | Mean work | Mean complete period |
 | --- | ---: | ---: | ---: |
 | Default VU1 transforms / EE projection | 29.361 | 31.065 ms | 34.059 ms |
-| Optional VU1 world / synchronous geometry before residency | 29.985 | 25.202 ms | 33.350 ms |
-| Optional VU1 world / asynchronous EE gather | 29.985 | 25.226 ms | 33.350 ms |
+| Optional VU1 world / uncached synchronous control | 29.985 | 25.268 ms | 33.350 ms |
+| Optional VU1 world / synchronous material reuse | 29.985 | 22.287 ms | 33.350 ms |
+| Optional VU1 world / material reuse and async EE gather | 29.985 | 22.298 ms | 33.350 ms |
 | Previous native051 world / resource-first control | 20.945 | 34.285 ms | 47.744 ms |
 
 Work excludes measured vsync/flip time but includes input, simulation, rendering
 and logging. Every measured work interval exceeds the 16.667 ms target. The
-default retains its preceding cadence. Separating VU1 preparation from material
-residency provides the earlier improvement over resource-first rendering. Async
-gathering adds 0.024 ms mean work relative to the same-source synchronous control;
-it does not produce an emulator speedup. The explicit modes retain their
-selected pose/input/motion and triangle records; this is logged evidence, not
-comparison of every internal state. The final three-run comparison is retained
-in `build/ps2-world-async-final-001/cadence-validation.json`.
+default retains its preceding cadence. Material reuse saves 2.981 ms (11.8%)
+against the same-build uncached path. Its mean work still exceeds the 60 Hz
+budget by 5.620 ms. Async gathering adds 0.011 ms relative to synchronous material
+reuse; it does not produce an emulator speedup. The uncached control is 0.066 ms
+slower than native054's 25.202 ms, so the same-build comparison is reported
+separately from historical results. Complete logged record/field comparisons
+retain game, geometry and resource values, with declared memo/scheduling
+diagnostics checked separately. These logs do not compare every internal state.
+The four-run result is retained in
+`build/ps2-world-material-final-001/cadence-validation.json`.
 
-A separate 601-update comparison submits the same immutable plan to both world
-modes. Seventeen sampled pairs match all 4,874,240 color words. Draw work falls
+The earlier native052 classification checkpoint compares resource-first and
+geometry-first world submission using the same immutable plans over 601 updates.
+Seventeen sampled pairs match all 4,874,240 color words. Draw work falls
 from 27.072 to 18.926 ms, excluding shared planning, vsync and readback; 525,887
 textured-face preload requests are omitted. This preserves the preceding world
 image but does not resolve its previously measured 66 differing color words

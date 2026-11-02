@@ -24,10 +24,12 @@ The optional [direct world renderer](../platform/ps2/native/vu1_world.md) sends
 model geometry through VU1 to GS, with ordered clipping fallback and explicit
 texture/CLUT completion. Geometry preparation now precedes texture residency:
 ready packets stay on VU1 until their material state is supplied, while clipped
-batches acquire textures only for emitted fans. `--drive-world-vu` selects the
-synchronous control; `--drive-world-async` selects nonblocking VU submission
-with EE gathering between submit and finish. Both take the same checkpoint,
-course and visual-directory arguments. The async schedule preserves sampled
+batches acquire textures only for emitted fans. `--drive-world-vu` selects
+synchronous submission; `--drive-world-async` selects nonblocking VU submission
+with EE gathering between submit and finish. Both reuse material bindings and
+GS state in a bounded, per-presentation cache. `--drive-world-no-memo` retains
+the synchronous uncached resolver for comparisons. All three take the same
+checkpoint, course and visual-directory arguments. The async schedule preserves sampled
 world-renderer pixels but has not demonstrated a speedup in Play or overlap on
 physical hardware. The reference probe's hardware table below does not
 describe this native path.

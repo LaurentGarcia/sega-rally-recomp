@@ -7,7 +7,7 @@ The development application selects the new path with
 `--drive-world-vu CHECKPOINT COURSE VISUAL_DIRECTORY`; it does not change the
 native vehicle arithmetic or load a reference runtime.
 
-The trailing `WorldSubmissionMode` argument selects `fused`, `classify_first`,
+The optional `WorldSubmissionMode` argument selects `fused`, `classify_first`,
 or the explicit `classify_async` scheduler.
 The API's default remains `fused` for compatibility and comparison. The
 application's explicit `--drive-world-vu` mode selects `classify_first` after
@@ -53,6 +53,49 @@ failure still follows the existing no-flip drain and recovery contract.
 The current sixteen-texture batch can require at most 64 of 96 texture pages and
 sixteen of 256 CLUT slots. Residency rechecking remains defensive; a zero count
 of ready-but-nonresident fallbacks is not evidence that this branch was exercised.
+
+## Immutable material resolution
+
+The trailing `WorldMaterialMode` selects `resolve_each` (the default control)
+or `memoized`, independently of fused, classified or async submission.
+The application explicitly selects `memoized` for `--drive-world-vu` and
+`--drive-world-async`; `--drive-world-no-memo CHECKPOINT COURSE VISUAL_DIRECTORY`
+retains synchronous classification with `resolve_each` for comparison.
+The memo is local to one `present_world` call: 64 entries occupy 4,096 bytes
+with the pinned EE compiler, with no allocation or cache retained across calls.
+Only immutable textured material pointers from the plan are keys; temporary flat
+materials bypass it. Each call, including a retry after rejection, starts with
+empty tags. The control does not initialize the table.
+
+A memo hit still performs the original texture LRU touch, then palette age and
+last-hit updates, and increments both existing resource-hit counters. The
+known-slot texture helper validates the complete texture identity before any
+mutation. All palette prerequisites are checked before that touch, so a failed
+lookup cannot double-count or repeat a partial resource operation. Misses use
+the unchanged texture/palette functions and their completion/upload fences.
+
+Successful texture and palette upload counts serve as per-call residency
+epochs. With at most 32,768 source faces, 16,384 emitted fans and one checker
+setup, these counters cannot wrap during a presentation. Unchanged epochs prove
+that a saved slot has not been overwritten; changed epochs retain the full
+texture-identity and sixteen-word palette comparison after all preloads.
+Clipped fallback uses the original writer, whose uploads invalidate the same
+proof. Source order and every existing touch, upload and eviction remain intact.
+
+After residency is established, the memo can copy the complete state previously
+built by the SDK for the same material, texture slot, CLUT slot and epochs.
+Depth/checker setup is fixed for the call. State resolution re-finds the key
+after preloading, because another material may have replaced that direct-mapped
+bucket; it never retains an unverified pointer into an evictable memo entry.
+GS packets still contain their original per-triangle state writes.
+
+The additional `world_material_memo_hits`, `world_material_memo_misses` and
+`world_material_memo_invalidations` count resolved preload requests and stale
+epoch observations. `world_material_state_hits` counts reused SDK state records;
+`world_material_residency_fast` counts post-preload face checks justified by
+unchanged epochs. These diagnostics do not replace existing cache counters or
+establish a speedup without a paired target measurement. The ordinary Frame
+texture, palette and primitive-writing functions are unchanged.
 
 ## Prepared geometry handles
 
@@ -187,6 +230,42 @@ report the work that actually occurred. Fused mode leaves the new counters zero.
 
 ## Evidence and limits
 
+The material-memo authored generation passed **20,930,560 literal pixel-word
+comparisons** and **25 no-flip rejections**. It compares memoized and ordinary
+resolution in all three world submission modes, including repeated pointers,
+different pointers with equal content, verified within-batch hash collisions,
+cold cache invalidation, and late rejection followed by recovery. Two changed
+caller descriptor/palette inputs produce new immutable prepared snapshots and
+visibly different reference pixels; the test never mutates a live plan. Each
+submission mode also reproduces 264 texture evictions and 288 CLUT uploads.
+Warm pairs preserve all seventeen resource/path counters checked by the fixture.
+The retained async/token and completion cases still execute in this generation.
+Its report is `build/ps2-world-material-display-ee-001/runtime-validation.json`,
+SHA-256 `a4c802a123e1a4e4bb8ab00fc2ee7b0da4a6893566ceae9a2e31e76ab5aaadb8`,
+with executed ELF, source archive, configuration and closed runtime identities.
+
+The known-slot texture-touch helper separately matches complete cache state
+against normal acquisition for **8,323 requests** and age-wrap cases, including
+non-mutating rejection. Optimized and sanitizer runs pass. Its report is
+`build/ps2-world-material-touch-001/validation.json`, SHA-256
+`59af1df7ebbfa701ac20749afefae680108729c6f73ce4bf1cbea1a219e85bec`.
+Palette age/touch equivalence is source-reviewed; the GS fixture checks counters
+and pixels rather than reading internal palette ages directly.
+
+The actual-scene comparison submits the same plan through synchronous
+classification with each material mode over **601 native updates**. Both emit
+885,445 triangles, and all **4,874,240 literal pixel words** from seventeen
+sampled frame pairs match. Mean draw work falls from **18.478 ms to 15.512 ms**,
+a **2.966 ms** reduction. All 29 original counters match on 593 stable warm
+pairs; eight cold/transition pairs are reported separately because the modes
+share a cache and alternate execution order. The memo records 537,496 preload
+hits, 537,032 state reuses and nineteen epoch invalidations. This is measured
+draw work on pinned Play, not complete application cadence, avoided uploads,
+physical-console performance or universal framebuffer equality. The report is
+`build/ps2-world-material-scene-ee-001/runtime-validation.json`, SHA-256
+`a1f3050a806f0d5c67ce7188da07ccd23da6f9b736e03c9e153785cbb8fd23e9`.
+
+The following async results retain their earlier, non-memoized identities.
 The async authored generation passed **12,328,960 literal pixel-word
 comparisons**, 27 async lifecycle checks in addition to the 24 retained token
 checks, and fifteen no-flip rejections. Frame, fused, synchronous classified and

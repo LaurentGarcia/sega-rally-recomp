@@ -97,6 +97,44 @@ struct OutsideTextures {
     }
     WorldModel model(){return {vertices,faces,{},materials};}
 };
+struct MemoMaterials {
+    static constexpr unsigned count=400;
+    // These index pairs cover every4-byte-aligned EE Material-array base for
+    // the64-entry pointer hash. Earlier faces establish the compacted index
+    // order; each final16-face batch alternates A/B to stress state re-lookup.
+    static constexpr std::array<std::array<unsigned,2>,13> collision_pairs{{
+        {{1,54}},{{50,103}},{{12,65}},{{51,104}},{{35,88}},{{69,122}},{{10,63}},
+        {{4,57}},{{68,121}},{{67,120}},{{9,62}},{{58,111}},{{66,119}}}};
+    std::array<std::uint8_t,128> pixels0{},pixels1{};
+    std::array<Texture,2> textures{};
+    std::array<Material,128> materials{};
+    std::array<WorldPoint,count*3> vertices{};
+    std::array<WorldFace,count> faces{};
+    MemoMaterials(){
+        pixels0.fill(0x21);pixels1.fill(0x43);
+        textures={Texture{pixels0.data(),pixels0.size(),8,8,9001},Texture{pixels1.data(),pixels1.size(),8,8,9002}};
+        for(unsigned i=0;i<materials.size();++i){
+            materials[i].texture=&textures[i&1];materials[i].cutout=(i%7)==0;materials[i].checker=(i%9)==0;
+            for(unsigned c=0;c<16;++c)materials[i].palette[c]=0xff000000u|((i+1)*0x107u+c*0x110100u);
+        }
+        materials[1]=materials[0]; // Different immutable pointers, equal resources/state.
+        for(unsigned i=0;i<count;++i){
+            const float x=-.9375f+float(i%16)*.1171875f,y=-.9375f+float((i/16)%12)*.15625f;
+            vertices[i*3]={x,y,.5f};vertices[i*3+1]={x+.078125f,y,.5f};vertices[i*3+2]={x,y+.109375f,.5f};
+            auto& f=faces[i];f.indices={3*i,3*i+1,3*i+2};
+            f.material_index=i<16?0:i<32?((i&1)?(i-16)/2+1:0):(i-32)%128;
+            if(i>=192)f.material_index=collision_pairs[(i-192)/16][i&1];
+            f.uv={{{0,0},{8,0},{0,8}}};
+        }
+    }
+    WorldModel model(){return {vertices,faces,{},materials};}
+};
+auto material_counts(const Stats& s){
+    return std::array<std::uint64_t,17>{s.triangles,s.texture_uploads,s.texture_hits,s.palette_uploads,s.palette_hits,
+        s.texture_bytes,s.palette_bytes,s.texture_evictions,s.texture_pages,s.checker_triangles,
+        s.world_source_triangles,s.world_batches,s.world_drawn_batches,s.world_fallback_batches,
+        s.world_path3_handoffs,s.world_path3_stream_retirements,s.world_gs_finishes};
+}
 std::uint64_t framebuffer(Display& display,bool compare,unsigned phase,std::uint64_t& words){
     require(display.output_height()<=512,"UNSUPPORTED FIXTURE HEIGHT");
     std::uint64_t hash=1469598103934665603ull;unsigned different=0;
@@ -210,6 +248,92 @@ unsigned async_token_checks(ps2::Vu1Transform& unit,unsigned height){
     check(unit.finish_prepare_world(submission,a,clips)==Vu1WorldPrepareResult::rejected,"DRAINED SUBMISSION ACCEPTED");
     check(!unit.drain_world(submission),"DRAINED SUBMISSION REUSED");
     return checks;
+}
+void material_memo_checks(Display& display,ps2::Vu1Transform& unit,std::uint64_t& words,unsigned& rejections,std::uint64_t& combined){
+    auto source=std::make_unique<MemoMaterials>();PreparedWorldModel model;
+    WorldScene normal,planner,limited;WorldSceneError error;WorldView view{identity()};
+    normal.set_numeric_mode(WorldNumericMode::native_float);
+    require(normal.configure(MemoMaterials::count,MemoMaterials::count*8,error),world_scene_error_message(error));
+    require(planner.configure_plan(MemoMaterials::count,MemoMaterials::count*8,error),world_scene_error_message(error));
+    require(limited.configure_plan(MemoMaterials::count,16,error),world_scene_error_message(error));
+    PreparedWorldInstance instance{&model,identity()};unsigned collision_cases=0,mutations=0;
+    std::uint64_t memo_hits=0,state_hits=0,epoch_invalidations=0,previous=0;
+    for(unsigned phase=0;phase<3;++phase){
+        // Publish a NEW immutable snapshot between calls. Caller-owned source
+        // descriptors/palettes change at the same addresses; no live plan is
+        // mutated, and prepared assets receive their new lifetime generations.
+        display.invalidate_textures();
+        if(phase==1){source->textures[0].width=16;++source->textures[0].generation;
+            source->pixels0.fill(0x65);++mutations;}
+        if(phase==2){for(auto& material:source->materials){material.palette[5]^=0x00ffff00u;
+            material.palette[6]^=0x00ff00ffu;}++mutations;}
+        require(model.assign(source->model(),error),world_scene_error_message(error));
+        require(normal.update_prepared({&instance,1},view,error),world_scene_error_message(error));
+        require(planner.plan_prepared({&instance,1},view,error),world_scene_error_message(error));
+        require(limited.plan_prepared({&instance,1},view,error),world_scene_error_message(error));
+        std::array<const Material*,64> buckets{};unsigned collisions=0;
+        for(const auto& m:planner.draw_plan().instances()[0].materials){
+            const auto p=reinterpret_cast<std::uintptr_t>(&m);auto& bucket=buckets[((p>>4)^(p>>10))&63];
+            collisions+=bucket&&bucket!=&m;bucket=&m;
+        }
+        require(collisions>0,"MEMO COLLISION COVERAGE");++collision_cases;
+        unsigned intra_batch_collisions=0;
+        const auto& planned=planner.draw_plan().instances()[0];
+        for(std::size_t first=192;first<MemoMaterials::count;first+=16){
+            const auto* a=&planned.materials[planned.faces[first].material_index];
+            const auto* b=&planned.materials[planned.faces[first+1].material_index];
+            const auto ah=reinterpret_cast<std::uintptr_t>(a),bh=reinterpret_cast<std::uintptr_t>(b);
+            intra_batch_collisions+=a!=b&&(((ah>>4)^(ah>>10))&63)==(((bh>>4)^(bh>>10))&63);
+        }
+        require(intra_batch_collisions>0,"MEMO INTRA-BATCH COLLISION NOT EXERCISED");
+        require(display.present(normal.frame()),display.error());
+        const auto expected=framebuffer(display,false,30+phase,words);
+        require(!phase||expected!=previous,"MEMO MUTATION DID NOT CHANGE PIXELS");previous=expected;
+        for(auto mode:{WorldSubmissionMode::fused,WorldSubmissionMode::classify_first,WorldSubmissionMode::classify_async}){
+            // Warm resident control and memo must issue the same resource
+            // touches/counters. Cold invalidation is a separately labeled case.
+            require(display.present_world(planner.draw_plan(),unit,mode),display.error());
+            const auto control=display.stats();
+            require(!control.world_material_memo_hits&&!control.world_material_state_hits&&
+                    !control.world_material_memo_misses,"CONTROL USED MATERIAL MEMO");
+            require(framebuffer(display,true,30+phase,words)==expected,"MEMO CONTROL PIXELS");
+            require(display.present_world(planner.draw_plan(),unit,mode,WorldMaterialMode::memoized),display.error());
+            const auto memo=display.stats();
+            require(material_counts(control)==material_counts(memo),"MEMO CHANGED WARM TOUCH/RESOURCE COUNTS");
+            require(memo.world_material_memo_hits>0&&memo.world_material_state_hits>0&&
+                    memo.world_material_residency_fast==MemoMaterials::count,"MEMO REUSE COVERAGE");
+            require(memo.world_material_memo_hits+memo.world_material_memo_misses==MemoMaterials::count,
+                    "MEMO REQUEST ACCOUNTING");
+            require(framebuffer(display,true,30+phase,words)==expected,"MEMO WARM PIXELS");
+            memo_hits+=memo.world_material_memo_hits;state_hits+=memo.world_material_state_hits;
+        }
+        display.invalidate_textures();
+        require(display.present_world(planner.draw_plan(),unit,WorldSubmissionMode::classify_first,WorldMaterialMode::memoized),display.error());
+        // Two authored images plus the existing whole-frame checker image.
+        require(display.stats().texture_uploads==3&&display.stats().world_material_memo_invalidations>0,
+                "MEMO COLD UPLOAD INVALIDATION NOT EXERCISED");
+        epoch_invalidations+=display.stats().world_material_memo_invalidations;
+        require(framebuffer(display,true,30+phase,words)==expected,"MEMO COLD PIXELS");
+        const auto front1=*GS_REG_DISPFB1,front2=*GS_REG_DISPFB2;
+        for(auto mode:{WorldSubmissionMode::fused,WorldSubmissionMode::classify_first,WorldSubmissionMode::classify_async}){
+            require(!display.present_world(limited.draw_plan(),unit,mode,WorldMaterialMode::memoized),"MEMO LATE CAPACITY ACCEPTED");++rejections;
+            require(display.stats().world_drawn_batches==1&&display.stats().world_gs_finishes==1,"MEMO REJECTION NOT DRAINED");
+            require(*GS_REG_DISPFB1==front1&&*GS_REG_DISPFB2==front2,"MEMO REJECTION FLIPPED");
+        }
+        require(framebuffer(display,true,30+phase,words)==expected,"MEMO REJECTION CHANGED FRONT");
+        require(display.present_world(planner.draw_plan(),unit,WorldSubmissionMode::classify_async,WorldMaterialMode::memoized),display.error());
+        require(framebuffer(display,true,30+phase,words)==expected,"MEMO REJECTION RECOVERY");
+        combined=(combined^expected)*1099511628211ull;
+        std::printf("WORLD MATERIAL MEMO PHASE PASS phase=%u collisions=%u intra_batch=%u hits=%lu state_hits=%lu invalidations=%llu hash=%016llx\n",phase,
+            collisions,intra_batch_collisions,(unsigned long)display.stats().world_material_memo_hits,(unsigned long)display.stats().world_material_state_hits,
+            (unsigned long long)epoch_invalidations,(unsigned long long)expected);
+    }
+    const auto front1=*GS_REG_DISPFB1,front2=*GS_REG_DISPFB2;
+    require(!display.present_world(planner.draw_plan(),unit,WorldSubmissionMode::classify_first,static_cast<WorldMaterialMode>(255)),
+            "INVALID MATERIAL MODE ACCEPTED");++rejections;
+    require(*GS_REG_DISPFB1==front1&&*GS_REG_DISPFB2==front2,"INVALID MATERIAL MODE FLIPPED");
+    std::printf("WORLD MATERIAL MEMO PASS phases=3 modes=3 collisions=%u mutations=%u warm_hits=%llu state_hits=%llu cold_invalidations=%llu late_rejections=9\n",
+        collision_cases,mutations,(unsigned long long)memo_hits,(unsigned long long)state_hits,(unsigned long long)epoch_invalidations);
 }
 }
 int main(){
@@ -513,6 +637,16 @@ int main(){
             (unsigned long)async_eviction.world_async_prepare_submissions,(unsigned long)async_eviction.world_async_emit_submissions,
             (unsigned long)async_eviction.world_async_gathered_triangles,(unsigned long)async_eviction.texture_evictions,
             (unsigned long)async_eviction.palette_uploads);
+        for(auto mode:{WorldSubmissionMode::fused,WorldSubmissionMode::classify_first,WorldSubmissionMode::classify_async}){
+            display.invalidate_textures();
+            require(display.present_world(planner.draw_plan(),unit,mode,WorldMaterialMode::memoized),display.error());
+            const auto memo=display.stats();
+            require(memo.world_drawn_batches==18&&memo.texture_evictions>0&&memo.palette_uploads==Eviction::count&&
+                    memo.world_material_memo_misses==Eviction::count,"MEMO EVICTION COVERAGE");
+            require(framebuffer(display,true,18,words)==classified_eviction_expected,"MEMO EVICTION PIXELS");
+            std::printf("WORLD MATERIAL MEMO EVICTION PASS mode=%u evictions=%lu palette_uploads=%lu misses=%lu\n",unsigned(mode),
+                (unsigned long)memo.texture_evictions,(unsigned long)memo.palette_uploads,(unsigned long)memo.world_material_memo_misses);
+        }
         // Exercise the separate full-FINISH packet tail. The fixture owns the
         // idle GS exclusively: after an empty Frame it draws into the currently
         // bound framebuffer without changing DISPFB. Full completion precedes
@@ -569,6 +703,7 @@ int main(){
             require(framebuffer(display,true,20+drain,words)==finished_expected,"ASYNC FULL FINISH PIXELS");
         }
         std::puts("WORLD DISPLAY ASYNC FULL FINISH PASS finish=1 drain=1 other_bank_retained=2");
+        material_memo_checks(display,unit,words,rejections,combined);
         std::printf("WORLD DISPLAY ASYNC POLLS pending=%u already_complete=%u hardware_overlap_not_inferred=1\n",async_pending_polls,async_complete_polls);
         std::printf("WORLD DISPLAY PASS phases=4 consecutive_pair=1 fallback_pair=1 eviction_pair=1 classified_triplets=4 outside_triplet=1 full_finish_pair=1 token_checks=%u legacy_direct=%u legacy_fallback=%u no_flip_rejections=%u pixel_words=%llu hash=%016llx\n",tokens,drawn,fallback,rejections,(unsigned long long)words,(unsigned long long)combined);
     }catch(const std::exception& error){std::printf("WORLD DISPLAY FAIL: %s\n",error.what());}

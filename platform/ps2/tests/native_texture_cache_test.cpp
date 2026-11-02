@@ -55,6 +55,84 @@ void last_hit_boundaries(){
  invariant(cache);std::puts("TEXTURE_CACHE AGE_WRAP PASS");
 #endif
 }
+void resident_touch_differential(){
+ Cache ordinary,memo;unsigned requests=0,hits=0,misses=0;
+ const auto equal=[](const Cache&a,const Cache&b){
+  REQUIRE(a.used_pages()==b.used_pages());
+  for(unsigned i=0;i<Cache::slot_count;++i){const auto&x=a.entry(i);const auto&y=b.entry(i);
+   REQUIRE(x.valid==y.valid&&x.key.indices==y.key.indices&&x.key.bytes==y.key.bytes&&
+           x.key.width==y.key.width&&x.key.height==y.key.height&&x.key.generation==y.key.generation&&
+           x.age==y.age&&x.first_page==y.first_page&&x.pages==y.pages);
+  }
+#ifdef RALLY_TEST_CACHE_AGE
+  REQUIRE(a.owners_==b.owners_&&a.age_==b.age_&&a.last_==b.last_&&a.used_pages_==b.used_pages_);
+#endif
+ };
+ const auto request=[&](Texture k,unsigned slot){
+  const auto saved=memo;const auto allocated=allocations;
+  const bool hit=memo.try_touch_resident(slot,k);
+  if(!hit)equal(memo,saved); // Even an age-wrap miss must not rebase.
+  const auto expected=ordinary.acquire(k);
+  const auto actual=hit?Cache::Result{slot,0,true}:memo.acquire(k);
+  REQUIRE(actual.slot==expected.slot&&actual.evictions==expected.evictions&&actual.hit==expected.hit);
+  if(hit)REQUIRE(expected.hit&&expected.slot==slot);
+  equal(ordinary,memo);REQUIRE(allocated==allocations);
+  ++requests;if(hit)++hits;else ++misses;return hit;
+ };
+ REQUIRE(!request(key(1),0));REQUIRE(request(key(1),0));
+ // Wrong resident slot, out-of-range slot and cleared/reused slot must not
+ // turn a stale memo into a hit or disturb subsequent fallback LRU order.
+ REQUIRE(!request(key(2),0));REQUIRE(!request(key(1),1));
+ REQUIRE(!request(key(1),Cache::slot_count));
+ REQUIRE(!request(key(1),std::numeric_limits<unsigned>::max()));
+ REQUIRE(request(key(2),1));
+ auto extra=key(2);++extra.bytes;REQUIRE(request(extra,1));
+ auto short_buffer=key(2);--short_buffer.bytes;REQUIRE(!request(short_buffer,1));
+ auto absent=key(2);absent.indices=nullptr;REQUIRE(!request(absent,1));
+ REQUIRE(!request(key(2,7,8),1));REQUIRE(!request(key(2,8,512),1));
+ REQUIRE(!request(key(3),1));REQUIRE(!request(key(2,64,128),1));
+ auto moved=key(2);moved.indices=pixels.data()+16;REQUIRE(!request(moved,1));
+ REQUIRE(!request(key(2,128,64),1));
+ auto high_generation=key(2);high_generation.generation=std::numeric_limits<std::uint64_t>::max();
+ REQUIRE(!request(high_generation,1));
+ ordinary.clear();memo.clear();REQUIRE(!request(key(2),1));
+ REQUIRE(!request(key(9),0));REQUIRE(!request(key(2),1));
+ // Fill all pages, repeatedly touch an older key, then require the same
+ // four-page eviction and sparse-page reuse decisions as ordinary acquire.
+ ordinary.clear();memo.clear();
+ for(unsigned i=1;i<=96;++i)REQUIRE(!request(key(i),Cache::slot_count));
+ for(unsigned i=0;i<8;++i)REQUIRE(request(key(1),0));
+ REQUIRE(!request(key(1000,256,256),0));
+ REQUIRE(!request(key(1001,128,256),1));
+ // Deterministic mixed hits, stale identities/slots, invalid metadata and
+ // new textures cover all page sizes without relying on private game data.
+ std::uint32_t random=0xa341316cu;const std::array<unsigned,6>sides{8,16,32,64,128,256};
+ for(unsigned i=0;i<8192;++i){
+  random=random*1664525u+1013904223u;unsigned slot=random%Cache::slot_count;
+  Texture k=ordinary.entry(slot).valid?ordinary.entry(slot).key:key(2000+i,sides[(random>>8)%6],sides[(random>>16)%6]);
+  if(i%11==0)k=key(12000+i,sides[(random>>8)%6],sides[(random>>16)%6]);
+  if(i%19==0)k.bytes=0;
+  if(i%23==0)++k.generation;
+  if(i%31==0)k.indices=nullptr;
+  if(i%13==0)slot=(slot+1)%Cache::slot_count;
+  if(i%7==0)slot=Cache::slot_count;
+  request(k,slot);
+ }
+#ifdef RALLY_TEST_CACHE_AGE
+ ordinary.clear();memo.clear();request(key(7),0);request(key(8),1);request(key(7),0);
+ ordinary.age_=memo.age_=std::numeric_limits<std::uint64_t>::max();
+ const auto boundary=memo;
+ REQUIRE(!memo.try_touch_resident(0,Texture{}));equal(memo,boundary);
+ REQUIRE(!memo.try_touch_resident(1,key(7)));equal(memo,boundary);
+ REQUIRE(!memo.try_touch_resident(Cache::slot_count,key(7)));equal(memo,boundary);
+ REQUIRE(request(key(7),0));REQUIRE(memo.age_==3);
+ ordinary.age_=memo.age_=std::numeric_limits<std::uint64_t>::max();
+ REQUIRE(!request(key(9),0));REQUIRE(memo.age_==3);
+ std::puts("TEXTURE_CACHE TOUCH_PRIVATE PASS owners=1 age=1 last=1 wrap=1");
+#endif
+ invariant(ordinary);invariant(memo);REQUIRE(hits>1000&&misses>1000);
+ std::printf("TEXTURE_CACHE TOUCH PASS requests=%u hits=%u misses=%u stale_identity=1 atomic_miss=1 exact_lru=1 no_allocations=1\n",requests,hits,misses);
+}
 void cases(){Cache cache;std::array<std::uint64_t,96> content{};unsigned requests=0;
  const auto request=[&](Texture k){bool known=false;
   for(unsigned i=0;i<96;++i){const auto&e=cache.entry(i);known|=e.valid&&e.key.indices==k.indices&&e.key.generation==k.generation&&e.key.width==k.width&&e.key.height==k.height;}
@@ -84,4 +162,4 @@ void cases(){Cache cache;std::array<std::uint64_t,96> content{};unsigned request
  std::printf("TEXTURE_CACHE PASS requests=%u checks=%u page_ownership=1 eviction=1 generation=1 atomic_rejection=1 no_allocations=1\n",requests,checks);
 }
 }
-int main(){last_hit_boundaries();cases();}
+int main(){last_hit_boundaries();resident_touch_differential();cases();}

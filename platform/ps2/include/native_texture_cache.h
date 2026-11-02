@@ -47,6 +47,21 @@ public:
         for(unsigned p=first;p<first+pages;++p)owners_[p]=static_cast<std::uint8_t>(slot+1);
         used_pages_+=pages;last_=slot;return {slot,evictions,false};
     }
+    // An immutable-plan memo may nominate a resident slot. Revalidate the
+    // complete input/key before touching it; a stale/invalid nomination leaves
+    // every field unchanged, including at the age-rebase boundary. Success is
+    // exactly the LRU/last-slot transition of acquire(key) returning this hit.
+    // This neither allocates pages nor proves an external CLUT is resident.
+    bool try_touch_resident(unsigned slot,const Texture& key) noexcept {
+        const auto side=[](unsigned n){return n>=8&&n<=256&&(n&(n-1))==0;};
+        if(slot>=slot_count||!key.indices||!side(key.width)||!side(key.height)||
+           key.bytes<std::size_t(key.width)*key.height/2)return false;
+        auto& e=entries_[slot];
+        if(!e.valid||e.key.indices!=key.indices||e.key.generation!=key.generation||
+           e.key.width!=key.width||e.key.height!=key.height)return false;
+        if(age_==std::numeric_limits<std::uint64_t>::max())rebase();
+        e.age=++age_;last_=slot;return true;
+    }
     const Entry& entry(unsigned slot)const noexcept{return entries_[slot];}
     unsigned used_pages()const noexcept{return used_pages_;}
     void clear() noexcept{entries_={};owners_={};age_=0;used_pages_=0;last_=slot_count;}

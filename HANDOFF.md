@@ -1,5 +1,133 @@
 # Handoff
 
+## Native PS2 immutable material binding reuse (2026-11-02)
+
+Continued from 52e5e847. Added a bounded per-presentation cache to the direct
+world renderer. It reuses texture/CLUT bindings and GS state for immutable
+material identities while retaining every source-order resource LRU touch,
+existing counter and resource-overwrite fence. A 64-entry direct-mapped table
+occupies 4,096 bytes on EE; no per-frame allocation is introduced. Successful
+texture/palette upload counts are conservative epochs, including uploads by
+ordered fallback. Epoch changes force the original resolver or full residency
+check. State reuse revalidates slots after all batch preloads to handle hash
+collisions. Every new call/retry clears tags. Flat temporary materials bypass
+the cache. The original Frame renderer, VU program and game arithmetic are
+unchanged; strict binary32 geometry and disabled FP contraction remain.
+
+The new TexturePageCache::try_touch_resident validates the nominated slot and
+complete accepted key, then reproduces acquire's hit transition. Failure leaves
+all state unchanged, even at the uint64 age-rebase boundary. The ordinary acquire
+body is unchanged. Differential tests compare full cache state across 8,323
+requests (3,566 hits/4,757 misses), including stale slots, malformed keys,
+clear/reuse, partial-page eviction, dimensions/generations and overflow. Both
+portable cases, optimized execution and ASan/UBSan pass. The report is
+`build/ps2-world-material-touch-001/validation.json`, SHA-256
+59af1df7ebbfa701ac20749afefae680108729c6f73ce4bf1cbea1a219e85bec.
+
+The selected-face census across 601 updates found 1,021,928 repeated material
+occurrences among 1,131,920 textured faces. A host-pointer 64-entry map retained
+nearly the 128-entry reuse rate, motivating the smaller table. These counts
+include faces subsequently skipped/fallback; they are not saved runtime calls.
+A fresh frozen-baseline profile attributes 4.087 ms to direct palette lookup,
+0.329 ms to texture lookup, 0.917 ms to combined residency checks and 0.362 ms
+to SDK TEX0/copy work. All three warmed poses upload nothing. Instrumentation
+adds 0.964 ms; fallback palette lookup is already inside fallback emission and
+must not be added twice. Report:
+`build/ps2-world-material-profile-ee-001/runtime-validation.json`, SHA-256
+40551ca4c13427a2f49ef11e152b48857bad3850c49c0a5a4d9c824e09420de3.
+
+The same-plan paired test advances 601 native updates with alternating resolver
+order. All 885,445 triangles per path, geometry/classification counts and
+4,874,240 sampled color words agree. Historical pixel hash af08a568c3638e99 and
+plan hash 3e8769a247c136f3 are preserved. Across 593 stable warmed pairs, all 29
+preexisting resource/path counters agree exactly; draw work decreases from
+18.460424 to 15.506901 ms (2.953523 ms, about 16%). Eight cold/transition pairs
+are explicitly retained. Their different upload totals arise from sharing one
+resource cache and do not prove avoided uploads. Overall draw work decreases
+18.478329 to 15.512225 ms. Memo totals: 537,496 binding hits, 537,032 state hits,
+606,000 fast residency checks, 68,535 misses and 19 epoch invalidations. Driver
+DMA qwords remain 15,201,330. Draw timings exclude shared game/plan work, vsync
+and readback. Report:
+`build/ps2-world-material-scene-ee-001/runtime-validation.json`, SHA-256
+a1f3050a806f0d5c67ce7188da07ccd23da6f9b736e03c9e153785cbb8fd23e9.
+
+The engine API still defaults to resolve_each. Production --drive-world-vu and
+--drive-world-async now opt into memoized materials; --drive-world-no-memo
+provides synchronous classification with the original resolver. Automatic
+textured startup still uses Frame. The new boot record declares material mode
+and table size; five WORLD counters expose cache use. The private CLI harness
+passes 75 cases, preserving 70 legacy argument/path selections and adding five
+control-option arity cases. Material selection changes only the explicit world
+modes. The full portable PS2 suite passes 307 tests in 106.289 seconds with no
+drift across 494 bound source files. Report:
+`build/ps2-world-material-final-001/portable-final-tests.json`, SHA-256
+48219f3901ddc0e96d63bb9b1295962b683a2296f5303b1db0e8af97fe04dfb7.
+
+The authored renderer fixture preserves 20,930,560 literal color words across
+all three submission modes, real within-batch hash collisions, equal-content
+materials with distinct identities, texture dimension/generation changes and
+palette changes via replacement immutable snapshots. Cold invalidation,
+288-material eviction, nine new late-capacity rejects/retries and the original
+ownership cases pass. There are 25 no-flip rejections overall. Warm authored
+pairs compare 17 resource/path counters; the separate actual-scene pair above
+compares all 29 old counters on stable warmed frames. Ten immediate VU polls
+again complete immediately and do not measure physical overlap. Report:
+`build/ps2-world-material-display-ee-001/runtime-validation.json`, SHA-256
+a4c802a123e1a4e4bb8ab00fc2ee7b0da4a6893566ceae9a2e31e76ab5aaadb8.
+
+Native055 and engine-demo055 pass source/dependency/symbol role gates with all
+35 shared engine identities matching. The explicit memo007, control008 and
+async009 wrappers differ only by argv selection and retain 71 byte-identical
+non-entry objects each. Their equivalent forbidden-runtime symbol gates pass.
+All five builds use strict O3, no fast math and disabled FP contraction. The
+original engine demo is cross-built, not re-executed. Build-set report:
+`build/ps2/native-055/build-set-validation.json`, SHA-256
+cbd20e88011fee4482227fb196af3f9fa69087232581b645f2e0c25dd0ff0171.
+Its 147-input compiled source archive is 190,170 bytes, SHA-256
+e3431b8d6618a22f96328cce760601b6d45a0d93d27fe79f904c73b12e1a65b5.
+
+Complete native055 application runs compare the first 660 start-to-start
+periods using identical private inputs and rendering preferences. Default Frame:
+29.360823 updates/sec, 31.064912 ms mean work. Uncached world control: 29.984821
+updates/sec, 25.267837 ms work. Synchronous memo: 29.984811 updates/sec,
+22.286921 ms work. Async memo: 29.984809 updates/sec, 22.298006 ms work. World
+periods remain 33.350 ms. Memo saves 2.980916 ms (11.7973%) against the same-build
+control; async adds 0.011085 ms. The new control is 0.065557 ms slower than
+native054's control, kept separate from the same-build result. All 660 measured
+work intervals in every run still exceed 16.667 ms. Memo maximum work is
+29.210069 ms. Work excludes only measured vsync/flip and includes input, game,
+rendering and logs. It is not a physical-console timing claim.
+
+Complete record keys and field sets are checked: default055/history matches
+98 records/602 non-timing fields; control/history and memo/control match
+98 records/644 unchanged values, with 70 added or changed memo diagnostics
+validated separately. Async/memo matches 98 records/602 unchanged values plus
+112 declared scheduling/memo diagnostics. Pointer hashing can change memo hit
+counts across executable layouts without changing resource behavior. Cross-
+renderer FRAME/PAD/UPDATE_PROFILE records match 42 records/210 values. These
+are complete logged-field comparisons, not every-frame internal-state proof.
+Ordinary Frame, texture, palette and primitive-writer source spans are byte-
+identical to the prior commit. Report:
+`build/ps2-world-material-final-001/cadence-validation.json`, SHA-256
+c4a5973fe30982952f2ae2beb7624b99564e1f2aa7ffed56840f961648ccfaba.
+
+Next measured target: whole-batch clipping fallback. The pre-memo instrumented
+three-pose profile measures 3.043 ms clipping plus 2.265 ms fallback emission;
+this path is unchanged. Across the 601-update pair, 33,706 of 83,064 batches
+fall back, accounting for 539,296 source faces and 137,280 emitted triangles.
+Count inside/outside/crossing/uncertain faces and ordered inside runs before
+changing admission. Additional submission overhead and actually recoverable
+work remain unknown; the 5.309 ms profile sum is not a promised saving.
+
+Rejected inferences and remaining limits: exact sampled memo/control pixels do
+not establish universal arcade fidelity or resolve the prior 66 world/Frame
+color differences. A 16% draw or 11.8% whole-work improvement is not a 60 fps
+result: presentation remains about 30 Hz in Play. No physical PS2, live pad,
+game audio, full race/AI/HUD/stages, fault injection or depth-buffer proof is
+added. This is the existing native developer vehicle loop with a fixed visual
+neighborhood. The source executable still excludes arcade processor/device
+runtime; private assets, test reports and ELFs remain ignored build outputs.
+
 ## Native PS2 nonblocking VU submission and EE lookahead (2026-11-02)
 
 Continued from 2595fe23. The world driver now separates submission, polling and
