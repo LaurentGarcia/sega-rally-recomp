@@ -48,6 +48,49 @@ owner cannot invalidate an already published frame's texture descriptors or
 pixels. Flat snapshots require no lease. An inactive bank may retain its older
 snapshots until that bank is reused; memory planning must include those leases.
 
+A separate opt-in `configure_plan(source_faces, output_triangles, error)`
+allocates two bounded banks for ordered source-face indices, copied instance
+views and 1,024 snapshot leases per bank. `plan_prepared()` reuses the existing
+native-float group bounds and authored-facing decisions, preserving instance,
+face, material and per-corner UV order. It publishes model-space vertices and
+the two explicit matrices; it does not transform every vertex, project, clip,
+assemble `Triangle` records or invoke a transform provider. Prepared model data
+is validated at assignment; current matrices, view and cumulative limits are
+checked on every plan call. No planning call allocates.
+
+`WorldDrawPlan` can only be published by `WorldScene`. Its const instance views
+borrow immutable snapshots retained by the plan bank, including untextured
+vertices and faces. Owner replacement/destruction cannot invalidate those
+views. A borrowed plan expires at the next successful plan/configure-plan or
+scene destruction; failed planning preserves the previous plan and statistics.
+Ordinary `Frame` configuration and updates use separate storage and do not
+expire it. Planning and consumption must be serialized. Inactive banks may
+retain older snapshots until reused, as with the frame banks.
+
+The plan is an input-admission and ordered-selection contract, not proof that
+transformed coordinates are valid or clipping expansion fits the configured
+output-triangle capacity. Its renderer must reject those later failures without
+presenting a partial backbuffer. Empty selected geometry still publishes clear
+and depth state. `plan_stats()` reports source/group/facing counts and both plan
+banks' storage; output-triangle, transformed-vertex and provider counts remain
+zero because no consumer work has happened yet. Snapshot storage is separate.
+
+The retained planner test independently expands plans through scalar binary32
+transforms and the float clipper, matching all frame/material/UV words across
+97 authored views. Its 6,544 checks cover group/facing order, clipped faces,
+empty selection, flat and textured snapshot lifetime, allocation failure,
+late validation failure and independent `Frame` lifetime. It passes ASan/UBSan
+in `build/ps2-world-plan-validation-001/sanitizer-result.json`. A separate
+source-bound host comparison uses the real visual bundle and 601 successive
+native vehicle updates: all 885,448 triangles and 19,584,759 checks match, with
+fingerprint `40830e756adb84c0` in the same directory's `live-result.json`.
+That run uses the developer checkpoint controls once, then neutral controls;
+it is neither an original replay nor VU/GS execution. The two owned scenes have
+distinct texture generations, so their material and texel contents are compared
+rather than asserting equal lifetime identifiers. Extra plan storage is
+323,144 bytes on that host build; EE layout and runtime cost need separate
+measurement.
+
 Snapshot storage is reported separately by
 `PreparedWorldModel::persistent_bytes()`: private storage plus actual vector
 capacities for 12-byte points, 72-byte faces, 8-byte groups and 24-byte group

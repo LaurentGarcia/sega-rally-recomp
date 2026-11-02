@@ -4,7 +4,9 @@
 #include <cstdint>
 #include <span>
 
+namespace ps2 { class Vu1Transform; }
 namespace ps2::native {
+class WorldDrawPlan;
 constexpr unsigned frame_width = 496, frame_height = 384;
 // GS User Manual v6 section2.5.4: CT32 may pair with Z16S, not Z16.
 // Section3.7.4: ZTE stays enabled even when ZMSK disables depth writes.
@@ -61,6 +63,16 @@ struct Stats {
     std::uint64_t decoration_ticks=0,vsync_ticks=0;
     std::uint32_t checker_triangles=0;
     std::uint32_t texture_evictions=0,texture_pages=0;
+    // Direct world submission only; the ordinary Frame path leaves these0.
+    std::uint32_t world_source_triangles=0,world_batches=0,world_drawn_batches=0;
+    std::uint32_t world_fallback_batches=0,world_rejected_batches=0,world_vu1_triangles=0;
+    // PATH3 work is retired before PATH1. An empty handoff after a completed
+    // world batch needs only the full GIF-idle guard, not another FINISH packet.
+    std::uint32_t world_path3_handoffs=0,world_path3_empty_skips=0;
+    // GS FINISH operations that retire one or more deferred world batches.
+    std::uint32_t world_gs_finishes=0;
+    // EOP-delimited PATH3 stream handoffs without waiting for GS completion.
+    std::uint32_t world_path3_stream_retirements=0;
 };
 using DisplayClock=std::uint64_t (*)(void*) noexcept;
 enum class ReadbackStatus {
@@ -90,6 +102,19 @@ public:
     // A retired transport requires process restart, including after destruction.
     bool initialize();
     bool present(const Frame &frame);
+    // Synchronous ordered model/world geometry submission. The plan retains
+    // immutable source/material leases through this call. The supplied owner
+    // must already have initialized its optional world kernel; no other VIF1,
+    // GIF or GS producer may run concurrently. Display resolves and retains
+    // each bounded batch's texture/CLUT residency, then retires PATH3 before
+    // VU1 emits PATH1. Its VIF/GIF packet retires before reuse; GS completion
+    // may be deferred until a resource overwrite, frame end or rejection.
+    // No deferred GS work survives a return except after fatal quarantine.
+    // Unsupported batches use the existing float clipper and
+    // triangle writer before any primitive from that batch has been emitted.
+    // No allocation per call. Rejection never flips a partial backbuffer;
+    // transport faults quarantine the Display and require process restart.
+    bool present_world(const WorldDrawPlan&, ps2::Vu1Transform&);
     bool present_status(const char *message);
     // Between calls, forget all cached texture identities. The next use uploads
     // its index bytes; copied-content CLUT entries remain valid. No allocation,

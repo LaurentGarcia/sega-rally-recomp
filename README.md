@@ -70,11 +70,14 @@ requests. A developer application now connects it to a textured road neighborhoo
 the recovered chase camera, body, shadow and four wheel transforms through direct
 PS2 services, without an arcade CPU or device runtime. Rendering performance,
 game audio and full race flow remain unfinished; this is not a playable release.
-The native renderer uses 32-bit geometry, VU1 transform batches and VU0 GS
-packing. The textured scene measures **20.00 native updates/sec over 660 frames
-in Play**, up from 8.89 in its first integrated run. The earlier flat diagnostic
-reached 59.99 updates/sec; the textured scene still needs substantial optimization
-for 60. Full-race and physical-console performance remain unverified.
+The default renderer uses 32-bit geometry, VU1 transform batches and VU0 GS
+packing. The textured scene measures **29.36 native updates/sec over 660 frames
+in Play**. An optional [world renderer](platform/ps2/native/vu1_world.md) now
+performs transforms, projection and direct GS packet production on VU1, with
+ordered clipping fallback. It passes authored pixel and resource-lifetime checks
+but still costs more frame time, so it remains experimental. The textured scene
+has not reached 60 updates/sec; full-race and physical-console performance remain
+unverified.
 See the [PS2 build guide and limits](docs/ps2.md).
 The [shared engine](docs/ps2-engine-architecture.md) keeps hardware services
 independent of Rally rules and includes an original engine-only sample.

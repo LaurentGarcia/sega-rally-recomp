@@ -62,6 +62,29 @@ and forwards the selected numeric mode, profiling clock and transform provider.
 The default is native float. Actual VU1 execution still requires the caller's
 installed provider; selecting the numeric mode alone does not offload work.
 
+`enable_draw_plan(error)` allocates optional ordered plan banks after loading.
+It retains the same recovered camera/body equations and history; subsequent
+`update()` calls publish `draw_plan()` instead of an assembled `Frame`. The
+course/body/attachment instance order and authored facing remain unchanged.
+This path always uses the planner's native-float bounds and does not invoke an
+installed transform/projection provider. The downstream renderer owns world
+transformation, projection and clipping, including final numeric and capacity
+rejection. Calling `frame()` in this mode returns an empty frame.
+
+Enabling is atomic on allocation failure and idempotent after success. It hides
+the previously published frame without resetting or advancing camera history.
+`reset()` retains the opt-in and allocations while restoring the first-pose
+check; successful `load()` or `configure()` discards the opt-in. Camera history
+commits only after successful planning, as it previously did after successful
+frame preparation. Plan views share the adapter's serialized publication
+lifetime. `persistent_bytes()` includes both ordinary frame storage and any
+optional plan banks; enabling does not silently free the ordinary storage.
+The extended fixture passes 210 checks under ASan/UBSan, including allocation
+rollback, eight independently checked camera-history updates, no planning
+allocation/provider calls, failed-update history preservation, reset and
+reconfiguration. Its current report is
+`build/ps2-world-plan-validation-001/sanitizer-result.json`.
+
 The cumulative scene is limited to 65,536 declared vertices and 32,768 source
 faces, counting repeated role instances. Output is capped at 16,384 triangles;
 clipping expansion beyond that cap rejects the frame. Assets are each subject

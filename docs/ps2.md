@@ -20,6 +20,10 @@ have different purposes:
 
 The [reusable engine guide](ps2-engine-architecture.md) describes the shared
 service boundary, ownership contracts and how to build the original sample.
+The optional [direct world renderer](../platform/ps2/native/vu1_world.md) sends
+model geometry through VU1 to GS, with ordered clipping fallback and explicit
+texture/CLUT completion. It is selected with `--drive-world-vu`; the reference
+probe's hardware table below does not describe this native path.
 The standalone native fixtures use fixed manifests containing only original
 native/test sources; they do not link the translated reference runtime.
 

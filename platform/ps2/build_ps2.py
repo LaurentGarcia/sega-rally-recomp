@@ -54,6 +54,7 @@ ENGINE_SOURCES = (
     "platform/ps2/src/native_textured_model.cpp",
     "platform/ps2/src/vu1_transform.cpp", "platform/ps2/src/vu1_transform_math.cpp",
     "platform/ps2/src/vu1_transform.vsm",
+    "platform/ps2/src/vu1_world.vsm",
 )
 STUDY_SOURCES = ("platform/ps2/src/native_mesh.cpp", "platform/ps2/src/native_scene.cpp")
 GAME_SOURCES = ("platform/ps2/native/race_progress.cpp", "platform/ps2/native/car_pose.cpp",
@@ -106,7 +107,7 @@ ENGINE_HEADERS = {
     "native_display.h", "native_geometry.h", "native_geometry_float.h",
     "native_geometry_float_internal.h", "world_scene.h", "native_textured_model.h",
     "native_texture_cache.h",
-    "pad_input.h", "pad_state.h", "debug_controls.h", "storage.h", "vu0_pack.h", "vu1_transform.h", "diagnostic_font.h",
+    "pad_input.h", "pad_state.h", "debug_controls.h", "storage.h", "vu0_pack.h", "vu1_transform.h", "vu1_world.h", "diagnostic_font.h",
 }
 STUDY_HEADERS = {"native_mesh.h", "native_scene.h"}
 NATIVE_TOOLKIT_HEADERS = ENGINE_HEADERS | STUDY_HEADERS

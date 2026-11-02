@@ -83,7 +83,9 @@ WorldView view(const std::array<float,3>& target,float yaw) {
 }
 int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* checkpoint_path,
                             const char* course_path,const char* body_path,NativeVehicleRenderMode mode,bool detailed_profiling,
-                            bool textured_presentation) {
+                            bool textured_presentation,bool world_presentation) {
+    if(world_presentation&&(!textured_presentation||mode!=NativeVehicleRenderMode::native_vu))
+        throw std::runtime_error("WORLD VU1 MODE REQUIRES TEXTURED NATIVE FLOAT PRESENTATION");
     display.present_status(textured_presentation?
         "NATIVE TEXTURED DRIVING TEST\nLOADING ONE INITIAL CHECKPOINT\nRECOVERED CAR AND CHASE VIEW\nFIXED VISUAL COURSE NEIGHBORHOOD":
         "NATIVE VEHICLE DEVELOPMENT TEST\nLOADING ONE INITIAL CHECKPOINT\nLIVE PAD / NATIVE GAME UPDATE\nDIAGNOSTIC BODY AND COURSE VIEW");
@@ -101,6 +103,8 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
             throw std::runtime_error(rally_visual_error_message(visual_error));
     }else if(!body.load(body_path,identity,body_error)||!body.attach_course(assets.course(),body_error))
         throw std::runtime_error(rally_body_error_message(body_error));
+    if(world_presentation&&!visual.enable_draw_plan(visual_error))
+        throw std::runtime_error(rally_visual_error_message(visual_error));
     const auto scene_stats=[&](){return textured_presentation?visual.stats():body.stats();};
     const auto scene_frame=[&](){return textured_presentation?visual.frame():body.frame();};
     const WorldSceneClock detail_clock=[](void*) noexcept -> std::uint64_t {return GetTimerSystemTime();};
@@ -109,15 +113,17 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
     display.set_profile_clock([](void*) noexcept -> std::uint64_t {return GetTimerSystemTime();});
     VuPresentation vu;
     bool use_vu1=false;
-    const auto mode_name=[&](){return vu.native_float?(use_vu1?"NATIVE_FLOAT_VU1":"NATIVE_FLOAT_EE"):
+    const auto mode_name=[&](){if(world_presentation)return "WORLD_VU1";return vu.native_float?(use_vu1?"NATIVE_FLOAT_VU1":"NATIVE_FLOAT_EE"):
         (use_vu1?"GUARDED_VU1":"EXACT_EE");};
     const auto apply_mode=[&](){
         vu.native_float=mode==NativeVehicleRenderMode::native_vu;
         body.set_numeric_mode(vu.native_float?WorldNumericMode::native_float:WorldNumericMode::reference);
         visual.set_numeric_mode(vu.native_float?WorldNumericMode::native_float:WorldNumericMode::reference);
         use_vu1=mode!=NativeVehicleRenderMode::reference&&vu.unit.initialize();
-        body.set_transform_provider(use_vu1?VuPresentation::batch:nullptr,&vu);
-        visual.set_transform_provider(use_vu1?VuPresentation::batch:nullptr,&vu);
+        if(world_presentation&&(!use_vu1||!vu.unit.initialize_world()))
+            throw std::runtime_error(vu.unit.error());
+        body.set_transform_provider(use_vu1&&!world_presentation?VuPresentation::batch:nullptr,&vu);
+        visual.set_transform_provider(use_vu1&&!world_presentation?VuPresentation::batch:nullptr,&vu);
         std::printf("NATIVE_VEHICLE_VU mode=%s status=\"%s\" synchronous=1\n",mode_name(),vu.unit.error());
     };
     apply_mode();
@@ -136,9 +142,9 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
     constexpr std::uint64_t frame_budget=kBUSCLK/60;
     display.set_caption(textured_presentation?nullptr:
         "NATIVE VEHICLE TEST\nDIAGNOSTIC BODY / COURSE");
-    std::printf("NATIVE_VEHICLE_BEGIN course=%lu asset_crc=%08lx checkpoint_frame=%lu body_bytes=%lu textured=%u\n",
+    std::printf("NATIVE_VEHICLE_BEGIN course=%lu asset_crc=%08lx checkpoint_frame=%lu body_bytes=%lu textured=%u world=%u\n",
         (unsigned long)assets.selector(),(unsigned long)assets.payload_crc32(),(unsigned long)controls.frame,
-        (unsigned long)(textured_presentation?visual.persistent_bytes():body.persistent_bytes()),unsigned(textured_presentation));
+        (unsigned long)(textured_presentation?visual.persistent_bytes():body.persistent_bytes()),unsigned(textured_presentation),unsigned(world_presentation));
     for(unsigned frame=1;;++frame){
         const auto frame_start=GetTimerSystemTime();
         if(frame>1){
@@ -184,7 +190,7 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
             visual.set_profile_clock(detailed_profiling||diagnostics?detail_clock:nullptr);
         }
         const auto pressed=pad_state.buttons&~previous_buttons;previous_buttons=pad_state.buttons;
-        if(pressed&ps2::Triangle){
+        if(!world_presentation&&(pressed&ps2::Triangle)){
             mode=static_cast<NativeVehicleRenderMode>((unsigned(mode)+1)%3);apply_mode();
         }
         if((pressed&ps2::Start)&&!(pad_state.buttons&ps2::Select)){
@@ -223,6 +229,7 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
         }else if(!body.update(pose,view(car.position,camera_yaw),body_error))
             throw std::runtime_error(rally_body_error_message(body_error));
         if(use_vu1&&!vu.unit.available()){
+            if(world_presentation)throw std::runtime_error(vu.unit.error());
             use_vu1=false;body.set_transform_provider(nullptr);
             visual.set_transform_provider(nullptr);
             std::printf("NATIVE_VEHICLE_VU_RETIRED update=%u status=\"%s\" switching_to=%s\n",frame,vu.unit.error(),mode_name());
@@ -243,12 +250,12 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
             "POSITION %.2f %.2f %.2f\n"
             "MOTION %.3f %.3f %.3f\n"
             "NATIVE UPDATE %llu US\n"
-            "GEOMETRY %llu US / TRIANGLES %lu\n\n"
-            "%s / VU1 VERTICES %lu\n"
+            "GEOMETRY %llu US / %s %lu\n\n"
+            "%s / %s %lu\n"
             "CROSS GAS / SQUARE BRAKE\n"
             "STICK OR LEFT/RIGHT STEER\n"
             "START RESET INITIAL CHECKPOINT\n"
-            "TRIANGLE CYCLE RENDERER\n"
+            "%s\n"
             "SELECT+START TOGGLE THIS PAGE\n"
             "TIMING IS EMULATOR OBSERVATION",
             textured_presentation?"TEXTURED CAR / FIXED VISUAL COURSE":"DIAGNOSTIC BODY / COLLISION COURSE",
@@ -258,10 +265,14 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
             pad_status,pad.sdk_state(),pad.sdk_request_state(),(unsigned long)state.gear,int(state.segment),
             double(car.position[0]),double(car.position[1]),double(car.position[2]),double(car.motion[0]),double(car.motion[1]),double(car.motion[2]),
             (unsigned long long)(update_ticks*1000000/kBUSCLK),(unsigned long long)(geometry_ticks*1000000/kBUSCLK),
-            (unsigned long)scene_stats().output_triangles,mode_name(),
-            (unsigned long)scene_stats().accepted_batch_vertices);
+            world_presentation?"PREVIOUS GS TRIANGLES":"TRIANGLES",
+            (unsigned long)(world_presentation?display.stats().triangles:scene_stats().output_triangles),mode_name(),
+            world_presentation?"PREVIOUS VU1 CORNERS":"VU1 VERTICES",
+            (unsigned long)(world_presentation?display.stats().world_vu1_triangles*3:scene_stats().accepted_batch_vertices),
+            world_presentation?"WORLD VU1 RENDERER FIXED":"TRIANGLE CYCLE RENDERER");
         display.set_debug_page(diagnostics?page:nullptr);
-        if(!display.present(scene_frame()))throw std::runtime_error(display.error());
+        const bool presented=world_presentation?display.present_world(visual.draw_plan(),vu.unit):display.present(scene_frame());
+        if(!presented)throw std::runtime_error(display.error());
         previous_vsync=display.stats().vsync_ticks;
         const auto draw_ticks=GetTimerSystemTime()-draw_start;total_draw_ticks+=draw_ticks;
         if(frame<=3||frame%60==0){
@@ -284,7 +295,12 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
                 (unsigned long)stats.transformed_vertices,(unsigned long)stats.vertex_cache_hits,
                 (unsigned long)stats.groups,(unsigned long)stats.culled_groups,
                 (unsigned long)stats.backface_rejected_faces);
-            std::printf("NATIVE_VEHICLE_VU_FRAME update=%u batches=%lu vertices=%lu accepted=%lu used_corners=%lu clipped_fallbacks=%lu failed_batches=%lu near_plane=%u budget=%u invalid=%u unsupported=%u transform_ticks=%llu guard_ticks=%llu max_bound_pixels=%.7g max_bound_depth=%.7g vu0_vertices=%lu status=\"%s\"\n",
+            if(world_presentation)std::printf("NATIVE_VEHICLE_WORLD update=%u source=%lu batches=%lu direct=%lu fallback=%lu rejected=%lu vu1_triangles=%lu vu0_vertices=%lu triangles=%lu status=\"%s\"\n",
+                frame,(unsigned long)display_stats.world_source_triangles,(unsigned long)display_stats.world_batches,
+                (unsigned long)display_stats.world_drawn_batches,(unsigned long)display_stats.world_fallback_batches,
+                (unsigned long)display_stats.world_rejected_batches,(unsigned long)display_stats.world_vu1_triangles,
+                (unsigned long)display_stats.vu0_vertices,(unsigned long)display_stats.triangles,vu.unit.error());
+            else std::printf("NATIVE_VEHICLE_VU_FRAME update=%u batches=%lu vertices=%lu accepted=%lu used_corners=%lu clipped_fallbacks=%lu failed_batches=%lu near_plane=%u budget=%u invalid=%u unsupported=%u transform_ticks=%llu guard_ticks=%llu max_bound_pixels=%.7g max_bound_depth=%.7g vu0_vertices=%lu status=\"%s\"\n",
                 frame,(unsigned long)stats.batch_calls,(unsigned long)stats.batch_vertices,
                 (unsigned long)stats.accepted_batch_vertices,(unsigned long)stats.provider_triangle_corners,
                 (unsigned long)stats.clipped_batch_fallbacks,(unsigned long)stats.failed_batches,
@@ -304,7 +320,7 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
             double(car.position[0]),double(car.position[1]),double(car.position[2]),double(car.motion[0]),double(car.motion[1]),double(car.motion[2]),
             (unsigned long long)update_ticks,(unsigned long long)geometry_ticks,(unsigned long long)draw_ticks,
             (unsigned long long)total_update_ticks,(unsigned long long)total_draw_ticks,unsigned(kBUSCLK),
-            (unsigned long)scene_stats().output_triangles,result.command_count);
+            (unsigned long)display.stats().triangles,result.command_count);
         ++controls.frame;
     }
 }

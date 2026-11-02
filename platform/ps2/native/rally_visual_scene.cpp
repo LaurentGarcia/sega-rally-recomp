@@ -77,7 +77,7 @@ struct RallyVisualScene::Storage {
     std::array<PreparedWorldModel,7> models;
     std::array<std::size_t,7> vertices{},faces{};
     WorldScene scene;
-    bool first=true,published=false;
+    bool first=true,published=false,plan_mode=false;
     bool initialize_scene(WorldSceneError& error) noexcept {
         std::size_t vertex_count=0,face_count=0;
         for(auto role:config.role_assets){
@@ -159,6 +159,15 @@ bool RallyVisualScene::load(const char* directory,std::uint32_t expected,RallyVi
     }catch(const std::bad_alloc&){return fail(error,RallyVisualError::allocation);}
      catch(const std::length_error&){return fail(error,RallyVisualError::capacity);}
 }
+bool RallyVisualScene::enable_draw_plan(RallyVisualError& error) noexcept {
+    if(!storage_)return fail(error,RallyVisualError::not_loaded);
+    auto& s=*storage_;if(s.plan_mode){error=RallyVisualError::none;return true;}
+    std::size_t faces=0;for(auto role:s.config.role_assets)faces+=s.faces[role];
+    WorldSceneError engine_error;
+    if(!s.scene.configure_plan(faces,std::min<std::size_t>(16384,faces*8),engine_error))
+        return fail(error,engine_error==WorldSceneError::allocation_failed?RallyVisualError::allocation:RallyVisualError::capacity);
+    s.plan_mode=true;s.published=false;timings_={};error=RallyVisualError::none;return true;
+}
 bool RallyVisualScene::update(const RenderPose& pose,RallyVisualError& error) noexcept {
     if(!storage_)return fail(error,RallyVisualError::not_loaded);
     auto& s=*storage_;if(s.first&&pose!=s.config.initial_pose)return fail(error,RallyVisualError::initial_pose);
@@ -177,7 +186,8 @@ bool RallyVisualScene::update(const RenderPose& pose,RallyVisualError& error) no
     view.world_to_clip[10]=s.config.far_z/range;view.world_to_clip[11]=1;
     view.world_to_clip[14]=-s.config.near_z*view.world_to_clip[10];
     const auto scene_start=now();WorldSceneError engine_error;
-    if(!s.scene.update_prepared(instances,view,engine_error))return fail(error,RallyVisualError::presentation);
+    const bool completed=s.plan_mode?s.scene.plan_prepared(instances,view,engine_error):s.scene.update_prepared(instances,view,engine_error);
+    if(!completed)return fail(error,RallyVisualError::presentation);
     s.state=next_state;s.first=false;s.published=true;timings_={scene_start-start,now()-scene_start};
     error=RallyVisualError::none;return true;
 }
@@ -199,12 +209,13 @@ void RallyVisualScene::set_transform_project_provider(WorldSceneTransformProject
 void RallyVisualScene::set_numeric_mode(WorldNumericMode mode) noexcept {
     mode_=mode;if(storage_)storage_->scene.set_numeric_mode(mode);
 }
-Frame RallyVisualScene::frame()const noexcept{return storage_&&storage_->published?storage_->scene.frame():Frame{};}
-WorldSceneStats RallyVisualScene::stats()const noexcept{return storage_&&storage_->published?storage_->scene.stats():WorldSceneStats{};}
+Frame RallyVisualScene::frame()const noexcept{return storage_&&storage_->published&&!storage_->plan_mode?storage_->scene.frame():Frame{};}
+WorldDrawPlan RallyVisualScene::draw_plan()const noexcept{return storage_&&storage_->published&&storage_->plan_mode?storage_->scene.draw_plan():WorldDrawPlan{};}
+WorldSceneStats RallyVisualScene::stats()const noexcept{return storage_&&storage_->published?(storage_->plan_mode?storage_->scene.plan_stats():storage_->scene.stats()):WorldSceneStats{};}
 RallyVisualTimings RallyVisualScene::timings()const noexcept{return timings_;}
 std::size_t RallyVisualScene::persistent_bytes()const noexcept {
     if(!storage_)return 0;
-    std::size_t bytes=sizeof(Storage)+storage_->scene.stats().persistent_bytes;
+    std::size_t bytes=sizeof(Storage)+storage_->scene.stats().persistent_bytes+storage_->scene.plan_stats().persistent_bytes;
     for(const auto& model:storage_->models)bytes+=model.persistent_bytes();return bytes;
 }
 const char* rally_visual_error_message(RallyVisualError error) noexcept {

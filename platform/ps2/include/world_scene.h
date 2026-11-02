@@ -114,6 +114,36 @@ struct PreparedWorldInstance {
     WorldMatrix object_to_world{};
 };
 
+// Ordered, untransformed geometry borrowed from immutable prepared snapshots.
+// Only WorldScene can publish a plan. Its instance views cannot be replaced
+// through this API; source UVs and material indices remain per face/corner.
+struct WorldDrawInstance {
+    std::span<const WorldPoint> vertices;
+    std::span<const WorldFace> faces;
+    std::span<const Material> materials;
+    WorldMatrix object_to_world{};
+    std::span<const std::uint32_t> visible_face_indices;
+};
+class WorldDrawPlan {
+public:
+    WorldDrawPlan() noexcept=default;
+    std::span<const WorldDrawInstance> instances() const noexcept{return instances_;}
+    const WorldMatrix& world_to_clip() const noexcept{return world_to_clip_;}
+    std::uint32_t clear_color() const noexcept{return clear_color_;}
+    bool depth_test() const noexcept{return depth_test_;}
+    std::size_t output_triangle_capacity() const noexcept{return output_triangle_capacity_;}
+private:
+    friend class WorldScene;
+    WorldDrawPlan(std::span<const WorldDrawInstance> instances,const WorldMatrix& view,
+                  std::uint32_t clear,std::size_t capacity) noexcept
+        :instances_(instances),world_to_clip_(view),clear_color_(clear),output_triangle_capacity_(capacity){}
+    std::span<const WorldDrawInstance> instances_{};
+    WorldMatrix world_to_clip_{};
+    std::uint32_t clear_color_=0xff101923u;
+    bool depth_test_=true;
+    std::size_t output_triangle_capacity_=0;
+};
+
 // Explicit fixed-world presentation adapter. It does not fit/recenter bounds,
 // advance game state, recover a game camera, or read reference-view transforms.
 // Caller supplies the proven model-local assembly and world/view transforms.
@@ -169,12 +199,32 @@ public:
     // textured snapshots; flat snapshots require no lease. Snapshot storage is separate from
     // WorldSceneStats::persistent_bytes and is reported by each model owner.
     bool update_prepared(std::span<const PreparedWorldInstance>,const WorldView&,WorldSceneError&) noexcept;
+    // Separate optional storage: no Triangle/material bank or transformed
+    // vertices are built by the planner.1..32768 source faces,1..16384 maximum
+    // emitted triangles. Allocation failure preserves the prior plan. Ordinary
+    // configure/update/Frame storage is independent and remains unchanged.
+    bool configure_plan(std::size_t source_faces,std::size_t output_triangles,WorldSceneError&) noexcept;
+    // Validate instance/view inputs, then select source faces in original order
+    // using the native-float group bounds and authored facing rules. No vertex
+    // transform/project/clip, provider callback or per-call allocation occurs.
+    // Planning does not prove transformed output is in domain or fits the final
+    // triangle cap: the renderer must reject numerical/expansion failures.
+    // Success retains every referenced snapshot, including flat geometry. The
+    // borrowed plan survives owner reassignment/destruction and normal Frame
+    // updates, until next successful plan/configure_plan or scene destruction.
+    // Failure retains the prior plan and its statistics.
+    bool plan_prepared(std::span<const PreparedWorldInstance>,const WorldView&,WorldSceneError&) noexcept;
+    WorldDrawPlan draw_plan() const noexcept;
+    // Source/group/facing counts only: output_triangles stays zero until a
+    // consumer actually emits geometry. Storage includes both plan banks.
+    WorldSceneStats plan_stats() const noexcept;
     Frame frame() const noexcept;
     WorldSceneStats stats() const noexcept;
 private:
     template<class Instance>
     bool update_impl(std::span<const Instance>,const WorldView&,WorldSceneError&) noexcept;
     struct Storage;std::unique_ptr<Storage> storage_;
+    struct PlanStorage;std::unique_ptr<PlanStorage> plan_storage_;
     WorldSceneClock clock_=nullptr;void* clock_context_=nullptr;
     WorldSceneTransformBatch transform_batch_=nullptr;void* transform_context_=nullptr;
     WorldSceneTransformProjectBatch transform_project_batch_=nullptr;

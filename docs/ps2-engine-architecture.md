@@ -33,7 +33,7 @@ might later discard. A folder name alone does not confer permission.
 
 | Role | Current files | Permitted project dependencies |
 | --- | --- | --- |
-| Engine | Native display, page-based texture cache, frame validation, world scene, owned textured models, clipping, VU0 packing, VU1 transforms, pad hardware, storage, PCM transport and IOP module | Explicit engine inventory only |
+| Engine | Native display, page-based texture cache, frame validation, world scene/draw plans, owned textured models, clipping, VU0 packing, VU1 transforms/direct GS packets, pad hardware, storage, PCM transport and IOP module | Explicit engine inventory only |
 | Rally game | Recovered main car update, contact/course rules, camera and model assembly, visual adapter and cabinet steering/filter | Own game role and engine |
 | Geometry study | `native_mesh`, `native_scene`, captured-view transforms and fitted camera | Own study role and engine |
 | Rally application | `platform/ps2/native/main.cpp` | Rally game, study and engine |
@@ -65,8 +65,33 @@ The allocation is 3,751,936 bytes in the NTSC layout and 4,161,536 bytes in PAL,
 including both framebuffers, depth, font and CLUT storage. NTSC readback fixtures
 validate mixed sizes, residency, eviction, invalidation, cutouts and checker
 masks. PAL has a checked memory budget but no new execution result. These
-services remain synchronous; simultaneous EE, VU0, VU1 and GS work is not yet
-established by the current measurements.
+calls remain serialized. The optional direct world path separates GIF stream
+retirement from GS drawing completion, so resident batches can leave drawing
+queued until a resource-overwrite or frame boundary. This does not establish
+overlapping VIF transfers and VU execution or simultaneous use of both VUs.
+
+### Direct world submission
+
+The optional [ordered world renderer](../platform/ps2/native/vu1_world.md)
+accepts immutable model geometry instead of a projected EE triangle array:
+
+```text
+EE game/camera -> ordered WorldDrawPlan -> VIF1 -> VU1 -> PATH1 -> GS
+                                                |
+                                       retained clipped batch
+                                                v
+                                      EE clip / VU0 XY -> PATH3 -> GS
+EE texture/CLUT ownership ------------------------------> PATH3 -> GS
+```
+
+VU1 performs the two transforms, whole-batch admission, projection and packet
+packing. Its exact Z16 conversion is separate from the measured binary32
+projection policy. Mixed materials retain source order and per-corner UVs;
+unsupported batches emit no prefix before the existing clipper takes over.
+The single VIF1 owner manages two bounded VU banks and persistent CPU staging.
+Display owns resource residency, GS state, failure quarantine and presentation.
+Generic authored fixtures exercise this interface without Rally data; the PS2
+CI cross-links the fixture, while execution/pixel proofs remain separate.
 
 SDK and standard-library dependencies are external to this project-file gate.
 Application entry points still call SDK startup, clock and sleep functions

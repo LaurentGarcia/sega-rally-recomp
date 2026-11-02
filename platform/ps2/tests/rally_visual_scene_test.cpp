@@ -111,6 +111,32 @@ void movement(){Source source;const auto model=source.model();const auto c=confi
  REQUIRE(scene.update(c.initial_pose,e));REQUIRE(provider_calls==calls);REQUIRE(hash(scene.frame())==original);
  REQUIRE(scene.persistent_bytes()>0);
 }
+void draw_planning(){Source source;const auto model=source.model();const auto c=config();RallyVisualError error;RallyVisualScene scene;
+ REQUIRE(!scene.enable_draw_plan(error)&&error==RallyVisualError::not_loaded);
+ unsigned calls=0;scene.set_transform_project_provider(project_provider,&calls);REQUIRE(scene.configure(c,{&model,1},error));REQUIRE(scene.update(c.initial_pose,error));
+ const auto initial_frame=hash(scene.frame());const auto provider_calls=calls;
+ fail_after=0;const bool enabled=scene.enable_draw_plan(error);fail_after=-1;
+ REQUIRE(!enabled&&error==RallyVisualError::allocation&&hash(scene.frame())==initial_frame);
+ REQUIRE(scene.enable_draw_plan(error));REQUIRE(scene.frame().triangles.empty()&&scene.draw_plan().output_triangle_capacity()==0);
+ const auto allocated=allocations;REQUIRE(scene.enable_draw_plan(error));REQUIRE(allocations==allocated);
+ auto history=c.initial_view_state;DrivingRenderView expected;
+ REQUIRE(update_driving_render_view(c.initial_pose,c.view,history,expected));
+ auto pose=c.initial_pose;
+ for(unsigned n=0;n<8;++n){pose.words.position[0]=std::bit_cast<std::uint32_t>(float(n)/8);pose.words.orientation[1]=std::bit_cast<std::uint32_t>(float(n)/64);
+  const auto before=allocations;REQUIRE(scene.update(pose,error));REQUIRE(allocations==before&&calls==provider_calls);REQUIRE(scene.frame().triangles.empty());
+  const auto plan=scene.draw_plan();REQUIRE(plan.instances().size()==7&&plan.output_triangle_capacity()>0);REQUIRE(update_driving_render_view(pose,c.view,history,expected));
+  const auto& matrix=plan.instances()[0].object_to_world;
+  for(unsigned k=0;k<3;++k){const auto p=expected.world_to_view.columns[k];REQUIRE(matrix[k*4]==p.x&&matrix[k*4+1]==p.y&&matrix[k*4+2]==p.z);}
+  REQUIRE(matrix[12]==expected.world_to_view.translation.x&&matrix[13]==expected.world_to_view.translation.y&&matrix[14]==expected.world_to_view.translation.z);
+  REQUIRE(scene.stats().output_triangles==0&&scene.stats().transformed_vertices==0);
+  auto invalid=pose;invalid.words.position[0]=std::bit_cast<std::uint32_t>(100000.f);invalid.words.orientation[1]=std::bit_cast<std::uint32_t>(.5f);
+  REQUIRE(!scene.update(invalid,error));REQUIRE(scene.draw_plan().instances().data()==plan.instances().data());
+ }
+ const auto before=allocations;scene.reset();REQUIRE(allocations==before&&scene.draw_plan().output_triangle_capacity()==0);
+ REQUIRE(!scene.update(pose,error)&&error==RallyVisualError::initial_pose);REQUIRE(scene.update(c.initial_pose,error));REQUIRE(scene.draw_plan().instances().size()==7);
+ // Reconfiguration clears the opt-in and publishes ordinary Frames again.
+ REQUIRE(scene.configure(c,{&model,1},error));REQUIRE(scene.update(c.initial_pose,error));REQUIRE(scene.draw_plan().output_triangle_capacity()==0&&!scene.frame().triangles.empty());
+}
 std::vector<std::uint8_t> model_bytes(){std::vector<std::uint8_t>b(264);std::memcpy(b.data(),"RLYTEXM1",8);
  put(b,8,1);put(b,12,64);put(b,16,3);put(b,20,1);put(b,24,1);put(b,28,1);put(b,32,32);put(b,40,200);
  put(b,44,12);put(b,48,40);put(b,52,76);put(b,56,16);
@@ -132,5 +158,5 @@ void files(const char* directory){auto c=config();auto asset=model_bytes();c.ass
  REQUIRE(!scene.load(directory,17,e)&&e==RallyVisualError::config);REQUIRE(hash(scene.frame())==previous);
 }
 }
-int main(int argc,char**argv){REQUIRE(argc==2);config_checks();movement();files(argv[1]);
+int main(int argc,char**argv){REQUIRE(argc==2);config_checks();movement();draw_planning();files(argv[1]);
  std::printf("RALLY_VISUAL PASS checks=%u native_pose_movement=1 projection=1 reset=1 asset_binding=1 atomic_history=1 no_update_allocations=1\n",checks);}

@@ -1,4 +1,5 @@
 #include "vu1_transform.h"
+#include "vu1_world.h"
 #include "vu0_pack.h"
 #include <algorithm>
 #include <array>
@@ -19,6 +20,70 @@ std::uint32_t seed=0x14295ab3;
 std::uint32_t next(){seed^=seed<<13;seed^=seed>>17;seed^=seed<<5;return seed;}
 bool check(bool value,const char*what){++checks;if(!value)std::printf("VU1 ENGINE FAIL %s check=%u\n",what,checks);return value;}
 TransformMatrix identity(){TransformMatrix m{};m[0]=m[5]=m[10]=m[15]=1;return m;}
+bool world_admission(){
+    std::array<Vu1WorldCorner,51> corners{};
+    std::array<Vu1WorldState,17> states{};
+    for(auto& c:corners)c.position={0,0,.5f,1};
+    for(auto& s:states){s.prim=3;s.rgba=0x80808080u;}
+    Vu1WorldBatch batch{identity(),identity(),{corners.data(),3},{states.data(),1},448,17};
+    for(unsigned n:{0u,3u,45u,48u}){
+        batch.corners={corners.data(),n};batch.states={states.data(),n/3};
+        if(!check(valid_native_vu1_world_input(batch),"world admitted batch bounds"))return false;
+    }
+    batch.corners={corners.data(),51};batch.states={states.data(),17};
+    if(!check(!valid_native_vu1_world_input(batch),"world too many corners"))return false;
+    batch.corners={corners.data(),4};batch.states={states.data(),1};
+    if(!check(!valid_native_vu1_world_input(batch),"world incomplete triangle"))return false;
+    batch.corners={corners.data(),3};batch.states={states.data(),2};
+    if(!check(!valid_native_vu1_world_input(batch),"world mismatched state count"))return false;
+    batch.states={states.data(),1};
+    for(unsigned h:{0u,384u,449u,513u}){batch.output_height=h;
+        if(!check(!valid_native_vu1_world_input(batch),"world unsupported GS height"))return false;}
+    batch.output_height=512;
+    if(!check(valid_native_vu1_world_input(batch),"world PAL height"))return false;
+    batch.completion=Vu1WorldCompletion::path1_retired;
+    if(!check(valid_native_vu1_world_input(batch),"world explicit queued completion"))return false;
+    batch.completion=static_cast<Vu1WorldCompletion>(255);
+    if(!check(!valid_native_vu1_world_input(batch),"world unknown completion mode"))return false;
+    batch.completion=Vu1WorldCompletion::gs_finished;
+    for(unsigned shift=3;shift<=8;++shift){corners[0].inv_width=corners[0].inv_height=std::ldexp(1.f,-int(shift));
+        if(!check(valid_native_vu1_world_input(batch),"world reciprocal texture sizes"))return false;}
+    for(float scale:{0.f,-.125f,.25f,.1f,0x1p-9f}){corners[0].inv_width=scale;
+        if(!check(!valid_native_vu1_world_input(batch),"world invalid texture scale"))return false;}
+    corners[0].inv_width=corners[0].inv_height=1;
+    for(auto raw:{1u,0x007fffffu,0x7f800000u,0xff800000u,0x7fc00000u,0x47800001u}){
+        const float invalid=std::bit_cast<float>(raw);
+        corners[2].v=invalid;
+        if(!check(!valid_native_vu1_world_input(batch),"world late invalid UV"))return false;
+        corners[2].v=0;corners[2].position.x=invalid;
+        if(!check(!valid_native_vu1_world_input(batch),"world late invalid vertex"))return false;
+        corners[2].position.x=0;batch.world_to_clip[15]=invalid;
+        if(!check(!valid_native_vu1_world_input(batch),"world invalid matrix"))return false;
+        batch.world_to_clip=identity();
+    }
+    corners[0].position.w=2;
+    if(!check(!valid_native_vu1_world_input(batch),"world homogeneous model position"))return false;
+    corners[0].position.w=1;batch.object_to_world[3]=.5f;
+    if(!check(!valid_native_vu1_world_input(batch),"world affine object matrix"))return false;
+    batch.object_to_world=identity();states[0].prim=19;
+    if(!check(valid_native_vu1_world_input(batch),"world textured primitive"))return false;
+    for(std::uint64_t prim:{0ull,4ull,7ull,0x13full}){states[0].prim=prim;
+        if(!check(!valid_native_vu1_world_input(batch),"world unsupported primitive"))return false;}
+    states[0].prim=3;states[0].rgba=0x81000000u;
+    if(!check(!valid_native_vu1_world_input(batch),"world GS alpha domain"))return false;
+    states[0].rgba=0x80000000u;
+    corners[0].position.x=-65536;corners[0].u=65536;corners[0].v=-0.f;
+    if(!check(valid_native_vu1_world_input(batch),"world inclusive numerical endpoints"))return false;
+#ifndef _EE
+    Vu1Transform unavailable;std::array<TransformVector4,3> clips{{{11,12,13,14},{21,22,23,24},{31,32,33,34}}};
+    const auto before=clips;
+    if(!check(!unavailable.initialize_world()&&
+        unavailable.draw_world(batch,clips)==Vu1WorldResult::rejected&&
+        !std::memcmp(clips.data(),before.data(),sizeof clips)&&
+        unavailable.world_stats().dma_qwords==0,"world host unavailable leaves clips untouched"))return false;
+#endif
+    return true;
+}
 std::array<float,4> lanes(const TransformVector4&v){return std::bit_cast<std::array<float,4>>(v);}
 // Host diagnostic only: independently ordered binary32 multiply/add with
 // contraction disabled. It tests the enclosure; it is not a VU emulator.
@@ -136,6 +201,7 @@ bool projection_contract(Vu1Transform&backend){
 }
 #endif
 bool run(){
+    if(!world_admission())return false;
     Vu1Transform backend;
 #ifdef _EE
     dma_channel_initialize(DMA_CHANNEL_VIF1,nullptr,0);

@@ -1,0 +1,343 @@
+# Generic, renderer-owned world packet continuation. One existing VU1 lease;
+# Display retires PATH3 and keeps all texture/CLUT slots resident until GS finish.
+# Upload at microinstruction512; entry offsets0/3 select data bank0/512.
+# Relative qwords (both banks have512 qwords):
+# 0..7: two column-major matrices, object-to-world then world-to-clip.
+# 8: integer corner_count, triangle_count, sequence, zero (max48/16).
+# 9: {248,192,0,1/1024};10: {640/496,height/384,2048,65536}.
+# 11: {496,384,1,65536};14: {65536,.5,0,2^-17}.
+# 15: {2^-16,1024,65536,65536}.
+# 12: output decision, clip_count, emitted_triangle_count, reason.
+# 13: exact echo of q8. Decision1=fallback/no GIF;2=whole batch emitted.
+# Reasons1=clip plane,2=numerical domain,3=zero/uncertain projected area.
+# 16..111:48 ordered corners, each {XYZ1},{u,v,inv_width,inv_height}.
+# 112..159:retained clip vectors;160..207:logical XY/reverse-depth/Q.
+# 256..497:16 triangles*15q +optional2q EOP FINISH;208..255/498..511 untouched.
+# Each15q template: AD tag,TEST,TEX0,CLAMP,PRIM,ST/RGBAQ/XYZ2 tag,
+# then3*{ST,RGBAQ,XYZ2}. Only ST and XYZ slots are overwritten here.
+# Classify/project/area-check the whole batch before the only XGKICK.
+# GS-finished mode terminates with the2q FINISH packet. Deferred mode sets EOP
+# on the last triangle tag instead; Display must finish before VRAM overwrite,
+# rejection return, readback, flip or owner release. The microcode is identical.
+# Native reciprocal presentation policy remains separate from exact Z16
+# conversion of the produced binary32 depth. FLUSH/MARK and full VIF/GIF idle
+# retire the stream before status reads or bank reuse. GS completion is separate;
+# neither two data banks nor deferred raster completion implies VIF/VU overlap.
+.vu
+.align 4
+.global native_vu1_world_begin
+.global native_vu1_world_bank1
+.global native_vu1_world_end
+# Original fused native presentation kernel, 16 triangles / 48 corners.
+# Explicit entry stubs select one exclusively owned512-qword bank.
+native_vu1_world_begin:
+    nop iaddiu vi15,vi00,0
+    nop b world_begin
+    nop nop
+native_vu1_world_bank1:
+    nop iaddiu vi15,vi00,512
+    nop b world_begin
+    nop nop
+world_begin:
+    nop lq vf01,0(vi15)
+    nop lq vf02,1(vi15)
+    nop lq vf03,2(vi15)
+    nop lq vf04,3(vi15)
+    nop lq vf05,4(vi15)
+    nop lq vf06,5(vi15)
+    nop lq vf07,6(vi15)
+    nop lq vf08,7(vi15)
+    nop lq vf09,9(vi15)
+    nop lq vf19,11(vi15)
+    nop lq vf30,8(vi15)
+    nop ilw.x vi02,8(vi15)
+    nop iaddiu vi03,vi15,16
+    nop iaddiu vi04,vi15,112
+    nop iaddiu vi10,vi00,16
+    nop iaddiu vi11,vi00,48
+    nop iadd vi12,vi00,vi00
+    nop iadd vi13,vi00,vi00
+    nop sq vf30,13(vi15)
+# Pass1 computes EVERY clip coordinate in the existing two-matrix order.
+world_transform:
+    nop lq vf10,0(vi03)
+    nop iaddi vi03,vi03,2
+    nop nop
+    nop nop
+    mulax.xyzw ACC,vf01,vf10x nop
+    madday.xyzw ACC,vf02,vf10y nop
+    maddaz.xyzw ACC,vf03,vf10z nop
+    maddw.xyzw vf11,vf04,vf10w nop
+    nop nop
+    nop nop
+    nop nop
+    mulax.xyzw ACC,vf05,vf11x nop
+    madday.xyzw ACC,vf06,vf11y nop
+    maddaz.xyzw ACC,vf07,vf11z nop
+    maddw.xyzw vf12,vf08,vf11w nop
+    nop nop
+    nop nop
+    nop nop
+    clipw.xyz vf12,vf12w sqi vf12,(vi04++)
+    sub.zw vf20,vf12,vf09 nop
+    nop nop
+    nop nop
+    nop fcand vi01,0x3f
+    nop ior vi13,vi13,vi01
+    nop fmand vi01,vi11
+    nop ior vi13,vi13,vi01
+    clipw.xyz vf12,vf19w nop
+    abs.w vf21,vf12 nop
+    nop nop
+    nop nop
+    nop fcand vi01,0x3f
+    sub.w vf22,vf19,vf21 ior vi12,vi12,vi01
+    nop nop
+    nop nop
+    nop nop
+    nop fmand vi01,vi10
+    nop ior vi12,vi12,vi01
+    nop iaddi vi02,vi02,-1
+    nop nop
+    nop ibne vi02,vi00,world_transform
+    nop nop
+    nop ibne vi12,vi00,world_numeric
+    nop nop
+    nop ibne vi13,vi00,world_clipped
+    nop nop
+# Pass2 projects every inside corner; no packet/GIF output exists yet.
+    nop ilw.x vi02,8(vi15)
+    nop iaddiu vi03,vi15,112
+    nop iaddiu vi04,vi15,160
+    nop lq vf20,15(vi15)
+    nop iaddiu vi10,vi00,224
+    nop iaddiu vi11,vi00,16
+    nop iaddiu vi12,vi00,64
+    nop iadd vi13,vi00,vi00
+world_project:
+    nop lqi vf12,(vi03++)
+    nop nop
+    nop nop
+    nop nop
+    nop div Q,vf00w,vf12w
+    nop waitq
+    mulq.xyzw vf14,vf12,Q nop
+    nop nop
+    nop nop
+    nop nop
+    mulq.w vf14,vf00,Q nop
+    addw.xyz vf15,vf00,vf00w nop
+    nop nop
+    nop nop
+    addw.x vf14,vf14,vf00w nop
+    sub.yz vf14,vf15,vf14 nop
+    nop nop
+    nop nop
+    nop nop
+    mul.xy vf14,vf14,vf09 nop
+    nop nop
+    nop nop
+    nop nop
+    sub.xyz vf21,vf19,vf14 sqi vf14,(vi04++)
+    nop nop
+    nop nop
+    nop nop
+    nop fmand vi01,vi10
+    sub.xyz vf22,vf14,vf00 ior vi13,vi13,vi01
+    nop nop
+    nop nop
+    nop nop
+    nop fmand vi01,vi10
+    subx.w vf22,vf14,vf20x ior vi13,vi13,vi01
+    nop nop
+    nop nop
+    nop nop
+    nop fmand vi01,vi11
+    subw.y vf23,vf20,vf14w ior vi13,vi13,vi01
+    nop nop
+    nop nop
+    nop nop
+    nop fmand vi01,vi12
+    nop ior vi13,vi13,vi01
+    nop iaddi vi02,vi02,-1
+    nop nop
+    nop ibne vi02,vi00,world_project
+    nop nop
+    nop ibne vi13,vi00,world_numeric
+    nop nop
+# Pass3 rejects zero or numerically uncertain area before any primitive.
+    nop ilw.y vi02,8(vi15)
+    nop iaddiu vi03,vi15,160
+    nop iaddiu vi11,vi00,136
+world_area:
+    nop lqi vf10,(vi03++)
+    nop lqi vf11,(vi03++)
+    nop lqi vf12,(vi03++)
+    nop nop
+    nop nop
+    sub.xy vf13,vf11,vf10 nop
+    sub.xy vf14,vf12,vf10 nop
+    nop nop
+    nop nop
+    nop nop
+    muly.x vf15,vf13,vf14y nop
+    mulx.y vf15,vf13,vf14x nop
+    nop nop
+    nop nop
+    nop nop
+    suby.x vf16,vf15,vf15y nop
+    abs.xy vf17,vf15 nop
+    nop nop
+    nop nop
+    abs.x vf16,vf16 nop
+    maxy.x vf17,vf17,vf17y nop
+    nop nop
+    nop nop
+    nop nop
+    mulx.x vf18,vf17,vf20x nop
+    nop nop
+    nop nop
+    nop nop
+    sub.x vf19,vf16,vf18 nop
+    nop nop
+    nop nop
+    nop nop
+    nop fmand vi01,vi11
+    nop ibne vi01,vi00,world_area_bad
+    nop nop
+    nop iaddi vi02,vi02,-1
+    nop nop
+    nop ibne vi02,vi00,world_area
+    nop nop
+# Pass4 fills ONLY ST and XYZ slots. EE state/tags/RGBA templates are intact.
+    nop lq vf01,14(vi15)
+    nop lq vf26,10(vi15)
+    nop ilw.y vi14,8(vi15)
+    nop iaddiu vi03,vi15,17
+    nop iaddiu vi04,vi15,262
+    nop iaddiu vi07,vi15,160
+world_packet_triangle:
+    nop iaddiu vi09,vi00,3
+world_packet_corner:
+    nop lqi vf24,(vi07++)
+    nop lq vf25,0(vi03)
+    nop iaddi vi03,vi03,2
+    nop nop
+    nop nop
+    mul.xy vf27,vf24,vf26 nop
+    mulw.xy vf29,vf25,vf24w nop
+    addw.z vf29,vf00,vf24w nop
+    sub.w vf29,vf00,vf00 nop
+    addz.xy vf27,vf27,vf26z nop
+    mulz.x vf29,vf29,vf25z nop
+    mulw.y vf29,vf29,vf25w nop
+    sub.zw vf30,vf00,vf00 nop
+    ftoi4.xy vf30,vf27 nop
+    addz.x vf10,vf00,vf24z nop
+    nop nop
+    nop nop
+    nop sq vf29,0(vi04)
+    clipw.xyz vf10,vf01w sq vf30,2(vi04)
+    nop nop
+    nop nop
+    nop nop
+    nop fcand vi01,1
+    nop ibeq vi01,vi00,world_depth_zero
+    nop nop
+# Executed exact-depth decomposition; final ISW zero-extends the16-bit result.
+    mulx.x vf11,vf10,vf01x nop
+    nop nop
+    nop nop
+    nop nop
+    ftoi0.x vf12,vf11 nop
+    nop nop
+    nop nop
+    nop nop
+    itof0.x vf13,vf12 nop
+    nop mtir vi05,vf12x
+    nop nop
+    nop nop
+    sub.x vf14,vf11,vf13 nop
+    nop nop
+    nop nop
+    nop nop
+    maxy.x vf15,vf14,vf01y nop
+    maxy.x vf16,vf10,vf01y nop
+    nop nop
+    nop nop
+    suby.x vf15,vf15,vf01y nop
+    suby.x vf16,vf16,vf01y nop
+    nop nop
+    nop nop
+    mulx.w vf17,vf00,vf15x nop
+    mulx.w vf18,vf00,vf14x nop
+    nop nop
+    nop nop
+    clipw.xyz vf10,vf17w nop
+    nop nop
+    nop nop
+    nop nop
+    nop fcand vi01,1
+    nop iaddiu vi06,vi00,1
+    nop isub vi06,vi06,vi01
+    nop iadd vi05,vi05,vi06
+    clipw.xyz vf16,vf18w nop
+    nop nop
+    nop nop
+    nop nop
+    nop fcand vi01,1
+    nop isub vi05,vi05,vi01
+    nop b world_depth_store
+    nop nop
+world_depth_zero:
+    nop iadd vi05,vi00,vi00
+    nop nop
+world_depth_store:
+    nop isw.z vi05,2(vi04)
+    nop iaddi vi04,vi04,3
+    nop iaddi vi09,vi09,-1
+    nop nop
+    nop ibne vi09,vi00,world_packet_corner
+    nop nop
+    nop iaddi vi04,vi04,6
+    nop iaddi vi14,vi14,-1
+    nop nop
+    nop ibne vi14,vi00,world_packet_triangle
+    nop nop
+    nop iaddiu vi05,vi00,2
+    nop ilw.x vi06,8(vi15)
+    nop ilw.y vi07,8(vi15)
+    nop isw.x vi05,12(vi15)
+    nop isw.y vi06,12(vi15)
+    nop isw.z vi07,12(vi15)
+    nop isw.w vi00,12(vi15)
+    nop iaddiu vi04,vi15,256
+    nop nop
+    nop nop
+    nop nop
+    nop xgkick vi04
+    nop nop
+    nop nop
+    nop[e] nop
+    nop nop
+world_clipped:
+    nop iaddiu vi05,vi00,1
+    nop b world_fallback
+    nop nop
+world_numeric:
+    nop iaddiu vi05,vi00,2
+    nop b world_fallback
+    nop nop
+world_area_bad:
+    nop iaddiu vi05,vi00,3
+world_fallback:
+    nop iaddiu vi06,vi00,1
+    nop ilw.x vi07,8(vi15)
+    nop isw.w vi05,12(vi15)
+    nop isw.x vi06,12(vi15)
+    nop isw.y vi07,12(vi15)
+    nop isw.z vi00,12(vi15)
+    nop[e] nop
+    nop nop
+native_vu1_world_end:
+.align 4

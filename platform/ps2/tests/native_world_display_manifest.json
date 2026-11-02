@@ -1,0 +1,19 @@
+{
+  "sources": [
+    "platform/ps2/tests/native_world_display_fixture.cpp",
+    "platform/ps2/src/native_display.cpp",
+    "platform/ps2/src/native_frame.cpp",
+    "platform/ps2/src/native_geometry.cpp",
+    "platform/ps2/src/native_geometry_float.cpp",
+    "platform/ps2/src/native_textured_model.cpp",
+    "platform/ps2/src/world_scene.cpp",
+    "platform/ps2/src/vu0_pack.cpp",
+    "platform/ps2/src/vu1_transform_math.cpp",
+    "platform/ps2/src/vu1_transform.cpp",
+    "platform/ps2/src/vu1_transform.vsm",
+    "platform/ps2/src/vu1_world.vsm"
+  ],
+  "includes": ["platform/ps2/include"],
+  "libraries": ["draw", "graph", "dma", "packet", "m"],
+  "embed_iop_modules": false
+}

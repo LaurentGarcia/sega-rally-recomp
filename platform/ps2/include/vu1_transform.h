@@ -6,6 +6,9 @@
 #include <span>
 
 namespace ps2 {
+struct Vu1WorldBatch;
+struct Vu1WorldStats;
+enum class Vu1WorldResult : std::uint8_t;
 struct alignas(16) TransformVector4 { float x=0,y=0,z=0,w=1; };
 // Native logical496x384 screen coordinates, reverse depth and reciprocal w.
 // An all-zero value (q==0) asks the caller to project/clip the retained clip
@@ -108,6 +111,13 @@ public:
     bool transform_project_native(const TransformMatrix&,const TransformMatrix&,
                                   std::span<const TransformVector4>,std::span<TransformVector4>,
                                   std::span<TransformProjectedVertex>) noexcept;
+    // Explicit optional setup allocates persistent direct-GS staging and loads
+    // a separate kernel. Uses this same exclusive VIF1/VU1 lease. The Display
+    // owns GS/GIF and must retire its PATH3 state/uploads before draw_world().
+    // No per-call allocation, concurrent producer or transfer overlap.
+    bool initialize_world() noexcept;
+    Vu1WorldResult draw_world(const Vu1WorldBatch&,std::span<TransformVector4> fallback_clip) noexcept;
+    Vu1WorldStats world_stats() const noexcept;
     bool available() const noexcept;
     const char* error() const noexcept;
     Vu1TransformStats stats() const noexcept;

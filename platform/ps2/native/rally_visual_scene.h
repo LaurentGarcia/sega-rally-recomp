@@ -46,6 +46,12 @@ public:
     // the first native update output at initial_game_frame. Subsequent calls
     // advance recovered chase history. No allocation; failure is atomic.
     bool update(const RenderPose&,RallyVisualError&) noexcept;
+    // Allocate the optional untransformed draw-plan banks after loading. Does
+    // not advance/reset camera history. Subsequent update() publishes a plan
+    // instead of a Frame; load/configure discard this opt-in. Failure preserves
+    // the existing mode/publication, and repeated enable is idempotent.
+    bool enable_draw_plan(RallyVisualError&) noexcept;
+    WorldDrawPlan draw_plan() const noexcept;
     // Reset history/guard and clear the published frame without reallocating.
     void reset() noexcept;
     void set_profile_clock(WorldSceneClock,void* context=nullptr) noexcept;

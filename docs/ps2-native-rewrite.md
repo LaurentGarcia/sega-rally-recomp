@@ -225,10 +225,37 @@ API remains available for further work, but transform-only is the default.
 The rebuilt native048 default measures 29.361 updates/sec and 31.085 ms mean
 work over the matching 660 periods. All 660 work intervals still exceed the
 16.667 ms budget; this restores the preceding path without a speedup claim.
-The next direction is renderer-owned prepared world/clip batches with explicit
-texture, packet and VU-bank lifetimes. A private authored XGKICK fixture has
-passed exact packet/framebuffer checks; it does not yet establish general
-scene integration, overlapping work or a game-rate improvement.
+An explicit `--drive-world-vu CHECKPOINT COURSE VISUAL_DIRECTORY` mode now
+consumes ordered prepared world geometry directly. VU1 performs transforms,
+projection and GS packet packing; clipped batches retain their original order
+through the EE clipper and VU0 coordinate packing. The
+[world-renderer contract](../platform/ps2/native/vu1_world.md) records resource
+lifetimes, completion boundaries and the authored/full-scene comparisons.
+This is an experimental opt-in. The automatic textured startup still uses the
+transform-only provider; another offload API alone does not establish faster
+complete frames or the 60 Hz target.
+
+The opt-in fixes native binary32 presentation for that run, so Triangle does
+not cycle renderers. Start still restores the initial checkpoint, and the
+diagnostic page reports the previous submitted GS triangle count. Game
+arithmetic, camera history and input behavior are shared with the normal path.
+
+The final native051 builds were measured over matching 660 complete periods in
+Play 0.72, with identical inputs and rendering preferences:
+
+| Renderer | Native updates/sec | Mean work | Mean complete period |
+| --- | ---: | ---: | ---: |
+| Default VU1 transforms / EE projection | 29.361 | 31.055 ms | 34.059 ms |
+| Optional VU1 world / direct GS | 20.945 | 34.285 ms | 47.744 ms |
+
+Work excludes measured vsync/flip time but includes input, simulation, rendering
+and logging. Every measured work interval exceeds the 16.667 ms target. The
+default reproduces the preceding cadence after restoring hot-loop inlining;
+the world path remains slower and is not enabled automatically. Selected logged
+game/pose/triangle fields agree between paths. Authored pixel comparisons pass,
+but the separate actual-scene comparison still records pixel differences.
+Evidence is bound in `build/ps2-world-final-003/cadence-validation.json`;
+physical-console performance is unverified.
 
 In native042 versus native043 at update 60, the last-
 palette shortcut reduces packet construction from 34.911 to 11.215 ms, while

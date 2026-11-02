@@ -69,6 +69,10 @@ jobs:
         run: python3 platform/ps2/tools/build_native_depth_fixture.py --scene-capture --container-platform linux/amd64 --output build/ps2-native-scene-ci
       - name: Cross-link the original GS resource lifetime and failure fixture
         run: python3 platform/ps2/tools/build_native_resource_fixture.py --container-platform linux/amd64 --output build/ps2-native-resources-ci
+      # Authored models and textures only. Cross-linking does not execute the
+      # VU/GS pixel comparisons; their runtime validation remains separate.
+      - name: Cross-link the authored ordered world Display fixture without game assets
+        run: python3 platform/ps2/build_ps2.py build --target core-probe --core-manifest platform/ps2/tests/native_world_display_manifest.json --backend docker --container-platform linux/amd64 --optimization O3 --output build/ps2-native-world-display-ci --jobs 2
       - name: Cross-link the recovered course-neighbor arithmetic fixture
         run: python3 platform/ps2/build_ps2.py build --target core-probe --core-manifest platform/ps2/tests/contact_neighborhood_manifest.json --container-platform linux/amd64 --output build/ps2-contact-neighborhood-ci --jobs 2
       - name: Cross-link the recovered car direction arithmetic fixture

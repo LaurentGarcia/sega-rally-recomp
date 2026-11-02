@@ -54,6 +54,19 @@ struct WorldScene::Storage {
     std::size_t source_capacity=0,output_capacity=0,count=0;
     unsigned active=0;std::uint32_t clear=0xff101923u;WorldSceneStats stats{};
 };
+struct WorldScene::PlanStorage {
+    struct Bank {
+        std::vector<WorldDrawInstance> instances;
+        std::vector<std::uint32_t> selected;
+        std::array<std::shared_ptr<const PreparedWorldModel::Storage>,1024> leases;
+        std::size_t lease_count=0;
+        void release_leases(){while(lease_count)leases[--lease_count].reset();}
+    };
+    std::array<Bank,2> banks;
+    std::size_t source_capacity=0,output_capacity=0,count=0;
+    unsigned active=0;bool published=false;
+    WorldMatrix view{};std::uint32_t clear=0xff101923u;WorldSceneStats stats{};
+};
 namespace {
 constexpr std::uint32_t cache_serial_mask=0x7fffffffu,approximate_vertex=0x80000000u;
 // Vertex indices use only16 bits; projection validity is independent of the
@@ -394,6 +407,78 @@ bool WorldScene::configure(std::size_t faces,std::size_t triangles,WorldSceneErr
     }catch(const std::bad_alloc&){return fail(WorldSceneError::allocation_failed,error);}
     catch(const std::length_error&){return fail(WorldSceneError::allocation_failed,error);}
 }
+bool WorldScene::configure_plan(std::size_t faces,std::size_t triangles,WorldSceneError& error)noexcept{
+    if(!faces||faces>32768||!triangles||triangles>16384)return fail(WorldSceneError::invalid_capacity,error);
+    try{
+        auto next=std::make_unique<PlanStorage>();next->source_capacity=faces;next->output_capacity=triangles;
+        next->stats.persistent_bytes=sizeof(PlanStorage);
+        for(auto& bank:next->banks){
+            bank.instances.resize(std::min<std::size_t>(faces,1024));bank.selected.resize(faces);
+            next->stats.persistent_bytes+=bank.instances.capacity()*sizeof(WorldDrawInstance)+bank.selected.capacity()*sizeof(std::uint32_t);
+        }
+        plan_storage_.swap(next);error=WorldSceneError::none;return true;
+    }catch(const std::bad_alloc&){return fail(WorldSceneError::allocation_failed,error);}
+     catch(const std::length_error&){return fail(WorldSceneError::allocation_failed,error);}
+}
+bool WorldScene::plan_prepared(std::span<const PreparedWorldInstance> instances,const WorldView& view,WorldSceneError& error)noexcept{
+    const auto now=[&]()noexcept{return clock_?clock_(clock_context_):std::uint64_t{0};};
+    const auto validation_start=now();
+    if(!plan_storage_)return fail(WorldSceneError::not_configured,error);
+    auto& plan=*plan_storage_;
+    if(instances.size()>1024||instances.size()>plan.banks[0].instances.size())return fail(WorldSceneError::input_limit,error);
+    if(!matrix(view.world_to_clip,false)||(view.clear_color>>24)!=255||
+       (view.use_facing&&(!value(view.facing_origin.x)||!value(view.facing_origin.y)||!value(view.facing_origin.z))))
+        return fail(WorldSceneError::invalid_transform,error);
+    std::size_t vertices=0,faces=0;
+    for(const auto& source:instances){
+        if(!source.model||!source.model->storage_)return fail(WorldSceneError::invalid_model,error);
+        if(!matrix(source.object_to_world,true))return fail(WorldSceneError::invalid_transform,error);
+        const auto& model=*source.model->storage_;
+        if(model.vertices.size()>65536-vertices||model.faces.size()>plan.source_capacity-faces)return fail(WorldSceneError::input_limit,error);
+        vertices+=model.vertices.size();faces+=model.faces.size();
+    }
+    const auto validation_ticks=now()-validation_start;
+    auto& bank=plan.banks[plan.active^1];bank.release_leases();std::size_t selected=0,instance_index=0;
+    std::uint32_t groups=0,culled=0,backfaces=0;std::uint64_t bounds_ticks=0;
+    for(const auto& source:instances){
+        const auto& model=*source.model->storage_;
+        const WorldInstance instance{{model.vertices,model.faces,model.groups,model.materials},source.object_to_world};
+        bank.leases[bank.lease_count++]=source.model->storage_;
+        const auto first=selected;std::size_t group_index=0;
+        const bool identity=identity_matrix(instance.object_to_world);
+        WorldFacing previous_facing;bool have_facing=false,previous_visible=false;
+        for(std::size_t face_index=0;face_index<model.faces.size();++face_index){
+            if(group_index<model.groups.size()&&model.groups[group_index].first_face==face_index){
+                const auto group=model.groups[group_index];const auto& bounds=model.bounds[group_index++];++groups;
+                const auto start=now();const bool outside=outside_group_float(instance,group,view.world_to_clip,&bounds,identity);bounds_ticks+=now()-start;
+                if(outside){have_facing=false;++culled;face_index+=group.face_count-1;continue;}
+            }
+            const auto& face=model.faces[face_index];
+            if(view.use_facing&&face.facing.enabled){bool visible;
+                if(have_facing&&same_facing(previous_facing,face.facing))visible=previous_visible;
+                else{
+                    if(!facing_visible(face.facing,instance.object_to_world,view.facing_origin,visible))return fail(WorldSceneError::invalid_transform,error);
+                    previous_facing=face.facing;previous_visible=visible;have_facing=true;
+                }
+                if(!visible){++backfaces;continue;}
+            }else have_facing=false;
+            bank.selected[selected++]=std::uint32_t(face_index);
+        }
+        bank.instances[instance_index++]={model.vertices,model.faces,model.materials,source.object_to_world,
+            std::span<const std::uint32_t>(bank.selected).subspan(first,selected-first)};
+    }
+    plan.active^=1;plan.count=instances.size();plan.view=view.world_to_clip;plan.clear=view.clear_color;plan.published=true;
+    plan.stats={std::uint32_t(instances.size()),std::uint32_t(vertices),std::uint32_t(faces),0,plan.stats.persistent_bytes};
+    plan.stats.groups=groups;plan.stats.culled_groups=culled;plan.stats.backface_rejected_faces=backfaces;
+    plan.stats.validation_ticks=validation_ticks;plan.stats.bounds_ticks=bounds_ticks;plan.stats.numeric_mode=WorldNumericMode::native_float;
+    error=WorldSceneError::none;return true;
+}
+WorldDrawPlan WorldScene::draw_plan()const noexcept{
+    if(!plan_storage_||!plan_storage_->published)return {};
+    const auto& p=*plan_storage_;
+    return WorldDrawPlan({p.banks[p.active].instances.data(),p.count},p.view,p.clear,p.output_capacity);
+}
+WorldSceneStats WorldScene::plan_stats()const noexcept{return plan_storage_?plan_storage_->stats:WorldSceneStats{};}
 void WorldScene::set_profile_clock(WorldSceneClock clock,void* context)noexcept{clock_=clock;clock_context_=context;}
 void WorldScene::set_transform_provider(WorldSceneTransformBatch provider,void* context)noexcept{
     transform_batch_=provider;transform_project_batch_=nullptr;transform_context_=context;

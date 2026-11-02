@@ -2,6 +2,9 @@
 #include "native_texture_cache.h"
 #include "diagnostic_font.h"
 #include "vu0_pack.h"
+#include "world_scene.h"
+#include "native_geometry_float.h"
+#include "vu1_world.h"
 #include <dma.h>
 #include <dma_registers.h>
 #include <draw.h>
@@ -17,6 +20,7 @@
 #include <vif_registers.h>
 #include <algorithm>
 #include <cassert>
+#include <bit>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -71,6 +75,20 @@ std::uint32_t gs_color(std::uint32_t argb) {
     return ((argb >> 16) & 255u) | (argb & 0xff00u) | ((argb & 255u) << 16) |
         (((argb >> 24) + 1u) / 2u << 24);
 }
+bool world_scalar_clip(const WorldMatrix& object,const WorldMatrix& camera,
+                       const ps2::TransformVector4& point,ps2::TransformVector4& output) {
+    const auto input=std::bit_cast<std::array<float,4>>(point);
+    std::array<float,4> world{},clip{};
+    // Match WorldScene's native scalar multiply/add order, without combining
+    // matrices or introducing binary64 work on an unsupported VU batch.
+    for(unsigned row=0;row<4;++row)for(unsigned col=0;col<4;++col)
+        world[row]+=object[row+4*col]*input[col];
+    for(unsigned row=0;row<4;++row)for(unsigned col=0;col<4;++col)
+        clip[row]+=camera[row+4*col]*world[col];
+    for(float value:clip){const auto magnitude=std::bit_cast<std::uint32_t>(value)&0x7fffffffu;
+        if(magnitude&&(magnitude<0x00800000u||magnitude>0x47800000u))return false;}
+    output=std::bit_cast<ps2::TransformVector4>(clip);return true;
+}
 }
 
 
@@ -83,6 +101,15 @@ struct Display::Impl {
     unsigned target = 1, height = 448;
     bool ready = false, use_vu0 = false, depth_active = false;
     bool transport_failed = false, retain_dma_memory = false;
+    bool bounded_submission = false;
+    // Submitted PATH3 work has no GS completion proof until complete().
+    // CPU-queued work is represented separately by q != packet->data.
+    bool path3_needs_finish = false;
+    bool path3_stream_pending = false;
+    // PATH1 has retired, but the GS may still be consuming these primitives.
+    // Only complete() proves their completion, including before VRAM reuse.
+    bool world_gs_pending = false;
+    std::uint32_t world_sequence = 0;
     const char *failure = "NATIVE GS NOT INITIALIZED", *debug = nullptr, *caption = nullptr;
     Stats counters{};
     DisplayClock clock=nullptr;void* clock_context=nullptr;
@@ -106,24 +133,72 @@ struct Display::Impl {
         staging = nullptr;
     }
 
-    void submit(qword_t *end) {
-        dma_channel_send_normal(DMA_CHANNEL_GIF, packet->data, int(end - packet->data), 0, 0);
-        dma_wait_fast();
+    bool retire_world(const char *message, bool stopped = true) {
+        ready=false;transport_failed=true;display_quarantined=true;
+        retain_dma_memory=retain_dma_memory||!stopped;failure=message;return false;
     }
-    void complete(qword_t *&q) {
+    bool submit(qword_t *end) {
+        if(transport_failed)return false;
+        const int result=dma_channel_send_normal(DMA_CHANNEL_GIF, packet->data, int(end - packet->data), 0, 0);
+        path3_needs_finish=true;
+        path3_stream_pending=true;
+        if(!bounded_submission){dma_wait_fast();return true;}
+        if(result<0)return retire_world("WORLD GIF SUBMISSION FAILED",stop_owned_dma(R_EE_D2_CHCR));
+        if(!wait_bits(R_EE_D2_CHCR,dma_running,0))
+            return retire_world("WORLD GIF DMA TIMEOUT",stop_owned_dma(R_EE_D2_CHCR));
+        return true;
+    }
+    bool complete(qword_t *&q) {
+        if(transport_failed)return false;
         q = draw_finish(q);
-        submit(q);
-        draw_wait_finish();
+        if(bounded_submission)*GS_REG_CSR=2;
+        if(!submit(q))return false;
+        if(bounded_submission){
+            if(!wait_csr(2,2))return retire_world("WORLD GS FINISH TIMEOUT");
+            *GS_REG_CSR=2;
+        }else draw_wait_finish();
+        path3_needs_finish=false;
+        if(world_gs_pending)++counters.world_gs_finishes;
+        world_gs_pending=false;
         q = packet->data;
+        return true;
     }
-    void upload(unsigned width, unsigned rows, unsigned psm, unsigned address, unsigned pitch, size_t bytes) {
+    bool retire_path3(qword_t *&q,bool finish_world=false) {
+        if(finish_world){
+            if(q!=packet->data||path3_needs_finish||world_gs_pending){
+                ++counters.world_path3_handoffs;
+                if(!complete(q))return false;
+            }else ++counters.world_path3_empty_skips;
+        }else if(q!=packet->data||path3_stream_pending){
+            // SDK state/clear packets may end with EOP=0. Close the owned GIF
+            // stream explicitly, without adding a GS FINISH. Packet retirement
+            // orders PATH3 before PATH1; VRAM overwrite/final flip still use
+            // complete() to retire the GS work represented by the dirty flags.
+            PACK_GIFTAG(q,GIF_SET_TAG(0,1,0,0,GIF_FLG_PACKED,1),GIF_REG_AD);++q;
+            if(!submit(q))return false;
+            q=packet->data;++counters.world_path3_stream_retirements;
+        }else ++counters.world_path3_empty_skips;
+        // EOP/FINISH consumption can precede the last GIF activity indication.
+        // Retain every idle bit, with a bounded wait before any PATH1 producer.
+        if(!wait_bits(R_EE_GIF_STAT,0x1f001febu,0))return retire_world("WORLD PATH3 IDLE TIMEOUT");
+        path3_stream_pending=false;
+        return true;
+    }
+    bool upload(unsigned width, unsigned rows, unsigned psm, unsigned address, unsigned pitch, size_t bytes) {
+        if(transport_failed)return false;
         // SDK chain flushing covers descriptors only; REF pixels require their
         // own explicit data-cache synchronization before GIF reads them.
         SyncDCache(staging, reinterpret_cast<std::uint8_t *>(staging) + bytes);
         qword_t *q = draw_texture_transfer(packet->data, staging, width, rows, psm, address, pitch);
         q = draw_texture_flush(q);
-        dma_channel_send_chain(DMA_CHANNEL_GIF, packet->data, int(q - packet->data), 0, 0);
-        dma_wait_fast();
+        const int result=dma_channel_send_chain(DMA_CHANNEL_GIF, packet->data, int(q - packet->data), 0, 0);
+        path3_needs_finish=true;
+        path3_stream_pending=true;
+        if(!bounded_submission){dma_wait_fast();return true;}
+        if(result<0)return retire_world("WORLD TEXTURE SUBMISSION FAILED",stop_owned_dma(R_EE_D2_CHCR));
+        if(!wait_bits(R_EE_D2_CHCR,dma_running,0))
+            return retire_world("WORLD TEXTURE DMA TIMEOUT",stop_owned_dma(R_EE_D2_CHCR));
+        return true;
     }
     qword_t *test(qword_t *q, bool cutout, bool compare_depth = true, bool checker = false) {
         atest_t alpha{DRAW_ENABLE, static_cast<unsigned char>(cutout ? ATEST_METHOD_GREATER_EQUAL : ATEST_METHOD_ALLPASS),
@@ -144,7 +219,7 @@ struct Display::Impl {
         q = test(q, false, false);
         return draw_clear(q, 0, 0, 0, 640, float(height), (color >> 16) & 255, (color >> 8) & 255, color & 255);
     }
-    TextureSlot &texture(const Texture &key, qword_t *&q) {
+    __attribute__((always_inline)) inline TextureSlot &texture(const Texture &key, qword_t *&q) {
         // Every key was validated before frame mutation (or is the fixed
         // original checker asset). Metadata changes cannot alter queued GIF
         // words. The existing completion fence precedes all VRAM overwrite.
@@ -152,14 +227,14 @@ struct Display::Impl {
         assert(selected.slot<texture_slots);
         auto* slot=&textures[selected.slot];
         if(selected.hit){++counters.texture_hits;return *slot;}
-        complete(q); // Earlier primitives must finish before VRAM is reused.
+        if(!complete(q))return *slot; // Earlier primitives must finish before VRAM is reused.
         const auto& allocation=texture_cache.entry(selected.slot);
         slot->buffer.address=texture_base+allocation.first_page*2048;
         slot->buffer.width=detail::TexturePageCache::pitch_for(key.width);
         slot->buffer.psm=GS_PSM_4;
         const size_t bytes = size_t(key.width) * key.height / 2;
         std::memcpy(staging, key.indices, bytes);
-        upload(key.width, key.height, GS_PSM_4, slot->buffer.address, slot->buffer.width, bytes);
+        if(!upload(key.width, key.height, GS_PSM_4, slot->buffer.address, slot->buffer.width, bytes))return *slot;
         slot->buffer.info = {draw_log2(key.width), draw_log2(key.height), TEXTURE_COMPONENTS_RGBA, TEXTURE_FUNCTION_DECAL};
         counters.texture_evictions+=selected.evictions;
         counters.texture_pages=texture_cache.used_pages();
@@ -180,9 +255,9 @@ struct Display::Impl {
         auto *slot = &palettes[0];
         for (auto &candidate : palettes)
             if (!candidate.valid || (slot->valid && candidate.age < slot->age)) slot = &candidate;
-        complete(q);
+        if(!complete(q))return *slot;
         for (unsigned index = 0; index < 16; ++index) staging[index] = gs_color(colors[index]);
-        upload(8, 2, GS_PSM_32, slot->buffer.address, 64, 64);
+        if(!upload(8, 2, GS_PSM_32, slot->buffer.address, 64, 64))return *slot;
         slot->colors = colors; slot->age = ++palette_age; slot->valid = true;
         last_palette = slot;
         ++counters.palette_uploads; counters.palette_bytes += 64;
@@ -206,7 +281,9 @@ struct Display::Impl {
             result[1]=0xff000000u;return result;
         }();
         auto& image=texture(key,q);
+        if(transport_failed)return;
         auto& clut=palette(colors,q);
+        if(transport_failed)return;
         framebuffer_t masked=frames[target];masked.mask=0x00ffffffu;
         q=draw_framebuffer(q,0,&masked);
         const auto saved_mask=depth.mask;depth.mask=1;
@@ -223,11 +300,78 @@ struct Display::Impl {
         rect.t0.u=rect.t0.v=0;rect.t1.u=frame_width;rect.t1.v=frame_height;
         rect.color.r=rect.color.g=rect.color.b=rect.color.a=0x80;rect.color.q=1;
         q=draw_rect_textured(q,0,&rect);
-        complete(q);
+        if(!complete(q))return;
         // Keep stipple alpha intact even when an ordinary opaque or cutout
         // primitive intervenes. Restore native depth writes for scene work.
         masked.mask=0xff000000u;q=draw_framebuffer(q,0,&masked);
         depth.mask=saved_mask;q=draw_zbuffer(q,0,&depth);
+    }
+    template<bool bounded>
+    __attribute__((always_inline)) inline void append_triangle(qword_t *&q, const Triangle &triangle, const qword_t *pixel_test, float sx, float sy) {
+        if constexpr(bounded){if(transport_failed)return;}
+        if (q - packet->data > 200) {
+            if constexpr(bounded){if(!submit(q))return;} else submit(q);
+            q = packet->data;
+        }
+        const auto &material = *triangle.material;
+        ++counters.triangles;
+        counters.checker_triangles+=material.checker;
+        if (use_vu0) counters.vu0_vertices += 3;
+        std::memcpy(q,pixel_test,32); q+=2;
+        if (!material.texture) {
+            // The SDK's 2D filled-triangle helper repeats v0.z for all three
+            // corners. Native 3D surfaces require independently interpolated Z.
+            prim_t primitive{}; primitive.type = PRIM_TRIANGLE;
+            color_t color{};
+            color.r = material.color >> 16; color.g = material.color >> 8; color.b = material.color;
+            color.a = ((material.color >> 24) + 1) / 2; color.q = 1;
+            q = draw_prim_start(q, 0, &primitive, &color);
+            const auto &v = triangle.vertices;
+            GsCoordinates positions[2]{{{2048.f + v[0].x * sx, 2048.f + v[0].y * sy,
+                                        2048.f + v[1].x * sx, 2048.f + v[1].y * sy}},
+                                      {{2048.f + v[2].x * sx, 2048.f + v[2].y * sy, 0, 0}}};
+            GsFixedCoordinates fixed[2];
+            if (use_vu0) quantize_gs_xy_vu0(positions, fixed, 2);
+            else quantize_gs_xy_scalar(positions, fixed, 2);
+            std::uint64_t registers[6]{};
+            for (unsigned k = 0; k < 3; ++k) {
+                registers[2*k] = color.rgbaq;
+                registers[2*k+1] = std::uint64_t(fixed[k/2].xy[(k%2)*2]) |
+                    std::uint64_t(fixed[k/2].xy[(k%2)*2+1]) << 16 |
+                    std::uint64_t(reverse_depth16(v[k].depth)) << 32;
+            }
+            std::memcpy(q, registers, sizeof registers); q += 3;
+            q = draw_prim_end(q, 2, DRAW_RGBAQ_REGLIST);
+            return;
+        }
+        auto &texture = this->texture(*material.texture, q);
+        if constexpr(bounded){if(transport_failed)return;}
+        auto &palette = this->palette(material.palette, q);
+        if constexpr(bounded){if(transport_failed)return;}
+        q = draw_texturebuffer(q, 0, &texture.buffer, &palette.buffer);
+        texwrap_t wrap{}; wrap.horizontal = wrap.vertical = WRAP_REPEAT;
+        q = draw_texture_wrapping(q, 0, &wrap);
+        prim_t primitive{}; primitive.type = PRIM_TRIANGLE; primitive.mapping = DRAW_ENABLE; primitive.mapping_type = PRIM_MAP_ST;
+        color_t white{}; white.r = white.g = white.b = white.a = 0x80; white.q = 1;
+        q = draw_prim_start(q, 0, &primitive, &white);
+        const auto &v = triangle.vertices;
+        GsCoordinates positions[2]{{{2048.f + v[0].x * sx, 2048.f + v[0].y * sy,
+                                    2048.f + v[1].x * sx, 2048.f + v[1].y * sy}},
+                                  {{2048.f + v[2].x * sx, 2048.f + v[2].y * sy, 0, 0}}};
+        GsFixedCoordinates fixed[2];
+        if (use_vu0) quantize_gs_xy_vu0(positions, fixed, 2);
+        else quantize_gs_xy_scalar(positions, fixed, 2);
+        std::uint64_t registers[10]{};
+        for (unsigned k = 0; k < 3; ++k) {
+            color_t color = white; color.q = v[k].q;
+            texel_t st{}; st.s = v[k].u * v[k].q / material.texture->width; st.t = v[k].v * v[k].q / material.texture->height;
+            registers[k * 3] = color.rgbaq; registers[k * 3 + 1] = st.uv;
+            registers[k * 3 + 2] = std::uint64_t(fixed[k / 2].xy[(k % 2) * 2]) |
+                std::uint64_t(fixed[k / 2].xy[(k % 2) * 2 + 1]) << 16 |
+                std::uint64_t(reverse_depth16(v[k].depth)) << 32;
+        }
+        std::memcpy(q, registers, sizeof registers); q += 5;
+        q = draw_prim_end(q, 3, DRAW_STQ_REGLIST);
     }
     void page(const char *text, bool fullscreen = true) {
         if (!text || !*text) return;
@@ -258,7 +402,7 @@ struct Display::Impl {
             unsigned c = static_cast<unsigned char>(*p);
             if (c >= 'a' && c <= 'z') c -= 'a' - 'A';
             if (c > 32 && c < 128) {
-                if (q - packet->data > 220) { submit(q); q = packet->data; }
+                if (q - packet->data > 220) { if(!submit(q))return; q = packet->data; }
                 texrect_t glyph{};
                 glyph.v0 = {float(8 + column * 12) * sx, float(8 + row * 16) * sy, 0};
                 glyph.v1 = {float(18 + column * 12) * sx, float(22 + row * 16) * sy, 0};
@@ -277,6 +421,7 @@ struct Display::Impl {
             if (debug) page(debug);
             else page(caption,false);
         }
+        if(transport_failed)return;
         const auto vsync_start=now();
         counters.decoration_ticks=vsync_start-start;
         graph_wait_vsync();
@@ -289,6 +434,13 @@ struct Display::Impl {
 Display::Display() : impl_(new (std::nothrow) Impl) {}
 Display::~Display() {
     if (!impl_) return;
+    // Defensive lifetime boundary: an exceptional exit must not release the
+    // renderer lease with deferred GS work. Discard unsent CPU geometry and
+    // retire only our owned work; transport failure already quarantined it.
+    if(impl_->world_gs_pending&&!impl_->transport_failed){
+        impl_->bounded_submission=true;qword_t* q=impl_->packet->data;
+        impl_->retire_path3(q,true);
+    }
     // A platform that cannot stop its owned DMA must not receive into freed
     // memory. Retain these bounded allocations on that fatal diagnostic path.
     if (!impl_->retain_dma_memory) impl_->free_buffers();
@@ -407,64 +559,8 @@ bool Display::present(const Frame &frame) {
     }
     const float sx = 640.f / frame_width, sy = float(d.height) / frame_height;
     for (const auto &triangle : frame.triangles) {
-        if (q - d.packet->data > 200) { d.submit(q); q = d.packet->data; }
         const auto &material = *triangle.material;
-        ++d.counters.triangles;
-        d.counters.checker_triangles+=material.checker;
-        if (d.use_vu0) d.counters.vu0_vertices += 3;
-        std::memcpy(q,pixel_tests[material.cutout?1:0][material.checker?1:0],32); q+=2;
-        if (!material.texture) {
-            // The SDK's 2D filled-triangle helper repeats v0.z for all three
-            // corners. Native 3D surfaces require independently interpolated Z.
-            prim_t primitive{}; primitive.type = PRIM_TRIANGLE;
-            color_t color{};
-            color.r = material.color >> 16; color.g = material.color >> 8; color.b = material.color;
-            color.a = ((material.color >> 24) + 1) / 2; color.q = 1;
-            q = draw_prim_start(q, 0, &primitive, &color);
-            const auto &v = triangle.vertices;
-            GsCoordinates positions[2]{{{2048.f + v[0].x * sx, 2048.f + v[0].y * sy,
-                                        2048.f + v[1].x * sx, 2048.f + v[1].y * sy}},
-                                      {{2048.f + v[2].x * sx, 2048.f + v[2].y * sy, 0, 0}}};
-            GsFixedCoordinates fixed[2];
-            if (d.use_vu0) quantize_gs_xy_vu0(positions, fixed, 2);
-            else quantize_gs_xy_scalar(positions, fixed, 2);
-            std::uint64_t registers[6]{};
-            for (unsigned k = 0; k < 3; ++k) {
-                registers[2*k] = color.rgbaq;
-                registers[2*k+1] = std::uint64_t(fixed[k/2].xy[(k%2)*2]) |
-                    std::uint64_t(fixed[k/2].xy[(k%2)*2+1]) << 16 |
-                    std::uint64_t(reverse_depth16(v[k].depth)) << 32;
-            }
-            std::memcpy(q, registers, sizeof registers); q += 3;
-            q = draw_prim_end(q, 2, DRAW_RGBAQ_REGLIST);
-            continue;
-        }
-        auto &texture = d.texture(*material.texture, q);
-        auto &palette = d.palette(material.palette, q);
-        q = draw_texturebuffer(q, 0, &texture.buffer, &palette.buffer);
-        texwrap_t wrap{}; wrap.horizontal = wrap.vertical = WRAP_REPEAT;
-        q = draw_texture_wrapping(q, 0, &wrap);
-        prim_t primitive{}; primitive.type = PRIM_TRIANGLE; primitive.mapping = DRAW_ENABLE; primitive.mapping_type = PRIM_MAP_ST;
-        color_t white{}; white.r = white.g = white.b = white.a = 0x80; white.q = 1;
-        q = draw_prim_start(q, 0, &primitive, &white);
-        const auto &v = triangle.vertices;
-        GsCoordinates positions[2]{{{2048.f + v[0].x * sx, 2048.f + v[0].y * sy,
-                                    2048.f + v[1].x * sx, 2048.f + v[1].y * sy}},
-                                  {{2048.f + v[2].x * sx, 2048.f + v[2].y * sy, 0, 0}}};
-        GsFixedCoordinates fixed[2];
-        if (d.use_vu0) quantize_gs_xy_vu0(positions, fixed, 2);
-        else quantize_gs_xy_scalar(positions, fixed, 2);
-        std::uint64_t registers[10]{};
-        for (unsigned k = 0; k < 3; ++k) {
-            color_t color = white; color.q = v[k].q;
-            texel_t st{}; st.s = v[k].u * v[k].q / material.texture->width; st.t = v[k].v * v[k].q / material.texture->height;
-            registers[k * 3] = color.rgbaq; registers[k * 3 + 1] = st.uv;
-            registers[k * 3 + 2] = std::uint64_t(fixed[k / 2].xy[(k % 2) * 2]) |
-                std::uint64_t(fixed[k / 2].xy[(k % 2) * 2 + 1]) << 16 |
-                std::uint64_t(reverse_depth16(v[k].depth)) << 32;
-        }
-        std::memcpy(q, registers, sizeof registers); q += 5;
-        q = draw_prim_end(q, 3, DRAW_STQ_REGLIST);
+        d.append_triangle<false>(q, triangle, pixel_tests[material.cutout?1:0][material.checker?1:0], sx, sy);
     }
     const auto completion_start=d.now();
     d.counters.build_ticks=completion_start-build_start;
@@ -472,6 +568,160 @@ bool Display::present(const Frame &frame) {
     d.counters.completion_ticks=d.now()-completion_start;
     d.flip(); d.failure = "NONE";
     return true;
+}
+bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit) {
+    if(!impl_||!impl_->ready)return false;
+    auto& d=*impl_;const auto validation_start=d.now();
+    const auto reject=[&d](const char* reason){d.failure=reason;return false;};
+    if(!plan.output_triangle_capacity()||plan.output_triangle_capacity()>16384||plan.instances().size()>1024)
+        return reject("INVALID WORLD DRAW PLAN");
+    if(!unit.available())return reject("WORLD VU1 OWNER UNAVAILABLE");
+    // Admission must not overwrite a foreign DMA descriptor or a reverse
+    // transfer. GIF may still be draining our last completed PATH3 packet;
+    // its full idle wait belongs to the owned handoff before XGKICK below.
+    if((*R_EE_D1_CHCR&dma_running)||*R_EE_D1_QWC||(*R_EE_D2_CHCR&dma_running)||*R_EE_D2_QWC||
+       (VIF1_STAT&0x1f803f0fu))return reject("WORLD REQUIRES IDLE OWNED DMA");
+    const auto control=*DMA_REG_CTRL,priority=*DMA_REG_PCR;
+    if(!(control&1u)||(control&0xccu)||(*DMA_REG_ENABLER&0x10000u)||
+       ((priority&0x80000000u)&&(priority&0x60000u)!=0x60000u)||(*DMA_REG_STAT&(1u<<17)))
+        return reject("WORLD DMA CONFIGURATION UNSUPPORTED");
+    // A plan is constructed only by WorldScene after immutable model, index,
+    // material and matrix validation. Scan the selected faces for whole-frame
+    // checker setup before touching the backbuffer; no source sorting occurs.
+    std::size_t source_faces=0;bool checker=false;
+    for(const auto& instance:plan.instances()){
+        if(instance.visible_face_indices.size()>32768-source_faces)return reject("WORLD SOURCE FACE LIMIT");
+        source_faces+=instance.visible_face_indices.size();
+        for(auto index:instance.visible_face_indices){const auto& face=instance.faces[index];
+            if(face.material_index!=world_flat_material)checker=checker||instance.materials[face.material_index].checker;}
+    }
+    d.counters={};d.counters.texture_pages=d.texture_cache.used_pages();
+    d.counters.world_source_triangles=std::uint32_t(source_faces);
+    const auto build_start=d.now();d.counters.validation_ticks=build_start-validation_start;
+    // All ordinary PATH3 helpers now use bounded completion and preserve their
+    // source memory after an un-stoppable DMA. Ordinary present() is unchanged.
+    d.bounded_submission=true;
+    struct SubmissionScope {
+        Impl& d;
+        ~SubmissionScope(){
+            // Backstop for every early/exceptional exit. All ordinary paths
+            // explicitly drain below; never publish an abandoned CPU prefix.
+            if((d.world_gs_pending||d.path3_needs_finish)&&!d.transport_failed){
+                qword_t* abandoned=d.packet->data;d.retire_path3(abandoned,true);
+            }
+            d.bounded_submission=false;
+        }
+    } scope{d};
+    qword_t* q=d.clear(plan.clear_color(),plan.depth_test());
+    const auto reject_frame=[&](const char* reason){
+        q=d.packet->data; // Discard only unsent partial CPU geometry.
+        if(!d.retire_path3(q,true))return false;
+        return reject(reason);
+    };
+    if(checker)d.checker_mask(q);
+    if(!d.ready)return false;
+    alignas(16) qword_t pixel_tests[2][2][2];
+    for(unsigned cutout=0;cutout<2;++cutout){d.test(pixel_tests[cutout][0],cutout!=0);
+        if(checker)d.test(pixel_tests[cutout][1],cutout!=0,true,true);}
+    std::array<ps2::Vu1WorldCorner,ps2::vu1_world_corner_capacity> corners;
+    std::array<ps2::TransformVector4,ps2::vu1_world_corner_capacity> clips;
+    std::array<ps2::Vu1WorldState,ps2::vu1_world_triangle_capacity> states;
+    std::array<Material,ps2::vu1_world_triangle_capacity> flat_materials;
+    std::array<const Material*,ps2::vu1_world_triangle_capacity> materials{};
+    std::array<unsigned,ps2::vu1_world_triangle_capacity> texture_slots_used{};
+    std::array<Impl::PaletteSlot*,ps2::vu1_world_triangle_capacity> palette_slots_used{};
+    std::array<Triangle,clip_triangle_capacity> clipped;
+    const float sx=640.f/frame_width,sy=float(d.height)/frame_height;
+    for(const auto& instance:plan.instances()){
+        for(std::size_t first=0;first<instance.visible_face_indices.size();){
+            const auto count=std::min(ps2::vu1_world_triangle_capacity,instance.visible_face_indices.size()-first);
+            for(std::size_t i=0;i<count;++i){const auto& face=instance.faces[instance.visible_face_indices[first+i]];
+                auto& flat=flat_materials[i];flat.texture=nullptr;flat.color=face.argb;flat.cutout=false;flat.checker=false;
+                materials[i]=face.material_index==world_flat_material?&flat:&instance.materials[face.material_index];
+                const auto& material=*materials[i];
+                for(unsigned c=0;c<3;++c){auto& corner=corners[i*3+c];const auto p=instance.vertices[face.indices[c]];
+                    corner.position={p.x,p.y,p.z,1};
+                    corner.u=material.texture?face.uv[c].u:0;corner.v=material.texture?face.uv[c].v:0;
+                    corner.inv_width=material.texture?1.f/material.texture->width:1;
+                    corner.inv_height=material.texture?1.f/material.texture->height:1;
+                }
+                if(material.texture){
+                    auto& image=d.texture(*material.texture,q);if(!d.ready)return false;
+                    texture_slots_used[i]=unsigned(&image-d.textures);
+                    palette_slots_used[i]=&d.palette(material.palette,q);if(!d.ready)return false;
+                }else palette_slots_used[i]=nullptr;
+            }
+            // Resolve every slot after all preload operations. No eviction,
+            // material upload or other producer runs until this batch retires.
+            bool resident=true;
+            for(std::size_t i=0;i<count;++i){const auto& material=*materials[i];
+                if(!material.texture)continue;
+                const auto& entry=d.texture_cache.entry(texture_slots_used[i]);const auto& key=*material.texture;
+                resident=resident&&entry.valid&&entry.key.indices==key.indices&&entry.key.generation==key.generation&&
+                    entry.key.width==key.width&&entry.key.height==key.height&&palette_slots_used[i]->valid&&
+                    palette_slots_used[i]->colors==material.palette;
+            }
+            bool direct=resident&&count<=plan.output_triangle_capacity()-d.counters.triangles;
+            if(direct){
+                for(std::size_t i=0;i<count;++i){const auto& material=*materials[i];auto& state=states[i];
+                    std::memcpy(&state.test,pixel_tests[material.cutout?1:0][material.checker?1:0]+1,8);
+                    state.tex0=0;state.clamp=0; // Existing WRAP_REPEAT in both axes.
+                    if(material.texture){
+                        alignas(16) qword_t resolved[8];
+                        const auto end=draw_texturebuffer(resolved,0,&d.textures[texture_slots_used[i]].buffer,&palette_slots_used[i]->buffer);
+                        if(end!=resolved+2)return reject_frame("UNSUPPORTED SDK WORLD TEX0 PACKET");
+                        std::memcpy(&state.tex0,resolved+1,8);
+                    }
+                    state.prim=GS_SET_PRIM(PRIM_TRIANGLE,0,material.texture?1:0,0,0,0,0,0,0);
+                    state.rgba=material.texture?0x80808080u:gs_color(material.color);
+                }
+                if(!d.retire_path3(q))return false;
+            }
+            ps2::Vu1WorldResult result=ps2::Vu1WorldResult::rejected;
+            ++d.counters.world_batches;
+            if(direct){
+                const ps2::Vu1WorldBatch batch{instance.object_to_world,plan.world_to_clip(),
+                    std::span(corners).first(count*3),std::span(states).first(count),d.height,++d.world_sequence,
+                    ps2::Vu1WorldCompletion::path1_retired};
+                result=unit.draw_world(batch,std::span(clips).first(count*3));
+            }
+            if(result==ps2::Vu1WorldResult::failed)return d.retire_world(unit.error());
+            if(result==ps2::Vu1WorldResult::drawn){
+                d.world_gs_pending=true;
+                ++d.counters.world_drawn_batches;d.counters.world_vu1_triangles+=std::uint32_t(count);
+                d.counters.triangles+=std::uint32_t(count);
+                for(std::size_t i=0;i<count;++i)d.counters.checker_triangles+=materials[i]->checker;
+            }else{
+                ++d.counters.world_fallback_batches;
+                if(result==ps2::Vu1WorldResult::rejected){++d.counters.world_rejected_batches;
+                    for(std::size_t i=0;i<count*3;++i)
+                        if(!world_scalar_clip(instance.object_to_world,plan.world_to_clip(),corners[i].position,clips[i]))
+                            return reject_frame("WORLD FALLBACK TRANSFORM OUTSIDE DOMAIN");
+                }
+                // The kernel emits no prefix on fallback. Preserve every
+                // source triangle and each clipped fan's order through the
+                // same primitive writer as the ordinary Frame path.
+                for(std::size_t i=0;i<count;++i){ClipTriangle input;input.material=materials[i];
+                    for(unsigned c=0;c<3;++c){const auto& v=clips[i*3+c];const auto& uv=corners[i*3+c];
+                        input.vertices[c]={v.x,v.y,v.z,v.w,uv.u,uv.v};}
+                    const auto clipped_result=clip_project_triangle_float(input,clipped);
+                    if(clipped_result.status!=ClipStatus::success)return reject_frame("WORLD FALLBACK CLIPPING FAILED");
+                    if(clipped_result.count>plan.output_triangle_capacity()-d.counters.triangles)
+                        return reject_frame("WORLD OUTPUT TRIANGLE LIMIT");
+                    const auto& material=*materials[i];
+                    for(std::size_t k=0;k<clipped_result.count;++k){
+                        d.append_triangle<true>(q,clipped[k],pixel_tests[material.cutout?1:0][material.checker?1:0],sx,sy);
+                        if(!d.ready)return false;
+                    }
+                }
+            }
+            first+=count;
+        }
+    }
+    const auto completion_start=d.now();d.counters.build_ticks=completion_start-build_start;
+    if(!d.retire_path3(q,true))return false;
+    d.counters.completion_ticks=d.now()-completion_start;
+    d.flip();if(!d.ready)return false;d.failure="NONE";return true;
 }
 bool Display::present_status(const char *message) {
     if (!impl_ || !impl_->ready) return false;

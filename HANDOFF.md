@@ -1,5 +1,150 @@
 # Handoff
 
+## Native PS2 ordered VU1/GS world pipeline (2026-11-01)
+
+Continued from 158a5476. The generic engine now accepts an immutable ordered
+WorldDrawPlan backed by retained prepared-model leases. Its preallocated double
+storage preserves instance, face, material and per-corner UV order without
+building a projected EE Frame. RallyVisualScene can explicitly select this
+publication mode; ordinary Frame production and recovered simulation arithmetic
+remain available unchanged. The developer application selects the new renderer
+only with `--drive-world-vu CHECKPOINT COURSE VISUAL_DIRECTORY`. Automatic
+textured startup retains the transform-only provider. This is still a native
+vehicle development loop with a fixed visual neighborhood, not full race flow.
+
+The VU1 world kernel performs model/world and view transforms, whole-batch
+classification, projection, Z16 conversion and ST/XYZ packet production, then
+XGKICK sends ordered mixed-material triangles to GS PATH1. Batches needing
+clipping emit no prefix; retained clip vectors feed the existing EE clipper and
+VU0 coordinate writer through PATH3. Two bounded VU data banks alternate under
+the existing exclusive VIF1 owner. Calls remain synchronous: this is not yet
+overlapping EE staging, VIF transfer and VU execution. Display owns texture and
+CLUT residency, GS state, resource retirement, rejection and presentation.
+
+The transport uploads only fresh state/header qwords and strided V4_8 colors;
+VU1 writes every ST/XYZ slot. Resident direct batches retire their GIF stream
+without waiting for GS FINISH. Queued PATH3 clear/fallback packets use an explicit
+zero-loop EOP before switching producers. GS FINISH remains mandatory before
+resource overwrite, rejected-frame recovery and final presentation. Timeout or
+ownership violations quarantine the relevant transport; foreign DMA is never
+stopped. The ordinary fully completed draw_world API remains available beside
+the renderer-owned deferred completion option. See
+platform/ps2/native/vu1_world.md for the exact ABI and ownership contract.
+
+Validation before whole-application cadence:
+
+- The exact VU depth fixture passes 230,399 cases and 3,719,168 memory-word
+  comparisons. The fused private kernel passes 1,433,600 literal framebuffer
+  comparisons and 32,768 memory words. These target the produced binary32 depth
+  and authored geometry; they do not prove general arcade raster equivalence.
+- The host planner matches 601 actual-scene updates, 885,448 ordered expanded
+  triangles and 19,584,759 bit/material checks. Separate ASan/UBSan planner and
+  Rally checks pass. This is host planning evidence, not VU/GS execution.
+- The retained authored world Display fixture008 passes 4,300,800 literal pixel
+  comparisons, ten no-flip rejection/recovery cases, mixed materials, clipping,
+  direct/fallback/direct ordering and 264 texture evictions. All production
+  inputs are bound to its ELF. CI now cross-links this original fixture without
+game assets; CI does not execute its framebuffer checks.
+- Actual-scene005 passes 601 independently assembled scene pairs with 885,445
+  emitted triangles on each path. Seventeen GS color comparisons contain 66
+  differing RGB words out of 4,874,240, maximum channel difference 134. Depth
+  buffers were not read. This is measured variation, not exact raster parity.
+- Scene-plus-draw work excluding vsync is 32.317 ms for the existing path and
+  34.452 ms for the new pipeline. The initial candidate cost 37.142 ms; compact
+  uploads and deferred GS completion reduce that cost, but the final EOP-only
+  handoff change saves just 0.004 ms in this test. It is not a measured speedup
+  over the existing renderer, nor a complete game-loop measurement.
+
+Private evidence is retained under build/ps2-world-plan-validation-001,
+build/ps2-vu-world-depth-ee-001, build/ps2-vu-world-gs-ee-002,
+build/ps2-world-display-ee-008 and build/ps2-world-pipeline-scene-ee-005.
+Each runtime report binds its compiled-source archive, ELF, inputs, emulator,
+configuration and output. Failed/incomplete experiments remain recorded:
+scene001 used an invalid 32-to-64-bit timer extension and stopped at rollover;
+002 onward uses the SDK 64-bit timer. Authored early fixtures accidentally used
+repeated vertex indices and were correctly rejected at model admission.
+Authored007 expected two stream retirements but its two fallback batches require
+three; correcting that assertion produces008 without a production change.
+
+The final 051 native app and original engine sample cross-build with all 35
+engine source identities matching. The world-mode adapter contains every native
+source unchanged, adds only argv selection, and retains 71 identical non-entry
+objects. Strict O3, no fast-math and disabled FP contraction are verified. Native
+and sample role/symbol gates exclude translated arcade processors and machine
+runtime; the adapter passes a separate equivalent symbol audit. The exact source
+closure is archived in build/ps2/native-051/source-snapshot.tar.gz and described
+by build-set-validation.json. The sample was cross-built, not re-executed here.
+
+The first complete 050 runs regress: the default measures 28.271 updates/sec
+and 31.872 ms work; world mode measures 21.001 updates/sec and 34.242 ms work
+over matching 660 complete periods. All periods exceed the 16.667 ms work budget.
+The default retains 588 non-timing fields across 98 common records against 048;
+world mode retains 196 semantic fields across 42 records against 050. These are
+logged controls, pose, motion and triangle counts, not a full internal-state
+comparison. Evidence: build/ps2-world-final-002/cadence-validation.json. The
+default regression is traced to the extracted append_triangle function's
+per-triangle call/stack cost and lost texture/palette inlining. Forced primitive
+inlining alone recovers 0.321 ms; specializing its transport checks recovers
+0.518 ms in total. Both partial candidates remain recorded and were not promoted.
+The third candidate also forces the hot texture lookup inline and restores
+29.3608 updates/sec with 31.055 ms mean work, 0.817 ms below 050 and within
+0.030 ms of 048. All 98 records and 588 non-timing fields agree across all five
+runs. That exact source was promoted. Ordinary Frame uses the unbounded SDK
+owner path; world fallback retains all bounded transport checks. This preserves
+one primitive implementation without paying the new checks on every ordinary
+triangle. Report: build/ps2-display-default-texture-inline-001/runtime-validation.json.
+
+Clean final builds reproduce this decision. Native051 measures 29.360823
+updates/sec, 34.058991 ms mean period and 31.054908 ms mean work over the first
+660 complete periods. World wrapper002 measures 20.944985 updates/sec,
+47.744126 ms mean period and 34.285206 ms mean work. The maximum work intervals
+are 37.326 and 36.608 ms respectively; all 660 exceed 16.667 ms in each run.
+The same 588 default and 196 cross-renderer non-timing fields match. Inputs,
+explicit rendering preferences, source closures and closed runtime metadata are
+bound in build/ps2-world-final-003/cadence-validation.json. The wrapper differs
+only by selecting the explicit production option. Keep the default unchanged;
+the new architecture is a validated experimental foundation, not a speedup.
+
+An exact-source private profiler checks poses 1/181/601 with 24 alternating
+off/on pairs, matching all 860,160 pixel words and paired renderer counters.
+The equal-weight mean of those three poses is 27.380 ms of profiled draw work:
+prepare 12.929 ms, residency/state resolution 2.327 ms, PATH3 retirement 0.519 ms,
+driver 6.221 ms, fallback clipping 3.027 ms and fallback emission 2.075 ms. The
+nested driver spends 2.341 ms in admission, 1.857 ms in packet assembly and
+1.773 ms in SDK DMA submission. These nested costs are already included in
+the driver total. Instrumentation adds 0.255 ms on average; residual work is
+0.021–0.055 ms per pose. The disabled hooks remain in the same instrumented
+binary, so this does not establish pristine-production timings. Preparation
+combines corner/material construction and cache lookup/uploads; tiny wait-loop
+times cannot isolate VU execution from emulator work inside SDK submission.
+Report: build/ps2-world-stage-profile-ee-001/runtime-validation.json.
+
+The next bounded experiment is geometry admission before texture residency:
+retain a whole batch's VU projection/clip result, resolve resources only for
+direct batches, and let fallback triangles acquire resources when emitted.
+At these poses 38/135, 51/136 and 62/141 batches fall back; their 608/816/992
+source faces produce only 214/171/238 triangles. They currently incur full
+preloading/resolution before clipping. A two-entry VU design could avoid that
+work while preserving source order, whole-batch fallback and resource leases,
+but adds a launch/status boundary. No implementation or speedup is claimed.
+Measure an alternating same-executable comparison and reject it if added
+transport cancels the saving. Real EE/VIF/VU overlap remains a later step.
+
+After the hot-loop correction, final authored fixture009 again passes all
+4,300,800 pixel comparisons and the same direct/fallback, rejection, recovery
+and eviction controls. Its entire guest stdout matches008; literal comparisons
+are performed within each run, while cross-run equality covers counters and
+fingerprints. The private readback copy still differs only by ignored DBP keys.
+Evidence: build/ps2-world-display-ee-009/runtime-validation.json.
+
+All 307 portable PS2 tests pass on the final source in 108.033 seconds without
+source drift in build/ps2-world-final-003/portable-tests.json. The earlier clean
+002 run passed in 100.697 seconds before the hot-loop correction. The initial
+307-test pass was marked unsealed because the authored fixture assertion changed
+during that run; clean reruns supersede it. Physical PS2 validation, asynchronous
+transfer overlap, full courses/race flow, live-pad proof and integrated game audio
+remain pending.
+
 ## Native PS2 projection and direct-GS investigation (2026-11-01)
 
 Continued from b1dc5621. The reusable VU1 driver now offers an optional native
