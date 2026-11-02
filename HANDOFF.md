@@ -1,5 +1,31 @@
 # Handoff
 
+## Native PS2 GCC test-sentinel portability correction (2026-11-02)
+
+GitHub CI for 808f38b cross-linked the PS2 targets successfully, but GCC
+rejected the new render-bridge test's memset into a type with default member
+initializers under -Werror=class-memaccess. This is a test-only correction:
+construct 72 uint32 words containing 0xa5a5a5a5, then bit_cast the complete value.
+All 288 sentinel bytes remain identical, including rejected-call fingerprints.
+No production or compiled PS2 application input changed; the native058 builds,
+paired scene proof and whole-app cadence recorded below remain applicable.
+
+Local GCC16 reproduces the old compile failure and accepts the corrected test.
+Clang and GCC both retain the 512-case fingerprint 9ef0ab3306a9f778 and verify
+all 72 sentinel words. Three focused portable tests pass. Report:
+build/ps2-render-sentinel-portability-001/validation.json, SHA-256
+1d2520aad546ad3bf4e6e7f84e3d2646f79f613579ac7e27fc602e1bd2ba39f7.
+The fresh optimized/ASan/UBSan differential again passes 1,294 exact matrix and
+success/rejection comparisons, including 483 rejected calls. Report:
+build/ps2-render-rotation-reuse-002/validation.json, SHA-256
+776bd792962dda3e0fa2067b80b084e528205604d6fe68e641c38354da0e7ce5.
+Earlier proof and failed CI evidence are retained, not overwritten.
+
+All 308 PS2 tests pass again in 104.251 seconds with no drift across 496
+source inputs. Report: build/ps2-bridge-reuse-final-001/portable-final-tests-002.json,
+SHA-256 496954af15d4e70b2785db710d2679b73f24cfe552beb1322bfcd2c2ee532b82. The corrected staged tree receives its own source gate
+and CI result in the final checkpoint record.
+
 ## Native PS2 exact car-rotation reuse (2026-11-02)
 
 Continued from 4651015. The next optimization was chosen after separating

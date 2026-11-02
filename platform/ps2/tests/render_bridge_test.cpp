@@ -51,9 +51,11 @@ std::uint64_t rotation_cases(BridgeFunction build){
             pose.words.attributes[7]=pose.words.attributes[9]=0x49800000;
             pose.words.attributes[8]=pose.words.attributes[10]=0xc9800000;
         }
-        CarRenderBridge actual;
+        std::array<std::uint32_t,72> sentinel;
+        sentinel.fill(0xa5a5a5a5u);
+        auto actual=std::bit_cast<CarRenderBridge>(sentinel);
         static_assert(sizeof actual==72*sizeof(std::uint32_t));
-        std::memset(&actual,0xa5,sizeof actual);const auto before=actual;
+        const auto before=actual;
         const bool okay=build(pose,geometry,view,actual);
         if(okay)++accepted;else{++rejected;require(same(actual,before));}
         add(okay);for(auto word:std::bit_cast<std::array<std::uint32_t,72>>(actual))add(word);
