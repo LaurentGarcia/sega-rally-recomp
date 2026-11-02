@@ -80,9 +80,14 @@ struct Stats {
     // Textured source-face preload requests omitted before clipping. Emitted
     // fallback fans still perform normal lookup; this is not avoided uploads.
     std::uint32_t world_skipped_preload_materials=0;
+    // Async mode only. Gather counts CPU source faces processed between a
+    // successful submission and its finish; it does not assert that hardware
+    // was still executing throughout that interval.
+    std::uint32_t world_async_prepare_submissions=0,world_async_emit_submissions=0;
+    std::uint32_t world_async_gathered_triangles=0;
 };
 using DisplayClock=std::uint64_t (*)(void*) noexcept;
-enum class WorldSubmissionMode : std::uint8_t { fused, classify_first };
+enum class WorldSubmissionMode : std::uint8_t { fused, classify_first, classify_async };
 enum class ReadbackStatus {
     ok, not_ready, invalid_rectangle, busy, unsupported_configuration,
     gif_timeout, finish_timeout, receive_timeout, fifo_timeout, cleanup_failed
@@ -119,6 +124,10 @@ public:
     // residency or GS emission; only ready batches preload resources, while
     // clipped fallback looks up resources for emitted fans. fused preserves
     // the original ordering as an explicit comparison/default mode.
+    // classify_async uses two fixed CPU batch buffers to gather the next
+    // source faces during submitted prepare/emit work. Every submission is
+    // finished before resource lookup, PATH3 access or mapped result reads;
+    // the same geometry, material order and GS completion fences apply.
     // Its VIF/GIF packet retires before reuse; GS completion
     // may be deferred until a resource overwrite, frame end or rejection.
     // No deferred GS work survives a return except after fatal quarantine.

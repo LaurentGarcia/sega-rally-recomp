@@ -138,6 +138,19 @@ bool prepared_admission(){
               !std::memcmp(clips.data(),before.data(),sizeof clips)&&
               !std::memcmp(&token,token_bytes.data(),sizeof token)&&
               unavailable.world_stats().dma_qwords==0,"unavailable/default/foreign token preserves outputs"))return false;
+    Vu1WorldSubmission submission;const auto submission_copy=submission;
+    std::array<unsigned char,sizeof submission> submission_bytes{};
+    std::memcpy(submission_bytes.data(),&submission,sizeof submission);
+    if(!check(unavailable.submit_prepare_world(geometry,submission)==Vu1WorldSubmitResult::rejected&&
+              unavailable.submit_emit_world(token,{states.data(),16},Vu1WorldCompletion::gs_finished,submission)==Vu1WorldSubmitResult::rejected&&
+              unavailable.poll_world(submission)==Vu1WorldPollResult::rejected&&
+              unavailable.finish_prepare_world(submission,token,clips)==Vu1WorldPrepareResult::rejected&&
+              unavailable.finish_emit_world(submission)==Vu1WorldResult::rejected&&
+              !unavailable.drain_world(submission)&&!foreign.drain_world(submission_copy)&&
+              !std::memcmp(&submission,submission_bytes.data(),sizeof submission)&&
+              !std::memcmp(&token,token_bytes.data(),sizeof token)&&
+              !std::memcmp(clips.data(),before.data(),sizeof clips)&&
+              unavailable.world_stats().dma_qwords==0,"unavailable async operations preserve handles/output without DMA"))return false;
 #endif
     return true;
 }

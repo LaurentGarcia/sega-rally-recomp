@@ -80,6 +80,9 @@ work per frame over the same 660-period Play test. Its sampled pixels match the
 preceding world path; it remains an explicit experimental mode. The textured
 scene has not reached 60 updates/sec; full-race and physical-console performance
 remain unverified.
+An additional asynchronous scheduler now gathers the next EE batch between
+VU submission and completion, with explicit buffer ownership. Its sampled
+images match the synchronous world renderer; it has not shown a speedup in Play.
 See the [PS2 build guide and limits](docs/ps2.md).
 The [shared engine](docs/ps2-engine-architecture.md) keeps hardware services
 independent of Rally rules and includes an original engine-only sample.

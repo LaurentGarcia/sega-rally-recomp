@@ -573,7 +573,7 @@ bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit,Wo
     if(!impl_||!impl_->ready)return false;
     auto& d=*impl_;const auto validation_start=d.now();
     const auto reject=[&d](const char* reason){d.failure=reason;return false;};
-    if(mode!=WorldSubmissionMode::fused&&mode!=WorldSubmissionMode::classify_first)
+    if(mode!=WorldSubmissionMode::fused&&mode!=WorldSubmissionMode::classify_first&&mode!=WorldSubmissionMode::classify_async)
         return reject("INVALID WORLD SUBMISSION MODE");
     if(!plan.output_triangle_capacity()||plan.output_triangle_capacity()>16384||plan.instances().size()>1024)
         return reject("INVALID WORLD DRAW PLAN");
@@ -603,9 +603,16 @@ bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit,Wo
     // All ordinary PATH3 helpers now use bounded completion and preserve their
     // source memory after an un-stoppable DMA. Ordinary present() is unchanged.
     d.bounded_submission=true;
+    ps2::Vu1WorldSubmission submission;bool submission_pending=false;
     struct SubmissionScope {
-        Impl& d;
+        Impl& d;ps2::Vu1Transform& unit;ps2::Vu1WorldSubmission& submission;bool& pending;
         ~SubmissionScope(){
+            // Retire VIF/PATH1 before any GS or CPU-buffer cleanup. No
+            // submitted operation may outlive the batch storage on this stack.
+            if(pending){
+                if(!unit.drain_world(submission))d.retire_world(unit.error());
+                pending=false;
+            }
             // Backstop for every early/exceptional exit. All ordinary paths
             // explicitly drain below; never publish an abandoned CPU prefix.
             if((d.world_gs_pending||d.path3_needs_finish)&&!d.transport_failed){
@@ -613,9 +620,13 @@ bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit,Wo
             }
             d.bounded_submission=false;
         }
-    } scope{d};
+    } scope{d,unit,submission,submission_pending};
     qword_t* q=d.clear(plan.clear_color(),plan.depth_test());
     const auto reject_frame=[&](const char* reason){
+        if(submission_pending){
+            const bool retired=unit.drain_world(submission);submission_pending=false;
+            if(!retired)return d.retire_world(unit.error());
+        }
         q=d.packet->data; // Discard only unsent partial CPU geometry.
         if(!d.retire_path3(q,true))return false;
         return reject(reason);
@@ -625,29 +636,63 @@ bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit,Wo
     alignas(16) qword_t pixel_tests[2][2][2];
     for(unsigned cutout=0;cutout<2;++cutout){d.test(pixel_tests[cutout][0],cutout!=0);
         if(checker)d.test(pixel_tests[cutout][1],cutout!=0,true,true);}
-    std::array<ps2::Vu1WorldCorner,ps2::vu1_world_corner_capacity> corners;
+    // Separate buffers keep the current flat-material pointers and corner
+    // storage intact while the EE gathers the next source batch. No sorting,
+    // resource lookup or mapped hardware access occurs during gather.
+    struct CpuBatch {
+        const WorldDrawInstance* instance=nullptr;
+        std::size_t first=0,count=0,gathered=0;
+        std::array<ps2::Vu1WorldCorner,ps2::vu1_world_corner_capacity> corners;
+        std::array<Material,ps2::vu1_world_triangle_capacity> flat_materials;
+        std::array<const Material*,ps2::vu1_world_triangle_capacity> materials{};
+    } batches[2];
     std::array<ps2::TransformVector4,ps2::vu1_world_corner_capacity> clips;
     std::array<ps2::Vu1WorldState,ps2::vu1_world_triangle_capacity> states;
-    std::array<Material,ps2::vu1_world_triangle_capacity> flat_materials;
-    std::array<const Material*,ps2::vu1_world_triangle_capacity> materials{};
     std::array<unsigned,ps2::vu1_world_triangle_capacity> texture_slots_used{};
     std::array<Impl::PaletteSlot*,ps2::vu1_world_triangle_capacity> palette_slots_used{};
     std::array<Triangle,clip_triangle_capacity> clipped;
     const float sx=640.f/frame_width,sy=float(d.height)/frame_height;
-    for(const auto& instance:plan.instances()){
-        for(std::size_t first=0;first<instance.visible_face_indices.size();){
-            const auto count=std::min(ps2::vu1_world_triangle_capacity,instance.visible_face_indices.size()-first);
-            for(std::size_t i=0;i<count;++i){const auto& face=instance.faces[instance.visible_face_indices[first+i]];
-                auto& flat=flat_materials[i];flat.texture=nullptr;flat.color=face.argb;flat.cutout=false;flat.checker=false;
-                materials[i]=face.material_index==world_flat_material?&flat:&instance.materials[face.material_index];
-                const auto& material=*materials[i];
-                for(unsigned c=0;c<3;++c){auto& corner=corners[i*3+c];const auto p=instance.vertices[face.indices[c]];
-                    corner.position={p.x,p.y,p.z,1};
-                    corner.u=material.texture?face.uv[c].u:0;corner.v=material.texture?face.uv[c].v:0;
-                    corner.inv_width=material.texture?1.f/material.texture->width:1;
-                    corner.inv_height=material.texture?1.f/material.texture->height:1;
-                }
+    std::size_t next_instance=0,next_face=0;
+    const auto reserve_batch=[&](CpuBatch& batch){
+        batch.instance=nullptr;batch.gathered=0;
+        while(next_instance<plan.instances().size()){
+            const auto& instance=plan.instances()[next_instance];
+            if(next_face==instance.visible_face_indices.size()){++next_instance;next_face=0;continue;}
+            batch.instance=&instance;batch.first=next_face;
+            batch.count=std::min(ps2::vu1_world_triangle_capacity,instance.visible_face_indices.size()-next_face);
+            next_face+=batch.count;return;
+        }
+        batch.count=0;
+    };
+    const auto gather=[&](CpuBatch& batch,std::size_t limit){
+        if(!batch.instance)return;
+        const auto& instance=*batch.instance;
+        limit=std::min(limit,batch.count);
+        for(;batch.gathered<limit;++batch.gathered){const auto i=batch.gathered;
+            const auto& face=instance.faces[instance.visible_face_indices[batch.first+i]];
+            auto& flat=batch.flat_materials[i];flat.texture=nullptr;flat.color=face.argb;flat.cutout=false;flat.checker=false;
+            batch.materials[i]=face.material_index==world_flat_material?&flat:&instance.materials[face.material_index];
+            const auto& material=*batch.materials[i];
+            for(unsigned c=0;c<3;++c){auto& corner=batch.corners[i*3+c];const auto p=instance.vertices[face.indices[c]];
+                corner.position={p.x,p.y,p.z,1};
+                corner.u=material.texture?face.uv[c].u:0;corner.v=material.texture?face.uv[c].v:0;
+                corner.inv_width=material.texture?1.f/material.texture->width:1;
+                corner.inv_height=material.texture?1.f/material.texture->height:1;
             }
+        }
+    };
+    unsigned active=0;reserve_batch(batches[active]);
+    while(batches[active].instance){
+            auto& current=batches[active];auto& next=batches[active^1];
+            gather(current,current.count);
+            const auto& instance=*current.instance;const auto count=current.count;
+            auto& corners=current.corners;auto& materials=current.materials;
+            const bool asynchronous=mode==WorldSubmissionMode::classify_async;
+            if(asynchronous)reserve_batch(next);
+            const auto gather_pending=[&](std::size_t limit){
+                const auto before=next.gathered;gather(next,limit);
+                d.counters.world_async_gathered_triangles+=std::uint32_t(next.gathered-before);
+            };
             const auto preload_materials=[&](){
                 for(std::size_t i=0;i<count;++i){const auto& material=*materials[i];
                     if(material.texture){
@@ -712,7 +757,20 @@ bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit,Wo
                 const ps2::Vu1WorldGeometry geometry{instance.object_to_world,plan.world_to_clip(),
                     std::span(corners).first(count*3),d.height,++d.world_sequence};
                 ++d.counters.world_prepared_batches;
-                const auto prepared=unit.prepare_world(geometry,token,std::span(clips).first(count*3));
+                ps2::Vu1WorldPrepareResult prepared;
+                if(asynchronous){
+                    const auto submitted=unit.submit_prepare_world(geometry,submission);
+                    if(submitted==ps2::Vu1WorldSubmitResult::failed)return d.retire_world(unit.error());
+                    prepared=ps2::Vu1WorldPrepareResult::rejected;
+                    if(submitted==ps2::Vu1WorldSubmitResult::submitted){
+                        submission_pending=true;++d.counters.world_async_prepare_submissions;
+                        gather_pending((next.count+1)/2);
+                        // Fixed, disjoint, fully sized outputs cannot trigger
+                        // the driver's retryable argument-rejection branch.
+                        prepared=unit.finish_prepare_world(submission,token,std::span(clips).first(count*3));
+                        submission_pending=false;
+                    }
+                }else prepared=unit.prepare_world(geometry,token,std::span(clips).first(count*3));
                 if(prepared==ps2::Vu1WorldPrepareResult::failed)return d.retire_world(unit.error());
                 if(prepared==ps2::Vu1WorldPrepareResult::ready){
                     ++d.counters.world_ready_batches;
@@ -726,7 +784,20 @@ bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit,Wo
                     if(resident){
                         if(!resolve_states()||!d.retire_path3(q))return false;
                         ++d.counters.world_emit_calls;
-                        result=unit.emit_world(token,std::span(states).first(count),ps2::Vu1WorldCompletion::path1_retired);
+                        if(asynchronous){
+                            const auto submitted=unit.submit_emit_world(token,std::span(states).first(count),
+                                ps2::Vu1WorldCompletion::path1_retired,submission);
+                            if(submitted==ps2::Vu1WorldSubmitResult::failed)return d.retire_world(unit.error());
+                            result=ps2::Vu1WorldResult::rejected;
+                            if(submitted==ps2::Vu1WorldSubmitResult::submitted){
+                                submission_pending=true;++d.counters.world_async_emit_submissions;
+                                // A drained abandoned emit can already have
+                                // submitted GS work, even before finish returns.
+                                d.world_gs_pending=true;
+                                gather_pending(next.count);
+                                result=unit.finish_emit_world(submission);submission_pending=false;
+                            }
+                        }else result=unit.emit_world(token,std::span(states).first(count),ps2::Vu1WorldCompletion::path1_retired);
                         if(result==ps2::Vu1WorldResult::failed)return d.retire_world(unit.error());
                     }
                     if(result!=ps2::Vu1WorldResult::drawn){
@@ -774,8 +845,11 @@ bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit,Wo
                     }
                 }
             }
-            first+=count;
-        }
+            if(asynchronous){
+                // A fallback has no emit interval. Complete the remaining
+                // lookahead once, without submitting it ahead of this batch.
+                gather(next,next.count);active^=1;
+            }else reserve_batch(current);
     }
     const auto completion_start=d.now();d.counters.build_ticks=completion_start-build_start;
     if(!d.retire_path3(q,true))return false;

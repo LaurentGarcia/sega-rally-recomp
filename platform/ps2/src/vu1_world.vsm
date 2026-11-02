@@ -27,6 +27,11 @@
 # neither two data banks nor deferred raster completion implies VIF/VU overlap.
 # Separate emit entry stubs perform no geometry arithmetic: the owner uploads
 # fresh tags/state/color, then consumes its single-use prepared-bank ticket.
+# Nonblocking EE submission changes no microcode schedule: one hardware job
+# runs at a time. Each bank remains reserved through mapped status collection;
+# both ready banks may coexist, each with its own count/sequence echo. EE may
+# gather separate CPU data before collection, but cannot access mapped VU data
+# or publish another VIF packet while the submitted operation remains live.
 # FLUSHE fences preparation; FLUSH fences emission (EE Manual6.3,p111-112).
 # Full VU/VIF/GIF retirement precedes any mapped VU read. V4-8 color uploads
 # use USN and CL3/WL1 (EE Manual6.3.4-5,p89-95); ST/XYZ slots remain intact.

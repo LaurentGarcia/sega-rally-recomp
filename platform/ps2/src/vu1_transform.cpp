@@ -130,8 +130,20 @@ struct Vu1Transform::Storage {
         alignas(16) std::array<Quad,vu1_world_triangle_capacity*15+2> output{};
         alignas(16) std::array<TransformVector4,vu1_world_corner_capacity> clips{};
         unsigned used=0,bank=0;
-        std::uint64_t ticket=0;
-        unsigned prepared_bank=0,prepared_count=0;
+        struct Bank {
+            std::uint64_t ticket=0;
+            Quad echo{};
+            unsigned count=0,phase=0; // free, preparing, ready, emitting
+        };
+        std::array<Bank,2> banks{};
+        struct Pending {
+            std::uint64_t ticket=0;
+            unsigned bank=0,kind=0; //1 preparation,2 emission
+            std::uint32_t started=0;
+            std::uint16_t mark=0;
+            Vu1WorldCompletion completion=Vu1WorldCompletion::path1_retired;
+        } pending;
+        std::uint32_t submit_started=0;
         bool ready=false;
         Vu1WorldStats counters{};
         void word(std::uint32_t v){packet[used++]=v;}
@@ -170,32 +182,38 @@ struct Vu1Transform::Storage {
         }
         asm volatile("sync":::"memory");return true;
     }
-    bool world_transfer(bool path1){
+    bool world_submit(bool path1){
         auto&w=*world;++sequence;
         w.word(command(path1?0x11:0x10)); // FLUSH retires VU and PATH1/2.
         w.word(command(0x07,0,sequence));
         while(w.used%4)w.word(0);
         for(unsigned i=0;i<4;++i)w.word(0);
-        const auto start=ticks();
+        w.submit_started=ticks();
+        if(w.pending.ticket){w.pending.started=w.submit_started;w.pending.mark=sequence;}
         if(dma_channel_send_normal(DMA_CHANNEL_VIF1,w.packet.data(),int(w.used/4),0,0)<0)
             return retire("VU1 WORLD DMA SUBMISSION FAILED");
         w.counters.dma_qwords+=w.used/4;
+        return true;
+    }
+    bool world_transfer(bool path1){
+        if(!world_submit(path1))return false;
+        const auto start=world->submit_started;
         while(VIF1_MARK!=sequence||!idle())
             if(std::uint32_t(ticks()-start)>=limit)return retire("VU1 WORLD COMPLETION TIMEOUT");
         asm volatile("sync":::"memory");return true;
     }
     bool world_idle(const void* expected){
         if(owner!=expected||quarantined||!configured()||!idle()){
-            world->ticket=0;ready=false;quarantined=true;failure="VU1 WORLD OWNERSHIP LOST";return false;
+            world->banks={};ready=false;quarantined=true;failure="VU1 WORLD OWNERSHIP LOST";return false;
         }
         if((*R_EE_D2_CHCR&running)||*R_EE_D2_QWC){
-            world->ticket=0;ready=false;quarantined=true;failure="VU1 WORLD PATH3 OWNERSHIP LOST";
+            world->banks={};ready=false;quarantined=true;failure="VU1 WORLD PATH3 OWNERSHIP LOST";
             return false; // Never stop a foreign DMA.
         }
         const auto started=ticks();
         while(*R_EE_GIF_STAT&0x1f001febu)
             if(std::uint32_t(ticks()-started)>=limit){
-                world->ticket=0;ready=false;quarantined=true;failure="VU1 WORLD GIF IDLE TIMEOUT";return false;
+                world->banks={};ready=false;quarantined=true;failure="VU1 WORLD GIF IDLE TIMEOUT";return false;
             }
         asm volatile("sync":::"memory");return true;
     }
@@ -209,21 +227,37 @@ struct Vu1Transform::Storage {
         std::copy_n(world->clips.begin(),count,output.begin());return true;
     }
     bool retire(const char*message){
-        if(world)world->ticket=0;
+        if(world){world->banks={};world->pending={};}
         ready=false;failure=message;quarantined=true;
         retain=!stop_owned();return false;
     }
 #endif
 };
 void Vu1Transform::invalidate_world() noexcept {
-    if(storage_&&storage_->world)storage_->world->ticket=0;
+    if(storage_&&storage_->world&&!storage_->world->pending.ticket&&
+       (storage_->world->banks[0].phase||storage_->world->banks[1].phase))storage_->world->banks={};
+}
+bool Vu1Transform::world_pending() noexcept {
+    if(storage_&&storage_->world&&storage_->world->pending.ticket){
+        storage_->failure="VU1 WORLD OPERATION PENDING";return true;
+    }
+    return false;
 }
 Vu1Transform::Vu1Transform() noexcept=default;
 Vu1Transform::~Vu1Transform(){
+    if(storage_&&storage_->world&&storage_->world->pending.ticket){
+        Vu1WorldSubmission submission;submission.owner_=this;submission.ticket_=storage_->world->pending.ticket;
+        if(!drain_world(submission)&&storage_->world->pending.ticket){
+#ifdef _EE
+            storage_->retire("VU1 WORLD DESTRUCTION DRAIN FAILED");
+#endif
+        }
+    }
     if(owner==this && !quarantined)owner=nullptr;
     if(storage_&&storage_->retain)storage_.release();
 }
 bool Vu1Transform::initialize() noexcept {
+    if(world_pending())return false;
     if(storage_&&storage_->ready)return true;
     invalidate_world();
     if(!storage_)storage_.reset(new(std::nothrow)Storage);
@@ -259,6 +293,7 @@ bool Vu1Transform::initialize() noexcept {
 bool Vu1Transform::transform(const TransformMatrix&a,const TransformMatrix&b,
                             std::span<const TransformVector4>input,std::span<TransformVector4>output,
                             TransformErrorBound&bound) noexcept {
+    if(world_pending())return false;
     invalidate_world();
     if(!storage_||!storage_->ready)return false;
     auto&s=*storage_;TransformErrorBound candidate;
@@ -269,6 +304,7 @@ bool Vu1Transform::transform(const TransformMatrix&a,const TransformMatrix&b,
 }
 bool Vu1Transform::transform_native(const TransformMatrix&a,const TransformMatrix&b,
                                    std::span<const TransformVector4>input,std::span<TransformVector4>output) noexcept {
+    if(world_pending())return false;
     invalidate_world();
     if(!storage_||!storage_->ready)return false;
     if(output.size()<input.size()||(!input.empty()&&!output.data())||!valid_native_vu1_transform_input(a,b,input)){
@@ -278,6 +314,7 @@ bool Vu1Transform::transform_native(const TransformMatrix&a,const TransformMatri
 bool Vu1Transform::transform_project_native(const TransformMatrix&a,const TransformMatrix&b,
                                            std::span<const TransformVector4>input,std::span<TransformVector4>output,
                                            std::span<TransformProjectedVertex>projected) noexcept {
+    if(world_pending())return false;
     invalidate_world();
     if(!storage_||!storage_->ready)return false;
     const auto count=input.size();
@@ -292,6 +329,7 @@ bool Vu1Transform::transform_project_native(const TransformMatrix&a,const Transf
     return transform_validated(a,b,input,output,projected.first(count));
 }
 bool Vu1Transform::initialize_world() noexcept {
+    if(world_pending())return false;
     if(!storage_||!storage_->ready)return false;
     auto&s=*storage_;
     if(s.world&&s.world->ready)return true;
@@ -329,6 +367,7 @@ bool Vu1Transform::initialize_world() noexcept {
 #endif
 }
 Vu1WorldResult Vu1Transform::draw_world(const Vu1WorldBatch& batch,std::span<TransformVector4> clip) noexcept {
+    if(world_pending())return Vu1WorldResult::rejected;
     invalidate_world();
     if(quarantined)return Vu1WorldResult::failed;
     if(!storage_||!storage_->ready||!storage_->world||!storage_->world->ready)return Vu1WorldResult::rejected;
@@ -437,21 +476,22 @@ Vu1WorldResult Vu1Transform::draw_world(const Vu1WorldBatch& batch,std::span<Tra
     return reject("VU1 HARDWARE UNAVAILABLE");
 #endif
 }
-Vu1WorldPrepareResult Vu1Transform::prepare_world(const Vu1WorldGeometry& geometry,Vu1WorldToken& token,
-                                                 std::span<TransformVector4> clip) noexcept {
-    invalidate_world();
-    if(quarantined)return Vu1WorldPrepareResult::failed;
-    if(!storage_||!storage_->ready||!storage_->world||!storage_->world->ready)return Vu1WorldPrepareResult::rejected;
-    auto&s=*storage_;auto&w=*s.world;const auto count=geometry.corners.size();
-    const auto reject=[&](const char*why){s.failure=why;++w.counters.rejected_batches;return Vu1WorldPrepareResult::rejected;};
-    if(!valid_native_vu1_world_geometry(geometry)||clip.size()<count||!clip.data()||!aligned(clip.data())||
-       ranges_overlap(clip.data(),count*sizeof(TransformVector4),geometry.corners.data(),geometry.corners.size_bytes())||
-       ranges_overlap(clip.data(),count*sizeof(TransformVector4),&token,sizeof(token))||
-       ranges_overlap(&token,sizeof(token),geometry.corners.data(),geometry.corners.size_bytes()))
+Vu1WorldSubmitResult Vu1Transform::submit_prepare_world(const Vu1WorldGeometry& geometry,
+                                                       Vu1WorldSubmission& submission) noexcept {
+    if(world_pending())return Vu1WorldSubmitResult::rejected;
+    if(quarantined)return Vu1WorldSubmitResult::failed;
+    if(!storage_||!storage_->ready||!storage_->world||!storage_->world->ready)return Vu1WorldSubmitResult::rejected;
+    auto&s=*storage_;auto&w=*s.world;
+    const auto reject=[&](const char*why){s.failure=why;++w.counters.rejected_batches;return Vu1WorldSubmitResult::rejected;};
+    if(!valid_native_vu1_world_geometry(geometry)||
+       ranges_overlap(&submission,sizeof(submission),geometry.corners.data(),geometry.corners.size_bytes()))
         return reject("VU1 WORLD PREPARE INPUT UNSUPPORTED");
+    const unsigned bank=w.banks[w.bank].phase?w.bank^1:w.bank;
+    if(w.banks[bank].phase)return reject("VU1 WORLD BANKS OCCUPIED");
 #ifdef _EE
+    const auto count=geometry.corners.size();
     if(world_ticket==UINT64_MAX)return reject("VU1 WORLD TICKET EXHAUSTED");
-    if(!s.world_idle(this))return Vu1WorldPrepareResult::failed;
+    if(!s.world_idle(this))return Vu1WorldSubmitResult::failed;
     const auto bits=[](float f){return std::bit_cast<std::uint32_t>(f);};
     std::memcpy(w.header.data(),geometry.object_to_world.data(),sizeof(TransformMatrix));
     std::memcpy(w.header.data()+4,geometry.world_to_clip.data(),sizeof(TransformMatrix));
@@ -462,48 +502,106 @@ Vu1WorldPrepareResult Vu1Transform::prepare_world(const Vu1WorldGeometry& geomet
     w.header[12]={};w.header[13]={};
     w.header[14]={bits(65536),bits(.5f),0,bits(0x1p-17f)};
     w.header[15]={bits(0x1p-16f),bits(1024),bits(65536),bits(65536)};
-    const unsigned base=w.bank*512;w.used=0;
+    const unsigned base=bank*512;w.used=0;
     w.word(command(0x6c,16,base));w.words(w.header.data(),sizeof(w.header));
     w.word(command(0x6c,unsigned(count*2),base+16));w.words(geometry.corners.data(),geometry.corners.size_bytes());
-    w.word(command(0x14,0,world_entry+w.bank*3));
+    w.word(command(0x14,0,world_entry+bank*3));
     // q8.w selects no-emission preparation. FLUSHE is sufficient for this
     // program; full GIF retirement is still required before mapped VU reads.
-    if(!s.world_transfer(false)||!s.world_idle(this))return Vu1WorldPrepareResult::failed;
+    auto& retained=w.banks[bank];retained={++world_ticket,w.header[8],unsigned(count),1};
+    w.pending={retained.ticket,bank,1,0,0,Vu1WorldCompletion::path1_retired};
+    if(!s.world_submit(false))return Vu1WorldSubmitResult::failed;
+    w.bank=bank^1;submission.owner_=this;submission.ticket_=w.pending.ticket;s.failure="NONE";
+    return Vu1WorldSubmitResult::submitted;
+#else
+    return reject("VU1 HARDWARE UNAVAILABLE");
+#endif
+}
+Vu1WorldPollResult Vu1Transform::poll_world(const Vu1WorldSubmission& submission) noexcept {
+    if(quarantined)return Vu1WorldPollResult::failed;
+    if(!storage_||!storage_->ready||!storage_->world||!storage_->world->ready)return Vu1WorldPollResult::rejected;
+    auto&s=*storage_;auto&w=*s.world;
+    if(submission.owner_!=this||!submission.ticket_||submission.ticket_!=w.pending.ticket){
+        s.failure="VU1 WORLD SUBMISSION STALE";return Vu1WorldPollResult::rejected;
+    }
+#ifdef _EE
+    // Only D1 was submitted by this owner. Never stop foreign D2, even when
+    // its unexpected activity forces the pending operation into quarantine.
+    if(owner!=this||!configured()||(*R_EE_D2_CHCR&running)||*R_EE_D2_QWC){
+        s.retire("VU1 WORLD PENDING OWNERSHIP LOST");return Vu1WorldPollResult::failed;
+    }
+    const bool finished=VIF1_MARK==w.pending.mark&&idle()&&!(*R_EE_GIF_STAT&0x1f001febu)&&
+        (w.pending.kind!=2||w.pending.completion!=Vu1WorldCompletion::gs_finished||(*GS_REG_CSR&2));
+    if(finished){asm volatile("sync":::"memory");s.failure="NONE";return Vu1WorldPollResult::complete;}
+    if(std::uint32_t(ticks()-w.pending.started)>=limit){
+        s.retire("VU1 WORLD ASYNC COMPLETION TIMEOUT");return Vu1WorldPollResult::failed;
+    }
+    s.failure="NONE";return Vu1WorldPollResult::pending;
+#else
+    s.failure="VU1 HARDWARE UNAVAILABLE";return Vu1WorldPollResult::rejected;
+#endif
+}
+Vu1WorldPrepareResult Vu1Transform::finish_prepare_world(const Vu1WorldSubmission& submission,
+                                                        Vu1WorldToken& token,std::span<TransformVector4> clip) noexcept {
+    if(quarantined)return Vu1WorldPrepareResult::failed;
+    if(!storage_||!storage_->ready||!storage_->world||!storage_->world->ready)return Vu1WorldPrepareResult::rejected;
+    auto&s=*storage_;auto&w=*s.world;
+    const auto reject=[&](const char*why){s.failure=why;++w.counters.rejected_batches;return Vu1WorldPrepareResult::rejected;};
+    if(submission.owner_!=this||!submission.ticket_||submission.ticket_!=w.pending.ticket||w.pending.kind!=1)
+        return reject("VU1 WORLD PREPARE SUBMISSION STALE");
+    auto& retained=w.banks[w.pending.bank];const auto count=retained.count;
+    if(clip.size()<count||!clip.data()||!aligned(clip.data())||
+       ranges_overlap(clip.data(),count*sizeof(TransformVector4),&token,sizeof(token))||
+       ranges_overlap(clip.data(),count*sizeof(TransformVector4),&submission,sizeof(submission))||
+       ranges_overlap(&token,sizeof(token),&submission,sizeof(submission)))
+        return reject("VU1 WORLD PREPARE OUTPUT UNSUPPORTED");
+#ifdef _EE
+    Vu1WorldPollResult polled;
+    do{polled=poll_world(submission);}while(polled==Vu1WorldPollResult::pending);
+    if(polled==Vu1WorldPollResult::failed)return Vu1WorldPrepareResult::failed;
+    if(polled!=Vu1WorldPollResult::complete)return reject("VU1 WORLD PREPARE SUBMISSION LOST");
+    const unsigned base=w.pending.bank*512;
     const volatile std::uint32_t*memory=reinterpret_cast<const volatile std::uint32_t*>(0x1100c000u+base*16);
     std::array<std::uint32_t,4> status,echo;
     for(unsigned i=0;i<4;++i){status[i]=memory[12*4+i];echo[i]=memory[13*4+i];}
-    if(echo!=w.header[8]||status[1]!=count||status[2]||
+    if(echo!=retained.echo||status[1]!=count||status[2]||
        (status[0]!=1&&status[0]!=3)||(status[0]==3&&status[3])||
        (status[0]==1&&(status[3]<1||status[3]>3))){
         s.retire("VU1 WORLD PREPARE STATUS INVALID");return Vu1WorldPrepareResult::failed;
     }
-    ++w.counters.batches;++w.counters.prepared_batches;w.counters.corners+=count;w.bank^=1;
+    w.pending={};++w.counters.batches;++w.counters.prepared_batches;w.counters.corners+=count;
     if(status[0]==1){
-        if(!s.world_clips(base,unsigned(count),clip))return reject(s.failure);
+        retained={};
+        if(!s.world_clips(base,count,clip))return reject(s.failure);
         ++w.counters.fallback_batches;s.failure="NONE";return Vu1WorldPrepareResult::fallback;
     }
-    w.prepared_bank=base;w.prepared_count=unsigned(count);w.ticket=++world_ticket;
-    token.owner_=this;token.ticket_=w.ticket;++w.counters.ready_batches;s.failure="NONE";
+    retained.phase=2;token.owner_=this;token.ticket_=retained.ticket;++w.counters.ready_batches;s.failure="NONE";
     return Vu1WorldPrepareResult::ready;
 #else
     return reject("VU1 HARDWARE UNAVAILABLE");
 #endif
 }
-Vu1WorldResult Vu1Transform::emit_world(const Vu1WorldToken& token,std::span<const Vu1WorldState> states,
-                                      Vu1WorldCompletion completion) noexcept {
-    if(quarantined)return Vu1WorldResult::failed;
-    if(!storage_||!storage_->ready||!storage_->world||!storage_->world->ready)return Vu1WorldResult::rejected;
+Vu1WorldSubmitResult Vu1Transform::submit_emit_world(const Vu1WorldToken& token,std::span<const Vu1WorldState> states,
+                                                    Vu1WorldCompletion completion,Vu1WorldSubmission& submission) noexcept {
+    if(world_pending())return Vu1WorldSubmitResult::rejected;
+    if(quarantined)return Vu1WorldSubmitResult::failed;
+    if(!storage_||!storage_->ready||!storage_->world||!storage_->world->ready)return Vu1WorldSubmitResult::rejected;
     auto&s=*storage_;auto&w=*s.world;
-    const auto reject=[&](const char*why){s.failure=why;++w.counters.rejected_batches;return Vu1WorldResult::rejected;};
-    if(token.owner_!=this||!token.ticket_||token.ticket_!=w.ticket)return reject("VU1 WORLD TOKEN STALE");
-    if(states.size()!=w.prepared_count/3||!states.data()||
-       (completion!=Vu1WorldCompletion::gs_finished&&completion!=Vu1WorldCompletion::path1_retired))
+    const auto reject=[&](const char*why){s.failure=why;++w.counters.rejected_batches;return Vu1WorldSubmitResult::rejected;};
+    unsigned bank=0;while(bank<2&&(w.banks[bank].phase!=2||w.banks[bank].ticket!=token.ticket_))++bank;
+    if(token.owner_!=this||!token.ticket_||bank==2)return reject("VU1 WORLD TOKEN STALE");
+    auto& retained=w.banks[bank];
+    if(states.size()!=retained.count/3||!states.data()||
+       (completion!=Vu1WorldCompletion::gs_finished&&completion!=Vu1WorldCompletion::path1_retired)||
+       ranges_overlap(&submission,sizeof(submission),states.data(),states.size_bytes())||
+       ranges_overlap(&submission,sizeof(submission),&token,sizeof(token)))
         return reject("VU1 WORLD EMIT INPUT UNSUPPORTED");
     for(const auto&state:states)
         if((state.prim!=3&&state.prim!=19)||(state.rgba>>24)>128)return reject("VU1 WORLD STATE UNSUPPORTED");
 #ifdef _EE
-    if(!s.world_idle(this))return Vu1WorldResult::failed;
-    const auto count=w.prepared_count;const unsigned base=w.prepared_bank;
+    if(world_ticket==UINT64_MAX)return reject("VU1 WORLD TICKET EXHAUSTED");
+    if(!s.world_idle(this))return Vu1WorldSubmitResult::failed;
+    const unsigned base=bank*512;
     const bool deferred=completion==Vu1WorldCompletion::path1_retired;
     const auto tag=[&](std::size_t index,std::uint64_t low,std::uint64_t high){
         w.output[index]={std::uint32_t(low),std::uint32_t(low>>32),std::uint32_t(high),std::uint32_t(high>>32)};
@@ -517,7 +615,8 @@ Vu1WorldResult Vu1Transform::emit_world(const Vu1WorldToken& token,std::span<con
     }
     const auto tail=states.size()*15;
     tag(tail,GIF_SET_TAG(1,1,0,0,GIF_FLG_PACKED,1),GIF_REG_AD);tag(tail+1,0,GS_REG_FINISH);
-    w.ticket=0;w.used=0; // Consumed before the first possible VU-memory write.
+    retained.ticket=0;retained.phase=3;w.used=0;
+    w.pending={++world_ticket,bank,2,0,0,completion};
     for(std::size_t t=0;t<states.size();++t){const unsigned address=base+256+unsigned(t*15);
         w.word(command(0x6c,6,address));w.words(w.output.data()+t*15,6*16);
         w.word(command(0x01,0,0x0103));w.word(command(0x6e,3,(address+7)|0x4000));
@@ -529,41 +628,104 @@ Vu1WorldResult Vu1Transform::emit_world(const Vu1WorldToken& token,std::span<con
     const auto offset=std::size_t(reinterpret_cast<std::uintptr_t>(entry)-reinterpret_cast<std::uintptr_t>(native_vu1_world_begin));
     w.word(command(0x14,0,world_entry+unsigned(offset/8)));
     if(!deferred)*GS_REG_CSR=2;
-    if(!s.world_transfer(true)||!s.world_idle(this))return Vu1WorldResult::failed;
+    if(!s.world_submit(true))return Vu1WorldSubmitResult::failed;
+    submission.owner_=this;submission.ticket_=w.pending.ticket;s.failure="NONE";
+    return Vu1WorldSubmitResult::submitted;
+#else
+    return reject("VU1 HARDWARE UNAVAILABLE");
+#endif
+}
+Vu1WorldResult Vu1Transform::finish_emit_world(const Vu1WorldSubmission& submission) noexcept {
+    if(quarantined)return Vu1WorldResult::failed;
+    if(!storage_||!storage_->ready||!storage_->world||!storage_->world->ready)return Vu1WorldResult::rejected;
+    auto&s=*storage_;auto&w=*s.world;
+    const auto reject=[&](const char*why){s.failure=why;++w.counters.rejected_batches;return Vu1WorldResult::rejected;};
+    if(submission.owner_!=this||!submission.ticket_||submission.ticket_!=w.pending.ticket||w.pending.kind!=2)
+        return reject("VU1 WORLD EMIT SUBMISSION STALE");
+#ifdef _EE
+    Vu1WorldPollResult polled;
+    do{polled=poll_world(submission);}while(polled==Vu1WorldPollResult::pending);
+    if(polled==Vu1WorldPollResult::failed)return Vu1WorldResult::failed;
+    if(polled!=Vu1WorldPollResult::complete)return reject("VU1 WORLD EMIT SUBMISSION LOST");
+    auto& retained=w.banks[w.pending.bank];const unsigned base=w.pending.bank*512,count=retained.count;
     const volatile std::uint32_t*memory=reinterpret_cast<const volatile std::uint32_t*>(0x1100c000u+base*16);
     std::array<std::uint32_t,4> status,echo;
     for(unsigned i=0;i<4;++i){status[i]=memory[12*4+i];echo[i]=memory[13*4+i];}
-    if(echo!=w.header[8]||status!=std::array<std::uint32_t,4>{2,count,count/3,0}){
+    if(echo!=retained.echo||status!=std::array<std::uint32_t,4>{2,count,count/3,0}){
         s.retire("VU1 WORLD EMIT STATUS INVALID");return Vu1WorldResult::failed;
     }
-    if(!deferred){const auto started=ticks();while(!(*GS_REG_CSR&2))
-        if(std::uint32_t(ticks()-started)>=limit){s.retire("VU1 WORLD GS COMPLETION TIMEOUT");return Vu1WorldResult::failed;}}
-    ++w.counters.drawn_batches;s.failure="NONE";return Vu1WorldResult::drawn;
+    retained={};w.pending={};++w.counters.drawn_batches;s.failure="NONE";return Vu1WorldResult::drawn;
 #else
     return reject("VU1 HARDWARE UNAVAILABLE");
 #endif
 }
 Vu1WorldResult Vu1Transform::cancel_world(const Vu1WorldToken& token,std::span<TransformVector4> clip) noexcept {
+    if(world_pending())return Vu1WorldResult::rejected;
     if(quarantined)return Vu1WorldResult::failed;
     if(!storage_||!storage_->ready||!storage_->world||!storage_->world->ready)return Vu1WorldResult::rejected;
     auto&s=*storage_;auto&w=*s.world;
     const auto reject=[&](const char*why){s.failure=why;++w.counters.rejected_batches;return Vu1WorldResult::rejected;};
-    if(token.owner_!=this||!token.ticket_||token.ticket_!=w.ticket)return reject("VU1 WORLD TOKEN STALE");
-    if(clip.size()<w.prepared_count||!clip.data()||!aligned(clip.data())||
-       ranges_overlap(clip.data(),w.prepared_count*sizeof(TransformVector4),&token,sizeof(token)))
+    unsigned bank=0;while(bank<2&&(w.banks[bank].phase!=2||w.banks[bank].ticket!=token.ticket_))++bank;
+    if(token.owner_!=this||!token.ticket_||bank==2)return reject("VU1 WORLD TOKEN STALE");
+    auto& retained=w.banks[bank];
+    if(clip.size()<retained.count||!clip.data()||!aligned(clip.data())||
+       ranges_overlap(clip.data(),retained.count*sizeof(TransformVector4),&token,sizeof(token)))
         return reject("VU1 WORLD CANCEL OUTPUT UNSUPPORTED");
 #ifdef _EE
     if(!s.world_idle(this))return Vu1WorldResult::failed;
     // Ready proved these clips valid. Revalidate before atomic publication;
     // corruption is a fatal ownership failure, not a retryable numerical case.
-    if(!s.world_clips(w.prepared_bank,w.prepared_count,clip)){
+    if(!s.world_clips(bank*512,retained.count,clip)){
         s.retire("VU1 WORLD PREPARED CLIP CORRUPTED");return Vu1WorldResult::failed;
     }
-    w.ticket=0;++w.counters.cancelled_batches;++w.counters.fallback_batches;s.failure="NONE";
+    retained={};++w.counters.cancelled_batches;++w.counters.fallback_batches;s.failure="NONE";
     return Vu1WorldResult::fallback;
 #else
     return reject("VU1 HARDWARE UNAVAILABLE");
 #endif
+}
+Vu1WorldPrepareResult Vu1Transform::prepare_world(const Vu1WorldGeometry& geometry,Vu1WorldToken& token,
+                                                 std::span<TransformVector4> clip) noexcept {
+    if(world_pending())return Vu1WorldPrepareResult::rejected;
+    invalidate_world();
+    if(quarantined)return Vu1WorldPrepareResult::failed;
+    if(!storage_||!storage_->ready||!storage_->world||!storage_->world->ready)return Vu1WorldPrepareResult::rejected;
+    const auto count=geometry.corners.size();
+    if(count>vu1_world_corner_capacity||clip.size()<count||!clip.data()||!aligned(clip.data())||
+       ranges_overlap(clip.data(),count*sizeof(TransformVector4),geometry.corners.data(),geometry.corners.size_bytes())||
+       ranges_overlap(clip.data(),count*sizeof(TransformVector4),&token,sizeof(token))||
+       ranges_overlap(&token,sizeof(token),geometry.corners.data(),geometry.corners.size_bytes())){
+        storage_->failure="VU1 WORLD PREPARE INPUT UNSUPPORTED";++storage_->world->counters.rejected_batches;
+        return Vu1WorldPrepareResult::rejected;
+    }
+    Vu1WorldSubmission submission;
+    const auto result=submit_prepare_world(geometry,submission);
+    if(result==Vu1WorldSubmitResult::failed)return Vu1WorldPrepareResult::failed;
+    if(result!=Vu1WorldSubmitResult::submitted)return Vu1WorldPrepareResult::rejected;
+    return finish_prepare_world(submission,token,clip);
+}
+Vu1WorldResult Vu1Transform::emit_world(const Vu1WorldToken& token,std::span<const Vu1WorldState> states,
+                                      Vu1WorldCompletion completion) noexcept {
+    Vu1WorldSubmission submission;
+    const auto result=submit_emit_world(token,states,completion,submission);
+    if(result==Vu1WorldSubmitResult::failed)return Vu1WorldResult::failed;
+    if(result!=Vu1WorldSubmitResult::submitted)return Vu1WorldResult::rejected;
+    return finish_emit_world(submission);
+}
+bool Vu1Transform::drain_world(const Vu1WorldSubmission& submission) noexcept {
+    if(quarantined)return false;
+    if(!storage_||!storage_->ready||!storage_->world||!storage_->world->ready)return false;
+    auto&w=*storage_->world;
+    if(submission.owner_!=this||!submission.ticket_||submission.ticket_!=w.pending.ticket){
+        storage_->failure="VU1 WORLD SUBMISSION STALE";return false;
+    }
+    if(w.pending.kind==2)return finish_emit_world(submission)==Vu1WorldResult::drawn;
+    Vu1WorldToken token;std::array<TransformVector4,vu1_world_corner_capacity> clips;
+    const auto result=finish_prepare_world(submission,token,clips);
+    if(result==Vu1WorldPrepareResult::ready)return cancel_world(token,clips)==Vu1WorldResult::fallback;
+    // Our output arguments are valid: rejected here is a completed numerical
+    // rejection, not a retained live job. No caller output has been published.
+    return result!=Vu1WorldPrepareResult::failed&&!w.pending.ticket;
 }
 Vu1WorldStats Vu1Transform::world_stats() const noexcept {
     return storage_&&storage_->world?storage_->world->counters:Vu1WorldStats{};

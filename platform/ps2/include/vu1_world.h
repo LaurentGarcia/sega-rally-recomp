@@ -49,6 +49,18 @@ private:
     std::uint64_t ticket_=0;
     friend class Vu1Transform;
 };
+// One in-flight DMA/VU operation. Copies identify the same single-use job.
+// A submission is distinct from the ready-bank token produced by preparation.
+class Vu1WorldSubmission {
+public:
+    Vu1WorldSubmission() noexcept=default;
+private:
+    const Vu1Transform* owner_=nullptr;
+    std::uint64_t ticket_=0;
+    friend class Vu1Transform;
+};
+enum class Vu1WorldSubmitResult : std::uint8_t { submitted,rejected,failed };
+enum class Vu1WorldPollResult : std::uint8_t { pending,complete,rejected,failed };
 enum class Vu1WorldPrepareResult : std::uint8_t { ready,fallback,rejected,failed };
 enum class Vu1WorldResult : std::uint8_t {
     drawn,     // Packet retired to requested completion; clip stays untouched.

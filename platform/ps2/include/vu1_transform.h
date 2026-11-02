@@ -10,10 +10,13 @@ struct Vu1WorldBatch;
 struct Vu1WorldGeometry;
 struct Vu1WorldState;
 class Vu1WorldToken;
+class Vu1WorldSubmission;
 struct Vu1WorldStats;
 enum class Vu1WorldResult : std::uint8_t;
 enum class Vu1WorldPrepareResult : std::uint8_t;
 enum class Vu1WorldCompletion : std::uint8_t;
+enum class Vu1WorldSubmitResult : std::uint8_t;
+enum class Vu1WorldPollResult : std::uint8_t;
 struct alignas(16) TransformVector4 { float x=0,y=0,z=0,w=1; };
 // Native logical496x384 screen coordinates, reverse depth and reciprocal w.
 // An all-zero value (q==0) asks the caller to project/clip the retained clip
@@ -119,7 +122,8 @@ public:
     // Explicit optional setup allocates persistent direct-GS staging and loads
     // a separate kernel. Uses this same exclusive VIF1/VU1 lease. The Display
     // owns GS/GIF and must retire its PATH3 state/uploads before draw_world().
-    // No per-call allocation, concurrent producer or transfer overlap.
+    // No per-call allocation or concurrent producer. The submit/finish API
+    // permits EE-only gathering while one owned hardware operation is pending.
     bool initialize_world() noexcept;
     Vu1WorldResult draw_world(const Vu1WorldBatch&,std::span<TransformVector4> fallback_clip) noexcept;
     // Geometry before residency. No GS packet is emitted by preparation.
@@ -136,9 +140,35 @@ public:
     Vu1WorldResult emit_world(const Vu1WorldToken&,std::span<const Vu1WorldState>,
                               Vu1WorldCompletion) noexcept;
     Vu1WorldResult cancel_world(const Vu1WorldToken&,std::span<TransformVector4>) noexcept;
-    // Every transform/draw/prepare attempt invalidates any older preparation,
-    // including empty/invalid attempts. Idempotent initialization retains it;
-    // actual initialization/program uploads invalidate it. Calls are serialized
+    // Nonblocking submission under the same exclusive lease. The owner copies
+    // all inputs into persistent DMA storage before returning submitted. Caller
+    // may then gather another batch in separate EE memory, but must not submit
+    // PATH3, VIF/VU work or mutate retained GS resources before finish/drain
+    // consumes the submission (even when poll has already reported complete).
+    // At most one hardware operation is in flight; up to two completed ready
+    // bank tokens may coexist. Async preparation preserves the other bank.
+    Vu1WorldSubmitResult submit_prepare_world(const Vu1WorldGeometry&,Vu1WorldSubmission&) noexcept;
+    Vu1WorldSubmitResult submit_emit_world(const Vu1WorldToken&,std::span<const Vu1WorldState>,
+                                          Vu1WorldCompletion,Vu1WorldSubmission&) noexcept;
+    // Poll does not wait or read mapped VU memory; complete means it is safe
+    // for finish to inspect status. Modular deadlines cover the whole job.
+    Vu1WorldPollResult poll_world(const Vu1WorldSubmission&) noexcept;
+    Vu1WorldPrepareResult finish_prepare_world(const Vu1WorldSubmission&,Vu1WorldToken&,
+                                               std::span<TransformVector4>) noexcept;
+    Vu1WorldResult finish_emit_world(const Vu1WorldSubmission&) noexcept;
+    // Bounded retirement without publishing a ready token or clips. A pending
+    // deferred emit still leaves GS FINISH to Display before resource reuse.
+    // Destruction also drains owned pending work before releasing its buffers.
+    bool drain_world(const Vu1WorldSubmission&) noexcept;
+    // Bad finish output arguments retain the live submission. Completed
+    // numerical rejection consumes it without publishing clips. Fatal errors
+    // quarantine the owner. Synchronous mutating calls reject BUSY while a job
+    // is live, including after poll reports complete but before finish/drain.
+    // With no live submission, every synchronous transform/draw/prepare attempt
+    // invalidates older preparations, including empty/invalid attempts. BUSY
+    // rejection preserves the in-flight operation and both banks. Async submit
+    // preparation preserves other ready banks. Idempotent initialization retains
+    // them; actual initialization/program uploads invalidate them. Calls are serialized
     // process-wide; the global ticket allocator rejects exhaustion, never wraps.
     Vu1WorldStats world_stats() const noexcept;
     bool available() const noexcept;
@@ -146,6 +176,7 @@ public:
     Vu1TransformStats stats() const noexcept;
 private:
     void invalidate_world() noexcept;
+    bool world_pending() noexcept;
     bool transform_validated(const TransformMatrix&,const TransformMatrix&,
                              std::span<const TransformVector4>,std::span<TransformVector4>,
                              std::span<TransformProjectedVertex> = {}) noexcept;

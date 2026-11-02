@@ -7,10 +7,13 @@ The development application selects the new path with
 `--drive-world-vu CHECKPOINT COURSE VISUAL_DIRECTORY`; it does not change the
 native vehicle arithmetic or load a reference runtime.
 
-The trailing `WorldSubmissionMode` argument selects `fused` or `classify_first`.
+The trailing `WorldSubmissionMode` argument selects `fused`, `classify_first`,
+or the explicit `classify_async` scheduler.
 The API's default remains `fused` for compatibility and comparison. The
 application's explicit `--drive-world-vu` mode selects `classify_first` after
-the paired validation below. Automatic textured startup still selects Frame,
+the paired validation below. `--drive-world-async CHECKPOINT COURSE VISUAL_DIRECTORY`
+selects `classify_async`; presentation still completes before returning to the
+application. Automatic textured startup still selects Frame,
 which retains its specialized, inlined primitive writer and texture lookup.
 
 ## Ownership and lifetime
@@ -67,11 +70,47 @@ to the same preparation, not another lease. A process-wide nonwrapping ticket
 also prevents a recycled owner address from reviving an old handle.
 
 Invalid token, state or output arguments reject without consuming a current
-ticket. Any transform, draw or preparation attempt invalidates older preparation,
-including empty or rejected attempts; actual program initialization does too.
-Idempotent initialization preserves it. Display returns no token to the caller.
-All operations use the same serialized VIF1 owner, persistent storage and two
-VU banks; this split introduces no asynchronous ownership or transfer overlap.
+ticket. Synchronous transform, draw or preparation attempts invalidate older
+preparations, including empty or rejected attempts; actual program initialization
+does too. Idempotent initialization preserves them. While an async submission is
+live, synchronous mutation rejects BUSY before changing either bank or pending
+DMA storage. Display returns no token to the caller.
+
+## Nonblocking submission and EE lookahead
+
+`submit_prepare_world` and `submit_emit_world` copy their inputs into the owner's
+persistent DMA staging and return an opaque `Vu1WorldSubmission`. A successful
+submission starts transport without waiting for VU/GIF completion. `poll_world`
+checks transport and the bounded whole-operation deadline without reading mapped
+VU memory; either pending or already complete is valid immediately after submit.
+`finish_prepare_world` and `finish_emit_world` wait as needed, inspect status and
+consume the submission. Wrong finish methods or invalid output spans reject
+without consuming it, allowing a valid retry. `drain_world` retires and consumes
+it without publishing geometry. Fatal transport faults quarantine the owner and
+retain source storage if owned DMA cannot be stopped.
+
+Only one DMA/VU operation is in flight. Two independent bank tickets may retain
+completed ready geometry; async preparation preserves the other bank and rejects
+when both are occupied. Emitting or cancelling one ticket leaves the other
+intact. This provides bank ownership for later scheduling; it does not mean two
+VU programs execute simultaneously.
+
+Display's initial `classify_async` schedule uses two fixed CPU batch buffers.
+While prepare N is submitted, it gathers the first half of N+1's original
+corners/material references. While emit N is submitted, it gathers the remainder.
+If N falls back, it completes that remaining CPU work after ordered fallback.
+Each face is gathered once. Gathering performs no resource lookup, PATH3 transfer
+or mapped VU access. The driver finishes before any such operation. Display marks
+the GS completion obligation as soon as a deferred emit is submitted, and drains
+any live submission before its GS rejection/destruction cleanup. There is no
+per-frame allocation and no pending operation survives a successful return.
+
+`world_async_prepare_submissions` and `world_async_emit_submissions` count accepted
+operations. `world_async_gathered_triangles` counts source faces gathered between
+submit and finish, not measured concurrent VU execution. In particular, an
+emulator may complete work while processing the DMA-start write. The separate
+synchronous mode remains the comparison control; asynchronous API shape alone
+does not establish a frame-time improvement.
 
 ## Submission and fallback
 
@@ -104,7 +143,7 @@ channel cannot be stopped safely.
 
 ## Transfer boundaries
 
-Submission remains synchronous at each GIF path handoff. Display terminates
+Completion remains mandatory at each GIF path handoff. Display terminates
 queued PATH3 state and fallback primitives with an explicit zero-loop EOP tag,
 then waits for bounded D2 completion and the full GIF-idle guard before PATH1.
 The delimiter is necessary because SDK clear/state packets can end with EOP
@@ -148,10 +187,61 @@ report the work that actually occurred. Fused mode leaves the new counters zero.
 
 ## Evidence and limits
 
+The async authored generation passed **12,328,960 literal pixel-word
+comparisons**, 27 async lifecycle checks in addition to the 24 retained token
+checks, and fifteen no-flip rejections. Frame, fused, synchronous classified and
+async classified output matched for the authored mixed-material, clipping,
+checker and depth cases. The tests also cover pending caller-scratch reuse,
+wrong/short finish retry, synchronous BUSY rejection, two occupied banks and
+third-preparation rejection, one-bank release preserving the other, explicit
+prepare/emit drain, cross-instance lookahead, cold offscreen materials, and
+resource eviction. Both deferred Display emission and explicit full-FINISH
+emission compare against completed framebuffer pixels.
+
+The report is `build/ps2-world-async-display-ee-001/runtime-validation-final.json`,
+SHA-256 `d9e7cbce9c48f66975043d8d0876cb17058cbd108ce6366bc761b06501b3f2ee`.
+It binds the executed ELF and its archived 23-file compiled source closure.
+The driver separately passed strict EE compilation, two portable tests and
+146,704 ASan/UBSan checks; its source-bound report is
+`build/ps2-world-async-driver-001/driver-validation.json`, SHA-256
+`d7def7c0c3b8d03e610504f3ccd4921ecaf52351bbf351db32c68d05805d6a92`.
+The 90.040-second observation closed with empty stderr. All ten immediate polls
+returned already complete, and none returned pending: this Play execution
+establishes ordering, ownership and pixel behavior, not measured simultaneous
+EE/VU execution. Scheduled lookahead counts alone are not overlap evidence.
+Separate actual-scene and full-application measurements follow.
+
+The paired actual-scene run advances 601 native updates with synchronous and
+async submissions of the same immutable plan. All **4,874,240 literal color
+words** from seventeen sampled frame pairs match. Mean draw work is **18.411 ms**
+synchronous and **18.428 ms** async, a measured increase of 0.017 ms. This is
+ownership and output evidence, not a speed gain. The report is
+`build/ps2-world-async-scene-ee-001/runtime-validation.json`, SHA-256
+`a4c84efa581d6bf22001b59d2b961cb0835d8f182d367dda4318a479afb59733`.
+
+Three separate native054 application runs compare the first 660 complete SDK
+periods with identical controls and assets. Ordinary Frame averages **29.361
+updates/s** and **31.065 ms** of work; synchronous world submission averages
+**29.985 updates/s / 25.202 ms**, and async world submission **29.985 updates/s /
+25.226 ms**. Work subtracts only the measured vsync/flip interval. The current
+sync-to-async comparison checks all 98 sampled records, their complete field
+sets and 602 equal non-timing values; the 42 scheduling-counter values are
+validated separately. Historical native052 comparisons remain separate.
+Every measured period exceeds the 60 Hz budget. These pinned Play measurements
+establish neither physical-console timing nor a measured async speedup. The
+report binds all three ELFs, configurations, logs, assets and the final source
+archive: `build/ps2-world-async-final-001/cadence-validation.json`, SHA-256
+`28976d6eabf7d40e3ed9b258811cd59544ce75f8ebb050ab2111bd120784699a`.
+
+Owner destruction with pending work is source-reviewed; this fixture executes
+explicit drains instead. It does not inject transport timeouts, force ticket
+exhaustion or prove physical-console behavior. The following results retain the
+prior synchronous generation's separate identity.
+
 The original authored fixture is
 [`native_world_display_fixture.cpp`](../tests/native_world_display_fixture.cpp).
-Its new geometry-first cases compare Frame, fused and classified pixels;
-check cold offscreen textures, prepared-token rejection/invalidation, both
+The sealed geometry-first generation described below compares Frame, fused and
+classified pixels, and checks cold offscreen textures, prepared-token rejection/invalidation, both
 completion modes, late capacity/numeric failure and resource eviction between
 prepare and emit. The source-bound Play run passed **9,175,040 literal pixel-word
 comparisons**, 24 token checks and thirteen no-flip rejections. Each of four

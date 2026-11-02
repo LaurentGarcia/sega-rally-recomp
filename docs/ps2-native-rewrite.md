@@ -235,27 +235,40 @@ This is an experimental opt-in. The automatic textured startup still uses the
 transform-only provider; another offload API alone does not establish faster
 complete frames or the 60 Hz target.
 
+`--drive-world-async CHECKPOINT COURSE VISUAL_DIRECTORY` selects the same world
+geometry and materials with nonblocking VU submission and two EE batch buffers.
+The EE gathers the next batch between submission and completion; all resource
+lookups, PATH3 work and mapped VU reads follow completion. One hardware operation
+may be pending, with two independently owned ready banks. The synchronous
+`--drive-world-vu` option remains available for comparisons. In a 601-update
+same-plan draw comparison, async takes 18.428 ms versus 18.411 ms for synchronous,
+with all 4,874,240 sampled color words and the preceding plan/pixel hashes equal.
+These are warm-cache draw intervals, not complete-game or console timings.
+
 The opt-in fixes native binary32 presentation for that run, so Triangle does
 not cycle renderers. Start still restores the initial checkpoint, and the
 diagnostic page reports the previous submitted GS triangle count. Game
 arithmetic, camera history and input behavior are shared with the normal path.
 
-The final native052 builds were measured over matching 660 complete periods in
+The final native054 builds were measured over matching 660 complete periods in
 Play 0.72, with identical inputs and rendering preferences:
 
 | Renderer | Native updates/sec | Mean work | Mean complete period |
 | --- | ---: | ---: | ---: |
-| Default VU1 transforms / EE projection | 29.361 | 31.046 ms | 34.059 ms |
-| Optional VU1 world / geometry before residency | 29.985 | 25.252 ms | 33.350 ms |
+| Default VU1 transforms / EE projection | 29.361 | 31.065 ms | 34.059 ms |
+| Optional VU1 world / synchronous geometry before residency | 29.985 | 25.202 ms | 33.350 ms |
+| Optional VU1 world / asynchronous EE gather | 29.985 | 25.226 ms | 33.350 ms |
 | Previous native051 world / resource-first control | 20.945 | 34.285 ms | 47.744 ms |
 
 Work excludes measured vsync/flip time but includes input, simulation, rendering
 and logging. Every measured work interval exceeds the 16.667 ms target. The
-default retains its preceding cadence. The world path is now faster after
-separating VU1 preparation from material residency, and stays explicitly
-selectable. Its 196 selected non-timing fields across 42 common records agree
-with both the default and preceding world run; this is logged pose/input/motion
-and triangle evidence, not comparison of every internal state.
+default retains its preceding cadence. Separating VU1 preparation from material
+residency provides the earlier improvement over resource-first rendering. Async
+gathering adds 0.024 ms mean work relative to the same-source synchronous control;
+it does not produce an emulator speedup. The explicit modes retain their
+selected pose/input/motion and triangle records; this is logged evidence, not
+comparison of every internal state. The final three-run comparison is retained
+in `build/ps2-world-async-final-001/cadence-validation.json`.
 
 A separate 601-update comparison submits the same immutable plan to both world
 modes. Seventeen sampled pairs match all 4,874,240 color words. Draw work falls
@@ -266,8 +279,8 @@ against Frame. Authored geometry adds 9,175,040 exact pixel comparisons, includi
 resource eviction, no-flip recovery and both completion modes. The complete-app
 evidence is bound in
 `build/ps2-world-classify-final-001/cadence-validation.json`. Physical-console
-performance remains unverified; handoffs remain synchronous and the 60 Hz
-target is unmet.
+performance remains unverified. That checkpoint uses synchronous handoffs;
+the subsequent async experiment also leaves the 60 Hz target unmet.
 
 In native042 versus native043 at update 60, the last-
 palette shortcut reduces packet construction from 34.911 to 11.215 ms, while

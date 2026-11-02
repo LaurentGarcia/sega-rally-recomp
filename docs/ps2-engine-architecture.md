@@ -112,12 +112,43 @@ coordinates for the same ordered fallback. The resource-first `fused` mode
 remains available as the comparison path.
 
 Tokens belong to one exclusive VU owner and one preparation. Copies cannot
-extend their lifetime, and another transform, draw or prepare attempt
-invalidates them. Texture transfers between prepare and emit are permitted
-under Display's ownership; another VU/VIF producer is not. VU, VIF and GIF must
-all be idle before the EE reads mapped VU memory. This split avoids unnecessary
-resource work but still uses synchronous handoffs; it does not claim DMA/VU
-overlap or a measured speed improvement by itself.
+extend their lifetime. With no pending submission, another synchronous
+transform, draw or prepare attempt invalidates them. Texture transfers between
+completed prepare and emit are permitted under Display's ownership; another
+VU/VIF producer is not. VU, VIF and GIF must all be idle before the EE reads
+mapped VU memory.
+
+`WorldSubmissionMode::classify_async` adds separate submit, poll and finish
+operations. Submission copies inputs into persistent DMA storage and starts
+transport without a completion wait. Two completed ready banks may coexist,
+but only one hardware operation may be pending. Each bank retains its own
+count, status echo and nonwrapping ticket. BUSY rejection preserves the pending
+operation; wrong finish/output arguments permit retry. A bounded drain consumes
+abandoned work, and fatal transport errors quarantine ownership and preserve
+storage if DMA cannot safely be stopped.
+
+Display uses two fixed EE batch buffers. It gathers half of batch N+1 during
+N's prepare interval and the remainder during N's emit interval. Clipped batches
+complete the remaining gather after ordered fallback. No resource lookup,
+PATH3 transfer or mapped VU read occurs between submit and finish. GS FINISH
+remains required at resource overwrite, rejected-frame cleanup and presentation.
+This schedules EE work between hardware issue and retirement; it does not
+establish simultaneous VU jobs or a measured hardware speedup. An emulator can
+complete VU work inside the DMA-start write itself.
+
+```text
+EE             submit prepare N | gather first half of N+1 | finish prepare N
+VIF / VU1                       | transform/classify N     | retired
+
+EE             resolve N resources/state; retire PATH3
+EE             submit emit N    | gather rest of N+1       | finish emit N
+VU1 / GIF                       | produce/consume N packet | retired
+GS                              | draw N; FINISH at resource/flip fence
+```
+
+The middle columns show work scheduled between issue and completion, not a
+measured duration or proof that EE and VU stayed busy concurrently. A clipping
+fallback has no emit interval. The synchronous mode remains a separate control.
 
 SDK and standard-library dependencies are external to this project-file gate.
 Application entry points still call SDK startup, clock and sleep functions
@@ -300,6 +331,26 @@ automatic Frame startup is unchanged. See the
 [current evidence](../platform/ps2/native/vu1_world.md#evidence-and-limits) and
 [whole-loop comparison](ps2-native-rewrite.md) for the separate scopes.
 
+The next scheduling experiment adds nonblocking submission and EE lookahead.
+An alternating same-plan comparison across 601 updates preserves the preceding
+plan/pixel hashes and all 4,874,240 sampled color words. Draw work is 18.411 ms
+for the synchronous control and 18.428 ms for async, a 0.017 ms increase in Play.
+These are draw-only intervals with shared planning and warm caches; they are
+not a whole-application or physical-console speed comparison. All ten immediate
+polls in the separate authored fixture already report completion. The SDK DMA
+send implementation returns after starting the channel, but Play can execute
+the work while servicing that write. These results validate scheduling and
+output without demonstrating hardware overlap.
+
+A separate instrumented three-pose baseline places corner gathering at 0.666 ms,
+material preload at 4.371 ms, residency recheck at 0.904 ms and state assembly at
+0.502 ms. Instrumentation adds 0.382 ms to draw work; the sampled warmed poses
+perform no texture or CLUT uploads. The material cost therefore includes repeated
+lookup and bookkeeping, not just transfers. Gathering alone cannot remove the
+remaining whole-frame budget gap. Material reuse needs a bounded experiment
+that preserves resource generations, eviction behavior and source order before
+its potential saving can be claimed.
+
 The manuals describe a different scheduling opportunity: upload one bank while
 VU1 processes another and the previous output travels to the GS. Direct GIF
 output needs an explicit material-order, bank-lifetime and submission contract;
@@ -381,9 +432,11 @@ demo as a second consumer.
   format requires its own explicit coordinate, version and lifetime contracts.
 - The production EE clipper uses float arithmetic; the software-double clipper
   remains a correctness reference. VU1 handles model/view transforms and VU0
-  packs GS coordinates, with CPU readback and serialized transfers. Further
-  offload requires numerical comparisons, complete bank/transfer budgets and
-  synchronized ownership. The current pipeline does not overlap unit work.
+  packs GS coordinates on the default Frame path. The optional world renderer
+  also projects and produces direct GS packets. Its async scheduler places
+  EE preparation between submit and finish, with one hardware operation pending;
+  actual concurrent execution and console throughput remain unmeasured. Further
+  overlap needs complete bank/transfer budgets and synchronized ownership.
 
 Further abstraction should follow another real consumer. A scene graph, entity
 system, plugin loader or general scheduler is not required to share the current

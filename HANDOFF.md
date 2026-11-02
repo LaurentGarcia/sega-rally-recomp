@@ -1,5 +1,106 @@
 # Handoff
 
+## Native PS2 nonblocking VU submission and EE lookahead (2026-11-02)
+
+Continued from 2595fe23. The world driver now separates submission, polling and
+completion. Submit copies caller inputs into persistent DMA storage and starts
+VIF transport without waiting. One operation may be pending; two independent
+ready VU banks may retain geometry. Per-bank count/echo/tickets prevent a later
+prepare from changing an earlier bank's completion contract. Mutating legacy
+calls reject BUSY without invalidation while a job is live. Invalid finish
+arguments preserve the submission for retry. Explicit drain and destruction
+retire owned work; fatal failures quarantine the owner and preserve storage if
+DMA cannot be stopped. The assembled VU microprogram is byte-identical to the
+preceding 2,464-byte program: no arithmetic or instruction change.
+
+Display's explicit classify_async mode uses two fixed CPU batch buffers. It
+gathers half of N+1 during prepare N and the rest during emit N, finishing each
+job before material lookup, PATH3 or mapped VU reads. Clipped batches finish
+remaining gathering after ordered fallback. Deferred GS obligations start at
+successful emit submission. Early exits drain the driver before GS cleanup.
+Source/fan order, resource overwrite fences and final presentation completion
+remain unchanged. This introduces no per-frame allocation, second concurrent
+hardware job, game arithmetic change or global fast math.
+
+Driver and renderer evidence:
+
+- `build/ps2-world-async-driver-001/driver-validation.json` records strict EE
+  compile, two portable cases, 146,704 ASan/UBSan checks and identical VU program
+  bytes. SHA-256 d7def7c0c3b8d03e610504f3ccd4921ecaf52351bbf351db32c68d05805d6a92.
+- `build/ps2-world-async-display-ee-001/runtime-validation-final.json` binds
+  12,328,960 literal pixel comparisons, 27 async lifecycle checks and fifteen
+  no-flip rejections. Two ready banks, third-prepare refusal, busy/wrong-finish
+  recovery, caller scratch reuse, eviction and explicit prepare/emit drain
+  execute. SHA-256 d9e7cbce9c48f66975043d8d0876cb17058cbd108ce6366bc761b06501b3f2ee.
+  Pending-owner destruction remains source-reviewed, not runtime exercised.
+- The actual-scene pair advances 601 native updates, preserving the preceding
+  plan/pixel hashes, geometry counts and all 4,874,240 sampled color words.
+  Synchronous draw work is 18.411297 ms; async is 18.427884 ms, an increase of
+  0.016587 ms. Shared planning is 4.119644 ms and game update 2.643522 ms.
+  This alternating, shared-cache draw comparison is not complete app cadence.
+  Report: `build/ps2-world-async-scene-ee-001/runtime-validation.json`, SHA-256
+  a4c84efa581d6bf22001b59d2b961cb0835d8f182d367dda4318a479afb59733.
+
+The authored run's ten immediate polls all report already complete. Inspection
+of the pinned SDK send routine confirms it publishes cache, starts DMA and
+returns without a completion loop. Play can execute the transfer/VU work inside
+the start-register write. Scheduled gathering therefore proves API ordering,
+not physical simultaneous execution or a throughput gain. The synchronous
+comparison mode remains available.
+
+The production app exposes `--drive-world-async CHECKPOINT COURSE VISUAL_DIRECTORY`.
+`--drive-world-vu` retains synchronous classify-first, and automatic textured
+startup retains Frame. The mode label distinguishes nonblocking submissions
+from still-completed presentation. A private executable CLI harness passes
+63 unchanged legacy argument cases and five new option/argument-count cases.
+The final application source passes all 307 portable tests in 108.020 seconds,
+with no source drift; `build/ps2-world-async-final-001/portable-final-tests.json`
+binds the exact sources and log. The earlier pre-CLI 307-test run is retained.
+
+Native054 complete-app runs compare the first 660 periods with identical
+private inputs and rendering preferences. Default Frame measures 29.360823
+updates/sec and 31.064928 ms work. Synchronous world measures 29.984816 updates/sec
+and 25.202281 ms work; async measures 29.984811 and 25.225836 ms. Mean world
+periods are 33.350 ms; maximum work is 31.090278 ms synchronous and 31.093750 ms
+async. Every measured work interval exceeds 16.667 ms. Work removes only measured
+vsync/flip from the start-to-start period and includes input/game/render/logging.
+The 0.023556 ms async increase provides no basis to promote it as a faster default.
+The complete 98 logged records and their field sets agree between world modes:
+602 non-timing values match, with all 42 declared scheduling-counter differences
+validated separately. Default/history and cross-renderer semantic comparisons
+also pass. Final report: `build/ps2-world-async-final-001/cadence-validation.json`,
+SHA-256 28976d6eabf7d40e3ed9b258811cd59544ce75f8ebb050ab2111bd120784699a.
+
+Native054 and engine-demo054 cross-build with all 35 shared engine source
+identities matching. The async005 and sync006 entry adapters pass only argv
+selection to the unchanged production application; each retains all 71 non-entry
+objects byte-for-byte and passes an equivalent forbidden-runtime symbol audit.
+Native/demo role gates, strict O3, disabled FP contraction and no fast math pass.
+The original engine sample is cross-built, not re-executed. Build-set report:
+`build/ps2/native-054/build-set-validation.json`, SHA-256
+51ea43cfb080226161b5feb5340aa97a313b545c398d19ecb72c09707b1d6d4a.
+The 187,753-byte compiled source archive is `source-snapshot.tar.gz` beside it,
+SHA-256 a397cdda729be83b1bb05851a946cf928a825ca9021863a5d0cedcbd56023492.
+Native053 is retained as a superseded pre-CLI compile; it is not final runtime
+evidence. The optional async window capture failed and adds no visual proof.
+
+A separate three-pose baseline profile binds to
+`build/ps2-world-classify-profile-ee-001/runtime-validation.json`, SHA-256
+73a899ce9424d55b05ce7f4a147012c060f65b1a84b647af007e744a84a99860.
+It preserves 860,160 sampled color words and all instrumented counter deltas.
+Corner gather costs 0.666 ms; preload lookup 4.371 ms; residency recheck 0.904 ms;
+state assembly 0.502 ms. Instrumentation itself adds 0.382 ms. All three warmed
+poses perform zero texture/CLUT uploads. This identifies repeated material
+lookup/bookkeeping as the next bounded experiment; no claim that all 5.777 ms
+is removable or that gathering alone closes the 60 Hz budget gap.
+
+Rejected inferences and unchanged limits: immediate-complete Play polls do not
+measure overlap on PS2; two retained banks do not execute two VU programs at
+once. No transport-fault injection, depth-buffer proof, physical console, live
+pad or game-audio validation is added. The prior 66 sampled world-versus-Frame
+color differences remain. Full race flow and 60 native updates/presentations
+per second remain unfinished.
+
 ## Native PS2 geometry before material residency (2026-11-02)
 
 Continued from 5daf6b78. The direct world pipeline now separates VU1 geometry

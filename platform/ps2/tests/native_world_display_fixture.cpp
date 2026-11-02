@@ -155,6 +155,62 @@ unsigned token_checks(ps2::Vu1Transform& unit,unsigned height){
     check(unit.cancel_world(token,clips)==Vu1WorldResult::rejected,"EMPTY TRANSFORM DID NOT INVALIDATE");
     return checks;
 }
+unsigned async_pending_polls=0,async_complete_polls=0;
+void observe_async_submission(ps2::Vu1Transform& unit,const ps2::Vu1WorldSubmission& submission){
+    const auto state=unit.poll_world(submission);
+    require(state==ps2::Vu1WorldPollResult::pending||state==ps2::Vu1WorldPollResult::complete,"ASYNC IMMEDIATE POLL FAILED");
+    if(state==ps2::Vu1WorldPollResult::pending)++async_pending_polls;else ++async_complete_polls;
+}
+unsigned async_token_checks(ps2::Vu1Transform& unit,unsigned height){
+    using namespace ps2;
+    unsigned checks=0;
+    const auto check=[&](bool okay,const char* label){require(okay,label);++checks;};
+    const std::array<Vu1WorldCorner,3> original{{{{-.5f,-.5f,.5f,1},0,0,1,1},
+                                               {{.5f,-.5f,.5f,1},0,0,1,1},
+                                               {{0,.5f,.5f,1},0,0,1,1}}};
+    auto input=original;
+    Vu1WorldGeometry geometry{identity(),identity(),input,height,1000};
+    std::array<TransformVector4,3> clips{{{7,8,9,10},{11,12,13,14},{15,16,17,18}}};
+    const auto sentinel=clips;
+    Vu1WorldSubmission submission,empty;Vu1WorldToken a,b,c;
+    check(unit.poll_world(empty)==Vu1WorldPollResult::rejected,"EMPTY SUBMISSION ACCEPTED");
+    check(unit.submit_prepare_world(geometry,submission)==Vu1WorldSubmitResult::submitted,"ASYNC FIRST PREPARE");
+    observe_async_submission(unit,submission);
+    const auto copied=submission;
+    // Submission owns a copy: caller scratch can be reused during execution.
+    input[0].position.x=.25f;
+    check(unit.finish_emit_world(submission)==Vu1WorldResult::rejected,"WRONG FINISH METHOD ACCEPTED");
+    check(unit.finish_prepare_world(submission,a,std::span(clips).first(2))==Vu1WorldPrepareResult::rejected,"ASYNC SHORT OUTPUT ACCEPTED");
+    check(std::memcmp(clips.data(),sentinel.data(),sizeof clips)==0,"ASYNC SHORT OUTPUT PUBLISHED");
+    check(unit.prepare_world(geometry,a,clips)==Vu1WorldPrepareResult::rejected,"SYNCHRONOUS PREPARE ACCEPTED BUSY");
+    check(!unit.transform_native(identity(),identity(),{},{}),"EMPTY TRANSFORM ACCEPTED BUSY");
+    const auto polled=unit.poll_world(submission);
+    check(polled==Vu1WorldPollResult::pending||polled==Vu1WorldPollResult::complete,"LIVE SUBMISSION POLL");
+    check(unit.finish_prepare_world(submission,a,clips)==Vu1WorldPrepareResult::ready,"ASYNC FIRST FINISH");
+    check(std::memcmp(clips.data(),sentinel.data(),sizeof clips)==0,"ASYNC READY PUBLISHED CLIPS");
+    check(unit.finish_prepare_world(copied,c,clips)==Vu1WorldPrepareResult::rejected,"COPIED COMPLETED SUBMISSION ACCEPTED");
+    input=original;++geometry.sequence;
+    check(unit.submit_prepare_world(geometry,submission)==Vu1WorldSubmitResult::submitted,"ASYNC SECOND BANK PREPARE");
+    observe_async_submission(unit,submission);
+    check(unit.finish_prepare_world(submission,b,clips)==Vu1WorldPrepareResult::ready,"ASYNC SECOND BANK FINISH");
+    ++geometry.sequence;
+    check(unit.submit_prepare_world(geometry,submission)==Vu1WorldSubmitResult::rejected,"THIRD RETAINED BANK ACCEPTED");
+    check(unit.cancel_world(a,clips)==Vu1WorldResult::fallback,"FIRST BANK LOST AFTER THIRD REJECTION");
+    for(unsigned i=0;i<3;++i)
+        check(std::memcmp(&clips[i],&original[i].position,sizeof clips[i])==0,"ASYNC DMA USED REUSED CALLER SCRATCH");
+    check(unit.submit_prepare_world(geometry,submission)==Vu1WorldSubmitResult::submitted,"RELEASED BANK NOT REUSABLE");
+    observe_async_submission(unit,submission);
+    check(unit.cancel_world(b,clips)==Vu1WorldResult::rejected,"CANCEL ACCEPTED DURING PENDING WORK");
+    check(unit.finish_prepare_world(submission,c,clips)==Vu1WorldPrepareResult::ready,"REUSED BANK FINISH");
+    check(unit.cancel_world(b,clips)==Vu1WorldResult::fallback,"OTHER READY BANK LOST");
+    check(unit.cancel_world(c,clips)==Vu1WorldResult::fallback,"REUSED BANK LOST");
+    check(unit.submit_prepare_world(geometry,submission)==Vu1WorldSubmitResult::submitted,"DRAIN PREPARE");
+    observe_async_submission(unit,submission);
+    check(unit.drain_world(submission),"PREPARE DRAIN FAILED");
+    check(unit.finish_prepare_world(submission,a,clips)==Vu1WorldPrepareResult::rejected,"DRAINED SUBMISSION ACCEPTED");
+    check(!unit.drain_world(submission),"DRAINED SUBMISSION REUSED");
+    return checks;
+}
 }
 int main(){
     std::setvbuf(stdout,nullptr,_IONBF,0);std::setvbuf(stderr,nullptr,_IONBF,0);
@@ -326,6 +382,20 @@ int main(){
             require(classified.world_prepared_batches==3&&classified.world_ready_batches==classified.world_drawn_batches&&
                     classified.world_emit_calls==classified.world_drawn_batches,"CLASSIFIED PREPARE/EMIT COUNTS");
             require(framebuffer(display,true,10+phase,words)==triplet_expected,"CLASSIFIED TRIPLET PIXELS");
+            require(display.present_world(planner.draw_plan(),unit,WorldSubmissionMode::classify_async),display.error());
+            const auto asynchronous=display.stats();
+            require(asynchronous.triangles==classified.triangles&&asynchronous.checker_triangles==classified.checker_triangles&&
+                    asynchronous.world_source_triangles==classified.world_source_triangles&&
+                    asynchronous.world_drawn_batches==classified.world_drawn_batches&&
+                    asynchronous.world_fallback_batches==classified.world_fallback_batches&&
+                    asynchronous.world_skipped_preload_materials==classified.world_skipped_preload_materials,
+                    "ASYNC ORDERED COUNTERS");
+            require(asynchronous.world_async_prepare_submissions==3&&asynchronous.world_async_emit_submissions==1&&
+                    asynchronous.world_async_gathered_triangles==18,"ASYNC BOTH GATHER INTERVALS");
+            require(framebuffer(display,true,10+phase,words)==triplet_expected,"ASYNC QUADRUPLET PIXELS");
+            std::printf("WORLD DISPLAY ASYNC PAIR PASS phase=%u submitted_prepare=%lu submitted_emit=%lu gathered=%lu hash=%016llx\n",phase,
+                (unsigned long)asynchronous.world_async_prepare_submissions,(unsigned long)asynchronous.world_async_emit_submissions,
+                (unsigned long)asynchronous.world_async_gathered_triangles,(unsigned long long)triplet_expected);
             combined=(combined^triplet_expected)*1099511628211ull;
             std::printf("WORLD DISPLAY TRIPLET PASS phase=%u prepared=%lu ready=%lu direct=%lu fallback=%lu skipped_preloads=%lu hash=%016llx\n",phase,
                 (unsigned long)classified.world_prepared_batches,(unsigned long)classified.world_ready_batches,
@@ -356,13 +426,20 @@ int main(){
         std::printf("WORLD DISPLAY OUTSIDE PASS fused_uploads=%lu classified_uploads=%lu skipped_preloads=%lu hash=%016llx\n",
             (unsigned long)outside_fused.texture_uploads,(unsigned long)outside_classified.texture_uploads,
             (unsigned long)outside_classified.world_skipped_preload_materials,(unsigned long long)outside_expected);
+        display.invalidate_textures();require(display.present_world(planner.draw_plan(),unit,WorldSubmissionMode::classify_async),display.error());
+        require(display.stats().world_async_prepare_submissions==1&&!display.stats().world_async_emit_submissions&&
+                !display.stats().world_async_gathered_triangles&&!display.stats().texture_uploads&&!display.stats().texture_hits&&
+                !display.stats().palette_uploads&&!display.stats().palette_hits,"ASYNC OUTSIDE TOUCHED RESOURCES");
+        require(framebuffer(display,true,14,words)==outside_expected,"ASYNC OUTSIDE PIXELS");
         const auto token_front1=*GS_REG_DISPFB1,token_front2=*GS_REG_DISPFB2;
         const auto tokens=token_checks(unit,display.output_height());
+        const auto async_tokens=async_token_checks(unit,display.output_height());
         require(*GS_REG_DISPFB1==token_front1&&*GS_REG_DISPFB2==token_front2,"TOKEN TEST FLIPPED");
         require(framebuffer(display,true,15,words)==outside_expected,"TOKEN TEST EMITTED GEOMETRY");
         require(!display.present_world(planner.draw_plan(),unit,static_cast<WorldSubmissionMode>(255)),"INVALID WORLD MODE ACCEPTED");++rejections;
         require(*GS_REG_DISPFB1==token_front1&&*GS_REG_DISPFB2==token_front2,"INVALID MODE FLIPPED");
         std::printf("WORLD DISPLAY TOKEN PASS checks=%u no_emission=1\n",tokens);
+        std::printf("WORLD DISPLAY ASYNC TOKEN PASS checks=%u two_banks=1 busy_recovery=1 owned_staging=1 no_emission=1\n",async_tokens);
         // Capacity rejection of a second ready batch retrieves its retained
         // clips; it does not silently recompute, emit, or drop the first batch.
         require(normal.update_prepared(consecutive,view,error),world_scene_error_message(error));
@@ -390,6 +467,24 @@ int main(){
         require(display.present_world(planner.draw_plan(),unit,WorldSubmissionMode::classify_first),display.error());
         require(framebuffer(display,true,17,words)==ready_expected,"CLASSIFIED NUMERICAL RECOVERY");
         std::puts("WORLD DISPLAY CLASSIFIED REJECTION PASS capacity=1 numerical=1 drained=2 recovered=2");
+        const auto async_front1=*GS_REG_DISPFB1,async_front2=*GS_REG_DISPFB2;
+        require(late.configure_plan(face_count,16,error),world_scene_error_message(error));
+        require(late.plan_prepared(consecutive,view,error),world_scene_error_message(error));
+        require(!display.present_world(late.draw_plan(),unit,WorldSubmissionMode::classify_async),"ASYNC LATE CAPACITY ACCEPTED");++rejections;
+        require(display.stats().world_async_prepare_submissions==2&&display.stats().world_async_emit_submissions==1&&
+                display.stats().world_gs_finishes==1,"ASYNC CAPACITY DRAIN");
+        require(*GS_REG_DISPFB1==async_front1&&*GS_REG_DISPFB2==async_front2,"ASYNC CAPACITY FLIPPED");
+        require(framebuffer(display,true,17,words)==ready_expected,"ASYNC CAPACITY CHANGED FRONT");
+        require(late.configure_plan(face_count,face_count*8,error),world_scene_error_message(error));
+        require(late.plan_prepared(bad,view,error),world_scene_error_message(error));
+        require(!display.present_world(late.draw_plan(),unit,WorldSubmissionMode::classify_async),"ASYNC NUMERICAL FAILURE ACCEPTED");++rejections;
+        require(display.stats().world_drawn_batches==1&&display.stats().world_gs_finishes==1,"ASYNC NUMERICAL DRAIN");
+        require(*GS_REG_DISPFB1==async_front1&&*GS_REG_DISPFB2==async_front2,"ASYNC NUMERICAL FLIPPED");
+        require(framebuffer(display,true,17,words)==ready_expected,"ASYNC NUMERICAL CHANGED FRONT");
+        require(display.present_world(planner.draw_plan(),unit,WorldSubmissionMode::classify_async),display.error());
+        require(framebuffer(display,true,17,words)==ready_expected,"ASYNC REJECTION RECOVERY");
+        require(display.stats().world_async_gathered_triangles==16,"ASYNC CROSS INSTANCE LOOKAHEAD");
+        std::puts("WORLD DISPLAY ASYNC REJECTION PASS capacity=1 numerical=1 drained=2 recovered=1 cross_instance=1");
         // Actual uploads between ready preparation and emission must preserve
         // retained geometry and complete preceding GS work before eviction.
         require(normal.update_prepared({&eviction_instance,1},view,error),world_scene_error_message(error));
@@ -408,6 +503,16 @@ int main(){
             (unsigned long)classified_eviction.world_ready_batches,(unsigned long)classified_eviction.world_drawn_batches,
             (unsigned long)classified_eviction.texture_evictions,(unsigned long)classified_eviction.palette_uploads,
             (unsigned long long)classified_eviction_expected);
+        display.invalidate_textures();require(display.present_world(planner.draw_plan(),unit,WorldSubmissionMode::classify_async),display.error());
+        const auto async_eviction=display.stats();
+        require(async_eviction.world_async_prepare_submissions==18&&async_eviction.world_async_emit_submissions==18&&
+                async_eviction.world_async_gathered_triangles==272&&async_eviction.texture_evictions>0&&
+                async_eviction.palette_uploads==Eviction::count,"ASYNC EVICTION/LOOKAHEAD COVERAGE");
+        require(framebuffer(display,true,18,words)==classified_eviction_expected,"ASYNC EVICTION PIXELS");
+        std::printf("WORLD DISPLAY ASYNC EVICTION PASS prepared=%lu emit=%lu gathered=%lu texture_evictions=%lu clut_uploads=%lu\n",
+            (unsigned long)async_eviction.world_async_prepare_submissions,(unsigned long)async_eviction.world_async_emit_submissions,
+            (unsigned long)async_eviction.world_async_gathered_triangles,(unsigned long)async_eviction.texture_evictions,
+            (unsigned long)async_eviction.palette_uploads);
         // Exercise the separate full-FINISH packet tail. The fixture owns the
         // idle GS exclusively: after an empty Frame it draws into the currently
         // bound framebuffer without changing DISPFB. Full completion precedes
@@ -439,6 +544,32 @@ int main(){
         require(framebuffer(display,true,19,words)==finished_expected,"FULL FINISH PIXELS");
         combined=(combined^finished_expected)*1099511628211ull;
         std::printf("WORLD DISPLAY FULL FINISH PASS emitted=1 consumed_copy_rejected=1 hash=%016llx\n",(unsigned long long)finished_expected);
+        // Two prepared banks coexist; finishing one emit must not consume
+        // the other bank. Both completion methods are exercised independently.
+        for(unsigned drain=0;drain<2;++drain){
+            require(display.present({{},finished_frame.clear_color,false}),display.error());
+            const auto async_finished_front1=*GS_REG_DISPFB1,async_finished_front2=*GS_REG_DISPFB2;
+            ps2::Vu1WorldSubmission pending;ps2::Vu1WorldToken emitting,other;
+            require(unit.submit_prepare_world(finished_geometry,pending)==ps2::Vu1WorldSubmitResult::submitted,"ASYNC FULL FINISH PREPARE");
+            observe_async_submission(unit,pending);
+            require(unit.finish_prepare_world(pending,emitting,finished_clips)==ps2::Vu1WorldPrepareResult::ready,"ASYNC FULL FINISH READY");
+            require(unit.submit_prepare_world(finished_geometry,pending)==ps2::Vu1WorldSubmitResult::submitted,"ASYNC OTHER BANK PREPARE");
+            observe_async_submission(unit,pending);
+            require(unit.finish_prepare_world(pending,other,finished_clips)==ps2::Vu1WorldPrepareResult::ready,"ASYNC OTHER BANK READY");
+            require(unit.submit_emit_world(emitting,{&finished_state,1},ps2::Vu1WorldCompletion::gs_finished,pending)==ps2::Vu1WorldSubmitResult::submitted,"ASYNC FULL FINISH EMIT");
+            observe_async_submission(unit,pending);
+            const auto pending_copy=pending;
+            ps2::Vu1WorldToken wrong_output;
+            require(unit.finish_prepare_world(pending,wrong_output,finished_clips)==ps2::Vu1WorldPrepareResult::rejected,"ASYNC EMIT WRONG FINISH ACCEPTED");
+            if(drain)require(unit.drain_world(pending),"ASYNC EMIT DRAIN FAILED");
+            else require(unit.finish_emit_world(pending)==ps2::Vu1WorldResult::drawn,"ASYNC EMIT FINISH FAILED");
+            require(unit.finish_emit_world(pending_copy)==ps2::Vu1WorldResult::rejected,"ASYNC EMIT SUBMISSION REUSED");
+            require(unit.cancel_world(other,finished_clips)==ps2::Vu1WorldResult::fallback,"ASYNC EMIT CONSUMED OTHER BANK");
+            require(*GS_REG_DISPFB1==async_finished_front1&&*GS_REG_DISPFB2==async_finished_front2,"ASYNC LOW LEVEL FLIPPED");
+            require(framebuffer(display,true,20+drain,words)==finished_expected,"ASYNC FULL FINISH PIXELS");
+        }
+        std::puts("WORLD DISPLAY ASYNC FULL FINISH PASS finish=1 drain=1 other_bank_retained=2");
+        std::printf("WORLD DISPLAY ASYNC POLLS pending=%u already_complete=%u hardware_overlap_not_inferred=1\n",async_pending_polls,async_complete_polls);
         std::printf("WORLD DISPLAY PASS phases=4 consecutive_pair=1 fallback_pair=1 eviction_pair=1 classified_triplets=4 outside_triplet=1 full_finish_pair=1 token_checks=%u legacy_direct=%u legacy_fallback=%u no_flip_rejections=%u pixel_words=%llu hash=%016llx\n",tokens,drawn,fallback,rejections,(unsigned long long)words,(unsigned long long)combined);
     }catch(const std::exception& error){std::printf("WORLD DISPLAY FAIL: %s\n",error.what());}
     while(true)SleepThread();
