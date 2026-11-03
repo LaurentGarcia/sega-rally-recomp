@@ -582,6 +582,70 @@ but complete packet-word coverage is not claimed. Textured game integration,
 failure cases, full-frame timing and console overlap remain separate gates.
 Report: `build/ps2-window-pipeline-ee-001/runtime-validation.json`.
 
+The first actual-scene integration prepares three original batches and emits
+one ready record at a time, preserving lazy texture/CLUT handling and draw
+order. All 601 plans, 17 literal image pairs / 4,874,240 framebuffer words and
+the historical plan/pixel hashes agree. Each of 1,202 primary draws follows a
+separately reported same-mode warm draw; switching layouts invalidates legacy
+emission templates and must not be charged only to the control.
+
+| 601-update comparison in Play | Control | Three-record window |
+| --- | ---: | ---: |
+| Mean primary draw work | 12.256647 ms | 12.426699 ms |
+| Preparation submissions | 83,064 | 27,862 |
+| Emission submissions | 49,358 | 49,358 |
+| Primary VIF input | 12,728,043 qwords | 12,413,383 qwords |
+
+This first integration is 0.170052 ms (1.3874%) slower despite fewer handoffs
+and bytes. It remains private. Both modes share the candidate executable,
+layout and resource owner; these are neither isolated native062 results nor
+complete-frame timings. The new layout adds VU packet construction as well as
+EE result handling. Numerical parity does not establish a throughput win or
+continuous hardware occupancy.
+Report: `build/ps2-world-window-scene-ee-001/runtime-validation.json`.
+
+The next candidate removes redundant full-result clearing and copying without
+changing VSM, resource order, fallback retrieval or synchronization. It repeats
+the full 601 proof successfully and measures 12.198705 ms control versus
+12.189505 ms window drawing. That 0.009201 ms difference is effectively parity;
+it is not a useful frame-rate gain. Each executable has its own paired control;
+cross-executable absolute timings also include code/layout and material-pointer
+hash effects. Report:
+`build/ps2-world-window-scene-ee-002/runtime-validation.json`.
+
+The third candidate makes the public result metadata-only (40 bytes) and keeps
+validated fallback coordinates in private storage owned by the current window
+ticket. Ordered fallback discard copies that stored prefix; a ready record
+abandoned for resources still retrieves its actual VU coordinates, and a numeric
+reject writes no coordinates. Idle fences and all-or-nothing validation remain.
+Extracted protocol tests cover stale/foreign/cancelled leases, invalid output
+ranges, idle failure, mixed records and reused prefixes under O3 and ASan/UBSan.
+
+Its full 601 scene comparison preserves the same counters and exact images while
+reducing paired mean drawing from 12.232512 to 11.708848 ms (4.2809%). All 601
+primary draws improve. The submission and DMA counts are unchanged from the
+first window implementation. The code removes redundant EE handling; the timing
+delta covers the complete paired path, not an isolated copy-cost measurement.
+Preparation still ends in one full-idle collection per window, and each emit call
+retires before returning. Continuous hardware occupancy is not established.
+This is a private draw-only result. Report:
+`build/ps2-world-window-scene-ee-003/runtime-validation.json`.
+
+A subsequent isolated full-application comparison retains all unmodified game
+objects and compares the first 660 complete periods in Play. Mean non-vsync work
+falls from 18.249879 to 17.752091 ms (2.7276%); the maximum falls from 25.586806
+to 25.019097 ms. Actual cadence remains about 30 native updates per second,
+with 659/660 candidate periods over the 16.667 ms budget. The control reproduces
+the earlier native062 measurement exactly. Fourteen sampled game/pose states
+and their associated renderer records agree, apart from explicitly checked
+material-pointer memo collisions; cadence aggregates cover all 660 periods.
+
+The candidate remains private, with production unchanged. Focused EE lifecycle
+and failure tests precede integration; physical-console throughput and overlap
+are unverified. A useful improvement in complete-loop work is established in
+this emulator scene, while the 60 Hz target remains unmet. Report:
+`build/ps2-window-app-001/cadence-validation.json`.
+
 The manuals describe a different scheduling opportunity: upload one bank while
 VU1 processes another and the previous output travels to the GS. Direct GIF
 output needs an explicit material-order, bank-lifetime and submission contract;

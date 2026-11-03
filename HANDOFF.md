@@ -1,5 +1,129 @@
 # Handoff
 
+## Native PS2 queued game-scene comparison (2026-11-03)
+
+Continued from ccf414c. The private three-record VU preparation window now
+executes the actual 601-update scene, with unchanged lazy resource handling and
+one ready record per emission call. It preserves original batch and material
+order, including mixed ready/fallback windows and instance boundaries. The
+prepared-corner overload retains dynamic matrix, ownership and output-alias
+checks; only the already validated static corner scan is omitted.
+
+The sealed comparison passes 601 plans, 2,404 presentations, 1,202 primary
+draws, all 17 literal framebuffer pairs / 4,874,240 words and the historical
+plan/pixel hashes. Each primary draw has a separately reported same-mode warm
+draw because the new VU layout invalidates both legacy emission templates.
+All primary pairs are upload-free. Renderer counters agree except the declared
+PATH3 handoff/fence fields; old driver counters and new window counters retain
+separate meanings.
+
+Mean draw work is 12.256646908 ms for the control and 12.426699136 ms for the
+window: **0.170052228 ms slower (1.3874%)**. Preparations fall from 83,064 to
+27,862, emissions remain 49,358, and actual VIF input falls from 12,728,043 to
+12,413,383 qwords. Fewer submissions and bytes did not improve this Play result.
+Both modes share the private executable/layout and resource owner; these are
+not isolated native062 or complete-application timings. The window also adds
+VU packet construction, so the remaining result-buffer copies alone are not
+an established explanation. Do not promote the first version as a speedup.
+
+Report: build/ps2-world-window-scene-ee-001/runtime-validation.json, SHA-256
+c147e46af7b07c06dd4803bd185bdb5f89889656b9754ec8460d58e9de49f718.
+ELF SHA-256: 5bd973da03c3eb8537addfbe4d82c0b72a86de2d6461fb9d9f25d1c6123662bc.
+The runtime sealer needed two harness corrections: its key parser rejected the
+uppercase AB/BA metadata, and its observation-duration bound excluded the
+requested 300 seconds. The compiled source/archive was left unchanged and the
+corrected sealer is separately bound in the report.
+
+Candidate 002 removes redundant full-window result clearing and copying while
+retaining the same VSM, DMA, fallback retrieval, resource order and fences.
+Each removed whole operation spans 2,368 bytes per preparation window. Its
+exact-helper poison/reuse checks pass 3,774 cases under O3 and ASan/UBSan.
+The complete 601 runtime proof passes again: control 12.198705283 ms versus
+window 12.189504761 ms, a 0.009200522 ms (0.0754%) difference. This is effectively
+parity, not a useful frame-rate gain. Across executables, code/layout and material
+pointer hashes also change; do not treat absolute timing differences as an
+isolated instruction-cost measurement. Report:
+build/ps2-world-window-scene-ee-002/runtime-validation.json, SHA-256
+8a37a8eec0da41e2dc9ad58d91f598692a99505e1b7ac22a0c149c21658d8705.
+
+Candidate 003 makes the public result metadata-only (40 bytes), retains fallback
+prefixes privately and uses those validated prefixes on ordered discard.
+Ready records abandoned for resource reasons still read their actual VU clips;
+numeric rejects write nothing. Ticket/cursor ownership, full-idle gates and
+all-or-nothing output validation remain explicit. The extracted protocol checks
+pass 226,047 cases / 452,629 checks under both strict O3 and ASan/UBSan, including
+stale/foreign/cancelled tokens, invalid outputs, idle failure and rejected mapped
+suffixes. This host proof uses explicit hardware stubs and does not establish
+physical VU/GIF retirement. Report:
+build/ps2-window-display-003/host-validation.json, SHA-256
+18e1d321406ba0228481f176f2714638ac66368e3826a2ee8ae60ee880ed6cdc.
+
+The 003 game-scene run passes all601 primary pairs, 17 literal image pairs /
+4,874,240 words and historical hashes. It measures 12.232511786 ms control
+versus 11.708847523 ms window drawing, saving 0.523664263 ms (4.2809%); every
+primary window draw is faster. Preparation/emission/DMA counts remain identical
+to revisions 001/002. The code removes redundant EE result handling without changing transfer
+policy; the measured delta covers the complete paired path, not isolated copies.
+Report: build/ps2-world-window-scene-ee-003/runtime-validation.json, SHA-256
+f259e1c9130a376d6149a0aa69015ec35fdcaaed1d3bc335aade7749a1489fa5.
+ELF SHA-256: 371c833c5810fafb26a94c5a95898de81a02768aa6d3a8ff4cf9bd9266888031.
+The paired result excludes simulation and plan construction, and its control
+shares the candidate executable/layout. A separately archived full-application
+overlay now supplies the next measurement below.
+Preparation still ends in one full-idle collection per window, and each emission
+call retires before returning. Continuous hardware occupancy is not established.
+
+The full-application overlay changes only renderer/driver inputs and initializes
+the window once after the existing synchronous mode setup. All unmodified game
+objects are byte-identical to the native062-equivalent control, with 60 strict-O3
+C++ units and a passing native symbol audit. The first nested Docker audit failed
+on socket permissions; its broader approval request was cancelled. A separately
+approved pinned-toolchain symbol check and workspace-only archive validation
+completed without changing the ELF. The initial failure log remains retained.
+
+Fresh isolated Play runs compare the first 660 complete periods:
+
+| Full application | Native062 control | Private window003 |
+| --- | ---: | ---: |
+| Mean non-vsync work | 18.249878998 ms | 17.752091225 ms |
+| Maximum non-vsync work | 25.586805556 ms | 25.019097222 ms |
+| Native updates per second | 29.987883683 | 30.010645348 |
+| Periods over 16.667 ms | 660/660 | 659/660 |
+
+The mean saving is 0.497787774 ms (2.727622%). The fresh control exactly
+reproduces the earlier062 result. All 112 sampled records / 714 strict
+non-timing fields agree; 70 memo slots are separately checked, with 39 actual
+pointer-hash-related differences and exact request totals. These comprise
+14 sampled game/pose states and cadence aggregates covering all 660 periods,
+not state comparisons on every update. Both runtimes are closed; the unequal
+180/90-second observation durations do not alter the fixed660 comparison.
+All relevant Play settings, seven assets, source and ELF identities are bound.
+Report: build/ps2-window-app-001/cadence-validation.json, SHA-256
+14d6247a71c1a876704f9867da72ba9f71a88f351566b6871474ee6cf9bf89ed.
+Candidate ELF SHA-256:
+496a09a1e933966a049ef350b7ecd528dca0a09823c3d7da79c6516d65e04fc9.
+
+Production remains native062. The private scene and full-loop improvements do
+not meet 60 Hz or demonstrate physical-console overlap. Before integration, run
+focused 003 EE lifecycle cases for cached fallback versus ready mapped retrieval,
+mixed numeric rejection, invalid outputs/tokens and early-failure lease cleanup.
+Reuse the existing arithmetic/image evidence. Expose only the measured
+prepare-three/emit-one path first; grouped emission and continuous occupancy
+remain separate work. The next planning investigation is a 601 first-invalid-row
+census for conservative bounds, whose independent rows could stop early on an
+uncertain range without changing arithmetic; it is not implemented or timed.
+
+An independent identity-matrix shortcut for the facing predicate passes
+3,097,152 strict host comparisons, but is rejected as a current-scene
+optimization: a host census finds zero identities among all 4,207 instance
+matrices over 601 updates. The course and six vehicle roles already contain
+the camera transform. No EE shortcut build was made. Coverage report:
+build/ps2-facing-scene-001/validation.json, SHA-256
+286f8f3e5cc89d866c864592efbb20d8c68d7af39eb65e9a628753d3d569d6be.
+This is an activation census, not a new whole-plan EE parity proof; the host
+selects 1,287,463 faces versus the retained EE's 1,287,461. A safe generic
+shortcut with no measured-scene activation is not a performance improvement.
+
 ## Native PS2 pipeline cost and resource experiments (2026-11-03)
 
 Continued from 98d9c1b. Production remains native062. The next experiments
