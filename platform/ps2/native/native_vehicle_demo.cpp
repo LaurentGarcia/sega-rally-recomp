@@ -4,6 +4,7 @@
 #include "rally_visual_scene.h"
 #include "debug_controls.h"
 #include "vu1_transform.h"
+#include "vu1_world.h"
 #include <timer.h>
 #include <algorithm>
 #include <cmath>
@@ -88,7 +89,8 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
     if(world_presentation&&(!textured_presentation||mode!=NativeVehicleRenderMode::native_vu))
         throw std::runtime_error("WORLD VU1 MODE REQUIRES TEXTURED NATIVE FLOAT PRESENTATION");
     if(world_submission!=WorldSubmissionMode::classify_first&&
-       (!world_presentation||world_submission!=WorldSubmissionMode::classify_async))
+       (!world_presentation||(world_submission!=WorldSubmissionMode::classify_async&&
+                              world_submission!=WorldSubmissionMode::classify_staged)))
         throw std::runtime_error("UNSUPPORTED WORLD SUBMISSION MODE");
     if(world_materials!=WorldMaterialMode::resolve_each&&
        (!world_presentation||world_materials!=WorldMaterialMode::memoized))
@@ -99,7 +101,8 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
     if(world_geometry!=WorldGeometryMode::raw&&
        (!world_presentation||world_geometry!=WorldGeometryMode::prepared))
         throw std::runtime_error("UNSUPPORTED WORLD GEOMETRY MODE");
-    const bool async_world=world_presentation&&world_submission==WorldSubmissionMode::classify_async;
+    const bool staged_world=world_presentation&&world_submission==WorldSubmissionMode::classify_staged;
+    const bool async_world=staged_world||(world_presentation&&world_submission==WorldSubmissionMode::classify_async);
     display.present_status(textured_presentation?
         "NATIVE TEXTURED DRIVING TEST\nLOADING ONE INITIAL CHECKPOINT\nRECOVERED CAR AND CHASE VIEW\nFIXED VISUAL COURSE NEIGHBORHOOD":
         "NATIVE VEHICLE DEVELOPMENT TEST\nLOADING ONE INITIAL CHECKPOINT\nLIVE PAD / NATIVE GAME UPDATE\nDIAGNOSTIC BODY AND COURSE VIEW");
@@ -127,7 +130,7 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
     display.set_profile_clock([](void*) noexcept -> std::uint64_t {return GetTimerSystemTime();});
     VuPresentation vu;
     bool use_vu1=false;
-    const auto mode_name=[&](){if(world_presentation)return async_world?"WORLD_VU1_ASYNC":"WORLD_VU1";return vu.native_float?(use_vu1?"NATIVE_FLOAT_VU1":"NATIVE_FLOAT_EE"):
+    const auto mode_name=[&](){if(world_presentation)return staged_world?"WORLD_VU1_STAGED":async_world?"WORLD_VU1_ASYNC":"WORLD_VU1";return vu.native_float?(use_vu1?"NATIVE_FLOAT_VU1":"NATIVE_FLOAT_EE"):
         (use_vu1?"GUARDED_VU1":"EXACT_EE");};
     const auto apply_mode=[&](){
         vu.native_float=mode==NativeVehicleRenderMode::native_vu;
@@ -340,6 +343,12 @@ int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,const char* chec
                 vu.counts.near_plane,vu.counts.budget,vu.counts.invalid,vu.counts.unsupported,
                 (unsigned long long)vu.counts.transform_ticks,(unsigned long long)vu.counts.guard_ticks,
                 vu.counts.max_pixels,vu.counts.max_depth,(unsigned long)display.stats().vu0_vertices,vu.unit.error());
+            if(world_presentation){
+                const auto stage=vu.unit.world_stats();
+                std::printf("NATIVE_VEHICLE_STAGE update=%u prepares=%lu submissions=%lu cancellations=%lu scope=cumulative\n",
+                    frame,(unsigned long)stage.staged_prepares,(unsigned long)stage.staged_submissions,
+                    (unsigned long)stage.staged_cancellations);
+            }
             if(textured_presentation)std::printf(
                 "NATIVE_VEHICLE_TEXTURES update=%u uploads=%lu hits=%lu bytes=%llu palettes=%lu palette_bytes=%llu checker=%lu evictions=%lu pages=%lu\n",
                 frame,(unsigned long)display_stats.texture_uploads,(unsigned long)display_stats.texture_hits,

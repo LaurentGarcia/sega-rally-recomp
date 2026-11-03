@@ -1,5 +1,86 @@
 # Handoff
 
+## Native PS2 CPU-staged preparation (2026-11-03)
+
+Continued from d5aceea. The generic world renderer has an explicit
+classify_staged mode and the game exposes --drive-world-staged. After gathering
+batch N+1 during emit N, EE validates and builds its preparation packet in a
+separate owned slot. It launches only after N retires. This still permits one
+hardware job, preserves primitive order and uses unchanged VSM, GS resource
+fences and mapped-read rules. Existing/default mode selection is unchanged.
+
+Each bank owns an aligned 8 KiB CPU packet. The active builder uses a direct
+pointer and scalar length; only CPU-staged packets save a per-slot length,
+restored at launch. Staging copies caller data and returns an opaque single-use
+ticket. BUSY rejection preserves it, cancellation can release the other bank
+while hardware is pending, and failure cleanup drains before releasing leases.
+The promoted driver SHA-256 is
+2ebd4d7b9f8294f786173cd1888108890e7cc04b1606ceeb696a9394898f396d.
+
+Validation completed on the promoted sources:
+
+- 308 portable PS2 tests pass in 108.310 seconds, with no drift across 497 files.
+  build/ps2-staged-final-002/portable-tests.json, SHA-256
+  f9830d0e007e56086240ca04c80d5bded97ea7b786a122e6937e9e4fd2de9a90.
+- Authored EE coverage retains 147 staged lifecycle checks and adds 240 checks
+  for unequal 3/48-corner stages, including an intervening emit. Exact normalized
+  packet words agree, including the new 1,168-word cases and retained 460/1,572
+  controls. All 30,392,320 compared framebuffer words agree. Injected deadline
+  tests quarantine/no-flip only; this is not physical timeout evidence.
+  build/ps2-packet-builder-proof-ee-001/runtime-validation.json, SHA-256
+  471c90c6a9e403201bc601290a93257e2a838ce37e3f56f722b4e9ad677744f5.
+- The final game pair advances 601 native updates, preserves all 885,445
+  triangles, 35 warm counters/transfers and the established plan/pixel hashes.
+  Seventeen image pairs match all 4,874,240 literal framebuffer words. There
+  are 48,757 staged preparations/submissions and no cancellations. On 593 warm
+  pairs, draw work is 12.693876 ms async and 12.716282 ms staged. Shared
+  simulation/planning are excluded: these are not complete-frame timings.
+  build/ps2-world-staged-scene-ee-002/runtime-validation.json, SHA-256
+  77f98c8e6d430aff9094dbb426993485f7f643a9b4fb7b60a6631b0bab812911.
+
+The initial indexed packet builder regressed the complete synchronous control
+from 18.546241 to 19.224187 ms. Direct access with stage-only length retention
+recovers 0.643313 ms, reaching 18.580874 ms mean / 25.993056 ms maximum over
+660 periods. This remains 0.034633 ms above native059; all 660 work intervals
+exceed 16.667 ms and cadence remains 29.987884 updates/sec. The first root002
+60-second run collected only 600 periods during host build contention; it was
+retained as incomplete and replaced by a closed 90-second comparison. The
+complete record/asset/config comparison is
+build/ps2-staged-final-001/packet-builder-cadence-validation.json, SHA-256
+324b1a5a836e46c64d34b7f3b5b00df266e10cd5f0658f72124a0cdbaf9a59a9.
+The final staged application measures 18.690470 ms mean / 26.114583 ms maximum
+across 660 periods, or 29.987869 updates/sec, with every interval over budget.
+The complete source/record/asset/config comparison is
+build/ps2-staged-final-002/cadence-validation.json, SHA-256
+2487bc060fa3b21e3836f379df9a1e82abfced7b5c741063c6ce40fb3d7b5aba.
+It adds 0.109596 ms versus the final synchronous control. Keep the scheduler
+experimental; this checkpoint establishes ownership/correctness, not a speedup.
+The discarded indexed-builder measurements remain separately sealed in
+build/ps2-staged-final-001/cadence060-validation.json. Staging has not shown a
+speedup in Play, whose immediate-complete polls cannot prove physical overlap.
+
+Native061, engine-demo061 and staged wrapper022 cross-build with strict O3.
+All 35 shared engine source identities and 71 non-entry wrapper objects match;
+the existing root002 synchronous wrapper binds to the same complete source bytes
+with only its explicit driver path and argv entry normalized. Forbidden-symbol
+audits pass. Build-set report: build/ps2/native-061/build-set-validation.json,
+SHA-256 87bad607ed12684b6aa08fc2da48809e2300d9adc6a67ba2f37423cb5cb06b49.
+
+The user's next focus is lean EE/DMA/VU payloads. The current maximum prepare
+transfer is 1,840 bytes, deferred emit 2,016 bytes, and full-FINISH emit 2,048
+bytes. The 8 KiB arrays are capacity rather than transmitted length. Preparations
+still resend all 256 header bytes. Retaining constants and omitting overwritten
+status/echo could remove 112 bytes per preparation, about 15.5 KB per update
+in this scene, but this is UNIMPLEMENTED. It needs output-height handling,
+per-bank invalidation across other VU-memory APIs and successful-transfer
+residency publication; staging/cancellation alone cannot publish residency.
+Audit: build/ps2-world-packet-audit-001/packet-audit.json. Measure EE work and
+whole-frame cadence alongside transferred bytes; do not shrink batches blindly.
+
+The target remains 60 native updates and presented frames/sec. The bounded
+scene is not a complete race; full game flow, AI/HUD/audio, broader fidelity,
+live-controller and physical-console validation remain outstanding.
+
 ## Native PS2 prepared facing continuations (2026-11-02)
 
 Continued from 2f936e3. PreparedWorldModel now computes one immutable byte per

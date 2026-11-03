@@ -575,7 +575,7 @@ bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit,Wo
     if(!impl_||!impl_->ready)return false;
     auto& d=*impl_;const auto validation_start=d.now();
     const auto reject=[&d](const char* reason){d.failure=reason;return false;};
-    if(mode!=WorldSubmissionMode::fused&&mode!=WorldSubmissionMode::classify_first&&mode!=WorldSubmissionMode::classify_async)
+    if(mode!=WorldSubmissionMode::fused&&mode!=WorldSubmissionMode::classify_first&&mode!=WorldSubmissionMode::classify_async&&mode!=WorldSubmissionMode::classify_staged)
         return reject("INVALID WORLD SUBMISSION MODE");
     if(material_mode!=WorldMaterialMode::resolve_each&&material_mode!=WorldMaterialMode::memoized)
         return reject("INVALID WORLD MATERIAL MODE");
@@ -614,14 +614,22 @@ bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit,Wo
     // source memory after an un-stoppable DMA. Ordinary present() is unchanged.
     d.bounded_submission=true;
     ps2::Vu1WorldSubmission submission;bool submission_pending=false;
+    // Stages contain no pending hardware. Their bank leases still need
+    // releasing on every failure, including after a drained current emit.
+    std::array<ps2::Vu1WorldStage,2> staged;
+    std::array<bool,2> staged_live{};
     struct SubmissionScope {
         Impl& d;ps2::Vu1Transform& unit;ps2::Vu1WorldSubmission& submission;bool& pending;
+        std::array<ps2::Vu1WorldStage,2>& staged;std::array<bool,2>& staged_live;
         ~SubmissionScope(){
             // Retire VIF/PATH1 before any GS or CPU-buffer cleanup. No
             // submitted operation may outlive the batch storage on this stack.
             if(pending){
                 if(!unit.drain_world(submission))d.retire_world(unit.error());
                 pending=false;
+            }
+            for(unsigned i=0;i<2;++i)if(staged_live[i]){
+                unit.cancel_staged_world(staged[i]);staged_live[i]=false;
             }
             // Backstop for every early/exceptional exit. All ordinary paths
             // explicitly drain below; never publish an abandoned CPU prefix.
@@ -630,7 +638,7 @@ bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit,Wo
             }
             d.bounded_submission=false;
         }
-    } scope{d,unit,submission,submission_pending};
+    } scope{d,unit,submission,submission_pending,staged,staged_live};
     qword_t* q=d.clear(plan.clear_color(),plan.depth_test());
     const auto reject_frame=[&](const char* reason){
         if(submission_pending){
@@ -738,7 +746,8 @@ bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit,Wo
             const auto corners=prepared_geometry?current.corners.prepared.corners():
                 std::span<const ps2::Vu1WorldCorner>(current.corners.raw).first(count*3);
             auto& materials=current.materials;
-            const bool asynchronous=mode==WorldSubmissionMode::classify_async;
+            const bool staging=mode==WorldSubmissionMode::classify_staged;
+            const bool asynchronous=mode==WorldSubmissionMode::classify_async||staging;
             if(asynchronous)reserve_batch(next);
             const auto gather_pending=[&](std::size_t limit){
                 const auto before=next.gathered;if(!gather(next,limit))return false;
@@ -864,7 +873,8 @@ bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit,Wo
                 ++d.counters.world_prepared_batches;
                 ps2::Vu1WorldPrepareResult prepared;
                 if(asynchronous){
-                    const auto submitted=prepared_geometry?
+                    const auto submitted=staged_live[active]?
+                        unit.submit_staged_prepare_world(staged[active],submission):prepared_geometry?
                         unit.submit_prepare_world(ps2::PreparedVu1WorldGeometry{instance.object_to_world,plan.world_to_clip(),
                             current.corners.prepared,d.height,d.world_sequence},submission):
                         unit.submit_prepare_world(ps2::Vu1WorldGeometry{instance.object_to_world,plan.world_to_clip(),
@@ -872,6 +882,7 @@ bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit,Wo
                     if(submitted==ps2::Vu1WorldSubmitResult::failed)return d.retire_world(unit.error());
                     prepared=ps2::Vu1WorldPrepareResult::rejected;
                     if(submitted==ps2::Vu1WorldSubmitResult::submitted){
+                        staged_live[active]=false;
                         submission_pending=true;++d.counters.world_async_prepare_submissions;
                         if(!gather_pending((next.count+1)/2))return reject_frame("WORLD PREPARED LOOKAHEAD INVALID");
                         // Fixed, disjoint, fully sized outputs cannot trigger
@@ -908,6 +919,19 @@ bool Display::present_world(const WorldDrawPlan& plan,ps2::Vu1Transform& unit,Wo
                                 // submitted GS work, even before finish returns.
                                 d.world_gs_pending=true;
                                 if(!gather_pending(next.count))return reject_frame("WORLD PREPARED LOOKAHEAD INVALID");
+                                if(staging&&next.instance){
+                                    const auto& transform=next.instance->object_to_world;
+                                    const auto prepared_next=prepared_geometry?
+                                        unit.stage_prepare_world(ps2::PreparedVu1WorldGeometry{transform,plan.world_to_clip(),
+                                            next.corners.prepared,d.height,d.world_sequence+1},staged[active^1]):
+                                        unit.stage_prepare_world(ps2::Vu1WorldGeometry{transform,plan.world_to_clip(),
+                                            std::span<const ps2::Vu1WorldCorner>(next.corners.raw).first(next.count*3),
+                                            d.height,d.world_sequence+1},staged[active^1]);
+                                    if(prepared_next==ps2::Vu1WorldStageResult::failed)return d.retire_world(unit.error());
+                                    if(prepared_next!=ps2::Vu1WorldStageResult::staged)
+                                        return reject_frame("WORLD LOOKAHEAD STAGING FAILED");
+                                    staged_live[active^1]=true;
+                                }
                                 result=unit.finish_emit_world(submission);submission_pending=false;
                             }
                         }else result=unit.emit_world(token,std::span(states).first(count),ps2::Vu1WorldCompletion::path1_retired);

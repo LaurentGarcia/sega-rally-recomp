@@ -8,7 +8,7 @@ The development application selects the new path with
 native vehicle arithmetic or load a reference runtime.
 
 The optional `WorldSubmissionMode` argument selects `fused`, `classify_first`,
-or the explicit `classify_async` scheduler.
+or the explicit `classify_async` and `classify_staged` schedulers.
 The API's default remains `fused` for compatibility and comparison. The
 application's explicit `--drive-world-vu` mode selects `classify_first` after
 the paired validation below. `--drive-world-async CHECKPOINT COURSE VISUAL_DIRECTORY`
@@ -222,6 +222,66 @@ submit and finish, not measured concurrent VU execution. In particular, an
 emulator may complete work while processing the DMA-start write. The separate
 synchronous mode remains the comparison control; asynchronous API shape alone
 does not establish a frame-time improvement.
+
+### CPU-staged preparation
+
+`--drive-world-staged CHECKPOINT COURSE VISUAL_DIRECTORY` selects the additional
+`classify_staged` schedule. After gathering N+1 during emit N, the EE also checks
+its dynamic inputs and assembles its prepare packet into a separate owned slot.
+This does not start another DMA or touch mapped VU memory, GIF state or texture
+residency. The existing finish retires N before the staged packet can launch.
+
+`stage_prepare_world` copies all inputs and returns a `Vu1WorldStage`. Each bank
+has an aligned 8 KiB packet. Construction uses a direct active pointer and scalar
+word count; only CPU-staged packets save a length per slot, restored at launch.
+Ordinary packet reset avoids per-word bank indexing and length save/restore.
+Copied handles identify
+the same single-use stage; caller inputs may immediately change or be destroyed.
+Invalid inputs, output aliases and full banks reject without consuming existing
+stages. `submit_staged_prepare_world` preserves the stage on BUSY or invalid
+arguments and uses the existing idle/FLUSHE/MARK protocol on acceptance.
+`cancel_staged_world` releases an unsubmitted stage without hardware access,
+including while the other bank has a pending operation.
+
+Pending completion checks retained bank echoes/counts, so another stage can
+reuse header scratch without changing its status expectations. Failure cleanup
+drains active DMA before releasing staged slots. An un-stoppable owned transfer
+retains the owner's storage under the existing quarantine rule. World storage
+grows from 13,248 to 21,504 bytes on EE; total VU owner storage grows from 20,544
+to 28,800 bytes. No update allocates memory. This remains one hardware job and
+changes no VSM code or GS resource fences.
+
+The authored staged fixture retains 147 lifecycle checks, an exact 460-word
+maximum preparation packet comparison and two 1,572-word Display comparisons
+after the existing bank/sequence normalization. Another 240 checks stage 3- and
+48-corner packets, launch the older packet first and retain the newer one across
+an intervening emit. These compare 1,168 additional packet words. Full retained
+coverage compares 30,392,320 literal color words. Raw and prepared geometry both
+exercise staging, late capacity rejection and recovery. An injected deadline
+tests quarantine and no-flip behavior; it is not an observed physical timeout.
+Report: `build/ps2-packet-builder-proof-ee-001/runtime-validation.json`.
+
+The final active-pointer scene pair advances 601 native updates and draws each immutable plan
+through async and staged modes using the same new driver. All 17 sampled frames
+match in 4,874,240 literal color words, retaining the historical plan and pixel
+hashes. On the 593 warm pairs, display work is 12.694 ms async versus 12.716 ms
+staged, an increase of 0.022 ms. These intervals exclude shared simulation and
+planning and must not be treated as full-frame timing. Transfer counts match;
+exact packet words are covered by the separate authored fixture. Play has shown
+no staging speedup, and physical hardware overlap remains unverified. Report:
+`build/ps2-world-staged-scene-ee-002/runtime-validation.json`.
+
+The first indexed packet builder added 0.678 ms to the complete synchronous
+control. The active-pointer builder recovers 0.643 ms: 18.581 ms mean work over
+660 periods, versus 18.546 ms before staging support. All periods remain over
+16.667 ms, and cadence stays about 30 updates/sec. These complete-app intervals
+include simulation and planning, unlike the paired draw timings above. Report:
+`build/ps2-staged-final-001/packet-builder-cadence-validation.json`.
+
+The final staged whole application measures 18.690 ms mean / 26.115 ms maximum
+over 660 periods, adding 0.110 ms versus that synchronous control. Every interval
+remains over budget. Its approximate 30 Hz cadence does not meet the 60 Hz target.
+Report: `build/ps2-staged-final-002/cadence-validation.json`.
 
 ## Submission and fallback
 

@@ -346,7 +346,8 @@ void material_memo_checks(Display& display,ps2::Vu1Transform& unit,std::uint64_t
         }
         require(collisions>0,"MEMO COLLISION COVERAGE");++collision_cases;
         unsigned intra_batch_collisions=0;
-        const auto& planned=planner.draw_plan().instances()[0];
+        const auto memo_plan=planner.draw_plan();
+        const auto& planned=memo_plan.instances()[0];
         for(std::size_t first=192;first<MemoMaterials::count;first+=16){
             const auto* a=&planned.materials[planned.faces[first].material_index];
             const auto* b=&planned.materials[planned.faces[first+1].material_index];
@@ -610,7 +611,226 @@ void prepared_geometry_checks(Display& display,ps2::Vu1Transform& unit,Authored&
     std::printf("WORLD PREPARED PASS pairs=6 modes=3 original_counters=35 late_rejections=6 invalid_mode=1 packet_words=%llu\n",(unsigned long long)packet_words);
 }
 
+// Original authored lifecycle/ordering controls; no game data.
+#ifdef PS2_WORLD_STAGE_TIMEOUT_PROOF
+bool stage_timeout_requested=false;
+#endif
+unsigned staged_driver_checks(Display& display,ps2::Vu1Transform& unit,std::uint64_t& words){
+    using namespace ps2;
+    unsigned checks=0;const auto check=[&](bool value,const char* label){require(value,label);++checks;};
+    std::array<Vu1WorldCorner,48> input;
+    const std::array<TransformVector4,3> positions{{{-.5f,-.5f,.5f,1},{.5f,-.5f,.5f,1},{0,.5f,.5f,1}}};
+    for(unsigned i=0;i<input.size();++i)input[i]={positions[i%3],float(i),float(i+1),1.f/64,1.f/32};
+    const auto original=input;
+    Vu1WorldGeometry geometry{identity(),identity(),input,display.output_height(),0xfffffffdu};
+    auto shifted=geometry;shifted.object_to_world[12]=.125f;shifted.sequence=9;
+    std::array<TransformVector4,48> clips{};
+    Vu1WorldStage first,second,third,empty;Vu1WorldSubmission job;Vu1WorldToken ready;
+    Vu1Transform foreign;
+    check(!unit.cancel_staged_world(empty),"STAGE DEFAULT CANCEL ACCEPTED");
+    check(unit.submit_staged_prepare_world(empty,job)==Vu1WorldSubmitResult::rejected,"STAGE DEFAULT SUBMIT ACCEPTED");
+    check(unit.stage_prepare_world(geometry,first)==Vu1WorldStageResult::staged,"STAGE FIRST COPY");
+    const auto copied=first;
+    check(foreign.submit_staged_prepare_world(first,job)==Vu1WorldSubmitResult::rejected,"STAGE FOREIGN SUBMIT ACCEPTED");
+    check(!foreign.cancel_staged_world(first),"STAGE FOREIGN CANCEL ACCEPTED");
+    check(unit.stage_prepare_world(shifted,second)==Vu1WorldStageResult::staged,"STAGE SECOND COPY");
+    check(unit.stage_prepare_world(geometry,third)==Vu1WorldStageResult::rejected,"STAGE THIRD BANK ACCEPTED");
+    check(unit.cancel_staged_world(copied),"STAGE COPIED CANCEL");
+    check(!unit.cancel_staged_world(first),"STAGE CANCELLED COPY ACCEPTED");
+    check(unit.stage_prepare_world(geometry,first)==Vu1WorldStageResult::staged,"STAGE RELEASED SLOT");
+    auto invalid=geometry;invalid.object_to_world[0]=std::bit_cast<float>(1u);
+    check(unit.stage_prepare_world(invalid,third)==Vu1WorldStageResult::rejected,"STAGE INVALID MATRIX ACCEPTED");
+    // All caller bytes can change before launch. The ready clips must derive
+    // from the earlier owned packet, not from this now unrelated source.
+    for(auto& v:input)v={{17,18,19,1},23,24,1,1};
+    check(unit.submit_staged_prepare_world(first,job)==Vu1WorldSubmitResult::submitted,"STAGE LAUNCH");
+    check(unit.submit_staged_prepare_world(second,job)==Vu1WorldSubmitResult::rejected,"STAGE LAUNCH WHILE BUSY");
+    check(!unit.transform_native(identity(),identity(),{},{}),"STAGE BUSY LEGACY INVALIDATION");
+    check(unit.cancel_staged_world(second),"STAGE CPU CANCEL WHILE OTHER DMA PENDING");
+    check(unit.finish_emit_world(job)==Vu1WorldResult::rejected,"STAGE WRONG FINISH ACCEPTED");
+    check(unit.finish_prepare_world(job,ready,std::span(clips).first(47))==Vu1WorldPrepareResult::rejected,"STAGE SHORT FINISH ACCEPTED");
+    check(unit.finish_prepare_world(job,ready,clips)==Vu1WorldPrepareResult::ready,"STAGE FINISH");
+    check(unit.submit_staged_prepare_world(first,job)==Vu1WorldSubmitResult::rejected,"STAGE CONSUMED COPY ACCEPTED");
+    check(unit.cancel_world(ready,clips)==Vu1WorldResult::fallback,"STAGE CLIP RETRIEVAL");
+    for(unsigned i=0;i<input.size();++i)check(std::memcmp(&clips[i],&original[i].position,16)==0,"STAGE RETAINED CALLER SOURCE");
+    input=original;
+    // Preserve a valid stage through output-alias rejection, then verify
+    // legacy nonbusy mutation invalidates every copied stage handle.
+    check(unit.stage_prepare_world(geometry,first)==Vu1WorldStageResult::staged,"STAGE ALIAS SETUP");
+    void* aliased_stage=&first;
+    check(unit.submit_staged_prepare_world(first,*static_cast<Vu1WorldSubmission*>(aliased_stage))==Vu1WorldSubmitResult::rejected,"STAGE OUTPUT ALIAS ACCEPTED");
+    check(unit.cancel_staged_world(first),"STAGE OUTPUT ALIAS CONSUMED TOKEN");
+    check(unit.stage_prepare_world(geometry,first)==Vu1WorldStageResult::staged,"STAGE LEGACY INVALIDATION SETUP");
+    check(unit.transform_native(identity(),identity(),{},{}),"STAGE LEGACY EMPTY TRANSFORM");
+    check(!unit.cancel_staged_world(first),"STAGE SURVIVED LEGACY MUTATION");
+    // Prepared metadata is inside the same alias boundary as numeric values.
+    std::array<WorldPoint,3> vertices{{{-.5f,-.5f,.5f},{.5f,-.5f,.5f},{0,.5f,.5f}}};WorldFace face;face.indices={0,1,2};
+    PreparedWorldModel model;WorldScene planner;WorldSceneError error;PreparedVu1WorldCorners proof;
+    check(model.assign({vertices,{&face,1}},error),"STAGE PREPARED MODEL");
+    check(planner.configure_plan(1,8,error),"STAGE PREPARED PLAN CONFIG");
+    PreparedWorldInstance instance{&model,identity()};check(planner.plan_prepared({&instance,1},{identity()},error),"STAGE PREPARED PLAN");
+    check(planner.draw_plan().begin_corners(0,0,1,1,proof),"STAGE PREPARED COPY");
+    const auto matrix=identity();PreparedVu1WorldGeometry owned{matrix,matrix,proof,display.output_height(),31};
+    auto* metadata=reinterpret_cast<std::byte*>(&proof)+sizeof(proof)-sizeof(Vu1WorldStage);
+    const auto before=proof;
+    check(unit.stage_prepare_world(owned,*reinterpret_cast<Vu1WorldStage*>(metadata))==Vu1WorldStageResult::rejected,"STAGE PREPARED METADATA ALIAS");
+    check(std::memcmp(&proof,&before,sizeof proof)==0,"STAGE ALIAS MUTATED OWNED INPUT");
+    check(unit.stage_prepare_world(owned,first)==Vu1WorldStageResult::staged,"STAGE PREPARED ACCEPTANCE");
+    proof={}; // No pointer or ownership lease survives the stage call.
+    check(unit.submit_staged_prepare_world(first,job)==Vu1WorldSubmitResult::submitted,"STAGE PREPARED SOURCE REUSE");
+    check(unit.drain_world(job),"STAGE PREPARED DRAIN");
+    // Establish the exact packet for a maximum-sized ordinary preparation.
+    begin_packet_pair(false);
+    check(unit.submit_prepare_world(shifted,job)==Vu1WorldSubmitResult::submitted,"STAGE PACKET REFERENCE");
+    check(unit.finish_prepare_world(job,ready,clips)==Vu1WorldPrepareResult::ready,"STAGE PACKET REFERENCE FINISH");
+    check(unit.cancel_world(ready,clips)==Vu1WorldResult::fallback,"STAGE PACKET REFERENCE CANCEL");
+    const auto expected_words=end_packet_pair(false);
+    // Shared header gets overwritten by B while A is emitting. A must still
+    // finish against its OWN sequence/count and leave the staged packet intact.
+    Material material;material.color=0xff2040c0u;
+    std::array<Vertex,3> output{{{124,288,0,0,1,.5f},{372,288,0,0,1,.5f},{248,96,0,0,1,.5f}}};
+    Triangle triangle{output,&material};Frame frame{{&triangle,1},0xff112233u,false};
+    check(display.present(frame),display.error());const auto expected=framebuffer(display,false,80,words);
+    check(display.present({{},frame.clear_color,false}),display.error());
+    const auto front1=*GS_REG_DISPFB1,front2=*GS_REG_DISPFB2;
+    auto single=geometry;single.corners=std::span(input).first(3);single.sequence=123;
+    check(unit.submit_prepare_world(single,job)==Vu1WorldSubmitResult::submitted,"STAGE EMIT SETUP");
+    check(unit.finish_prepare_world(job,ready,clips)==Vu1WorldPrepareResult::ready,"STAGE EMIT READY");
+    Vu1WorldState state;state.test=GS_SET_TEST(1,1,0x80,0,0,1,1,1);state.prim=3;state.rgba=0x80c04020u;
+    check(unit.submit_emit_world(ready,{&state,1},Vu1WorldCompletion::gs_finished,job)==Vu1WorldSubmitResult::submitted,"STAGE PENDING EMIT");
+    check(unit.stage_prepare_world(shifted,second)==Vu1WorldStageResult::staged,"STAGE DURING PENDING EMIT");
+    for(auto& v:input)v={{17,18,19,1},23,24,1,1};
+    check(unit.finish_emit_world(job)==Vu1WorldResult::drawn,"STAGE OVERWROTE EMIT HEADER/PACKET");
+    begin_packet_pair(true);
+    check(unit.submit_staged_prepare_world(second,job)==Vu1WorldSubmitResult::submitted,"STAGE AFTER EMIT LAUNCH");
+    check(unit.finish_prepare_world(job,ready,clips)==Vu1WorldPrepareResult::ready,"STAGE AFTER EMIT FINISH");
+    check(unit.cancel_world(ready,clips)==Vu1WorldResult::fallback,"STAGE AFTER EMIT CLIPS");
+    check(end_packet_pair(true)==expected_words,"STAGE PACKET LENGTH CHANGED");
+    for(unsigned i=0;i<input.size();++i){auto p=original[i].position;p.x+=.125f;
+        check(std::memcmp(&clips[i],&p,16)==0,"STAGE WRONG BANK MATRIX/SEQUENCE");}
+    check(*GS_REG_DISPFB1==front1&&*GS_REG_DISPFB2==front2,"STAGE LOW LEVEL FLIPPED");
+    check(framebuffer(display,true,80,words)==expected,"STAGE EMIT PIXELS CHANGED");
+    std::printf("WORLD STAGE DRIVER PASS checks=%u packet_words=%lu caller_reused=2 pending_emit=1 full_bank=1 metadata_alias=1\n",checks,(unsigned long)expected_words);
+    return checks;
 }
+
+void staged_display_checks(Display& display,ps2::Vu1Transform& unit,Authored& source,std::uint64_t& words){
+    WorldScene planner,limited;PreparedWorldModel model;WorldSceneError error;
+    require(model.assign(source.model(),error),world_scene_error_message(error));
+    require(planner.configure_plan(face_count,face_count*8,error),world_scene_error_message(error));
+    require(limited.configure_plan(face_count,16,error),world_scene_error_message(error));
+    PreparedWorldInstance instance{&model,identity()};WorldView view{identity()};
+    require(planner.plan_prepared({&instance,1},view,error),world_scene_error_message(error));
+    require(limited.plan_prepared({&instance,1},view,error),world_scene_error_message(error));
+    for(auto geometry:{WorldGeometryMode::raw,WorldGeometryMode::prepared}){
+        const auto render=[&](WorldSubmissionMode mode){return display.present_world(planner.draw_plan(),unit,mode,
+            WorldMaterialMode::memoized,WorldFallbackMode::reject_outside,geometry);};
+        require(render(WorldSubmissionMode::classify_async),display.error());
+        begin_packet_pair(false);require(render(WorldSubmissionMode::classify_async),display.error());
+        const auto expected_words=end_packet_pair(false);const auto control=display.stats();
+        const auto expected=framebuffer(display,false,81+unsigned(geometry),words);
+        const auto before=unit.world_stats();begin_packet_pair(true);
+        require(render(WorldSubmissionMode::classify_staged),display.error());
+        require(end_packet_pair(true)==expected_words,"STAGE DISPLAY PACKET WORDS CHANGED");
+        const auto actual=display.stats();const auto after=unit.world_stats();
+        require(fallback_control_counts(control)==fallback_control_counts(actual)&&control.world_trivial_rejects==actual.world_trivial_rejects,
+                "STAGE DISPLAY COUNTERS CHANGED");
+        require(control.world_async_gathered_triangles==actual.world_async_gathered_triangles&&
+                control.world_async_prepare_submissions==actual.world_async_prepare_submissions&&
+                control.world_async_emit_submissions==actual.world_async_emit_submissions,"STAGE ASYNC SCHEDULE CHANGED");
+        require(after.staged_prepares>before.staged_prepares&&after.staged_submissions>before.staged_submissions,"STAGE DISPLAY DID NOT STAGE");
+        require(framebuffer(display,true,81+unsigned(geometry),words)==expected,"STAGE DISPLAY PIXELS CHANGED");
+        const auto front1=*GS_REG_DISPFB1,front2=*GS_REG_DISPFB2;
+        require(!display.present_world(limited.draw_plan(),unit,WorldSubmissionMode::classify_staged,
+            WorldMaterialMode::memoized,WorldFallbackMode::reject_outside,geometry),"STAGE LATE CAPACITY ACCEPTED");
+        require(*GS_REG_DISPFB1==front1&&*GS_REG_DISPFB2==front2,"STAGE FAILED FRAME FLIPPED");
+        require(framebuffer(display,true,81+unsigned(geometry),words)==expected,"STAGE FAILED FRAME CHANGED FRONT");
+        require(render(WorldSubmissionMode::classify_staged),display.error());
+        require(framebuffer(display,true,81+unsigned(geometry),words)==expected,"STAGE FAILURE LEFT BANK/PACKET LEASE");
+        std::printf("WORLD STAGE DISPLAY PASS geometry=%u staged=%lu launched=%lu packet_words=%lu hash=%016llx\n",unsigned(geometry),
+            (unsigned long)(after.staged_prepares-before.staged_prepares),(unsigned long)(after.staged_submissions-before.staged_submissions),
+            (unsigned long)expected_words,(unsigned long long)expected);
+    }
+}
+
+unsigned unequal_staged_checks(Display& display,ps2::Vu1Transform& unit,std::uint64_t& words){
+    using namespace ps2;
+    unsigned checks=0;std::uint64_t total_packet_words=0;
+    const auto check=[&](bool okay,const char* label){require(okay,label);++checks;};
+    std::array<Vu1WorldCorner,48> input;
+    const std::array<TransformVector4,3> p{{{-.5f,-.5f,.5f,1},{.5f,-.5f,.5f,1},{0,.5f,.5f,1}}};
+    for(unsigned i=0;i<input.size();++i)input[i]={p[i%3],float(i),float(i+1),1.f/64,1.f/32};
+    const Vu1WorldGeometry a{identity(),identity(),std::span(input).first(3),display.output_height(),51};
+    auto b=a;b.corners=input;b.object_to_world[12]=.125f;b.sequence=903;
+    Vu1WorldState state;state.test=GS_SET_TEST(1,1,0x80,0,0,1,1,1);state.prim=3;state.rgba=0x80c04020u;
+    std::array<TransformVector4,48> clips;Vu1WorldSubmission job;Vu1WorldToken ready;
+    for(unsigned emit=0;emit<2;++emit){
+        std::size_t reference_words=0;std::uint64_t reference_hash=0;
+        for(unsigned staged=0;staged<2;++staged){
+            check(display.present({{},0xff112233u,false}),display.error());
+            const auto front1=*GS_REG_DISPFB1,front2=*GS_REG_DISPFB2;
+            begin_packet_pair(staged!=0);
+            Vu1WorldStage older,newer;
+            if(staged){
+                check(unit.stage_prepare_world(a,older)==Vu1WorldStageResult::staged,"UNEQUAL STAGE A3");
+                check(unit.stage_prepare_world(b,newer)==Vu1WorldStageResult::staged,"UNEQUAL STAGE B48");
+                check(unit.submit_staged_prepare_world(older,job)==Vu1WorldSubmitResult::submitted,"UNEQUAL RESTORE OLDER A3");
+            }else check(unit.submit_prepare_world(a,job)==Vu1WorldSubmitResult::submitted,"UNEQUAL REFERENCE A3");
+            check(unit.finish_prepare_world(job,ready,clips)==Vu1WorldPrepareResult::ready,"UNEQUAL FINISH A3");
+            if(emit){
+                check(unit.submit_emit_world(ready,{&state,1},Vu1WorldCompletion::gs_finished,job)==Vu1WorldSubmitResult::submitted,"UNEQUAL INTERVENING EMIT");
+                check(unit.finish_emit_world(job)==Vu1WorldResult::drawn,"UNEQUAL INTERVENING EMIT FINISH");
+            }else{
+                check(unit.cancel_world(ready,clips)==Vu1WorldResult::fallback,"UNEQUAL CANCEL A3");
+                for(unsigned i=0;i<3;++i)check(std::memcmp(&clips[i],&p[i],16)==0,"UNEQUAL A3 CLIP IDENTITY");
+            }
+            if(staged)check(unit.submit_staged_prepare_world(newer,job)==Vu1WorldSubmitResult::submitted,"UNEQUAL RESTORE NEWER B48");
+            else check(unit.submit_prepare_world(b,job)==Vu1WorldSubmitResult::submitted,"UNEQUAL REFERENCE B48");
+            check(unit.finish_prepare_world(job,ready,clips)==Vu1WorldPrepareResult::ready,"UNEQUAL FINISH B48");
+            check(unit.cancel_world(ready,clips)==Vu1WorldResult::fallback,"UNEQUAL CANCEL B48");
+            for(unsigned i=0;i<48;++i){auto expected=p[i%3];expected.x+=.125f;
+                check(std::memcmp(&clips[i],&expected,16)==0,"UNEQUAL B48 CLIP IDENTITY");}
+            const auto packet_words=end_packet_pair(staged!=0);
+            if(!staged)reference_words=packet_words;
+            else check(packet_words==reference_words&&packet_words>0,"UNEQUAL PACKET STREAM LENGTH");
+            check(*GS_REG_DISPFB1==front1&&*GS_REG_DISPFB2==front2,"UNEQUAL LOW LEVEL FLIPPED");
+            const auto pixels=framebuffer(display,staged!=0,90+emit,words);
+            if(!staged)reference_hash=pixels;
+            else check(pixels==reference_hash,"UNEQUAL STAGED PIXELS");
+        }
+        total_packet_words+=reference_words;
+        std::printf("WORLD STAGE UNEQUAL PAIR PASS emit=%u corners_a=3 corners_b=48 packet_words=%lu hash=%016llx\n",emit,(unsigned long)reference_words,(unsigned long long)reference_hash);
+    }
+    std::printf("WORLD STAGE UNEQUAL PASS pairs=2 checks=%u packet_words=%llu older_length_restored=1 newer_survived_emit=1\n",checks,(unsigned long long)total_packet_words);
+    return checks;
+}
+
+#ifdef PS2_WORLD_STAGE_TIMEOUT_PROOF
+void staged_timeout_check(Display& display,ps2::Vu1Transform& unit){
+    using namespace ps2;
+    // Diagnostic hook withholds completion observation and advances only the
+    // existing deadline branch. It cannot fabricate a successful retirement.
+    // Run last: the production fatal path permanently quarantines this owner.
+    const std::array<Vu1WorldCorner,3> input{{{{-.5f,-.5f,.5f,1},0,0,1,1},{{.5f,-.5f,.5f,1},0,0,1,1},{{0,.5f,.5f,1},0,0,1,1}}};
+    Vu1WorldGeometry geometry{identity(),identity(),input,display.output_height(),99};
+    Vu1WorldSubmission job;Vu1WorldStage next;
+    require(unit.submit_prepare_world(geometry,job)==Vu1WorldSubmitResult::submitted,"STAGE TIMEOUT SETUP");
+    require(unit.stage_prepare_world(geometry,next)==Vu1WorldStageResult::staged,"STAGE TIMEOUT NEXT PACKET");
+    const auto front1=*GS_REG_DISPFB1,front2=*GS_REG_DISPFB2;
+    stage_timeout_requested=true;
+    require(unit.poll_world(job)==Vu1WorldPollResult::failed,"STAGE INJECTED TIMEOUT NOT FATAL");
+    stage_timeout_requested=false;
+    require(!unit.available()&&!unit.cancel_staged_world(next)&&!unit.drain_world(job),"STAGE TIMEOUT RETAINED USABLE JOB");
+    require(unit.submit_staged_prepare_world(next,job)==Vu1WorldSubmitResult::failed,"STAGE TIMEOUT LAUNCHED NEXT");
+    require(*GS_REG_DISPFB1==front1&&*GS_REG_DISPFB2==front2,"STAGE TIMEOUT FLIPPED");
+    std::puts("WORLD STAGE TIMEOUT PASS injected_deadline=1 quarantine=1 no_flip=1 physical_timeout_not_inferred=1");
+}
+#endif
+
+}
+#ifdef PS2_WORLD_STAGE_TIMEOUT_PROOF
+extern "C" bool ps2_world_stage_timeout_requested(){return stage_timeout_requested;}
+#endif
 int main(){
     std::setvbuf(stdout,nullptr,_IONBF,0);std::setvbuf(stderr,nullptr,_IONBF,0);
     try {
@@ -982,6 +1202,12 @@ int main(){
         trivial_reject_checks(display,unit,source,outside_source,words,rejections,combined);
         prepared_driver_checks(unit,display.output_height());
         prepared_geometry_checks(display,unit,source,outside_source,words,rejections,combined);
+        unequal_staged_checks(display,unit,words);
+        staged_driver_checks(display,unit,words);
+        staged_display_checks(display,unit,source,words);
+#ifdef PS2_WORLD_STAGE_TIMEOUT_PROOF
+        staged_timeout_check(display,unit);
+#endif
         std::printf("WORLD DISPLAY ASYNC POLLS pending=%u already_complete=%u hardware_overlap_not_inferred=1\n",async_pending_polls,async_complete_polls);
         std::printf("WORLD DISPLAY PASS phases=4 consecutive_pair=1 fallback_pair=1 eviction_pair=1 classified_triplets=4 outside_triplet=1 full_finish_pair=1 token_checks=%u legacy_direct=%u legacy_fallback=%u no_flip_rejections=%u pixel_words=%llu hash=%016llx\n",tokens,drawn,fallback,rejections,(unsigned long long)words,(unsigned long long)combined);
     }catch(const std::exception& error){std::printf("WORLD DISPLAY FAIL: %s\n",error.what());}

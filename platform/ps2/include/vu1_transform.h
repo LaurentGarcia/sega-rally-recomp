@@ -14,6 +14,8 @@ class PreparedVu1WorldCorners;
 struct Vu1WorldState;
 class Vu1WorldToken;
 class Vu1WorldSubmission;
+class Vu1WorldStage;
+enum class Vu1WorldStageResult : std::uint8_t;
 struct Vu1WorldStats;
 enum class Vu1WorldResult : std::uint8_t;
 enum class Vu1WorldPrepareResult : std::uint8_t;
@@ -159,6 +161,19 @@ public:
     // consumes the submission (even when poll has already reported complete).
     // At most one hardware operation is in flight; up to two completed ready
     // bank tokens may coexist. Async preparation preserves the other bank.
+    // CPU-only admission and packet construction in a free owned slot. May
+    // run while the other bank has a pending job; it performs no MMIO, DMA,
+    // mapped VU reads or resource lookup. At most one hardware job still runs.
+    // The copied inputs may be destroyed immediately. Invalid/full-bank calls
+    // leave both banks and caller outputs intact. The process is serialized.
+    Vu1WorldStageResult stage_prepare_world(const Vu1WorldGeometry&,Vu1WorldStage&) noexcept;
+    Vu1WorldStageResult stage_prepare_world(const PreparedVu1WorldGeometry&,Vu1WorldStage&) noexcept;
+    // BUSY or bad-argument rejection retains the stage. Accepted submit
+    // consumes it and uses the unchanged idle/FLUSHE/MARK completion protocol.
+    Vu1WorldSubmitResult submit_staged_prepare_world(const Vu1WorldStage&,Vu1WorldSubmission&) noexcept;
+    // CPU-only cancellation is allowed while the OTHER bank is pending.
+    // Successful cancellation consumes all handle copies, without hardware.
+    bool cancel_staged_world(const Vu1WorldStage&) noexcept;
     Vu1WorldSubmitResult submit_prepare_world(const Vu1WorldGeometry&,Vu1WorldSubmission&) noexcept;
     Vu1WorldSubmitResult submit_prepare_world(const PreparedVu1WorldGeometry&,Vu1WorldSubmission&) noexcept;
     Vu1WorldSubmitResult submit_emit_world(const Vu1WorldToken&,std::span<const Vu1WorldState>,
@@ -180,7 +195,7 @@ public:
     // With no live submission, every synchronous transform/draw/prepare attempt
     // invalidates older preparations, including empty/invalid attempts. BUSY
     // rejection preserves the in-flight operation and both banks. Async submit
-    // preparation preserves other ready banks. Idempotent initialization retains
+    // preparation preserves other ready or CPU-staged banks. Idempotent initialization retains
     // them; actual initialization/program uploads invalidate them. Calls are serialized
     // process-wide; the global ticket allocator rejects exhaustion, never wraps.
     Vu1WorldStats world_stats() const noexcept;
@@ -192,6 +207,8 @@ private:
                                       const PreparedVu1WorldCorners*) noexcept;
     Vu1WorldPrepareResult prepare_world_checked(const Vu1WorldGeometry&,Vu1WorldToken&,
                                                 std::span<TransformVector4>,const PreparedVu1WorldCorners*) noexcept;
+    Vu1WorldStageResult stage_prepare_world_checked(const Vu1WorldGeometry&,Vu1WorldStage&,
+                                                    const PreparedVu1WorldCorners*) noexcept;
     Vu1WorldSubmitResult submit_prepare_world_checked(const Vu1WorldGeometry&,Vu1WorldSubmission&,
                                                       const PreparedVu1WorldCorners*) noexcept;
     void invalidate_world() noexcept;

@@ -147,15 +147,20 @@ bool valid_native_vu1_world_input(const PreparedVu1WorldBatch& batch) noexcept {
 struct Vu1Transform::Storage {
     struct World {
         using Quad=std::array<std::uint32_t,4>;
-        alignas(64) std::array<std::uint32_t,2048> packet{};
+        // A live DMA reads only its bank's immutable CPU packet. Staging the
+        // other bank may reuse header scratch, never these submitted bytes.
+        alignas(64) std::array<std::array<std::uint32_t,2048>,2> packets{};
+        std::array<unsigned,2> used_words{};
+        std::array<std::uint32_t,2048>* active_packet=&packets[0];
+        unsigned active_used=0;
         alignas(16) std::array<Quad,16> header{};
         alignas(16) std::array<Quad,vu1_world_triangle_capacity*15+2> output{};
         alignas(16) std::array<TransformVector4,vu1_world_corner_capacity> clips{};
-        unsigned used=0,bank=0;
+        unsigned bank=0;
         struct Bank {
             std::uint64_t ticket=0;
             Quad echo{};
-            unsigned count=0,phase=0; // free, preparing, ready, emitting
+            unsigned count=0,phase=0; //0 free,1 preparing,2 ready,3 emitting,4 CPU-staged
         };
         std::array<Bank,2> banks{};
         struct Pending {
@@ -168,8 +173,12 @@ struct Vu1Transform::Storage {
         std::uint32_t submit_started=0;
         bool ready=false;
         Vu1WorldStats counters{};
-        void word(std::uint32_t v){packet[used++]=v;}
-        void words(const void*p,std::size_t bytes){std::memcpy(packet.data()+used,p,bytes);used+=unsigned(bytes/4);}
+        auto& packet(){return *active_packet;}
+        unsigned& used(){return active_used;}
+        void select_packet(unsigned slot){active_packet=&packets[slot];active_used=used_words[slot];}
+        void reset_packet(unsigned slot){active_packet=&packets[slot];active_used=0;}
+        void word(std::uint32_t v){packet()[used()++]=v;}
+        void words(const void*p,std::size_t bytes){std::memcpy(packet().data()+used(),p,bytes);used()+=unsigned(bytes/4);}
     };
     std::unique_ptr<World> world;
     alignas(64) std::array<std::uint32_t,1024> packet{};
@@ -208,13 +217,13 @@ struct Vu1Transform::Storage {
         auto&w=*world;++sequence;
         w.word(command(path1?0x11:0x10)); // FLUSH retires VU and PATH1/2.
         w.word(command(0x07,0,sequence));
-        while(w.used%4)w.word(0);
+        while(w.used()%4)w.word(0);
         for(unsigned i=0;i<4;++i)w.word(0);
         w.submit_started=ticks();
         if(w.pending.ticket){w.pending.started=w.submit_started;w.pending.mark=sequence;}
-        if(dma_channel_send_normal(DMA_CHANNEL_VIF1,w.packet.data(),int(w.used/4),0,0)<0)
+        if(dma_channel_send_normal(DMA_CHANNEL_VIF1,w.packet().data(),int(w.used()/4),0,0)<0)
             return retire("VU1 WORLD DMA SUBMISSION FAILED");
-        w.counters.dma_qwords+=w.used/4;
+        w.counters.dma_qwords+=w.used()/4;
         return true;
     }
     bool world_transfer(bool path1){
@@ -375,9 +384,9 @@ bool Vu1Transform::initialize_world() noexcept {
     }
     // MPG is bounded to256 instructions per command; address units are8 bytes.
     for(std::size_t offset=0;offset<bytes;){
-        const auto chunk=std::min<std::size_t>(2048,bytes-offset);w.used=0;
+        const auto chunk=std::min<std::size_t>(2048,bytes-offset);w.reset_packet(0);
         w.word(command(0x10));
-        while(w.used%2!=1)w.word(0);
+        while(w.used()%2!=1)w.word(0);
         w.word(command(0x4a,unsigned(chunk/8),world_entry+unsigned(offset/8)));
         w.words(native_vu1_world_begin+offset,chunk);
         if(!s.world_transfer(false))return false;
@@ -454,7 +463,7 @@ Vu1WorldResult Vu1Transform::draw_world_checked(const Vu1WorldBatch& batch,std::
     const auto output_count=count/3*15+2;
     tag(output_count-2,GIF_SET_TAG(1,1,0,0,GIF_FLG_PACKED,1),GIF_REG_AD);
     tag(output_count-1,0,GS_REG_FINISH);
-    const unsigned base=w.bank*512;w.used=0;
+    const unsigned base=w.bank*512;w.reset_packet(w.bank);
     w.word(command(0x6c,16,base));w.words(w.header.data(),sizeof(w.header));
     w.word(command(0x6c,unsigned(count*2),base+16));w.words(batch.corners.data(),batch.corners.size_bytes());
     // Publish only immutable headers/state and color. The microprogram writes
@@ -552,7 +561,7 @@ Vu1WorldSubmitResult Vu1Transform::submit_prepare_world_checked(const Vu1WorldGe
     w.header[12]={};w.header[13]={};
     w.header[14]={bits(65536),bits(.5f),0,bits(0x1p-17f)};
     w.header[15]={bits(0x1p-16f),bits(1024),bits(65536),bits(65536)};
-    const unsigned base=bank*512;w.used=0;
+    const unsigned base=bank*512;w.reset_packet(bank);
     w.word(command(0x6c,16,base));w.words(w.header.data(),sizeof(w.header));
     w.word(command(0x6c,unsigned(count*2),base+16));w.words(geometry.corners.data(),geometry.corners.size_bytes());
     w.word(command(0x14,0,world_entry+bank*3));
@@ -567,6 +576,88 @@ Vu1WorldSubmitResult Vu1Transform::submit_prepare_world_checked(const Vu1WorldGe
     return reject("VU1 HARDWARE UNAVAILABLE");
 #endif
 }
+Vu1WorldStageResult Vu1Transform::stage_prepare_world(const Vu1WorldGeometry& geometry,Vu1WorldStage& stage) noexcept {
+    return stage_prepare_world_checked(geometry,stage,nullptr);
+}
+Vu1WorldStageResult Vu1Transform::stage_prepare_world(const PreparedVu1WorldGeometry& geometry,Vu1WorldStage& stage) noexcept {
+    const Vu1WorldGeometry raw{geometry.object_to_world,geometry.world_to_clip,geometry.corners.corners(),
+        geometry.output_height,geometry.sequence};
+    return stage_prepare_world_checked(raw,stage,&geometry.corners);
+}
+Vu1WorldStageResult Vu1Transform::stage_prepare_world_checked(const Vu1WorldGeometry& geometry,
+                                                              Vu1WorldStage& stage,
+                                                              const PreparedVu1WorldCorners* prepared) noexcept {
+    if(quarantined)return Vu1WorldStageResult::failed;
+    if(!storage_||!storage_->ready||!storage_->world||!storage_->world->ready)return Vu1WorldStageResult::rejected;
+    auto&s=*storage_;auto&w=*s.world;
+    const auto reject=[&](const char*why){s.failure=why;++w.counters.rejected_batches;return Vu1WorldStageResult::rejected;};
+    const bool input_valid=prepared?
+        prepared_world_geometry(geometry.object_to_world,geometry.world_to_clip,*prepared,geometry.output_height):
+        valid_native_vu1_world_geometry(geometry);
+    if(!input_valid||
+       ranges_overlap(&stage,sizeof(stage),geometry.corners.data(),geometry.corners.size_bytes())||
+       (prepared&&ranges_overlap(&stage,sizeof(stage),prepared,sizeof(*prepared))))
+        return reject("VU1 WORLD PREPARE INPUT UNSUPPORTED");
+    const unsigned bank=w.banks[w.bank].phase?w.bank^1:w.bank;
+    if(w.banks[bank].phase)return reject("VU1 WORLD BANKS OCCUPIED");
+#ifdef _EE
+    const auto count=geometry.corners.size();
+    if(world_ticket==UINT64_MAX)return reject("VU1 WORLD TICKET EXHAUSTED");
+    if(owner!=this)return reject("VU1 WORLD STAGING OWNER LOST");
+    const auto bits=[](float f){return std::bit_cast<std::uint32_t>(f);};
+    std::memcpy(w.header.data(),geometry.object_to_world.data(),sizeof(TransformMatrix));
+    std::memcpy(w.header.data()+4,geometry.world_to_clip.data(),sizeof(TransformMatrix));
+    w.header[8]={std::uint32_t(count),std::uint32_t(count/3),geometry.sequence,1};
+    w.header[9]={bits(248),bits(192),0,bits(0x1p-10f)};
+    w.header[10]={bits(640.f/496.f),bits(float(geometry.output_height)/384.f),bits(2048),bits(65536)};
+    w.header[11]={bits(496),bits(384),bits(1),bits(65536)};
+    w.header[12]={};w.header[13]={};
+    w.header[14]={bits(65536),bits(.5f),0,bits(0x1p-17f)};
+    w.header[15]={bits(0x1p-16f),bits(1024),bits(65536),bits(65536)};
+    const unsigned base=bank*512;w.reset_packet(bank);
+    w.word(command(0x6c,16,base));w.words(w.header.data(),sizeof(w.header));
+    w.word(command(0x6c,unsigned(count*2),base+16));w.words(geometry.corners.data(),geometry.corners.size_bytes());
+    w.word(command(0x14,0,world_entry+bank*3));
+    // Staged packets alone retain an unfinished builder length across calls.
+    w.used_words[bank]=w.used();
+    // Only copied CPU storage has changed. Pending completion reads its own
+    // bank echo/count; shared header scratch is never its DMA source.
+    w.banks[bank]={++world_ticket,w.header[8],unsigned(count),4};
+    w.bank=bank^1;stage.owner_=this;stage.ticket_=w.banks[bank].ticket;
+    ++w.counters.staged_prepares;s.failure="NONE";
+    return Vu1WorldStageResult::staged;
+#else
+    return reject("VU1 HARDWARE UNAVAILABLE");
+#endif
+}
+Vu1WorldSubmitResult Vu1Transform::submit_staged_prepare_world(const Vu1WorldStage& stage,Vu1WorldSubmission& submission) noexcept {
+    if(world_pending())return Vu1WorldSubmitResult::rejected;
+    if(quarantined)return Vu1WorldSubmitResult::failed;
+    if(!storage_||!storage_->ready||!storage_->world||!storage_->world->ready)return Vu1WorldSubmitResult::rejected;
+    auto&s=*storage_;auto&w=*s.world;
+    const auto reject=[&](const char*why){s.failure=why;++w.counters.rejected_batches;return Vu1WorldSubmitResult::rejected;};
+    unsigned bank=0;while(bank<2&&(w.banks[bank].phase!=4||w.banks[bank].ticket!=stage.ticket_))++bank;
+    if(stage.owner_!=this||!stage.ticket_||bank==2)return reject("VU1 WORLD STAGE STALE");
+    if(ranges_overlap(&submission,sizeof(submission),&stage,sizeof(stage)))return reject("VU1 WORLD STAGE OUTPUT ALIASED");
+#ifdef _EE
+    if(!s.world_idle(this))return Vu1WorldSubmitResult::failed;
+    auto& retained=w.banks[bank];w.select_packet(bank);retained.phase=1;
+    w.pending={retained.ticket,bank,1,0,0,Vu1WorldCompletion::path1_retired};
+    if(!s.world_submit(false))return Vu1WorldSubmitResult::failed;
+    submission.owner_=this;submission.ticket_=w.pending.ticket;
+    ++w.counters.staged_submissions;s.failure="NONE";return Vu1WorldSubmitResult::submitted;
+#else
+    return reject("VU1 HARDWARE UNAVAILABLE");
+#endif
+}
+bool Vu1Transform::cancel_staged_world(const Vu1WorldStage& stage) noexcept {
+    if(quarantined||!storage_||!storage_->ready||!storage_->world||!storage_->world->ready)return false;
+    auto&s=*storage_;auto&w=*s.world;
+    unsigned bank=0;while(bank<2&&(w.banks[bank].phase!=4||w.banks[bank].ticket!=stage.ticket_))++bank;
+    if(stage.owner_!=this||!stage.ticket_||bank==2){s.failure="VU1 WORLD STAGE STALE";return false;}
+    w.banks[bank]={};++w.counters.staged_cancellations;s.failure="NONE";return true;
+}
+
 Vu1WorldPollResult Vu1Transform::poll_world(const Vu1WorldSubmission& submission) noexcept {
     if(quarantined)return Vu1WorldPollResult::failed;
     if(!storage_||!storage_->ready||!storage_->world||!storage_->world->ready)return Vu1WorldPollResult::rejected;
@@ -665,7 +756,7 @@ Vu1WorldSubmitResult Vu1Transform::submit_emit_world(const Vu1WorldToken& token,
     }
     const auto tail=states.size()*15;
     tag(tail,GIF_SET_TAG(1,1,0,0,GIF_FLG_PACKED,1),GIF_REG_AD);tag(tail+1,0,GS_REG_FINISH);
-    retained.ticket=0;retained.phase=3;w.used=0;
+    retained.ticket=0;retained.phase=3;w.reset_packet(bank);
     w.pending={++world_ticket,bank,2,0,0,completion};
     for(std::size_t t=0;t<states.size();++t){const unsigned address=base+256+unsigned(t*15);
         w.word(command(0x6c,6,address));w.words(w.output.data()+t*15,6*16);

@@ -8,7 +8,9 @@ enum class NativeVehicleRenderMode { native_vu, reference, guarded_vu };
 // world_presentation requires textured/native_vu and keeps that renderer fixed;
 // it is an explicit opt-in to untransformed plans and direct VU1 world batches.
 // classify_async schedules EE gathering between submit and finish calls; it
-// does not imply measured hardware overlap. Presentation still completes here.
+// does not imply measured hardware overlap. classify_staged also assembles the
+// next CPU preparation packet while an emit is pending, without another DMA.
+// Both are explicit options; presentation still completes before return.
 // Material memoization is scoped to one immutable draw plan presentation.
 // reject_outside skips repeated work only for validated VU fallback clips.
 int run_native_vehicle_demo(Display& display,ps2::PadInput& pad,

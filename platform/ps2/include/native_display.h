@@ -96,7 +96,7 @@ struct Stats {
     std::uint32_t world_trivial_rejects=0;
 };
 using DisplayClock=std::uint64_t (*)(void*) noexcept;
-enum class WorldSubmissionMode : std::uint8_t { fused, classify_first, classify_async };
+enum class WorldSubmissionMode : std::uint8_t { fused, classify_first, classify_async, classify_staged };
 enum class WorldMaterialMode : std::uint8_t { resolve_each, memoized };
 enum class WorldFallbackMode : std::uint8_t { clip_each, reject_outside };
 enum class WorldGeometryMode : std::uint8_t { raw, prepared };

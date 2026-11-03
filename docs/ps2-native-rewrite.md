@@ -361,6 +361,21 @@ in updates 1–60; subsequent windows peak at 20.085 ms or less. Window totals
 cannot identify the precise worst frame or attribute it to texture uploads.
 The complete-app report is `build/ps2-facing-final-001/cadence-validation.json`.
 
+The subsequent CPU-staged driver allows the EE to build the next preparation
+packet while a prior emit is pending, with separate packet ownership and one
+hardware job at a time. It remains an explicit `--drive-world-staged` option.
+An initial indexed-buffer implementation regressed the synchronous control to
+19.224 ms. Direct packet access and stage-only length retention bring it back
+to 18.581 ms mean / 25.993 ms maximum over 660 complete intervals, still about
+0.035 ms above native059. Cadence remains 29.987884 updates/sec, with all 660
+intervals over budget. The performance report is
+`build/ps2-staged-final-001/packet-builder-cadence-validation.json`;
+see the [pipeline contract](../platform/ps2/native/vu1_world.md#cpu-staged-preparation).
+The final staged application measures 18.690 ms mean / 26.115 ms maximum over
+660 periods, about 0.110 ms above the final synchronous control. It has the same
+approximately 30 Hz cadence and remains experimental; physical overlap and a
+net frame-time benefit are unverified.
+
 The preceding native057 builds were measured over matching 660 complete periods in
 Play 0.72, with identical inputs and rendering preferences:
 

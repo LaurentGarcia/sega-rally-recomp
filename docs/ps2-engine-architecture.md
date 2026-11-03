@@ -176,6 +176,25 @@ This schedules EE work between hardware issue and retirement; it does not
 establish simultaneous VU jobs or a measured hardware speedup. An emulator can
 complete VU work inside the DMA-start write itself.
 
+The explicit `classify_staged` mode also validates and assembles N+1's prepare
+packet while N's emit is pending. Each bank owns a separate aligned 8 KiB CPU
+packet; staging cannot overwrite a live DMA source. Construction uses a direct
+active pointer and scalar word count. Only unsubmitted stages save a per-slot
+length, restored at launch; ordinary packets need no saved builder state. An opaque
+`Vu1WorldStage` reserves its bank and owns all copied inputs. Submit consumes it
+only after the current hardware operation retires; cancellation can release an
+unsubmitted stage while the other bank is pending. Legacy synchronous mutation
+invalidates stages under the same nonbusy rule as ready tokens. Presentation
+failure cleanup and owner destruction drain pending work before cancelling
+stages or releasing resources.
+
+This adds 8,256 persistent bytes to an initialized world owner on EE, including
+metadata and alignment. VSM programs, texture/CLUT lifetime rules, mapped-read
+fences and primitive order are unchanged. There is still one hardware job at
+most. The game exposes `--drive-world-staged` as an experimental option; defaults
+retain their prior modes. Its cumulative stage counters distinguish preparation,
+accepted launch and cancellation from actual unit overlap.
+
 ```text
 EE             submit prepare N | gather first half of N+1 | finish prepare N
 VIF / VU1                       | transform/classify N     | retired
@@ -189,6 +208,20 @@ GS                              | draw N; FINISH at resource/flip fence
 The middle columns show work scheduled between issue and completion, not a
 measured duration or proof that EE and VU stayed busy concurrently. A clipping
 fallback has no emit interval. The synchronous mode remains a separate control.
+
+The allocated 8 KiB slots are capacity, not DMA transfer sizes. With 16 triangles,
+preparation sends 1,840 bytes; emission sends 2,016 bytes with deferred completion
+or 2,048 bytes with GS FINISH. Preparation currently resends a 256-byte header:
+128 bytes of matrices, 16 bytes of counts/sequence/mode, 80 bytes of constants,
+and 32 bytes of status/echo that VU1 rewrites. Across the retained 601-update scene,
+83,064 preparations and 49,358 emissions transfer about 405 KB per update.
+
+Reducing repeated payload is a separate, unimplemented optimization. Retaining
+constants and omitting overwritten status fields could remove 112 bytes per
+preparation, about 15.5 KB per update in that scene. It must handle output-height
+changes and every other API that writes VU memory; CPU staging cannot establish
+hardware residency. Compare complete frame time as well as bytes: splitting
+payload into more DMA submissions adds setup and retirement costs.
 
 SDK and standard-library dependencies are external to this project-file gate.
 Application entry points still call SDK startup, clock and sleep functions

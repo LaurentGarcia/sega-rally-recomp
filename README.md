@@ -77,13 +77,16 @@ performs transforms, projection and direct GS packet production on VU1, with
 ordered clipping fallback. Geometry classification, bounded material reuse,
 outside-face rejection, prepared corners, exact rotation reuse and prepared
 visibility metadata bring that path to about **30 native updates/sec**, with
-**18.55 ms mean work per frame** over a 660-period Play test. The latest
-visibility change saves another **0.24 ms (1.3%)** against the preceding build.
+**18.58 ms mean work per frame** over a 660-period Play test. Prepared
+visibility previously saved **0.24 ms (1.3%)**; the staged-capable driver adds
+about **0.03 ms** to that synchronous control.
 It remains an explicit experimental mode. The textured
 scene has not reached 60 updates/sec; full-race and physical-console performance
 remain unverified.
 An additional asynchronous scheduler now gathers the next EE batch between
-VU submission and completion, with explicit buffer ownership. Its sampled
+VU submission and completion, with explicit buffer ownership. An additional
+`--drive-world-staged` option builds the next preparation packet during the
+previous emit, using separate owned buffers. Its sampled
 images match the synchronous world renderer; it has not shown a speedup in Play.
 See the [PS2 build guide and limits](docs/ps2.md).
 The [shared engine](docs/ps2-engine-architecture.md) keeps hardware services

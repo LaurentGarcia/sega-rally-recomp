@@ -99,6 +99,18 @@ private:
     std::uint64_t ticket_=0;
     friend class Vu1Transform;
 };
+// CPU-owned packet only; no hardware operation has been launched. Copies
+// identify the same single-use stage. A stage reserves one bank until submit
+// or cancellation and owns all copied numeric inputs, with no caller lease.
+class Vu1WorldStage {
+public:
+    Vu1WorldStage() noexcept=default;
+private:
+    const Vu1Transform* owner_=nullptr;
+    std::uint64_t ticket_=0;
+    friend class Vu1Transform;
+};
+enum class Vu1WorldStageResult : std::uint8_t { staged,rejected,failed };
 enum class Vu1WorldSubmitResult : std::uint8_t { submitted,rejected,failed };
 enum class Vu1WorldPollResult : std::uint8_t { pending,complete,rejected,failed };
 enum class Vu1WorldPrepareResult : std::uint8_t { ready,fallback,rejected,failed };
@@ -113,6 +125,7 @@ struct Vu1WorldStats {
     std::uint64_t corners=0,dma_qwords=0;
     std::size_t persistent_bytes=0;
     std::uint32_t prepared_batches=0,ready_batches=0,cancelled_batches=0;
+    std::uint32_t staged_prepares=0,staged_submissions=0,staged_cancellations=0;
 };
 // Bounded numerical and packet-shape admission, independent of hardware.
 // Resolved TEST/TEX0/CLAMP values remain the Display owner's responsibility.
