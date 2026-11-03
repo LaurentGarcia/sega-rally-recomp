@@ -99,6 +99,7 @@ class WorldScene(unittest.TestCase):
             self.assertIn("WORLD_PLAN PASS frames=97",result.stdout)
             self.assertIn("ordered_geometry=1 immutable_leases=1 atomic_failure=1 no_plan_allocations=1",result.stdout)
             self.assertIn("WORLD_PLAN_CORNERS PASS atomic_replacement=1 owned_values=1 no_gather_allocations=1",result.stdout)
+            self.assertIn("WORLD_PLAN_FACING PASS scenarios=1584 exact_selection=1 group_resets=1 disabled_keys=1 rotated_instances=1",result.stdout)
 
     def test_prepared_gather_order_and_mutable_equivalence(self):
         compiler=shutil.which("clang++") or shutil.which("g++")

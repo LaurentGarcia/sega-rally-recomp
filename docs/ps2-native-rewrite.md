@@ -296,7 +296,7 @@ not cycle renderers. Start still restores the initial checkpoint, and the
 diagnostic page reports the previous submitted GS triangle count. Game
 arithmetic, camera history and input behavior are shared with the normal path.
 
-The latest native058 car bridge reuses exact sine/cosine pairs for body/shadow
+The native058 car bridge reuses exact sine/cosine pairs for body/shadow
 yaw, front-wheel steering and common wheel spin within each update. Its 12
 rotations need 14 rather than 24 sine evaluations. Each pair is calculated at
 its first original use; matrix arithmetic, binary64 expressions, validation and
@@ -326,6 +326,40 @@ ELF layouts. Geometry, resource work, game state fields and controls agree.
 These logs do not compare every internal state. Default and async presentation
 were not remeasured for this change. The complete-app report is
 `build/ps2-bridge-reuse-final-001/cadence-validation.json`.
+
+Native059 moves repeated adjacent-face descriptor comparisons into immutable
+model preparation. Each face stores one byte identifying an exact continuation
+of the preceding enabled normal/point descriptor. Planning retains the original
+visibility arithmetic, cull resets and face order, with no per-frame allocation.
+The four retained model owners add 3,428 bytes on EE, including vector metadata.
+The portable comparison matches 40,605 facing evaluations and 2,091 published
+plans; 1,584 authored scenarios exercise group boundaries, rotated instances,
+disabled descriptors and camera positions, with six additional one-bit key
+controls. All 308 portable PS2 tests pass.
+
+A paired EE fixture uses the previous planner body against the same prepared
+storage. Planner/publication falls from 2.086 to 1.871 ms; total adapter work
+falls from 3.632 to 3.417 ms. All 601 ordered plans and counters agree, and
+17 framebuffer pairs preserve all 4,874,240 color words and historical hashes.
+This comparison isolates traversal; the whole-app run below also includes the
+changed storage layout. The paired report is
+`build/ps2-facing-continuation-scene-ee-002/runtime-validation.json`.
+
+Fresh 660-period complete-app observations use the same prepared-world mode,
+assets, checkpoint and neutral input:
+
+| Prepared world path | Native updates/sec | Mean work | Maximum work |
+| --- | ---: | ---: | ---: |
+| Native058 control | 29.987285 | 18.791 ms | 26.141 ms |
+| Native059 prepared visibility | 29.987888 | 18.546 ms | 25.894 ms |
+
+Mean work falls by 0.244 ms (1.3%). All 660 work intervals remain over the
+16.667 ms target; this has not increased the observed presentation cadence.
+These are Play measurements in the bounded vehicle scene, not full-race or
+physical-console performance. A separate audit places the native058 maximum
+in updates 1–60; subsequent windows peak at 20.085 ms or less. Window totals
+cannot identify the precise worst frame or attribute it to texture uploads.
+The complete-app report is `build/ps2-facing-final-001/cadence-validation.json`.
 
 The preceding native057 builds were measured over matching 660 complete periods in
 Play 0.72, with identical inputs and rendering preferences:

@@ -14,6 +14,7 @@ namespace ps2::native {
 struct PreparedWorldModel::Storage {
     std::vector<WorldPoint> vertices;
     std::vector<WorldFace> faces;
+    std::vector<std::uint8_t> facing_continuation;
     std::vector<WorldFaceGroup> groups;
     std::vector<std::array<float,6>> bounds;
     std::vector<Material> materials;
@@ -328,7 +329,8 @@ PreparedWorldModel::~PreparedWorldModel()=default;
 bool PreparedWorldModel::valid()const noexcept{return bool(storage_);}
 std::size_t PreparedWorldModel::persistent_bytes()const noexcept{
     return storage_?sizeof(Storage)+storage_->vertices.capacity()*sizeof(WorldPoint)+
-        storage_->faces.capacity()*sizeof(WorldFace)+storage_->groups.capacity()*sizeof(WorldFaceGroup)+
+        storage_->faces.capacity()*sizeof(WorldFace)+storage_->facing_continuation.capacity()*sizeof(std::uint8_t)+
+        storage_->groups.capacity()*sizeof(WorldFaceGroup)+
         storage_->bounds.capacity()*sizeof(std::array<float,6>)+storage_->materials.capacity()*sizeof(Material)+
         storage_->texture_scales.capacity()*sizeof(std::array<float,2>)+
         storage_->textures.capacity()*sizeof(Texture)+storage_->indices.capacity():0;
@@ -341,6 +343,13 @@ bool PreparedWorldModel::assign(WorldModel model,WorldSceneError& error)noexcept
         auto replacement=std::make_shared<Storage>();
         replacement->vertices.assign(model.vertices.begin(),model.vertices.end());
         replacement->faces.assign(model.faces.begin(),model.faces.end());
+        // Only immutable, adjacent enabled descriptors can continue the same
+        // exact six-word facing key. Runtime cull/disabled/instance resets
+        // still decide whether a previously evaluated result is available.
+        replacement->facing_continuation.resize(model.faces.size());
+        for(std::size_t i=1;i<model.faces.size();++i)
+            replacement->facing_continuation[i]=model.faces[i-1].facing.enabled&&model.faces[i].facing.enabled&&
+                same_facing(model.faces[i-1].facing,model.faces[i].facing);
         replacement->groups.assign(model.groups.begin(),model.groups.end());
         replacement->bounds.reserve(model.groups.size());
         for(const auto& group:model.groups)replacement->bounds.push_back(local_bounds(model,group));
@@ -455,7 +464,7 @@ bool WorldScene::plan_prepared(std::span<const PreparedWorldInstance> instances,
         bank.leases[bank.lease_count++]=source.model->storage_;
         const auto first=selected;std::size_t group_index=0;
         const bool identity=identity_matrix(instance.object_to_world);
-        WorldFacing previous_facing;bool have_facing=false,previous_visible=false;
+        bool have_facing=false,previous_visible=false;
         for(std::size_t face_index=0;face_index<model.faces.size();++face_index){
             if(group_index<model.groups.size()&&model.groups[group_index].first_face==face_index){
                 const auto group=model.groups[group_index];const auto& bounds=model.bounds[group_index++];++groups;
@@ -464,10 +473,10 @@ bool WorldScene::plan_prepared(std::span<const PreparedWorldInstance> instances,
             }
             const auto& face=model.faces[face_index];
             if(view.use_facing&&face.facing.enabled){bool visible;
-                if(have_facing&&same_facing(previous_facing,face.facing))visible=previous_visible;
+                if(have_facing&&model.facing_continuation[face_index])visible=previous_visible;
                 else{
                     if(!facing_visible(face.facing,instance.object_to_world,view.facing_origin,visible))return fail(WorldSceneError::invalid_transform,error);
-                    previous_facing=face.facing;previous_visible=visible;have_facing=true;
+                    previous_visible=visible;have_facing=true;
                 }
                 if(!visible){++backfaces;continue;}
             }else have_facing=false;

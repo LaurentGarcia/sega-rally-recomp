@@ -59,6 +59,98 @@ void parity(){Source source;PreparedWorldModel model;WorldSceneError error;R(mod
  WorldView outside{identity()};outside.use_facing=true;outside.facing_origin.x=100;R(planner.plan_prepared(instances,outside,error));for(const auto&i:planner.draw_plan().instances())R(i.visible_face_indices.empty());
  R(planner.plan_prepared({},outside,error));R(planner.draw_plan().instances().empty()&&planner.draw_plan().output_triangle_capacity()==96);
 }
+void facing_continuations(){
+ // Different group partitions cross equal-plane runs, including a culled
+ // middle run followed by the same back-facing key. The uncached oracle
+ // evaluates each surviving face independently using exact dyadic inputs.
+ std::array<WorldPoint,6>points{{{-.25f,-.25f,.5f},{.25f,-.25f,.5f},{0,.25f,.5f},
+                               {3,.125f,.5f},{3.5f,.125f,.5f},{3,.375f,.5f}}};
+ std::array<WorldFace,12>faces{};
+ WorldScene planner,normal;WorldSceneError error;
+ R(planner.configure_plan(24,192,error));R(normal.configure(24,192,error));
+ normal.set_numeric_mode(WorldNumericMode::native_float);Expanded expanded;
+ unsigned scenarios=0;
+ for(unsigned component=0;component<6;++component){
+  WorldFacing front{{1,1,1},{1,1,1},true},back=front;
+  const std::array<float*,6>fields{&back.normal.x,&back.normal.y,&back.normal.z,
+      &back.point.x,&back.point.y,&back.point.z};*fields[component]=-8;
+  for(unsigned i=0;i<faces.size();++i){faces[i]={};faces[i].indices={0,1,2};
+   faces[i].argb=0xff112200u+i;faces[i].facing=front;}
+  for(unsigned i:{2u,3u,7u,8u,9u})faces[i].facing=back;
+  faces[5].facing.enabled=false;
+  faces[7].indices=faces[8].indices={3,4,5};
+  faces[10].facing={};faces[10].facing.normal.x=std::bit_cast<float>(0x7fc12345u);
+  faces[11].facing={{0,-0.f,0},{1,1,1},true};
+  for(unsigned partition=0;partition<66;++partition){
+   std::vector<WorldFaceGroup>groups;
+   if(partition){const unsigned mask=partition==1?0:partition==2?2047:(partition*37u)&2047u;
+    unsigned first=0;for(unsigned i=0;i<12;++i)if(i==11||(mask&(1u<<i))){groups.push_back({first,i+1-first});first=i+1;}}
+   PreparedWorldModel model;R(model.assign({points,faces,groups},error));
+   std::array<PreparedWorldInstance,2>instances{{{&model,identity()},{&model,identity()}}};
+   // Signed zeros in disabled/zero-dot descriptors remain copied exactly.
+   for(unsigned position=0;position<4;++position){
+    WorldView view{identity()};view.use_facing=true;view.facing_origin={float(position)/8,0,0};
+    instances[0].object_to_world=identity();instances[0].object_to_world[12]=.125f;
+    instances[1].object_to_world=identity();instances[1].object_to_world[0]=0;
+    instances[1].object_to_world[1]=1;instances[1].object_to_world[4]=-1;
+    instances[1].object_to_world[5]=0;instances[1].object_to_world[13]=-.125f;
+    if(position&1)std::swap(instances[0],instances[1]);
+    const auto before=allocations;R(planner.plan_prepared(instances,view,error));R(allocations==before);
+    const auto plan=planner.draw_plan();unsigned expected_backfaces=0,expected_culled=0;
+    for(unsigned owner=0;owner<2;++owner){
+     std::array<bool,12>culled{};
+     for(auto group:groups)if(group.first_face>=7&&group.first_face+group.face_count<=9){
+      ++expected_culled;for(unsigned i=0;i<group.face_count;++i)culled[group.first_face+i]=true;}
+     std::array<std::uint32_t,12>selected{};unsigned count=0;
+     for(unsigned i=0;i<faces.size();++i){if(culled[i])continue;const auto& f=faces[i].facing;bool visible=true;
+      if(f.enabled){const auto n=transform(instances[owner].object_to_world,{f.normal.x,f.normal.y,f.normal.z,0});
+       const auto p=transform(instances[owner].object_to_world,{f.point.x,f.point.y,f.point.z,1});
+       const float x=n[0]*(p[0]-view.facing_origin.x),y=n[1]*(p[1]-view.facing_origin.y),z=n[2]*(p[2]-view.facing_origin.z);
+       visible=(x+y)+z>=0;}
+      if(visible)selected[count++]=i;else ++expected_backfaces;
+     }
+     const auto actual=plan.instances()[owner].visible_face_indices;
+     R(actual.size()==count&&std::equal(actual.begin(),actual.end(),selected.begin()));
+     R(std::bit_cast<std::uint32_t>(plan.instances()[owner].faces[11].facing.normal.y)==0x80000000u);
+    }
+    R(planner.plan_stats().groups==groups.size()*2&&planner.plan_stats().culled_groups==expected_culled&&
+      planner.plan_stats().backface_rejected_faces==expected_backfaces);
+    R(normal.update_prepared(instances,view,error));R(expanded.render(plan));equal(normal.frame(),expanded.frame(plan));
+    // Turning facing off does not consume the continuation metadata.
+    if(position==0){view.use_facing=false;R(planner.plan_prepared(instances,view,error));
+     R(planner.plan_stats().backface_rejected_faces==0);R(normal.update_prepared(instances,view,error));
+     const auto unrestricted=planner.draw_plan();R(expanded.render(unrestricted));equal(normal.frame(),expanded.frame(unrestricted));}
+    ++scenarios;
+   }
+  }
+ }
+ R(scenarios==1584);
+ // A one-bit change in any one of the six enabled words turns an exact
+ // zero-dot front face into a back face. Adjacent signed-zero keys remain
+ // stored distinctly even though both decisions are visible.
+ for(unsigned component=0;component<6;++component){
+  const unsigned axis=component%3,other=(axis+1)%3,unused=(axis+2)%3;
+  std::array<float,3>n{},p{};n[axis]=n[other]=1;p[axis]=-1;p[other]=1;
+  std::array<WorldFace,7>edges{};
+  for(auto& f:edges){f.indices={0,1,2};f.facing={{n[0],n[1],n[2]},{p[0],p[1],p[2]},true};}
+  std::array<float*,6>fields{&edges[1].facing.normal.x,&edges[1].facing.normal.y,&edges[1].facing.normal.z,
+      &edges[1].facing.point.x,&edges[1].facing.point.y,&edges[1].facing.point.z};
+  *fields[component]=std::bit_cast<float>(component<3?0x3f800001u:0xbf800001u);edges[2].facing=edges[1].facing;
+  const std::array<float*,3>zeros{&edges[5].facing.normal.x,&edges[5].facing.normal.y,&edges[5].facing.normal.z};
+  *zeros[unused]=-0.f;edges[6].facing=edges[5].facing;
+  const std::array<WorldFaceGroup,3>groups{{{0,2},{2,1},{3,4}}};PreparedWorldModel model;
+  R(model.assign({std::span(points).first(3),edges,groups},error));PreparedWorldInstance instance{&model,identity()};
+  WorldView view{identity()};view.use_facing=true;R(planner.plan_prepared({&instance,1},view,error));
+  const auto plan=planner.draw_plan();const std::array<std::uint32_t,5>expected{0,3,4,5,6};
+  const auto selected=plan.instances()[0].visible_face_indices;
+  R(selected.size()==expected.size()&&std::equal(selected.begin(),selected.end(),expected.begin()));
+  R(planner.plan_stats().backface_rejected_faces==2);
+  const auto& zero=plan.instances()[0].faces[5].facing.normal;
+  R((std::bit_cast<std::array<std::uint32_t,3>>(zero)[unused]==0x80000000u));
+  R(normal.update_prepared({&instance,1},view,error));R(expanded.render(plan));equal(normal.frame(),expanded.frame(plan));
+ }
+ std::puts("WORLD_PLAN_FACING PASS scenarios=1584 exact_selection=1 group_resets=1 disabled_keys=1 rotated_instances=1 one_bit_keys=6");
+}
 void lifetime_and_atomicity(){Source source;WorldScene scene;WorldSceneError error;WorldView view{identity()};view.use_facing=true;R(scene.draw_plan().output_triangle_capacity()==0);
  R(!scene.plan_prepared({},view,error)&&error==WorldSceneError::not_configured);R(scene.configure_plan(12,96,error));auto owner=std::make_unique<PreparedWorldModel>();R(owner->assign(source.model(),error));PreparedWorldInstance instance{owner.get(),identity()};R(scene.plan_prepared({&instance,1},view,error));const auto plan=scene.draw_plan();Expanded expected;R(expected.render(plan));const auto data=plan.instances().data();const auto stats=scene.plan_stats();
  // Same owner receives new storage, then dies: both flat positions and texture
@@ -132,4 +224,4 @@ void corner_transactions(){
  std::puts("WORLD_PLAN_CORNERS PASS atomic_replacement=1 owned_values=1 no_gather_allocations=1");
 }
 }
-int main(){parity();lifetime_and_atomicity();corner_transactions();std::printf("WORLD_PLAN PASS frames=%u checks=%u ordered_geometry=1 immutable_leases=1 atomic_failure=1 no_plan_allocations=1\n",frames,checks);}
+int main(){parity();facing_continuations();lifetime_and_atomicity();corner_transactions();std::printf("WORLD_PLAN PASS frames=%u checks=%u ordered_geometry=1 immutable_leases=1 atomic_failure=1 no_plan_allocations=1\n",frames,checks);}

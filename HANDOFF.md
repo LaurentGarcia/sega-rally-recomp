@@ -1,5 +1,84 @@
 # Handoff
 
+## Native PS2 prepared facing continuations (2026-11-02)
+
+Continued from 2f936e3. PreparedWorldModel now computes one immutable byte per
+face identifying an exact six-word facing-key continuation of the immediately
+preceding enabled descriptor. plan_prepared retains all instance, disabled-face
+and culled-group resets; it removes only repeated key comparisons and copies.
+Dot-product arithmetic, face order, clipping, VU code and submission are unchanged.
+Allocation failure preserves the old snapshot. persistent_bytes includes the
+new vector; the retained four owners add exactly 3,428 EE bytes: 3,380 payload
+bytes and four 12-byte vector descriptors. Production source SHA-256:
+5457f81b32989623c12665e7c87426a29b1246fc73bb452a2e4aa036e0732b7f.
+
+The authored planner fixture covers 1,584 partition/rotation/origin scenarios,
+six one-bit key controls, disabled descriptors, culled runs and allocation
+failure. Strict O3 and ASan/UBSan comparisons against 2f936e3 preserve all
+40,605 facing evaluations and 2,091 published plans, hashes ecac8b56e350f363
+and 4ca9744e141c8597. Report:
+build/ps2-facing-continuation-proof-001/validation.json, SHA-256
+7503c23212b9de371856332ac6ae0973f3b9bd4664bc4d7b8b9220815bc80cda.
+All 308 portable PS2 tests pass in 114.954 seconds with no source drift. Report:
+build/ps2-facing-final-001/portable-tests.json, SHA-256
+60bbdaee066f7c6ac3487f7bc8eb3bf1eec865be8c512be3386f91fc83b02ac5.
+
+The paired strict-O3 EE fixture retains the exact previous plan_prepared body
+as a private baseline method. Both methods use candidate snapshot storage;
+this isolates traversal cost, not the allocation/layout change. One common
+dispatcher and three outer clocks alternate baseline/candidate order through
+601 live native updates; inner clocks remain disabled. All ordered plans and
+counters agree, including 885,445 triangles. Seventeen image pairs compare
+all 4,874,240 color words, preserving plan hash 3e8769a247c136f3 and pixel hash
+af08a568c3638e99. The initial private fixture's include collision is retained
+in failed EE001; EE002 uses an exact private dependency-header copy and changes
+no production headers. The closed runtime report is
+build/ps2-facing-continuation-scene-ee-002/runtime-validation.json, SHA-256
+b20fefff1f34cf91c6354e01fe8b10d1281e013d2ecdd0f13dc6032daf380381.
+
+| Paired phase | Baseline ms | Continuations ms |
+| --- | ---: | ---: |
+| Adapter total | 3.631823 | 3.416667 |
+| Camera/body/instance preparation | 1.537299 | 1.536184 |
+| Planner/publication | 2.086335 | 1.871034 |
+| Residual | 0.008189 | 0.009449 |
+
+Native059, engine-demo059 and prepared-world wrapper017 cross-build from current
+sources. All 35 shared engine identities agree across applications; all 71
+non-entry wrapper objects match native059. Build-set report:
+build/ps2/native-059/build-set-validation.json, SHA-256
+785de5b77cac710ddf930b141fd1c021a7e735ad899ba2f9cf94a1ff53cdc1b7.
+
+Two closed 60-second complete-app runs retain the same seven assets, checkpoint,
+neutral disconnected-pad input and rendering preferences. First 660 periods:
+
+| Prepared world path | Updates/sec | Mean work ms | Maximum work ms |
+| --- | ---: | ---: | ---: |
+| Fresh058 control | 29.987285 | 18.790599 | 26.140625 |
+| Continuations059 | 29.987888 | 18.546241 | 25.894097 |
+
+Mean work saves 0.244358 ms (1.3004%); all 660 intervals remain over 16.667 ms.
+All 98 record/field sets and 658 non-memo values agree. Seventy pointer-layout
+memo diagnostics are retained, with 36 allowed actual differences. Boot storage
+changes by precisely 3,428 bytes; other boot fields agree. The fresh control
+matches historical058 timing. Report:
+build/ps2-facing-final-001/cadence-validation.json, SHA-256
+af8b20d84584aa6f56882da952ee335e59c20a71aaf06ec5ff1e279024df47af.
+
+The read-only slow-window audit locates 058's maximum in updates 1–60; the
+remaining windows peak at 20.085069 ms or less. It cannot identify the exact
+frame or attribute the peak to uploads. FRAME display_ticks already includes
+geometry_ticks: do not add them twice. Current packet_ticks cannot separate
+prepare/emit/fallback/material costs; historical detailed profiles predate
+several optimizations and must not be treated as current residual costs.
+
+The independent CPU-staged packet lane remains an ignored overlay under
+build/ps2-staged-prepare-001; it is not part of native059 or this commit.
+One hardware job remains pending at most. Full races, AI/HUD/game audio,
+live-controller and physical-console validation, and the prior 66 reference
+color differences remain open. These are bounded Play scene measurements,
+not a 60 Hz or full-game claim.
+
 ## Native PS2 GCC test-sentinel portability correction (2026-11-02)
 
 GitHub CI for 808f38b cross-linked the PS2 targets successfully, but GCC

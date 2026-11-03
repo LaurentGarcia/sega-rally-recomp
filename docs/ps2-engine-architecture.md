@@ -282,6 +282,16 @@ Rally releases its temporary decoded geometry after preparing body and course
 models. Preparation cost and persistent storage belong to asset loading, not
 the frame budget.
 
+Prepared models also retain one continuation byte per face. A set byte means
+that this face and its immediate predecessor both enable facing and have
+bit-identical normal/point words, including signed zero. `plan_prepared` can
+reuse the preceding visibility result without comparing six words or copying
+the descriptor each frame. Culled groups, disabled facing and new instances
+still reset that result; allocation or validation failure preserves the old
+snapshot. This changes no dot-product arithmetic or primitive order. The
+retained Rally scene needs 3,380 payload bytes across four shared model owners,
+plus the vector bookkeeping included in `persistent_bytes()`.
+
 The bounded vertex cache also retains successfully validated inside projections.
 Their lifetime is one instance update; clipped or failed projections use the
 full clipper. The internal helper contract preserves projection order,

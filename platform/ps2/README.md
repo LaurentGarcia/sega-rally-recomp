@@ -59,7 +59,7 @@ directory. The output directory must be new or empty:
 ```sh
 python3 platform/ps2/tools/preview_play.py \
   --emulator build/ps2/emulator/Play.app/Contents/MacOS/Play \
-  --elf build/ps2/native-058/segarally-ps2-native-port.elf \
+  --elf build/ps2/native-059/segarally-ps2-native-port.elf \
   --host "build/ps2/emulator/Play Data Files/vfs/host" \
   --output build/ps2-preview-001 --mode raw --seconds 20
 ```
