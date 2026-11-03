@@ -480,6 +480,108 @@ to 14.384 ms (6.8%). The earlier clipper already rejected these faces before
 polygon clipping; this saving comes from repeated construction, validation and
 outcode work. It is separate from the remaining cost of clipping crossing faces.
 
+The native062 follow-up profiles three fixed plans at updates 1, 181 and 601,
+with instrumentation disabled/enabled in the same strict-O3 executable. All
+860,160 sampled framebuffer words and 35 renderer / 12 driver counters agree.
+The enabled clocks add 0.396 ms mean draw work; the disabled build still retains
+the hooks and layout. These are warmed draw measurements, excluding game and
+plan construction, rather than a new complete-loop performance result.
+
+| Exclusive Display phase | Three-plan mean, nominal CP0 ms |
+| --- | ---: |
+| Gather | 0.495 |
+| Preparation handoff | 0.488 |
+| Preparation call | 3.040 |
+| Direct material handling | 2.690 |
+| Emission handoff | 0.017 |
+| Emission call | 1.665 |
+| Fallback clipping, resources and packet emission | 4.143 |
+
+Driver detail is nested inside those calls, not additional frame cost:
+preparation assembly/send measure 0.594/1.930 ms and emission assembly/send
+0.347/1.188 ms. Combined finish polling measures 0.00845 ms. All 5,384 sampled
+sends and first finish polls observe completion in Play. SDK send includes cache
+publication and may execute emulated VU work inline; these numbers neither
+measure physical DMA bandwidth nor establish continuous hardware occupancy.
+Report: `build/ps2-pipeline-profile-ee-001/runtime-validation.json`.
+
+Across the separate 601-update scene, the renderer submits 83,064 preparations
+and 49,358 emissions: 220.34 VIF submissions per update. Of 83,064 source
+batches, 33,706 take the whole-batch fallback. Reducing these software handoffs
+and repeated material work is the next measured target. Smaller payloads alone
+leave those costs in place. A resident-material prototype and a bounded queued
+classification design were tested separately. Neither is a shipped streaming
+pipeline.
+
+The first resident-material experiment binds 278 materials, 66 unique textures
+(86 pages, including the checker) and 195 CLUTs before drawing. It keeps the
+existing 16-triangle geometry decisions and substitutes prebuilt resource state
+in both direct and fallback draws. Three fixed plans pass 1,720,320 literal
+framebuffer-word comparisons with unchanged geometry outcomes. A balanced
+same-executable comparison measures 15.273 ms for ordinary classification,
+14.226 ms for resident classification and 14.310 ms for resident fused drawing.
+The last plan ties ordinary/resident classification at 14.731 ms, with fused
+drawing 0.243 ms slower. The experiment adds 44,096 bytes of bounded scratch
+members; this is not a complete allocation-size measurement.
+
+These measurements do not establish an improvement over native062: all modes
+share an owner whose resource cache is expanded by the resident mode, and the
+extra code/storage may change the control's cost. Each measured draw first warms
+its own mode because fused drawing invalidates retained emission templates.
+First-encounter records retain transition costs but are not independent cold-cache
+trials. Report:
+`build/ps2-world-pinned-ee-002/runtime-validation.json`.
+
+The subsequent four isolated processes reject this eager whole-scene binding
+approach for promotion. Both executables share 49 byte-identical non-Display
+objects, including the measurement entry point; every run starts with a fresh
+Display and one fixed mode. Warm draw results in Play are:
+
+| Plan update | Native062 | Prototype disabled | Resident classify | Resident fused |
+| --- | ---: | ---: | ---: | ---: |
+| 1 | 13.215 ms | 13.281 ms | 14.210 ms | 14.095 ms |
+| 181 | 11.523 ms | 11.655 ms | 13.738 ms | 13.868 ms |
+| 601 | 12.255 ms | 12.405 ms | 14.747 ms | 14.974 ms |
+| Equal-weight mean | 12.331 ms | 12.447 ms | 14.231 ms | 14.313 ms |
+
+Both proposed paths lose in every view: resident classification adds 1.900 ms
+(15.4%) and fused adds 1.981 ms (16.1%) on average versus native062. Three
+framebuffer hashes and geometry outcomes agree across all four runs. This is
+separate from the earlier literal-word comparisons; no new whole-game or console
+result is claimed. The shared-owner control was inflated, while disabled
+prototype overhead is only 0.116 ms in the isolated mean. Do not use the mixed
+comparison as a speedup. The next queued driver can use bounded, lazy resource
+preparation; full-scene eager binding is not its prerequisite. Report:
+`build/ps2-world-pinned-isolated-002/comparison.json`.
+
+Bandwidth must be attributed to the correct link. The GS manual v6, section
+1.1.2, gives theoretical peaks of 38.4 GB/s for its local framebuffer port and
+9.6 GB/s for its local texture port, versus 1.2 GB/s host transfers. These are
+different paths, not a single bandwidth available to EE code. The current
+601-update trace sends about 339 KB of VIF input per update, or 20.3 MB/s if
+sustained at the 60-update target; that arithmetic is a traffic budget, not a
+measured physical transfer rate. It does not include other DMA traffic or burst
+contention. Prefer resident GS resources, useful overlap and fewer EE handoffs;
+judge any additional packet compression by total frame work, including its EE
+packing cost. More bytes can be worthwhile when they remove processing or
+round trips. Filling every cache or VU data word is not an occupancy objective:
+retain room for the next input and for output still owned by GIF.
+
+The first private queued driver executes three retained preparation records
+before one terminal EE collection, then emits each ordered ready run through
+alternating GS output buffers. Its three 160-qword records, 48-qword projection
+scratch and two 242-qword outputs occupy 1,012/1,024 VU1 data qwords. Existing
+arithmetic and 16-triangle batch decisions are preserved. Fallback clips are
+copied before another launch, and mapped reads still require full idle.
+
+Six authored flat-material cases pass 1,392 clip words, 2,112 dense geometry
+words, 4,308 surviving packet words, 1,720,320 literal framebuffer words and
+576 guard words against the current driver. The first output in two A/B/A
+runs is overwritten before mapped capture; its pixel effects are compared,
+but complete packet-word coverage is not claimed. Textured game integration,
+failure cases, full-frame timing and console overlap remain separate gates.
+Report: `build/ps2-window-pipeline-ee-001/runtime-validation.json`.
+
 The manuals describe a different scheduling opportunity: upload one bank while
 VU1 processes another and the previous output travels to the GS. Direct GIF
 output needs an explicit material-order, bank-lifetime and submission contract;

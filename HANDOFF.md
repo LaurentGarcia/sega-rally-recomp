@@ -1,5 +1,119 @@
 # Handoff
 
+## Native PS2 pipeline cost and resource experiments (2026-11-03)
+
+Continued from 98d9c1b. Production remains native062. The next experiments
+target repeated EE resource work and software handoffs; no continuously occupied
+hardware pipeline or physical bandwidth result has been established.
+
+The three-plan profiler (updates 1/181/601) passes 860,160 literal framebuffer
+word comparisons and all 35 renderer / 12 driver counters. Disabled/enabled
+instrumentation measures 12.453270/12.848958 ms mean draw work in the same ELF,
+excluding game and plan construction. Enabled clocks add 0.395689 ms. Exclusive
+Display phase means are gather 0.49485, prepare handoff 0.48848, prepare call
+3.03962, direct material work 2.69030, emit handoff 0.01675, emit call 1.66543,
+and whole fallback 4.14250 ms. Fallback includes resources and packet emission;
+it is not pure clipping. Nested driver assembly/send totals are 0.940366 and
+3.118579 ms; never add these again to Display phases. Finish polling is
+0.008454 ms. All 5,384 immediate and first-poll observations are already complete
+in Play, whose SDK send may execute VU work inline. Report:
+build/ps2-pipeline-profile-ee-001/runtime-validation.json, SHA-256
+4a09f74a55de10a4fb65e2946afdba5dd6f51191a84b9fef991a7e33b7ca06c3.
+
+The retained bundle's entire working set, including the checker, fits the current
+96-page / 256-CLUT arena: 66 texture identities, 86 pages and 195 palettes. This
+does not prove aligned placement or performance. The private resident-material
+prototype simulates actual page-cache allocation before live mutation, binds
+278 materials once per presentation, and reuses their GS state in the existing
+direct and fallback geometry paths. Its bounded scratch members occupy 44,096
+EE bytes (not a complete Impl allocation delta). The existing VSM and driver
+are unchanged; fused mode uses the existing larger full-state packets.
+
+The corrected shared-owner comparison passes 1,720,320 framebuffer words and
+geometry outcomes. Equal-weight three-plan means are ordinary classification
+15.273148, resident classification 14.226273 and resident fused 14.310185 ms.
+At update601 resident classification ties the control and fused loses 0.243056
+ms. These are not net improvements over native062: all modes share expanded
+cache state and the candidate has different code/storage layout. Report:
+build/ps2-world-pinned-ee-002/runtime-validation.json, SHA-256
+c884e7b3ed51f9963b3b7d76fda2bf9d2930f69120054b32d8a2a88e6e9b40ee.
+
+The initial001 fixture was not run: fused draws invalidate compact emission
+templates, so balanced interleaving could invalidate its same-mode DMA-counter
+assumption. Corrected002 warms the selected mode before each measured draw.
+Its FIRST records preserve transitions but are not independent cold-cache trials.
+Do not equate normalized resource addresses or framebuffer comparisons with a
+literal GS-packet-word proof. Cache population and pointer-hash/code layout are
+possible causes of the different control cost, not established explanations.
+
+Four corrected isolated002 runs now reject eager full-scene binding for
+promotion. Native062 / disabled prototype / resident classify / resident fused
+three-plan mean draw work is 12.331019 / 12.447049 / 14.231481 / 14.312500 ms.
+Resident modes lose in every view, adding 1.900463 ms (15.4%) / 1.981481 ms
+(16.1%) versus native062. Three framebuffer hashes and geometry outcomes agree;
+native/disabled resource counters agree except declared material-address hash
+memo collisions. All 49 non-Display objects, including the common main, are
+byte-identical across the strict-O3 executables. Complete per-mode cold and warm
+records, source closure, emulator and all relevant preferences are retained.
+Only five validated runtime-local storage directory strings are normalized
+between configs. Report:
+build/ps2-world-pinned-isolated-002/comparison.json, SHA-256
+afb2e5bd8f28d39c1ced57cd70d9965f229865b3d5965c9fa4313dd4dad1f364.
+
+Isolated001 exposed a separate fixture bug: the storage counter is set during
+admission, so reading it before the first draw falsely rejected candidate mode1.
+Corrected002 uses an explicit linked diagnostic identity marker; the renderer
+algorithm is unchanged and all001 evidence is retained. The earlier shared
+comparison inflated the control cost; the isolated disabled prototype adds only
+0.116030 ms on average. Do not promote this resident implementation or describe
+its shared-owner result as a net speedup. The queued driver remains independent;
+future integration should prepare only needed resources lazily or per window.
+
+Host extraction of the exact admission code passes 3,203 checks in strict O3
+and ASan/UBSan, with 23 admissions (13 accepted, 10 declined), no admission
+allocation and unchanged live-cache/age state. Cases include capacity boundaries,
+aligned fragmentation, hash collisions, generation/owner replacement and checker
+resources. SDK upload/GS failure paths are outside this proof. Report:
+build/ps2-world-pinned-admission-001/validation.json, SHA-256
+2e71f5e44acdc5a6d131e2e651c72981b9044d892386ca08c7fadf9a3ac98121.
+
+The private streaming design uses three 160-qword retained records, shared
+48-qword projection scratch and two 242-qword GS outputs: 1,012 of 1,024 VU1
+data qwords, with 12 guards. Dense ST/XYZ replaces consumed input only after
+all classification checks; fallback clips are copied before another VU launch.
+One terminal collection serves three preparations, and alternating XGKICK
+outputs preserve GIF ownership. The abstract lifetime model passes 33,824
+count/readiness combinations; it is not VU instruction or hardware validation.
+Actual 601-update batch counts permit 83,064 preparation returns to become 27,862.
+The private driver and 3,032-byte VU program now cross-build and execute. Six
+authored flat-material cases exercise counts up to16, non-unit W, ready runs,
+mixed fallback holes, ordered discard and alternating output buffers. All 1,392
+clip words, 2,112 dense ST/XYZ words, 4,308 surviving GS packet words, 1,720,320
+literal framebuffer words and 576 guard words agree with native062. Two first-A
+packets are overwritten by a third emission before mapped packet capture; their
+image effects are checked, but their complete packet words are not. No claim of
+full packet coverage, textured parity, error-path proof, speedup or physical
+overlap follows. Runtime report:
+build/ps2-window-pipeline-ee-001/runtime-validation.json, SHA-256
+aa601b2192bf784ee721d8f0e211be237d833018d3be180baef2e6ac3cc17916.
+Build report: build/ps2-window-pipeline-ee-001/build-validation.json, SHA-256
+0c5e1d6a7de4494d42cdde77c68c1e921676288ccce438faf3756f0c4f9f8819.
+The draft review caught duplicate entry labels and a legacy CPU-staging route
+that bypassed live-window exclusion; both were fixed before compilation.
+Design: build/ps2-window-pipeline-design-001/design.md. Next is private
+actual-scene integration with bounded, lazy/per-window resources and unchanged
+batch decisions, followed by the601-update comparison. The existing native062
+default is unchanged; nothing from this prototype is in production.
+
+Keep bandwidth paths separate: GS local framebuffer/texture peaks do not give
+the EE that same transfer rate. Current062 VIF traffic is about 339 KB/update,
+equivalent to 20.3 MB/s at the requested 60-update target, excluding other traffic
+and contention. More bytes can win if they remove EE work or handoffs; filling
+all caches or using every VU data word is not an objective. Preserve room and
+ownership for subsequent input and still-live output. The complete-loop
+18.249879 ms native062 result and outstanding 60-Hz/gameplay/console limits below
+remain authoritative until a replacement is validated.
+
 ## Native PS2 compact VIF emission packets (2026-11-03)
 
 Continued from f686bd4. The user's EE/DMA/VU payload focus is now implemented
