@@ -76,15 +76,15 @@ in Play**. An optional [world renderer](platform/ps2/native/vu1_world.md) now
 performs transforms, projection and direct GS packet production on VU1, with
 ordered clipping fallback. Geometry classification, bounded material reuse,
 outside-face rejection, prepared corners, exact rotation reuse and prepared
-visibility metadata bring that path to about **30 native updates/sec**, with
-**18.58 ms mean work per frame** over a 660-period Play test. Prepared
-visibility previously saved **0.24 ms (1.3%)**; the staged-capable driver adds
-about **0.03 ms** to that synchronous control.
+visibility metadata bring that path to about **30 native updates/sec**. Compact
+VIF uploads now reach **18.25 ms mean work per frame** over a 660-period Play
+test, saving **0.33 ms (1.8%)**. They preserve the GS packets while reducing total
+EE-to-VU traffic by **16.27%** in the retained scene.
 It remains an explicit experimental mode. The textured
 scene has not reached 60 updates/sec; full-race and physical-console performance
 remain unverified.
-An additional asynchronous scheduler now gathers the next EE batch between
-VU submission and completion, with explicit buffer ownership. An additional
+An asynchronous scheduler gathers the next EE batch between
+VU submission and completion, with explicit buffer ownership. The
 `--drive-world-staged` option builds the next preparation packet during the
 previous emit, using separate owned buffers. Its sampled
 images match the synchronous world renderer; it has not shown a speedup in Play.

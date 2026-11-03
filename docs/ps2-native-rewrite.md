@@ -371,10 +371,23 @@ to 18.581 ms mean / 25.993 ms maximum over 660 complete intervals, still about
 intervals over budget. The performance report is
 `build/ps2-staged-final-001/packet-builder-cadence-validation.json`;
 see the [pipeline contract](../platform/ps2/native/vu1_world.md#cpu-staged-preparation).
-The final staged application measures 18.690 ms mean / 26.115 ms maximum over
+The native061 staged application measures 18.690 ms mean / 26.115 ms maximum over
 660 periods, about 0.110 ms above the final synchronous control. It has the same
 approximately 30 Hz cadence and remains experimental; physical overlap and a
 net frame-time benefit are unverified.
+
+Native062 then reduces emission packet construction using retained VU templates
+and masked state uploads. The complete synchronous scene improves to 18.250 ms
+mean / 25.587 ms maximum across 660 periods, saving 0.331 ms (1.8%) from the
+staged-capable control. Total EE-to-VU input falls 16.27% in the 601-update game
+pair; a full warm deferred emit is 1,168 bytes instead of 2,016. Authored final
+GS packet comparisons and game pixel comparisons pass. Cadence remains about
+30 updates/sec, with all intervals still over budget. See
+[compact emission uploads](../platform/ps2/native/vu1_world.md#compact-emission-uploads)
+for cold costs, invalidation rules and separate proof scopes.
+The compact staged application measures 18.366 ms mean / 25.740 ms maximum,
+saving 0.325 ms versus native061 staged but still costing 0.116 ms above the
+compact synchronous control. It remains an experimental option.
 
 The preceding native057 builds were measured over matching 660 complete periods in
 Play 0.72, with identical inputs and rendering preferences:

@@ -1,5 +1,91 @@
 # Handoff
 
+## Native PS2 compact VIF emission packets (2026-11-03)
+
+Continued from f686bd4. The user's EE/DMA/VU payload focus is now implemented
+for world emission. Each VU bank retains fixed GIF tags and GS register-address
+words; masked V2-32 UNPACK updates five low-64-bit state/tag values per triangle.
+The geometry EOP bit always refreshes, colors retain the previous unmasked
+upload, and STMOD/CYCLE/MASK are explicitly set and restored. The driver SHA-256
+is 1e3668617d4d523f8ea848b87935a21611098bed2118e79767fb31388159e60d.
+
+A warm 16-triangle deferred emit falls from 2,016 to 1,168 bytes (42.1% less). Its cold
+seed is 2,768 bytes; GS-FINISH emits are 1,200 warm / 2,800 cold. Preparation
+remains 1,840 bytes and final PATH1 output remains 240 bytes per triangle.
+The 8 KiB owned slots are capacity, not transfer size. Template residency is
+independent of numeric tokens. Projection invalidates bank 0, fused draws
+invalidate their selected bank, and full FINISH invalidates its bank because a
+short tail can overwrite the next template. Pending exclusion and quarantine
+prevent unretired seeds being reused. No extra hardware job, VSM arithmetic
+change, mapped write during a pending job or fence removal is introduced.
+
+Completed bounded validation:
+
+- The authored fixture compares the frozen full-upload body with compact
+  emission through 126 emits per path, both banks and counts 1–16. It covers
+  grow/shrink, short FINISH then growth, projection 54/55/96 and fused draws.
+  All 68,904 literal GS words, 21,816 header/clip words and 1,146,880 pixel words
+  agree. Bank guards/front-buffer identity remain intact. The oracle observes
+  final VU-resident GS data after the existing idle/status proof; it does not
+  compare or normalize the intentionally different compressed input streams.
+  build/ps2-emit-template-proof-ee-001/runtime-validation.json, SHA-256
+  3ab258d4b7bf6db96afd854ae851ddd9202ff468a5b30035fe1cd10ff4db655e.
+- The actual-game pair advances 601 native updates and 885,445 triangles.
+  All 35 warm counters and 17 image pairs / 4,874,240 color words agree,
+  retaining plan hash 3e8769a247c136f3 and pixel hash af08a568c3638e99. It has
+  48,757 staged preparations/submissions and zero cancellations. Async seeds
+  both banks on frame 1, adding exactly 200 qwords versus the following staged
+  draw; transfers agree on frames 2–601. Total async input falls from 15,201,330
+  to 12,728,243 qwords including cold seeds: 16.27% less, saving 65,839 bytes
+  per update. Warm draw work is 12.422150 ms async / 12.449035 ms staged over
+  593 pairs; these exclude shared simulation/planning.
+  build/ps2-world-staged-scene-ee-003/runtime-validation.json, SHA-256
+  4e8735b4ddefcf3a835376197b42d834591854f9e2e0cb360cb96fb216170495.
+- The complete synchronous application improves from 18.580874 to 18.249879 ms
+  mean work and from 25.993056 to 25.586806 ms maximum over 660 periods. This
+  saves 0.330995 ms (1.8%). All 112 logged records pass the bounded comparison;
+  all stage counters are zero and private assets/render preferences agree.
+  Every work interval is still over 16.667 ms; cadence is 29.987884 updates/sec.
+  build/ps2-emit-template-ee-001/runtime-validation.json, SHA-256
+  12d379001bf6e5375b09b40730745134faaeb2e89a133f14c6d74f7727f34a38.
+
+Native062, engine-demo062 and staged wrapper023 cross-build with strict O3.
+All 35 shared engine identities and 71 non-entry wrapper objects agree; the
+existing compact synchronous control binds to the same source bytes after its
+private driver path and argv entry are accounted for. Role/symbol audits pass.
+Build-set report: build/ps2/native-062/build-set-validation.json, SHA-256
+8b9c2f28e96b139f59a8688d5bc823d7752b917685e8e972fb271cc2dc0a5bc2.
+
+The final staged application measures 18.365954 ms mean / 25.739583 ms maximum
+across 660 periods, saving 0.324516 ms versus native061 staged. It is still
+0.116075 ms slower than compact synchronous mode, with every interval over
+budget and cadence 29.987869 updates/sec. Keep staging experimental.
+Closed cadence report: build/ps2-emit-template-final-001/cadence-validation.json,
+SHA-256 9211ab93f80dd2b166ab1b8599952adfa454ffe235cfaa67c745a0413fc1708b.
+The EE ABI audit confirms no storage growth from native061: World remains
+21,504 bytes and its parent Storage remains 7,296 bytes, both aligned to 64.
+Report: build/ps2-world-storage-size-002/validation.json, SHA-256
+7762b0aa1602f2af8e3595efcac7175560d651fb9bdce2338dd60e2cc1f146b5.
+
+The promoted sources also pass all 308 portable PS2 tests in 102.735 seconds,
+with no drift across 497 source files. Report:
+build/ps2-emit-template-final-001/portable-tests.json, SHA-256
+ee325a4cc1f7d30efc3a5345207b05ff160a79c8622dbf32290abe862d726ab9.
+
+Preparation-header retention is still UNIMPLEMENTED. Removing 112 repeated
+bytes could save about 15.5 KB/update here, but requires output-height handling,
+all-writer invalidation and successful transfer ownership. The next performance
+step should distinguish EE gather/material/packet work from SDK send/retirement
+with bounded batch-level instrumentation; small final-drain time alone cannot
+establish that GS or transport are cheap. Play can execute VU work inside SDK
+send, so its timing is not physical DMA/VU concurrency evidence.
+
+The target remains 60 native updates and presented frames/sec. Full race flow,
+AI/HUD/game audio, live-controller, broader fidelity and physical PS2 validation
+remain outstanding. The earlier native061 section records historical packet
+sizes and staging measurements; the compact emission result above supersedes
+its emission packet sizes, while preparation-header reuse is pending.
+
 ## Native PS2 CPU-staged preparation (2026-11-03)
 
 Continued from d5aceea. The generic world renderer has an explicit

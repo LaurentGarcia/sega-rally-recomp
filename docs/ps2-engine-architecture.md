@@ -209,19 +209,40 @@ The middle columns show work scheduled between issue and completion, not a
 measured duration or proof that EE and VU stayed busy concurrently. A clipping
 fallback has no emit interval. The synchronous mode remains a separate control.
 
-The allocated 8 KiB slots are capacity, not DMA transfer sizes. With 16 triangles,
-preparation sends 1,840 bytes; emission sends 2,016 bytes with deferred completion
-or 2,048 bytes with GS FINISH. Preparation currently resends a 256-byte header:
-128 bytes of matrices, 16 bytes of counts/sequence/mode, 80 bytes of constants,
-and 32 bytes of status/echo that VU1 rewrites. Across the retained 601-update scene,
-83,064 preparations and 49,358 emissions transfer about 405 KB per update.
+The allocated 8 KiB slots are capacity, not DMA transfer sizes. Native062 keeps
+fixed GIF tags and GS register-address words in each VU bank. A masked V2-32
+UNPACK replaces only the low 64 bits of TEST/TEX0/CLAMP/PRIM and the geometry tag;
+its last-triangle EOP bit is updated on every emit. The existing unmasked color
+upload remains unchanged. STMOD, CYCLE and MASK are explicitly set and restored
+to the owner's normal state. The resulting PATH1 packet stays 240 bytes per
+triangle; this reduces EE construction and VIF input, not the GS packet itself.
 
-Reducing repeated payload is a separate, unimplemented optimization. Retaining
-constants and omitting overwritten status fields could remove 112 bytes per
-preparation, about 15.5 KB per update in that scene. It must handle output-height
-changes and every other API that writes VU memory; CPU staging cannot establish
-hardware residency. Compare complete frame time as well as bytes: splitting
-payload into more DMA submissions adds setup and retirement costs.
+| Maximum 16-triangle transfer | Before | Warm templates | Cold templates |
+| --- | ---: | ---: | ---: |
+| Preparation | 1,840 B | 1,840 B | 1,840 B |
+| Deferred emission | 2,016 B | 1,168 B | 2,768 B |
+| Emission with GS FINISH | 2,048 B | 1,200 B | 2,800 B |
+
+Template residency is separate from numeric ready/staged tickets. Projection
+writes invalidate bank 0; fused draws invalidate their selected bank. Full
+FINISH invalidates its bank because a short tail can overwrite the following
+triangle's template. Seeding runs inside the existing owned emit packet, never
+as a mapped write during another job. Pending-job exclusion and quarantine
+prevent reuse before successful retirement. No additional job or fence removal
+is introduced.
+
+Across the retained 601-update scene, 83,064 preparations and 49,358 emissions
+now transfer 12,728,243 qwords, including both cold seeds, versus 15,201,330:
+about 339 KB per update instead of 405 KB, a 16.27% reduction. Literal final GS
+packet and pixel comparisons are separate from these transfer counters.
+
+Preparation still resends a 256-byte header: 128 bytes of matrices, 16 bytes of
+counts/sequence/mode, 80 bytes of constants, and 32 bytes of overwritten
+status/echo. Retaining its constants remains unimplemented. It could remove
+112 bytes per preparation, about 15.5 KB per update here, but needs output-height
+handling and invalidation across every other VU-memory writer. CPU staging
+cannot establish hardware residency. Measure complete frame time alongside
+bytes; additional DMA submissions introduce setup and retirement costs.
 
 SDK and standard-library dependencies are external to this project-file gate.
 Application entry points still call SDK startup, clock and sleep functions

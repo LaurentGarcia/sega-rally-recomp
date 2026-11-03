@@ -163,6 +163,8 @@ struct Vu1Transform::Storage {
             unsigned count=0,phase=0; //0 free,1 preparing,2 ready,3 emitting,4 CPU-staged
         };
         std::array<Bank,2> banks{};
+        // Private experiment: numeric token lifetime is independent of these fixed VU words.
+        std::array<bool,2> emit_templates{};
         struct Pending {
             std::uint64_t ticket=0;
             unsigned bank=0,kind=0; //1 preparation,2 emission
@@ -463,7 +465,7 @@ Vu1WorldResult Vu1Transform::draw_world_checked(const Vu1WorldBatch& batch,std::
     const auto output_count=count/3*15+2;
     tag(output_count-2,GIF_SET_TAG(1,1,0,0,GIF_FLG_PACKED,1),GIF_REG_AD);
     tag(output_count-1,0,GS_REG_FINISH);
-    const unsigned base=w.bank*512;w.reset_packet(w.bank);
+    const unsigned base=w.bank*512;w.emit_templates[w.bank]=false;w.reset_packet(w.bank);
     w.word(command(0x6c,16,base));w.words(w.header.data(),sizeof(w.header));
     w.word(command(0x6c,unsigned(count*2),base+16));w.words(batch.corners.data(),batch.corners.size_bytes());
     // Publish only immutable headers/state and color. The microprogram writes
@@ -747,24 +749,42 @@ Vu1WorldSubmitResult Vu1Transform::submit_emit_world(const Vu1WorldToken& token,
     const auto tag=[&](std::size_t index,std::uint64_t low,std::uint64_t high){
         w.output[index]={std::uint32_t(low),std::uint32_t(low>>32),std::uint32_t(high),std::uint32_t(high>>32)};
     };
-    for(std::size_t t=0;t<states.size();++t){const auto&state=states[t];const auto p=t*15;
-        tag(p,GIF_SET_TAG(4,0,0,0,GIF_FLG_PACKED,1),GIF_REG_AD);
-        tag(p+1,state.test,GS_REG_TEST);tag(p+2,state.tex0,GS_REG_TEX0);
-        tag(p+3,state.clamp,GS_REG_CLAMP);tag(p+4,state.prim,GS_REG_PRIM);
-        tag(p+5,GIF_SET_TAG(3,deferred&&t+1==states.size(),0,0,GIF_FLG_PACKED,3),
-            GIF_REG_ST|(std::uint64_t(GIF_REG_RGBAQ)<<4)|(std::uint64_t(GIF_REG_XYZ2)<<8));
-    }
     const auto tail=states.size()*15;
-    tag(tail,GIF_SET_TAG(1,1,0,0,GIF_FLG_PACKED,1),GIF_REG_AD);tag(tail+1,0,GS_REG_FINISH);
     retained.ticket=0;retained.phase=3;w.reset_packet(bank);
     w.pending={++world_ticket,bank,2,0,0,completion};
-    for(std::size_t t=0;t<states.size();++t){const unsigned address=base+256+unsigned(t*15);
-        w.word(command(0x6c,6,address));w.words(w.output.data()+t*15,6*16);
+    // Private masked-V2 experiment. V2 writes XY; the mask preserves ZW,
+    // which hold fixed AD register addresses and the geometry register list.
+    // Explicit normal mode prevents inherited STMOD arithmetic on state bits.
+    w.word(command(0x05,0,0));w.word(command(0x01,0,0x0101));
+    w.word(command(0x20));w.word(0);
+    if(!w.emit_templates[bank]){
+        for(unsigned t=0;t<vu1_world_triangle_capacity;++t){const auto p=t*15;
+            tag(p,GIF_SET_TAG(4,0,0,0,GIF_FLG_PACKED,1),GIF_REG_AD);
+            tag(p+1,0,GS_REG_TEST);tag(p+2,0,GS_REG_TEX0);
+            tag(p+3,0,GS_REG_CLAMP);tag(p+4,0,GS_REG_PRIM);
+            tag(p+5,GIF_SET_TAG(3,0,0,0,GIF_FLG_PACKED,3),
+                GIF_REG_ST|(std::uint64_t(GIF_REG_RGBAQ)<<4)|(std::uint64_t(GIF_REG_XYZ2)<<8));
+            w.word(command(0x6c,6,base+256+p));w.words(w.output.data()+p,96);
+        }
+    }
+    w.word(command(0x20));w.word(0xf0f0f0f0u);
+    for(std::size_t t=0;t<states.size();++t){const auto&state=states[t];const unsigned address=base+256+unsigned(t*15);
+        const std::array<std::uint64_t,5> lower{state.test,state.tex0,state.clamp,state.prim,
+            GIF_SET_TAG(3,deferred&&t+1==states.size(),0,0,GIF_FLG_PACKED,3)};
+        w.word(command(0x74,5,address+1));w.words(lower.data(),sizeof(lower));
         w.word(command(0x01,0,0x0103));w.word(command(0x6e,3,(address+7)|0x4000));
         for(unsigned k=0;k<3;++k)w.word(states[t].rgba);
         w.word(command(0x01,0,0x0101));
     }
-    if(!deferred){w.word(command(0x6c,2,base+256+unsigned(tail)));w.words(w.output.data()+tail,32);}
+    w.word(command(0x20));w.word(0);
+    w.word(command(0x01,0,0x0101));w.word(command(0x05,0,0));
+    if(!deferred){
+        tag(tail,GIF_SET_TAG(1,1,0,0,GIF_FLG_PACKED,1),GIF_REG_AD);tag(tail+1,0,GS_REG_FINISH);
+        w.word(command(0x6c,2,base+256+unsigned(tail)));w.words(w.output.data()+tail,32);
+    }
+    // Full FINISH may replace the following triangle's fixed header. A failed
+    // transport quarantines the owner, so no unexecuted seed can be reused.
+    w.emit_templates[bank]=deferred;
     const auto*entry=base?native_vu1_world_emit_bank1:native_vu1_world_emit;
     const auto offset=std::size_t(reinterpret_cast<std::uintptr_t>(entry)-reinterpret_cast<std::uintptr_t>(native_vu1_world_begin));
     w.word(command(0x14,0,world_entry+unsigned(offset/8)));
@@ -895,6 +915,7 @@ bool Vu1Transform::transform_validated(const TransformMatrix&a,const TransformMa
         s.ready=false;quarantined=true;s.failure="VU1 OWNERSHIP OR CONFIGURATION LOST";return false;
     }
     const bool project=!projected.empty();
+    if(project&&s.world)s.world->emit_templates[0]=false;
     if(project&&!s.projection_ready){
         const auto bytes=std::size_t(reinterpret_cast<std::uintptr_t>(native_vu1_project_end)-
                                     reinterpret_cast<std::uintptr_t>(native_vu1_project_begin));

@@ -235,8 +235,7 @@ residency. The existing finish retires N before the staged packet can launch.
 has an aligned 8 KiB packet. Construction uses a direct active pointer and scalar
 word count; only CPU-staged packets save a length per slot, restored at launch.
 Ordinary packet reset avoids per-word bank indexing and length save/restore.
-Copied handles identify
-the same single-use stage; caller inputs may immediately change or be destroyed.
+Copied handles identify the same single-use stage; caller inputs may immediately change or be destroyed.
 Invalid inputs, output aliases and full banks reject without consuming existing
 stages. `submit_staged_prepare_world` preserves the stage on BUSY or invalid
 arguments and uses the existing idle/FLUSHE/MARK protocol on acceptance.
@@ -251,7 +250,7 @@ grows from 13,248 to 21,504 bytes on EE; total VU owner storage grows from 20,54
 to 28,800 bytes. No update allocates memory. This remains one hardware job and
 changes no VSM code or GS resource fences.
 
-The authored staged fixture retains 147 lifecycle checks, an exact 460-word
+The native061 authored staged fixture retains 147 lifecycle checks, an exact 460-word
 maximum preparation packet comparison and two 1,572-word Display comparisons
 after the existing bank/sequence normalization. Another 240 checks stage 3- and
 48-corner packets, launch the older packet first and retain the newer one across
@@ -261,7 +260,7 @@ exercise staging, late capacity rejection and recovery. An injected deadline
 tests quarantine and no-flip behavior; it is not an observed physical timeout.
 Report: `build/ps2-packet-builder-proof-ee-001/runtime-validation.json`.
 
-The final active-pointer scene pair advances 601 native updates and draws each immutable plan
+The native061 active-pointer scene pair advances 601 native updates and draws each immutable plan
 through async and staged modes using the same new driver. All 17 sampled frames
 match in 4,874,240 literal color words, retaining the historical plan and pixel
 hashes. On the 593 warm pairs, display work is 12.694 ms async versus 12.716 ms
@@ -278,10 +277,57 @@ control. The active-pointer builder recovers 0.643 ms: 18.581 ms mean work over
 include simulation and planning, unlike the paired draw timings above. Report:
 `build/ps2-staged-final-001/packet-builder-cadence-validation.json`.
 
-The final staged whole application measures 18.690 ms mean / 26.115 ms maximum
+The native061 staged whole application measures 18.690 ms mean / 26.115 ms maximum
 over 660 periods, adding 0.110 ms versus that synchronous control. Every interval
 remains over budget. Its approximate 30 Hz cadence does not meet the 60 Hz target.
 Report: `build/ps2-staged-final-002/cadence-validation.json`.
+
+### Compact emission uploads
+
+Native062 retains fixed GIF tags and AD register addresses in each bank and
+uses masked V2-32 UNPACK to update the five changing low-64-bit state/tag values
+per triangle. The geometry tag's EOP bit always refreshes. Colors use the same
+unmasked V4-8 upload. Explicit normal STMOD, CYCLE 1/1 and MASK restoration keep
+the following owner operations independent of the temporary write mask.
+
+A warm 16-triangle deferred packet falls from 2,016 to 1,168 bytes (42.1%). Its
+first cold upload seeds all 16 templates and is 2,768 bytes. Full-FINISH sizes
+are 1,200 bytes warm and 2,800 bytes cold. The emitted GS packet is unchanged.
+Projection writes invalidate bank 0, fused draws invalidate their bank, and
+full FINISH invalidates its bank so subsequent length growth cannot reuse a
+header overwritten by a short FINISH tail. Numeric token resets alone do not
+invalidate templates. Pending exclusion/quarantine keep unretired seeds from
+being reused. There is no new allocation or microcode arithmetic.
+
+The private authored oracle executes the frozen original full-upload body and
+the compact body through 126 emits each. Counts 1–16, both banks, grow/shrink,
+short FINISH followed by growth, projection counts 54/55/96 and fused draws
+agree in all 68,904 live GS words, 21,816 header/clip words and 1,146,880 pixel
+words. End-of-bank guards and front-buffer identity remain intact. This proof
+compares the executed GS data, since compressed DMA input streams intentionally
+differ. Report: `build/ps2-emit-template-proof-ee-001/runtime-validation.json`.
+
+The new 601-update game pair preserves the 35 warm counters, all 17 literal
+frame pairs (4,874,240 words) and the historical plan/pixel hashes. Async seeds
+both banks first and sends exactly 200 more qwords on frame 1; subsequent paired
+transfers agree. Its total input falls from 15,201,330 to 12,728,243 qwords,
+including the cold seeds (16.27% less). Warm draw work is 12.422 ms async and
+12.449 ms staged, excluding shared simulation/planning. Report:
+`build/ps2-world-staged-scene-ee-003/runtime-validation.json`.
+
+The complete synchronous application improves from 18.581 to 18.250 ms mean
+work, with maximum work falling from 25.993 to 25.587 ms across 660 periods.
+This saves 0.331 ms (1.8%) but every work interval remains over 16.667 ms and
+cadence remains about 30 updates/sec. Report:
+`build/ps2-emit-template-ee-001/runtime-validation.json`.
+
+The final staged application reaches 18.366 ms mean / 25.740 ms maximum over
+660 periods, saving 0.325 ms versus native061 staged. It remains 0.116 ms
+slower than the compact synchronous control in Play, at about 30 updates/sec
+with every interval over budget. CPU staging remains an explicit option.
+Report: `build/ps2-emit-template-final-001/cadence-validation.json`.
+The final strict-O3 builds share the same engine source identities, and the
+EE ABI audit confirms unchanged World/Storage sizes of 21,504/7,296 bytes.
 
 ## Submission and fallback
 
@@ -327,7 +373,8 @@ Preparation also requires retired VIF/DMA/GIF transport before mapped status
 access, although GS raster work may remain pending. Display retires an EOP0
 PATH3 stream before preparation, and again after any resource upload before
 emit or cancel. The separate emit entry preserves retained ST/XYZ while uploading
-fresh packet headers and colors. Both the full `gs_finished` tail and deferred
+dynamic state/tag low words and colors. Fixed header words are retained or
+reseeded after invalidation. Both the full `gs_finished` tail and deferred
 `path1_retired` tail retain their existing completion obligations. These boundaries
 follow EE User Manual v6 sections6.2.3–6.2.4 (mapped VU memory ownership),
 sections6.3.4–6.3.5 (UNPACK/STCYCL), and the FLUSHE/FLUSH descriptions on
@@ -345,8 +392,8 @@ renderer. Destruction has a pending-work backstop.
 `world_path3_empty_skips` counts handoffs requiring neither submission; and
 `world_gs_finishes` counts completion fences that retire pending direct draws.
 The latter is not a count of every GS FINISH used for resource uploads. The VIF
-packet sends fresh state tags and compact colors every batch; it does not assume
-output memory survived an intervening use of the optional projection kernel.
+packet sends fresh dynamic state/tag low words and compact colors every batch;
+projection invalidation forces fixed header words to be reseeded before reuse.
 
 Geometry-first diagnostics count preparation calls (`world_prepared_batches`),
 ready results (`world_ready_batches`), attempted emissions (`world_emit_calls`)
